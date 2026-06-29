@@ -1,0 +1,52 @@
+[
+  {
+    "object_id": "file_001",
+    "name": "项目说明书.md",
+    "object_type": "markdown",
+    "path": "inbox/项目说明书.md",
+    "semantic_labels": ["specification", "project_doc"],
+    "sensitivity_level": "low",
+    "source_state": "trusted",
+    "allowed_actions": ["read", "move", "tag"]
+  },
+  {
+    "object_id": "file_002",
+    "name": "临时记录.txt",
+    "object_type": "text",
+    "path": "inbox/临时记录.txt",
+    "semantic_labels": ["temporary_note"],
+    "sensitivity_level": "low",
+    "source_state": "trusted",
+    "allowed_actions": ["read", "move", "tag"]
+  },
+  {
+    "object_id": "file_003",
+    "name": "专利权利要求草稿.md",
+    "object_type": "markdown",
+    "path": "inbox/专利权利要求草稿.md",
+    "semantic_labels": ["patent_claim", "draft"],
+    "sensitivity_level": "high",
+    "source_state": "trusted",
+    "allowed_actions": ["read", "candidate_tag"]
+  },
+  {
+    "object_id": "file_004",
+    "name": "合同扫描件.pdf",
+    "object_type": "pdf",
+    "path": "inbox/合同扫描件.pdf",
+    "semantic_labels": ["contract", "legal"],
+    "sensitivity_level": "high",
+    "source_state": "trusted",
+    "allowed_actions": ["read", "candidate_tag"]
+  },
+  {
+    "object_id": "file_005",
+    "name": "未知来源资料.docx",
+    "object_type": "docx",
+    "path": "inbox/未知来源资料.docx",
+    "semantic_labels": ["unknown"],
+    "sensitivity_level": "unknown",
+    "source_state": "unverified",
+    "allowed_actions": ["read_metadata"]
+  }
+]

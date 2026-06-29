@@ -1,0 +1,599 @@
+﻿"fault recovery" AND robot AND manipulation AND rule：
+
+
+… and methods for selecting resources for transmitting beam failure recovery …
+WO EP US CN JP KR BR CA ES TW CN114189264B S·纳加拉贾 高通股份有限公司
+Priority 2017-09-11 • Filed 2018-09-11 • Granted 2024-03-12 • Published 2024-03-12
+26. The apparatus of claim 18, wherein the processor is further configured to: receiving a message including configuration information via Radio Resource Control (RRC) signaling, wherein the configuration information includes the beam fault recovery information; and at least a portion of the beam …
+Beam reconfiguration rules for beam update based on group component carriers
+WO EP US CN CN114651402B 周彦 高通股份有限公司
+Priority 2019-11-15 • Filed 2020-11-13 • Granted 2025-01-24 • Published 2025-01-24
+Aspects relate to mechanisms for a wireless communication device to reset a beam. The UE identifies a list of a plurality of Component Carriers (CCs) (1102). The UE detects a beam failure on a first CC of the plurality of CCs (1104). The UE transmits a beam-fault-recovery request to the base …
+Systems and methods for sending beam failure recovery requests
+WO EP US CN JP KR BR TW CN110832790B M·N·伊斯兰 高通股份有限公司
+Priority 2017-06-14 • Filed 2018-06-08 • Granted 2023-11-10 • Published 2023-11-10
+27. A method of beam fault recovery operable by a system comprising a scheduling entity and a User Equipment (UE), comprising: Assigning, at the scheduling entity, the same Random Access Channel (RACH) resource for transmitting a Beam Fault Recovery Request (BFRR) to a plurality of scheduled …
+… timers and constants based on radio link management and beam failure recovery …
+WO EP US CN CN110945958B S·纳加拉贾 高通股份有限公司
+Priority 2017-07-28 • Filed 2018-07-28 • Granted 2023-07-28 • Published 2023-07-28
+… of Things" (IoT). Mobile devices may additionally be self-propelled or other transportation vehicles, remote sensors or actuators, robots or robotic … 9. The method of claim 1, wherein the first set of indications associated with the beam failure recovery procedure is obtained from a physical …
+Communication systems and methods for hydrogen fueling and electric charging
+WO EP US JP KR US20200346554A1 Jesper Nissen BOISEN Nikola Corporation
+Priority 2019-02-18 • Filed 2020-07-15 • Published 2020-11-05
+… near field communication as well as vehicle to infrastructure communication. Safety information, fueling or charging information, payment information, and other information may be transmitted, and the redundant nature of the communication permits fault recovery and improved process monitoring. In …
+Beam failure recovery in undisturbed cells
+WO EP US CN JP KR JP2022506484A スヴェドマン，パトリック コンヴィーダ ワイヤレス， エルエルシー
+Priority 2018-11-01 • Filed 2019-10-31 • Published 2022-01-17
+Transmission of the beam failure recovery request in the uplink bandwidth part of the first cell and Receiving the beam failure recovery response in the downlink bandwidth part of the first cell and The method according to claim 1, further comprising. The method of claim 1, wherein the beam fault …
+Beam fault reporting response
+WO EP US CN KR BR CN114651410B 周彦 高通股份有限公司
+Priority 2019-11-15 • Filed 2020-11-13 • Granted 2024-11-29 • Published 2024-11-29
+means for receiving an Acknowledgement (ACK) message from the UE when the beam fault recovery response is decoded by the UE. 18. The base station of claim 16, further comprising: Means for receiving a Negative Acknowledgement (NACK) message from the UE when the beam-fault recovery response is not …
+A microscopic positioning control method and system based on adaptive visual- …
+CN CN120259435B 祝志芳 南昌工程学院
+Priority 2025-06-05 • Filed 2025-06-05 • Granted 2025-08-01 • Published 2025-08-01
+… , feature fusion based on an attention mechanism, fusion pose generation and error correction, reinforcement learning parameter real-time optimization, fuzzy sliding mode anti-interference control instruction generation, dynamic impedance protection and real-time withdrawal, fault recovery and …
+Wireless transmitting/receiving unit and method implemented therein
+WO EP US CN BR CA CN117335937A 郭泳宇 Idac控股公司
+Priority 2020-04-08 • Filed 2021-04-08 • Published 2024-01-02
+fig. 2 is a block diagram illustrating an exemplary hybrid beamforming architecture; FIG. 3 is a flow chart illustrating an exemplary Beam Fault Recovery (BFR) procedure; FIG. 4 is a flow chart illustrating an exemplary Beam Fault Recovery (BFR) procedure; fig. 5 illustrates exemplary inter-cell …
+Method and apparatus for beam failure recovery
+WO EP US CN JP BR CN116250186A 郭泳宇 交互数字专利控股公司
+Priority 2020-08-05 • Filed 2021-08-05 • Published 2023-06-09
+14. The method of claim 1, the method further comprising: receiving an activation indication of a set of RSs for Beam Fault Recovery (BFR) in a Medium Access Control (MAC) Control Element (CE) message, wherein the activation indication indicates an identifier associated with the set of RSs for BFR;
+Beam Troubleshooting
+WO EP US CN KR CN115917986A 张倩 高通股份有限公司
+Priority 2020-06-26 • Filed 2021-06-25 • Published 2023-04-04
+The mobile device can also be an automobile or other transportation vehicle, remote sensor or actuator, robot or robotic device, satellite radio, … 15. The user equipment according to claim 14, wherein the beam failure indication comprises a beam failure recovery request (BFRQ) and is used to …
+Specific to the sign computation equipment in domain
+WO EP US CN CN105074722B 约瑟夫·米托拉三世 哈克普鲁夫科技公司
+Priority 2013-02-05 • Filed 2014-01-28 • Granted 2018-01-26 • Published 2018-01-26
+… computing device of claim 1 , further comprising: A fault recovery circuit configured to configure at least one of the one or more first pipe segments or the one or more second pipe segments based on a lookup table in response to the domain-specific symbolic computing device generating a fault.
+Dynamic path planning from a fault condition
+WO US WO2021041907A1 Stoyan GAYDAROV X Development Llc
+Priority 2019-08-30 • Filed 2020-08-28 • Published 2021-03-04
+5. The method of claim 4, wherein the subset of tasks lacks one or more tasks performed by the robot before the fault. 6. The method of claim 4, wherein the resume process definition graph includes a motion node that represents a motion action that causes the robot to move from the recovery …
+Case unit detection for storage and retrieval systems
+WO EP US CN JP KR TW JP2017222519A サリバン、ロバート シムボティック エルエルシー
+Priority 2011-09-09 • Filed 2017-08-29 • Published 2017-12-21
+… A seismic fault control module configured and an automatic case mapper that communicates with and is initialized to identify the location of at least one case unit in the storage structure that traverses the take-off path An automatic storage and retrieval system, including a seismic fault recovery …
+Distributed intelligent multi-machine collaborative operating system, method, …
+CN CN120972664A 曲明成 哈尔滨工业大学重庆研究院
+Priority 2025-08-04 • Filed 2025-08-04 • Published 2025-11-18
+… of industrial robots, AGV trolleys, sensors and other equipment of different manufacturers are large in difference, and uniform scheduling is difficult to realize (as in patent US20210056789B 2). 4. The fault-tolerant capability is insufficient, the existing system lacks a rapid fault recovery …
+Receive cell restriction rules for beam fault report response
+WO EP US CN CN114651401B 周彦 高通股份有限公司
+Priority 2019-11-15 • Filed 2020-11-13 • Granted 2026-02-17 • Published 2026-02-17
+Receives a beam fault recovery (BFR) request from the user equipment (UE), the beam fault recovery (BFR) request including the identifier of the candidate beam; Generate BFR response based on the identified candidate beams; The BFR response is transmitted to the UE based on the restriction rules, …
+Store and fetch the detection of system box unit
+CN CN107067206A R.萨利文 西姆伯蒂克有限责任公司
+Priority 2011-09-09 • Filed 2012-09-10 • Published 2017-08-18
+In the one side of disclosed embodiment, work station 700 can be configured to substantially in the feelings aided in without operator Feed-in is substantially remedied under condition and/or any exception or failure in conveyor system is fed out, and is passed with control server 120 Fault recovery …
+In-flight auto-ignition control method of engine of unmanned aerial vehicle
+CN CN106043715A 华康 襄阳宏伟航空器有限责任公司
+Priority 2016-05-27 • Filed 2016-05-27 • Published 2016-10-26
+1. a unmanned vehicle electromotor method for controlling automatic ignition aloft, it is adaptable to awing send out at unmanned vehicle Give birth to fault and stop working and after fault recovery, carry out ignition trigger again, it is characterised in that the method includes: (11) detection …
+Initiating recovery actions when a dataset ceases to be synchronously …
+US US12411739B2 David Grunwald Pure Storage, Inc.
+Priority 2017-03-10 • Filed 2022-07-22 • Granted 2025-09-09 • Published 2025-09-09
+wherein the request to modify the dataset is one of a plurality of requests to modify the dataset, and wherein the recovery information comprises an order in which the plurality of requests to modify the dataset are to be applied. 9. The method of claim 1 , wherein the recovery action comprises …
+High availability and disaster recovery for replicated object stores
+US US12554587B2 Ronald Karr Pure Storage, Inc.
+Priority 2022-01-10 • Filed 2023-08-08 • Granted 2026-02-17 • Published 2026-02-17
+High availability and disaster recovery for replicated object stores is disclosed. An embodiment includes receiving, by a first storage system of a plurality of storage systems symmetrically replicating objects of a bucket, a request to establish immutable content for the bucket; indicating, by …
+Method and apparatus for mobility procedures for highly directional systems
+WO EP US CN CN119301884A P·埃德贾克普勒 交互数字专利控股公司
+Priority 2022-03-29 • Filed 2023-03-28 • Published 2025-01-10
+… -mounted displays (HMDs), vehicles, drones, medical devices and applications (e.g., tele-surgery), industrial devices and applications (e.g., robots … A beam failure detection and recovery procedure is performed on the second receive beam based on the received criteria associated with the second …
+Integrated radio link failure handling in the access backhaul network
+WO EP US CN CN116724661A B·C·古玛迪 高通股份有限公司
+Priority 2021-01-25 • Filed 2022-01-07 • Published 2023-09-08
+Additionally, the mobile apparatus may be an automobile or other transportation vehicle, a remote sensor or actuator, a robot or robotic device, a … determining whether the IAB node has recovered from the radio link failure; and Responsive to determining that the IAB node has not recovered from …
+Method and apparatus for performing beam failure recovery procedure in wireless …
+WO EP US CN KR CN116114297A 李承俊 Lg 电子株式会社
+Priority 2020-08-03 • Filed 2021-07-09 • Published 2023-05-12
+The present invention relates to a method of transmitting a Beam Fault Recovery (BFR) Medium Access Control (MAC) Control Element (CE) by a User Equipment (UE) in a wireless communication system. In particular, the method comprises the steps of: configuring cell indexes and priorities of cells for …
+Method and apparatus for transmitting beam fault recovery information by user …
+EP US CN JP KR CN116489685B 李韩菀 Lg电子株式会社
+Priority 2022-01-21 • Filed 2022-10-20 • Granted 2026-02-03 • Published 2026-02-03
+A method and apparatus for transmitting beam fault recovery information by a user equipment in a wireless communication system. A method of transmitting a truncated Beam Fault Recovery (BFR) Medium Access Control (MAC) Control Element (CE) by a User Equipment (UE) is disclosed. The method includes …
+System and method for valuing and managing cellular communications electronic …
+US US20240104615A1 Seth David Heine PrologMobile, Inc.
+Priority 2021-01-04 • Filed 2023-11-30 • Published 2024-03-28
+… technique based on fault factors; (i) determine financial value of the electronic devices for reusage in device reusage paths; (j) tract status of repairs, refurbishment interventions, fault recovery processes of electronic devices; and (k) generate reports by device analytics techniques.
+Zero-outage beam failure recovery and mobility procedures for highly …
+WO EP US CN CN119174230A U·萨利姆 交互数字专利控股公司
+Priority 2022-04-27 • Filed 2023-04-25 • Published 2024-12-20
+Fig. 12 is an example flow diagram for zero-break beam fault recovery in an individual device/external mobility configuration. Fig. 13 is an example flow diagram for zero disruption beam fault recovery in a unified configuration. Fig. 14 is an example illustration of a beam fault recovery solution …
+Asynchronous remote data duplication
+EP US JP KR DE DE69502651T2 Robert Frederic Tucson Az 85730 Kern International Business Machines Corp., Armonk, N.Y.
+Priority 1994-02-22 • Filed 1995-02-07 • Granted 1999-02-25 • Published 1999-02-25
+Fig. 11 is a flowchart illustrating a process for creating consistency groups. Fig. 12 is a table illustrating the application of full consistency group recovery rules for an ECKD Architecture device for a given sequence of input/output operations on a DASD lane. Fig. 13 is a description of the …
+Method, user equipment, base station for beam failure report response
+TWI916338B 周嚴 美商高通公司
+Priority 2019-11-15 • Filed 2020-11-13 • Granted 2026-03-01 • Published 2026-03-01
+The user equipment according to claim 21 further includes: a component for sending a negative acknowledgment (NACK) message when the beam failure recovery response is not decoded. A base station includes: a component for receiving a beam fault recovery request from a user equipment (UE) during a …
+Methods, architectures, devices, and systems for beam fault recovery
+WO EP CN CN121128102A 郭荣祐 交互数字专利控股公司
+Priority 2023-04-04 • Filed 2024-04-03 • Published 2025-12-12
+A process, method, architecture, apparatus, system, device, and computer program product for measurement of beam fault recovery. A wireless transmit/receive unit, WTRU, determines a beam failure of at least one beam, wherein the beam failure is determined based on a measured value of a first type …
+Method and apparatus for radio link failure and recovery in multi-path side- …
+WO EP US CN JP MX CN120935863A 马蒂诺·弗雷达 交互数字专利控股公司
+Priority 2022-08-03 • Filed 2023-08-02 • Published 2025-11-11
+21. The WTRU of claim 19 wherein the recovery procedure is a Secondary Cell Group (SCG) failure recovery procedure. 22. The WTRU of claim 21, wherein the SCG fault recovery procedure comprises the processor being further configured to: transmitting RRC message to the network, and Operation …
+
+"error handling" AND robot AND task AND replan：
+
+Sort by · Relevance  Group by · None  Deduplicate by · Family  Results / page · 100 
+Robotic kitchen hub systems and methods for minimanipulation library …
+US US20210387350A1 Mark Oleynik Mark Oleynik
+Priority 2019-06-12 • Filed 2020-12-13 • Published 2021-12-16
+A robotic kitchen system, comprising: a master robotic module assembly having a processor, one or more robotic arms, and one or more robotic end effectors; one or more slave robotic module assemblies, each robotic module assembly having one or more robotic arms and one or more robotic end effectors …
+Swarm Based Orchard Management
+WO US US20230025714A1 Lucas Thorne Buckland Bovi, Inc.
+Priority 2021-07-16 • Filed 2022-07-18 • Published 2023-01-26
+wherein the task manager divides the first task into multiple subtasks based on a spacing between rows of the orchard and a spacing between multiple robots of the one or more robots. 16 . The computer-implemented method of claim 1 , wherein: the one or more robots comprise a transport robot and a …
+Robotic system for processing packages arriving out of sequence
+US CN JP KR DE KR102400028B1 니콜라예프 디안코프 로젠 무진 아이엔씨
+Priority 2019-05-31 • Filed 2020-05-29 • Granted 2022-05-19 • Published 2022-05-19
+A method for operating a robotic system, comprising: accessing a stacking plan for placing a package on a platform, the stacking plan representing a three-dimensional (3D) mapping of the package along a horizontal plane of the platform and at multiple layers on the platform, the stacking plan …
+Robotic system for palletizing packages using real-time placement simulation
+US CN JP KR DE KR102332603B1 니콜라예프 디안코프 로젠 무진 아이엔씨
+Priority 2019-05-31 • Filed 2020-05-29 • Granted 2021-11-26 • Published 2021-11-26
+The robot of claim 5 , wherein the stacking surface area requirement includes a package spacing requirement for gap areas and/or voids between the packages forming the top surface of the uniform packing layer that is less than a spacing threshold. How to make the system work. The robotic system of …
+A ROBOT SYSTEM WITH PACKING MECHANISM
+US CN JP KR DE DE102019130635B4 Rosen Nikolaev Diankov Mujin, Inc.
+Priority 2019-05-31 • Filed 2019-11-13 • Granted 2024-01-25 • Published 2024-01-25
+Robot system (100), comprising: a robotic arm and an end effector; at least one processor (202); and at least one memory device (204) which is connected to the at least one processor (202) and on which instructions executable by the processor (202) for carrying out the method according to one of …
+Automated agriculture system
+WO EP US JP GB US10185317B2 Benno Pichlmaier Agco International Gmbh
+Priority 2014-12-04 • Filed 2015-12-02 • Granted 2019-01-22 • Published 2019-01-22
+38 may take, from simple guide rails or bodies to complex electromagnetic clamping systems, although simpler options are preferred in order to keep the cost of a robot to a minimum. Where the robot is configured as a planter, resource delivered will include seeds and optionally also fertilizer.
+Robot System Simulation Engine
+WO EP US CN JP KR CA MX JP7757373B2 サン・チョウエン デクステリティ・インコーポレーテッド
+Priority 2019-10-25 • Filed 2023-11-15 • Granted 2025-10-21 • Published 2025-10-21
+receiving, via a communication interface, communications indicative of actions to be performed by a robotic element from a robotic control system including an internal state machine used to maintain a view of the state of the robotic element; simulating performance of the behavior by the robotic …
+Techniques for arrayed printing of a permanent layer with improved speed and …
+WO EP CN JP KR KR102185496B1 나히드 하지 카티바, 인크.
+Priority 2014-06-30 • Filed 2015-06-30 • Granted 2020-12-03 • Published 2020-12-03
+… in a fluid “well” with a liquid deposited until liquid curing, the error may not be clearly aligned with the nozzle spacing or nozzle firing timing, so that the nozzle The number of droplets deposited in the pixel well may be too high or too small due to a linear shift in the firing assignment.
+Techniques for arrayed printing of a permanent layer with improved speed and …
+US US9700908B2 Michael Baker Kateeva, Inc.
+Priority 2012-12-27 • Filed 2015-06-30 • Granted 2017-07-11 • Published 2017-07-11
+A repeatable manufacturing process uses a printer to deposits liquid for each product carried by a substrate to form respective thin films. The liquid is dried, cured or otherwise processed to form from the liquid a permanent layer of each respective product. To perform printing, each newly- …
+Techniques for arrayed printing of a permanent layer with improved speed and …
+US US11673155B2 Michael Baker Kateeva, Inc.
+Priority 2012-12-27 • Filed 2021-04-07 • Granted 2023-06-13 • Published 2023-06-13
+In another embodiment, droplets produced by each nozzle are empirically measured in situ, and measured droplet characteristics that vary from nozzle-to-nozzle, or that depend on drive parameters used to eject droplets from a nozzle, are stored and factored into nozzle assignment. For example, in a …
+Techniques for arrayed printing of a permanent layer with improved speed and …
+US US11167303B2 Michael Baker Kateeva, Inc.
+Priority 2012-12-27 • Filed 2019-03-18 • Granted 2021-11-09 • Published 2021-11-09
+A repeatable manufacturing process uses a printer to deposits liquid for each product carried by a substrate to form respective thin films. The liquid is dried, cured or otherwise processed to form from the liquid a permanent layer of each respective product. To perform printing, each newly- …
+Application Recovery Across Different Execution Environments
+US US20250021237A1 Virendra Prakashaiah Pure Storage, Inc.
+Priority 2020-02-25 • Filed 2023-12-28 • Published 2025-01-16
+… hardware, computer software, or a combination of computer hardware and software. In some implementations, the storage array controllers 110 A-D may be configured to carry out various storage tasks. Storage tasks may include writing data received from the computing devices 164 A-B to storage array 102
+Materials handling vehicle path validation and dynamic path modification
+WO EP US CN KR AU BR CA MX US11914394B2 Justin F. Thode Crown Equipment Corporation
+Priority 2016-08-26 • Filed 2022-02-25 • Granted 2024-02-27 • Published 2024-02-27
+… to FIG. 1 , examples of such hardware include, for example, vehicle forks or other storage and retrieval hardware 15 that can extend and/or rotate, operator compartment doors that open and close, robotic arms, etc. To account for this, as is illustrated in FIG. 1 , the dynamic exterior boundary 13
+… library adjustments and calibrations of multi-functional robotic platforms with …
+US US20210069910A1 Mark Oleynik Mark Oleynik
+Priority 2019-06-12 • Filed 2020-06-12 • Published 2021-03-11
+1 . A system for mass production of a robotic kitchen module, comprising: a kitchen module frame for housing a robotic apparatus in an instrumented environment, the robotic apparatus having one or more robotic arms and one or more effectors, the one or more robotic arms including a share joint, the …
+Robotic kitchen hub systems and methods for minimanipulation library …
+US US20220118618A1 Mark Oleynik Mark Oleynik
+Priority 2020-10-16 • Filed 2021-08-10 • Published 2022-04-21
+The present disclosure is directed to methods, computer program products, and computer systems of a robotic kitchen hub for calibrations of multi-functional robotic platforms for commercial and residential environments with artificial intelligence and machine learning. The multi-functional robotic …
+Physics-enhanced federated distributed computational graph architecture for …
+US US20250259084A1 Jason Crabtree Qomplx Llc
+Priority 2024-02-08 • Filed 2025-03-12 • Published 2025-08-14
+This architecture allows research institutions to collaborate on complex biological analysis tasks without compromising their sensitive data, enabling breakthrough discoveries through shared computational resources and expertise while maintaining the security, compliance, and confidentiality …
+High power laser flat panel workpiece treatment system controller
+WO EP US JP KR TW TWI364702B Joseph E Conway Cymer Inc
+Priority 2006-06-02 • Filed 2007-05-31 • Granted 2012-05-21 • Published 2012-05-21
+a master system controller reading and writing database, Contains the user-provided 5-party definition. 39. The device of claim 31, further comprising: • an OEM read-only database containing the definition of the read-only task supplied by the OEM; • a master system controller reading and writing …
+Robotic kitchen hub systems and methods for minimanipulation library …
+WO WO2022074448A1 Mark Oleynik Mark Oleynik
+Priority 2020-10-06 • Filed 2021-08-11 • Published 2022-04-14
+1. A computer-implemented method for calibrating a robotic apparatus, the method comprising: moving at least one element of the robotic apparatus from a predetermined start configuration until the at least one element of the robotic apparatus is in contact with a predetermined surface of an object;
+Handling replications between different networks
+US DE DE102021113808A1 Logan Jennings Pure Storage, Inc.
+Priority 2020-07-23 • Filed 2021-05-28 • Published 2022-01-27
+In some implementations, storage array controllers 110A-D may be configured to perform device management tasks from storage drives 171A-F in storage array 102A-B. For example, storage array controllers 110A-D may maintain control information that may describe the state of one or more storage blocks …
+Data recovery in a virtual storage system
+WO US CN DE DE112020003420T5 Ronald Karr Pure Storage, Inc.
+Priority 2019-07-18 • Filed 2020-04-29 • Published 2022-05-05
+In some implementations, storage array controllers 110A-D can be configured to offload device management tasks from storage drives 171A-F to storage array 102A-B. For example, storage array controllers 110A-D may maintain control information that may describe the state of one or more storage blocks …
+Systems and methods for hands-free pedestrian navigation
+EP US CN JP KR ES GB IL JP7852901B2 ティロシュ，エフド ヴェーライド ジオ エルティーディー．
+Priority 2020-10-07 • Filed 2021-09-30 • Granted 2026-04-28 • Published 2026-04-28
+… is moving in the correct direction. However, if the system determines that the distance to both the expected next node A and the expected consecutive node B is increasing, and this pattern continues for 10 seconds, the system assumes the user is walking in the wrong direction and issues a replan.
+Thing machine system and method
+WO EP US CN JP AU CA TW JP7256742B2 ノースラップ，チャールズ ノースラップ，チャールズ
+Priority 2016-12-07 • Filed 2017-12-07 • Granted 2023-04-12 • Published 2023-04-12
+It is a schematic diagram showing a sing machine as a general-purpose tuning machine. 1 is a schematic diagram showing ThingMachine as an adaptive neural bot; FIG. 4 is a graph showing that P(TM(thing)) allocates and initializes a thing with a name equal to a monad as the root of a thing:graph of …
+System and method for reliable transmission in communications systems
+WO EP US CN WO2018082505A1 Toufiqul Islam Huawei Technologies Co., Ltd.
+Priority 2016-11-02 • Filed 2017-10-27 • Published 2018-05-11
+… of less than or equal to 1 millisecond (ms) and reliability at 99.999 ％or higher. Intended applications for URLLC include augmented reality, wireless automation, vehicular (e.g., automobiles, air planes, drones, mobile service robots, and so on) efficiency and safety, mobile gaming, and so forth.
+A real-time path planning method for full coverage of cleaning robots
+CN CN114995458B 林睿 苏州澜途科技有限公司
+Priority 2022-06-27 • Filed 2022-06-27 • Granted 2025-02-07 • Published 2025-02-07
+The cleaning robot moves along the planned path to the edge starting point; Starting from the edge starting point, moving along the boundary, following by the DWA algorithm, and performing closed loop detection at the same time; The closed-loop detection is used to determine whether the robot has …
+Robotic kitchen hub systems and methods for minimanipulation library
+WO EP EP4099880A1 Mark Oleynik Mark Oleynik
+Priority 2020-02-06 • Filed 2020-12-14 • Published 2022-12-14
+28. The robotic system of claim 26, wherein the first plurality of objects is changed to a second plurality of objects for use in the first worktop of the cooking station. 29. The robotic system of claim 26, wherein the robotic kitchen module is a mobile module that can be detached from the …
+Automatic logistics sorting system and automatic logistics sorting method
+WO EP US JP KR AU SG JP6926269B2 リー，チエンペイ 北京極智嘉科技股▲ふん▼有限公司
+Priority 2017-09-30 • Filed 2020-04-13 • Granted 2021-08-25 • Published 2021-08-25
+Further, in the above system, the drop storage port is located in the motion area of the robot in the form of an array (as shown in FIG. 1, the drop storage port is located in the plane of the steel platform in the form of an array). Therefore, while the robot is executing the drop task, other …
+Multimodal Feedback Integrated Knowledge Retrieval Enhanced Robot Control System
+JP JP2025108598A 村上由宇 ニューヨークゼネラルグループインク
+Priority 2025-04-16 • Filed 2025-04-16 • Published 2025-07-23
+A multimodal feedback integrated knowledge retrieval enhanced robot control system, comprising a language processing component, a vision system, a force sensing module, a speech recognition and synthesis module, a robot control system, a multimodal integration module, and a curated knowledge base, …
+Technologies for blockchain-based data transparency and authentication
+US US12273463B2 Archana Sekar Genesys Cloud Services, Inc.
+Priority 2020-09-23 • Filed 2023-08-18 • Granted 2025-04-08 • Published 2025-04-08
+2 ). As one example, an end user may have an issue with her cable internet service and communicate this issue to her personal bot system by speaking or typing a natural language phrase such as: “My internet connection is down. Please contact the cable company for service.” A natural language refers …
+Federated distributed computational graph platform for advanced biological …
+US US20250258937A1 Jason Crabtree Qomplx Llc
+Priority 2024-02-08 • Filed 2025-03-14 • Published 2025-08-14
+wherein the distributed graph architecture comprises a multi-level computation graph structure that distributes computational tasks for parallel processing across nodes through a controller which modifies node connections based on monitored computational load and the predefined resource …
+Physics-enhanced federated distributed computational graph architecture for …
+US US20250259711A1 Jason Crabtree Qomplx Llc
+Priority 2024-02-08 • Filed 2025-03-13 • Published 2025-08-14
+Existing approaches in federated machine learning, transfer learning, and federated High Performance Computing (HPC) typically focus on partitioned model training or distributed classical compute tasks, emphasizing partial data privacy and decentralized parameter aggregation. These standard …
+Robotic system for palletizing packages using real-time placement simulation
+
+CN CN111605938B 鲁仙·出杏光 牧今科技
+Priority 2019-05-31 • Filed 2020-02-07 • Granted 2021-04-30 • Published 2021-04-30
+1. A method for operating a robotic system, the method comprising: implementing a plan for receiving a set of parcels at a starting location, wherein the set of parcels is received parcel by parcel at the starting location, and wherein at least a portion of the set of parcels is to be placed on a …
+Federated distributed computational graph architecture for biological system …
+US US20250258956A1 Jason Crabtree Qomplx Llc
+Priority 2024-02-08 • Filed 2025-02-21 • Published 2025-08-14
+The federation manager maintains system-wide coordination through several integrated components. The resource tracking system continuously monitors node availability, computational capacity, and capabilities, enabling efficient task distribution across the federation. The blind execution …
+Handling semidurable writes in a storage system
+
+US US20250117140A1 Sankara Vaideeswaran Pure Storage, Inc.
+Priority 2022-10-31 • Filed 2024-10-14 • Published 2025-04-10
+and accompanying description illustrate various embodiments of features and mechanisms for a storage system that may determine whether an error occurred while programming (e.g., writing) data blocks, and may reprogram a subset of the data blocks when an error occurs. When an error occurs while …
+Singing Machine
+WO EP US CN JP AU CA TW JP7603646B2 ノースラップ，チャールズ ノースラップ，チャールズ
+Priority 2016-09-19 • Filed 2022-10-11 • Granted 2024-12-20 • Published 2024-12-20
+FIG. 1 is a schematic diagram showing a tuning machine as a general-purpose tuning machine. FIG. 1 is a schematic diagram showing a Singing Machine as an adaptive neural bot. Graph showing that during initialization, P(TM(thing)) allocates and initializes a thing with name equal to the monad as the …
+Financial task execution method, apparatus, device, medium and program product
+CN CN118312599A 赵滢 中国工商银行股份有限公司
+Priority 2024-05-15 • Filed 2024-05-15 • Published 2024-07-09
+1. A method of performing a financial task for a financial agent, the financial agent comprising a large language model, a planner, and an executor, the method comprising: Inputting a user instruction into the large language model, wherein the large language model is obtained in advance through …
+An autonomous inspection and early warning bionic robot dolphin system and …
+
+CN CN114954863A 李道亮 中国农业大学
+Priority 2022-07-05 • Filed 2022-07-05 • Published 2022-08-30
+3. The autonomous inspection and early warning bionic robotic dolphin system according to claim 2, wherein the chest further comprises a chest shell and a rib connector; the chest multi-modal motion control module further comprises a pectoral fin, a pectoral fin A sealing unit and a steering gear …
+Blockchain-based technologies for hyper-personalized interactions across …
+
+US US20220094544A1 Archana Sekar Genesys Telecommunications Laboratories, Inc.
+Priority 2020-09-23 • Filed 2020-09-23 • Published 2022-03-24
+In some embodiments, the application 120 may be an automated agent (i.e., a personal bot system) configured to automate interactions with enterprises (e.g., the enterprise 106 ) and/or other devices/services to achieve particular goals or results as requested by end users (e.g., a request for data) …
+Technologies for providing prediction-as-a-service through intelligent …
+
+US US20220092056A1 Archana Sekar Genesys Telecommunications Laboratories, Inc.
+Priority 2020-09-23 • Filed 2020-09-23 • Published 2022-03-24
+of FIG. 2 ). As one example, an end user may have an issue with her cable internet service and communicate this issue to her personal bot system by speaking or typing a natural language phrase such as: “My internet connection is down. Please contact the cable company for service.” A natural language …
+Technologies for data bidding and negotiating in an enterprise system using a …
+
+US US12067613B2 Archana Sekar Genesys Cloud Services, Inc.
+Priority 2020-09-23 • Filed 2020-09-23 • Granted 2024-08-20 • Published 2024-08-20
+selecting, by the personal bot agent of the end user device, the at least one of the first enterprise and the second enterprise in response to analyzing the corresponding responses from the plurality of enterprise agents; displaying, by the personal bot agent of the end user device, the at least …
+Low-latency, low-overhead data framing method for capacity-limited delay- …
+
+WO EP US CN JP BR CA DE GB TW TW202029675A 凱文Ｊ 巴比奇 美商天波網路公司
+Priority 2018-11-14 • Filed 2019-11-14 • Published 2020-08-01
+… channels, such as a fiber optic network, are rejected for radio transmission. When the packet is received, the receiver deduces message length by using information from various error handling techniques, such as forward error correction (FEC) and cyclic redundancy check (CRC) techniques. Fill data …
+Transmission apparatus and method, receiving apparatus and method for use in …
+
+WO EP US TW TW202011710A 湯瑪士 漢特 日商索尼股份有限公司
+Priority 2018-08-03 • Filed 2019-07-11 • Published 2020-03-16
+… systems and components for transmission and reception that simultaneously provide low latency, high reliability, and extremely low bit or packet error rates. Application examples include (but are not limited to) Industry 4.0 applications, robots, virtual reality (VR), or perception networks.
+System comprising development environments and machine controls
+
+WO EP US DE DK EP2524267B1 Andreas Keibel KUKA Roboter GmbH
+Priority 2010-01-13 • Filed 2010-12-29 • Granted 2015-12-23 • Published 2015-12-23
+A method for creating machine programs (6), in particular robot programs, in the at least one development environment (2) and for controlling at least one machine, in particular a robot, by the at least one machine control (12) by means of a system according to one of the preceding claims, wherein …
+Swarm Based Orchard Management
+US US20250315759A1 Lucas Thorne Buckland Bovi, Inc.
+Priority 2021-07-16 • Filed 2025-06-20 • Published 2025-10-09
+the method further comprises dividing the first task into multiple subtasks based on clumps of plants in the orchard; prioritization is assigned based on a sparsity of the plants within the clumps. 10 . The computer-implemented method of claim 1 , wherein: the first task comprises multiple subtasks …
+Handling semidurable writes in a storage system
+WO US WO2024097622A1 Sankara Vaideeswaran Pure Storage, Inc.
+Priority 2022-10-31 • Filed 2023-10-27 • Published 2024-05-10
+[0019] FIG. 3F illustrates an example container system. [0020] Figure 4 illustrates an embodiment of a storage system that may reprogram data blocks that are semidurable, in accordance with an embodiment. [0021] Figure 5A is a block diagram illustrating an example segment, in accordance with an …
+Robotic system for handling out-of-order arriving packages
+
+CN CN111498212B 鲁仙·出杏光 牧今科技
+Priority 2019-05-31 • Filed 2020-03-20 • Granted 2021-05-07 • Published 2021-05-07
+15. A tangible, non-transitory, computer-readable storage medium having stored thereon processor instructions that, when executed by one or more processors of a robotic system, cause the robotic system to perform a method, the method comprising: accessing a stacking plan for placing packages on a …
+… library adjustments and calibrations of multi-functional robotic platforms with …
+WO WO2020250039A1 Mark Oleynik Mark Oleynik
+Priority 2019-06-12 • Filed 2020-06-12 • Published 2020-12-17
+a task management and distribution module receiving an operation mode, the operation mode including a robot mode, a collaborative mode and a user mode, wherein in the collaborative mode, the task management and distribution module distributing one or more minimanipulations to a first operation zone …
+Migrating Applications To A Cloud-Computing Environment
+
+US US20230262122A1 Virendra Prakashaiah Pure Storage, Inc.
+Priority 2020-02-25 • Filed 2023-04-25 • Published 2023-08-17
+… comprising computer hardware, computer software, or a combination of computer hardware and software. In some implementations, the storage array controllers 110 A-D may be configured to carry out various storage tasks. Storage tasks may include writing data received from the computing devices 164 A-B …
+A computer-implemented method for optimizing process assembly
+
+EP EP4307191A1 Markus Thannhuber Einhell Germany AG
+Priority 2022-07-12 • Filed 2023-07-11 • Published 2024-01-17
+A work package represents how the computer implemented environment, where the method is carried out, connects to and acts on the real world, by causing a succession of actions, and ultimately leading to a physical change, by managing the tasks of real people and managing the assembly of these tasks …
+Systems and methods for configuring and using automated systems in buildings
+WO FR WO2013083656A2 Alain FRANCO Greenleaf
+Priority 2011-12-05 • Filed 2012-12-05 • Published 2013-06-13
+… protocols, such as SCS BUS with OpenWebNet, C-Bus, CEBus, EnOcean, EHS, KNX, etc. Building automation systems that can be controlled by these home automation technologies include: heating, ventilation and air conditioning (HVAC), lighting control systems, audio and video, security , robotics, etc.
+Application integration system and method using intelligent agents for …
+
+US US7454399B2 Bruce Matichuk Celcorp, Inc.
+Priority 2000-10-03 • Filed 2004-05-24 • Granted 2008-11-18 • Published 2008-11-18
+Models that encapsulate information on how remote applications are controlled and data is accessed are created to be used by a runtime agent that intelligently reasons out goal-oriented plans and execute tasks to solve problem statements generated by a user interface or other software agents. The …
+Data-processing apparatus and method
+
+EP US JP DE EP0829806B1 Yasuyuki Tahara Kabushiki Kaisha Toshiba
+Priority 1996-09-17 • Filed 1997-09-17 • Granted 2005-04-06 • Published 2005-04-06
+According to Etzioni et al, agents perform high level tasks on a user's behalf and a goal manager receives task specifications from the user and invokes a planner with goals to achieve. Such planner synthesizes sequences of operating system commands to satisfy requests received from the user, then …
+Open high speed bus for microcomputer system
+
+US US5517626A Jordan J. Archer S3, Incorporated
+Priority 1990-05-07 • Filed 1993-01-29 • Granted 1996-05-14 • Published 1996-05-14
+An open high-speed local system bus for a microcomputer system which is decoupled from I/O and provides a consistent interface to the CPU subsystem, memory subsystem, graphics subsystem and peripheral subsystem. The local system bus supports discrete and burst transactions, pipelining in both the …
+Procedures for troubleshooting a robot system
+DE DE102024120805A1 Daniel Leidner Deutsches Zentrum für Luft- und Raumfahrt e.V.
+Priority 2024-07-22 • Filed 2024-07-22 • Published 2026-01-22
+Procedure according to one of the Claims 1 until 10 , characterized in that the continuous real-time data about the current state of the robot (2) and/or the tasks and/or the environment can be acquired with at least one sensor device (38). Procedure according to one of the Claims 1 until 11 ,
+Smart cell culture
+
+EP US US20050260743A1 Rosemary Drake Drake Rosemary A L
+Priority 2004-05-20 • Filed 2005-05-16 • Published 2005-11-24
+In a further implementation of the invention, the automated cell culture system may be used to support studies of cell differentiation. In addition it can perform all the maintenance tasks associated with provision of assay plates for a variety of cell based transport assays; these assays are an …
+Motion path planning method and device for desktop wheeled robot
+CN CN121386764A 柳昆鹏 深圳天境羽宏科技有限公司
+Priority 2025-10-29 • Filed 2025-10-29 • Published 2026-01-23
+and transferring the instantiated task context object containing the specific planning constraint and the target information to the subsequent dynamic planner selection logic. 6. The method for planning a motion path of a tabletop wheeled robot according to claim 1, wherein the task context further …
+Robot system with packaging mechanism
+
+CN CN111498214B 鲁仙·出杏光 牧今科技
+Priority 2019-05-31 • Filed 2020-03-20 • Granted 2021-05-07 • Published 2021-05-07
+at least one memory device communicatively connected to the at least one processor and having instructions stored thereon that, when executed by the at least one processor, cause the robotic system to implement a stacking plan for using an end effector of a robotic arm and placing available parcels …
+Robot programming with active assisting functions
+WO EP CN EP4688344A1 Rune SØE-KNUDSEN Universal Robots A/S
+Priority 2023-05-02 • Filed 2024-05-01 • Published 2026-02-11
+2. The robot system according to claim 1 wherein said user interface allows said user to define at least a part of said robot program by specifying at least one of said robot tasks and said order of execution of said robot tasks. 3. The robot system according to any one of claims 1-2 wherein said …
+Interactive information processing method, electronic device, storage medium, …
+WO CN WO2026003598A1 王峰 云智能资产控股（新加坡）私人股份有限公司
+Priority 2024-06-27 • Filed 2025-04-16 • Published 2026-01-02
+21. A method for processing interactive information, comprising: acquiring query information, wherein the query information represents information to be answered in a task-oriented dialogue scenario; acquiring configuration information associated with the query information, wherein the …
+Multi-vision language action model control method, device, equipment, medium …
+CN CN121657550A 王文鑫 中国联合网络通信集团有限公司
+Priority 2025-12-10 • Filed 2025-12-10 • Published 2026-03-13
+The application provides a multi-vision language action model control method, a device, equipment, a medium and a product, and relates to the field of intelligent operation robots. The method comprises the steps of obtaining input signals for controlling multi-vision language action model …
+Information generation device, information generation method, computer program, …
+JP JP7708484B1 将也 阿蘓 株式会社LexxPluss
+Priority 2025-04-02 • Filed 2025-05-13 • Granted 2025-07-15 • Published 2025-07-15
+The learning model is constructed by learning a learning data set, The learning data set includes learning document data indicating an operation content to be executed by the learning robot, and learning control related information which is information regarding the control of the learning robot,
+… for intelligent error diagnosis and automatic diagnosis of reasons of task …
+CN CN121166422A 李鸿飞 适享智慧(上海)科技有限公司
+Priority 2025-09-08 • Filed 2025-09-08 • Published 2025-12-19
+3) Send the error message and the original task plan to the replanning agent; 4) Analyze the causes of errors using the redesigned agent and generate new execution strategies; 5) Based on the error type and task requirements, match backup tools or alternative solutions to generate an optimized task …
+Testing method, device, equipment and medium for scheduling system of robot …
+CN CN117851264A 冷晓琨 乐聚(苏州)机器人技术有限公司
+Priority 2024-01-31 • Filed 2024-01-31 • Published 2024-04-09
+The invention relates to the technical field of robot scheduling and discloses a testing method, a device, equipment and a medium of a scheduling system of a robot cluster.
+A Risk Perception Path Planning Method and System Based on Time Series …
+CN121453064B 张一舟 苏州大学
+Filed 2025-12-31 • Granted 2026-05-01 • Published 2026-05-01
+9. The risk perception path planning method based on time-series prediction according to claim 1, characterized in that it further includes: if the robot detects that the current node is impassable during path execution, a replanning decision mechanism is triggered, the steps of which include: …
+Handling semidurable writes in a storage system
+WO WO2026084798A1 Sankara Vaideeswaran Pure Storage, Inc.
+Priority 2024-10-14 • Filed 2025-09-05 • Published 2026-04-23
+[0019] FIG. 3F illustrates an example container system. [0020] Figure 4 illustrates an embodiment of a storage system that may reprogram data blocks that arc semidurable, in accordance with an embodiment. [0021] Figure 5A is a block diagram illustrating an example segment, in accordance with an …
+… and system for cooperative driving control of low-profile cage towing robots
+KR KR102939778B1 정우재 노블로지스 주식회사
+Priority 2025-06-05 • Filed 2025-06-05 • Granted 2026-03-16 • Published 2026-03-16
+A placement step in which multiple traction robots receive collaboration information from a central server, enter the lower part of a target cage, and align; A coupling step in which the plurality of traction driving robots each perform position and height control at the bottom of the target cage …
+Modular microfactory swarm for autarkic urban infrastructure
+US US20260085514A1 Samuel Odeh Samuel Odeh
+Priority 2025-11-12 • Filed 2025-11-12 • Published 2026-03-26
+1 . A modular robotic tile, comprising: (a) a multi-material extrusion mechanism configured to deposit locally characterized feedstock (identified by on-site spectral fingerprint or density profile) with closed-loop control of flow rate, temperature, and deposition pressure; (b) an onboard dual- …
+Automated system and method for experiment handling for incubation and image …
+WO EP CN KR WO2024249903A1 Michele ARGENTATI Molecular Devices, Llc
+Priority 2023-06-02 • Filed 2024-05-31 • Published 2024-12-05
+6. The method of one of the previous claims, wherein the schedule of tasks in the automated workflow 7 includes the existing experiment protocol timing requirements, the method further comprising: determining a set of new tasks associated with the new workflow; determining one or more new timing …
+System and method of semantic segmentation and material identification of 3d …
+US US20260038283A1 Nithin Gopalakrishnan Nair Nvidia Corporation
+Priority 2024-08-01 • Filed 2025-01-16 • Published 2026-02-05
+in accordance with at least one embodiment. The system 100 may perform various tasks in various environments, such as factories, healthcare facilities (e.g., hospitals), offices, households, and/or any suitable context or environment. In at least one embodiment, at least a portion of the system 100
+An intelligent warehousing and logistics teaching sandbox system
+CN CN120823746A 刘洋 湖北三丰小松物流技术有限公司
+Priority 2025-09-10 • Filed 2025-09-10 • Published 2025-10-21
+1. An intelligent warehousing and logistics teaching sandbox system, characterized by including the following modules: The order management module is used to receive and parse the teaching simulation order in JSON format through the WebSocket protocol, and generate material demand tasks containing …
+Techniques for arrayed printing of a permanent layer with improved speed and …
+
+US US12330178B2 Michael Baker Kateeva, Inc.
+Priority 2012-12-27 • Filed 2023-03-24 • Granted 2025-06-17 • Published 2025-06-17
+In another embodiment, droplets produced by each nozzle are empirically measured in situ, and measured droplet characteristics that vary from nozzle-to-nozzle, or that depend on drive parameters used to eject droplets from a nozzle, are stored and factored into nozzle assignment. For example, in a …
+Video restoration methods and devices
+CN CN121053035A 胡强 上海交通大学
+Priority 2025-07-25 • Filed 2025-07-25 • Published 2025-12-02
+… steps, if it is determined based on the quality assessment result output by the third agent that the repair of the current degradation type has not been successfully completed, the second agent reverts to the previous node of the current repair sequence through a rollback mechanism and replans the …
+A material storage method, system and storage medium
+CN CN120146753A 孙少斌 北京钢研高纳科技股份有限公司
+Priority 2025-02-08 • Filed 2025-02-08 • Published 2025-06-13
+… bin positions, the characteristics of materials, the picking efficiency and other factors. And by creating and recording a warehouse entry task, the relevant material conveying system (such as AGVs or conveyor belts) can be notified to move the tray materials to the designated warehouse location.
+Risk perception path planning method and system based on time sequence …
+CN121453064A 张一舟 苏州大学
+Priority 2025-12-31 • Filed 2025-12-31 • Published 2026-02-03
+wherein, the Is a dynamic node At the time of prediction Is used to determine the predictive risk cost of (1), For the predicted moment when the robot arrives at the dynamic node, In the form of a dynamic node, Is a dynamic node At the time of prediction Is a risk of blockage of the (c) in the (c), For the …
+Computer program for multiple types of user interfaces and method for testing …
+WO AU WO2001022227A1 Gerrit Johannes De Vries Actuarieel Adviesbureau Vermaase B.V.
+Priority 1999-09-20 • Filed 1999-09-20 • Published 2001-03-29
+Some part of the system will have to decide when specific views and models have to be introduced in or removed from the system. To maintain user interface independence, construction of views should be a task of the interface layer. However, as the construction of views may vary a lot among distinct …
+Method and apparatus for contest creation based on security markets and …
+US US20250312700A1 Josh Marvel Finium LLC
+Priority 2024-04-03 • Filed 2025-04-01 • Published 2025-10-09
+… one or more predictive performance insights for one more participant aggregated distribution weightings. 20 . The system of claim 16 , wherein the simulation includes at least one bot participant configured to transmit participant selection data according to a predefined algorithmic strategy.
+Sparse programming image validation
+
+WO US US20230251844A1 Benjamin Goska Nvidia Corporation
+Priority 2022-01-21 • Filed 2022-01-21 • Published 2023-08-10
+illustrates a schematic diagram of an example of a process to verify a part, in accordance with at least one embodiment; FIG. 2 B illustrates a schematic diagram of an example of a process to reprogram a part, in accordance with at least one embodiment; FIG. 3 illustrates a schematic diagram of an …
+Tagged-data prediction
+US US12443529B2 Paolo Monti Arm Limited
+Priority 2024-01-25 • Filed 2024-01-25 • Granted 2025-10-14 • Published 2025-10-14
+… in association with a block of one or more memory locations comprising an addressed location identified by the given target address; and in response to a mismatch being detected between the given address tag and the given memory safety check tag, performing a memory safety error handling response.
+Spacecraft module chassis system
+
+US US20250206469A1 JOHN FRANCIS McENTEE Space.Org
+Priority 2023-12-26 • Filed 2024-04-05 • Published 2025-06-26
+A system of versatile foundational spacegoing module infrastructure which is a framework of modular hardware and software elements which can be used to rapidly design and produce spacecraft. Preferred embodiments may comprise or include spacecraft modular building elements uniquely suitable for …
+Autonomous vehicle delivery with integrated communication and control systems
+US US20260057335A1 Kevin Bruns Skyhaul Aerospace And Marine Services Corporation
+Priority 2024-08-23 • Filed 2025-08-22 • Published 2026-02-26
+an estimated vessel arrival time for flight crew members; automated invoice generation for clients; assignment of pre-flight and post-flight checklists to UAVs for flight crew members; maintenance requirement tracking and upcoming maintenance action notification transmission; maintenance record …
+
+"anomaly recovery" AND robot AND control AND policy：
+
+Sort by · Relevance  Group by · None  Deduplicate by · Family  Results / page · 100 
+An operation and maintenance method and system for a multi-cloud management …
+CN CN119917235B 张耿李 深圳市尺素科技有限公司
+Priority 2024-12-31 • Filed 2024-12-31 • Granted 2025-09-02 • Published 2025-09-02
+Where L PPO (θ) represents the objective function of the PPO algorithm, E t represents the expected value at time step t, rt (θ) represents the importance sampling ratio, which represents the ratio of the current policy to the old policy, clip represents the clipping function, which is used to …
+A method, apparatus, equipment, and medium for optimizing robot motion control.
+CN CN121018570A 蒋兴国 华能汕头海门发电有限责任公司
+Priority 2025-09-17 • Filed 2025-09-17 • Published 2025-11-28
+This invention discloses a method, apparatus, device, and medium for optimizing robot motion control. The method inputs a task description in natural language, robot state information, historical execution trajectories, and environmental feedback information into a pre-set large language model.
+Anomaly detection and recovery system and method based on OPC UA
+EP US CN CN115622726A 海科·科齐奥勒克 Abb瑞士股份有限公司
+Priority 2021-07-12 • Filed 2022-07-01 • Published 2023-01-17
+3. Anomaly detection and recovery system (100) according to claim 1 or 2, wherein The anomaly detector (208) includes a rules engine configured to execute predefined domain-specific and/or factory-specific rules (224) on the OPC UA traffic flows. 4. The anomaly detection and recovery system (100) …
+Control method of robot charging system, robot charging system and medium
+CN CN118263957A 夏舸 深圳优地科技有限公司
+Priority 2024-04-22 • Filed 2024-04-22 • Published 2024-06-28
+Acquiring a second power and a second average searching time for the robot to find a new charging pile to re-pile and enter a charging state, and taking the retry time, the second power and the second average searching time as the response information; and And when the robot is used for discharging …
+An industrial digital factory collaborative working method and cloud platform
+CN CN120295258A 林秀闹 浙江省邮电工程建设有限公司
+Priority 2025-06-11 • Filed 2025-06-11 • Published 2025-07-11
+‌ carrying out implicit state synchronization protocol processing between edge nodes on the preliminary control strategy set, eliminating resource preemption conflict through a distributed consensus algorithm of conflict residual errors, and generating a conflict-free cooperative control …
+Abnormality processing method, robot, conveyance system, program product, and …
+CN CN114367983B 许爱功 北京旷视机器人技术有限公司
+Priority 2021-12-29 • Filed 2021-12-29 • Granted 2024-07-26 • Published 2024-07-26
+cleaning the custom time length: deleting the abnormal code from the abnormal list according to a self-determined period; And (3) key cleaning: deleting the abnormal code from the abnormal list in response to a signal that a key of the robot is pressed; command cleaning: and deleting the abnormal …
+Abnormality recognition method, device, smart machine and storage medium
+CN CN110198471A 马星辰 北京猎户星空科技有限公司
+Priority 2018-02-27 • Filed 2018-02-27 • Published 2019-09-03
+6. The method of claims 1-5, wherein the smart device is a robotic arm. 7. An abnormality recognition apparatus, characterized by comprising: the video stream acquisition module is used for acquiring a video stream of a current task scene when the intelligent device executes a task; the task …
+A robotic arm execution method for dynamic task tree traversal
+CN CN119098961A 邹欣珏 云南自由贸易试验区苇航智能科技有限责任公司
+Priority 2024-09-20 • Filed 2024-09-20 • Published 2024-12-10
+S2.4: Integrate the trained machine learning model into the robotic arm control process to achieve real-time dynamic adjustment of task type priority. 5. According to the method for executing a dynamic task tree traversal by a robot arm according to claim 4, it is characterized in that the machine …
+Motion control method and device, behavior tree, electronic equipment and …
+CN CN118322207B 杜坤 北京小米机器人技术有限公司
+Priority 2024-05-08 • Filed 2024-05-08 • Granted 2024-12-03 • Published 2024-12-03
+The present disclosure relates to a motion control method and apparatus, a behavior tree, an electronic device, and a storage medium, the method including controlling a robot to perform a preset motion based on a first sub-tree of the behavior tree, and detecting at least one index of the robot;
+Network anomaly recovery method, device, electronic equipment, server and …
+WO EP US CN CN116455727A 刘晓磊 维沃移动通信有限公司
+Priority 2023-04-21 • Filed 2023-04-21 • Published 2023-07-18
+The application discloses a network anomaly recovery method, a device, electronic equipment, a server and a storage medium, and belongs to the technical field of communication. The method comprises the following steps: transmitting a target data packet to a server under the condition that the …
+Software system based on self-adaptive decentralization architecture and …
+CN CN120676351A 黄嘉� 沈阳松辽电子仪器有限公司
+Priority 2025-05-22 • Filed 2025-05-22 • Published 2025-09-19
+(2) Data synchronization and consistency management module, which is used to ensure data consistency between nodes in a decentralized environment and synchronize data based on timestamps, priority rules or blockchain technology; (3) A decentralized communication management module, which is used to …
+Method for processing incoming call, related device and computer program …
+CN CN113037914A 林晓斌 北京百度网讯科技有限公司
+Priority 2021-03-01 • Filed 2021-03-01 • Published 2021-06-25
+Furthermore, considering that the incoming call party generates a sense of incongruity and the situation that the incoming call intention cannot be obtained due to the fact that the electronic sound or the robot sound is directly used for replying is avoided, a personalized expression mode and …
+Industrial robot control method and system based on deep reinforcement learning
+CN CN121374604A 许建明 福建网能科技开发有限责任公司
+Priority 2025-11-25 • Filed 2025-11-25 • Published 2026-01-23
+This invention discloses an industrial robot control method and system based on deep reinforcement learning. The method includes the following steps: constructing a virtual simulation environment comprising a robotic arm, an item to be inspected, a conveyor line, and an inspection platform;
+Cable tunnel navigation positioning method and electronic equipment
+CN CN121855543A 郭甜 国网北京市电力公司
+Priority 2026-01-20 • Filed 2026-01-20 • Published 2026-04-14
+The application discloses a cable tunnel navigation and positioning method and electronic equipment. The method comprises the steps of obtaining current pose information of a target robot, historical environment semantic graphs and multi-source observation data collected by the target robot in a …
+Task scheduling and state switching method for inspection robot of quantitative …
+CN CN121635356A 姚结兵 安徽信力共擎科技有限公司
+Priority 2025-12-18 • Filed 2025-12-18 • Published 2026-03-10
+1. A method for task scheduling and state switching of an inspection robot using a quantized state machine, characterized by comprising the following steps: S1, obtain the state machine operation configuration data, read and merge the state machine operation configuration data using the …
+Robot system collaborative management method and device, robot system
+CN CN120723406A 柏秋利 北京东土科技股份有限公司
+Priority 2025-06-26 • Filed 2025-06-26 • Published 2025-09-30
+1. A collaborative management method for a robot system, characterized in that the robot system includes a server and multiple robots; the server serves as a master node; each of the robots serves as a slave node; the method is applied to the server; the method comprises: Obtaining a resource type …
+Short message service monitoring method and electronic device
+CN CN120825677A 王刚 维沃移动通信有限公司
+Priority 2025-08-20 • Filed 2025-08-20 • Published 2025-10-21
+Under the condition that the short message service has the second abnormality, controlling the short message application program to send a second instruction to the intermediate communication framework layer so as to control the intermediate communication framework layer to execute the second …
+A state machine modeling and abnormal response method for agricultural robots
+CN CN120610576A 张家伟 广东芯鲜派现代农业集团有限责任公司
+Priority 2025-06-06 • Filed 2025-06-06 • Published 2025-09-09
+4. The agricultural robot-oriented state machine modeling and anomaly response method of claim 2, wherein the anomaly state set Each abnormal state in (a) Representing a typical class of problems or faults that agricultural robots may encounter in agricultural operations; the abnormal triggering …
+Model training method, task processing method and model training system
+CN CN120218271A 何涛 浙江阿里巴巴机器人有限公司
+Priority 2023-12-26 • Filed 2023-12-26 • Published 2025-06-27
+… process a large amount of linguistic data prior to a particular task. By pre-training the models, they can capture more complex language and semantic rules, thus performing well in a variety of natural language processing tasks and reducing the large-scale data requirements for a particular task.
+… testing system and method for multi-model, multi-configuration robots
+CN CN121144207A 张肇元 珞石(山东)机器人集团股份有限公司
+Priority 2025-09-22 • Filed 2025-09-22 • Published 2025-12-16
+In step one above, communication is established between the server and multiple test industrial control computers. The automated test platform software allocates independent threads that match the number of test industrial control computers and sends the robot control software module to the test …
+Service end product operation and maintenance method, device and equipment …
+CN CN121967152A 汪轲 来也科技(北京)有限公司
+Priority 2025-12-29 • Filed 2025-12-29 • Published 2026-05-01
+1. The operation and maintenance method for realizing the service end product of the Agent based on the robot process automation RPA, the artificial intelligence AI and the large language model LLM is characterized in that the operation and maintenance method is applied to an operation and …
+Robot target following method, device and equipment
+CN CN121640027A 刘飞 北京尚睿通科技有限公司
+Priority 2025-11-28 • Filed 2025-11-28 • Published 2026-03-10
+If the following target is not found within the set time, controlling the robot to search at a second preset rotating speed, wherein the first preset rotating speed is larger than the second preset rotating speed; And if the following target is not found yet, controlling the robot to stop moving, …
+Management method, system, electronic equipment and storage medium of …
+CN CN120085629A 任沛 北京人形机器人创新中心有限公司
+Priority 2025-05-06 • Filed 2025-05-06 • Published 2025-06-03
+The present application provides a management method, system, electronic device and storage medium of an intelligent industrial system, which are applied to the field of industrial automation technology. Multimodal data are collected from a target device and its working environment, and it is …
+A method and system for regulating automotive paint delivery pressure based on …
+CN CN121945327A 臧毅 北京瑞科恒业喷涂技术有限公司
+Priority 2026-01-30 • Filed 2026-01-30 • Published 2026-05-01
+The paint delivery system is controlled to perform operations by pre-setting a set of paint delivery parameters. If a quality abnormality or abnormal pressure action occurs during the operation, the paint delivery working parameter set is updated based on the control and optimization model, and the …
+Anomaly positioning method, system and related products
+CN CN118885317A 高诚裕 财付通支付科技有限公司
+Priority 2023-04-25 • Filed 2023-04-25 • Published 2024-11-01
+9. An anomaly location system, characterized in that the anomaly location system is in communication with an alarm platform, a database, and a log platform; the anomaly location system comprises: a data collector, an instruction orchestration engine, and an alarm robot; wherein the instruction …
+Switching method of state machine, state machine and system
+CN CN121567728A 陆伟峰 上海矽加半导体有限公司
+Priority 2025-11-17 • Filed 2025-11-17 • Published 2026-02-24
+1. A method for switching states in a state machine, characterized in that the method comprises: When the command state machine receives an instruction request in the idle state, it switches to the response state; wherein, the instruction request represents an instruction for controlling the …
+An automatic batching system and method for cross-cutting column materials
+CN CN121778438A 潘荣贵 无锡智蓝智能科技有限公司
+Priority 2026-02-09 • Filed 2026-02-09 • Published 2026-04-03
+A priority rule based on location distance; Classification rules based on material specification concentration; a balancing rule based on cache hierarchy load; a center of gravity stratification rule based on material weight; orientation reservation rules based on order marks; Each rule can be …
+Method and device for executing task, electronic equipment and medium
+CN CN121597330A 杨天骄 北京百度网讯科技有限公司
+Priority 2025-12-05 • Filed 2025-12-05 • Published 2026-03-03
+As an example, in an enterprise supply chain management scenario, the target task may be "query and derive specific numbered stream order details", with the corresponding target application being an "Enterprise Resource Planning (ERP) system client". At this time, three stages such as "login", " …
+Exception handling methods, service platforms, and computing devices
+CN CN121705083A 占文杰 杭州蚂蚁酷爱科技有限公司
+Priority 2026-02-10 • Filed 2026-02-10 • Published 2026-03-20
+Specifically, the service platform can comprise an operation environment of the container, a corresponding containerized service management module and the like, can provide operation basis and support for containerized services, and can ensure the correctness and availability of containerized …
+Multi-module parallel motion control method for high-speed fully automatic …
+CN CN120177807A 周史良 北京华大吉比爱生物技术有限公司
+Priority 2025-05-23 • Filed 2025-05-23 • Published 2025-06-20
+7. The high-speed fully automatic chemiluminescence immunoassay analyzer multi-module parallel motion control method according to claim 6, characterized in that the TestPos state update rule is: When the last reaction cup in the outer circle of the incubation plate is removed, if its incubation …
+System and method for real-time detection of code integrity violations
+US US20250355997A1 Daniel Boyle Daniel Boyle
+Priority 2025-07-25 • Filed 2025-07-25 • Published 2025-11-20
+… a growing challenge. In collaborative or sensitive coding environments, such as enterprise repositories, educational platforms, or regulatory systems, maintaining the authenticity and authorship of source code is critical for auditing, intellectual property management, and ethical compliance.
+A METHOD FOR AUTOMATED PROCESSING OF EMPLOYEE DATA USING ARTIFICIAL …
+EA052928B1 Ирина Ивановна Староверова Общество С Ограниченной Ответственностью "Умега"
+Filed 2025-10-16 • Published 2026-03-30
+Obtain a second set of data through periodic employee surveys, including responses to questions and user metadata; Receive a third set of data from the task management system and/or time tracking system and/or HR system; Performing a semantic analysis of the first data set using at least one large …
+Telecommunications marketing strategy generation method, device and storage …
+CN121998679A 翟立柱 中国联合网络通信集团有限公司
+Filed 2026-01-19 • Published 2026-05-08
+Telecom marketing strategy generation method, device and storage medium Technical Field The present application relates to the field of telecommunications marketing, and in particular, to a telecommunications marketing policy generation method, apparatus, and storage medium. Background With the …

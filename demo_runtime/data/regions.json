@@ -1,0 +1,20 @@
+[
+  {
+    "region_id": "region_docs",
+    "name": "说明文档区",
+    "path": "organized/docs",
+    "allowed_sensitivity": ["low", "medium"]
+  },
+  {
+    "region_id": "region_archive",
+    "name": "归档区",
+    "path": "organized/archive",
+    "allowed_sensitivity": ["low"]
+  },
+  {
+    "region_id": "region_candidates",
+    "name": "候选操作区",
+    "path": "organized/candidates",
+    "allowed_sensitivity": ["medium", "high", "unknown"]
+  }
+]

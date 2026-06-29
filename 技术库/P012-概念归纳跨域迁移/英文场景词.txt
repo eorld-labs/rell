@@ -1,0 +1,844 @@
+﻿"affordance" AND concept AND robot AND experience AND formation：
+
+Systems and methods for flexible human-machine collaboration
+
+WO EP US CN JP KR CA DK ES MX JP7192026B2 ゲーリン ケレハー ザ ジョンズ ホプキンス ユニバーシティ
+Priority 2014-09-02 • Filed 2021-04-21 • Granted 2022-12-19 • Published 2022-12-19
+when executed on the processor, providing a composition of robot functions and one or more user interaction functions, said robot functions modeling at least one function of a robot to perform a type of work movement; , specializing the robotic function with an information kernel to provide a …
+Systems and methods for safe and reliable autonomous vehicles
+
+WO EP US CN JP EP3707572B1 Michael Alan Ditty Nvidia Corporation
+Priority 2017-11-10 • Filed 2018-11-09 • Granted 2023-08-23 • Published 2023-08-23
+FCW systems are in wide use today, but often provide false alerts. According to a 2017 Consumer Reports survey, about 45 percent of the vehicles with FCW experienced at least one false alert, with several modes reporting over 60 percent false alerts. RADAR-based FCW systems are subject to false …
+Systems and methods for implementing augmented reality and/or virtual reality
+
+US US10182210B1 Stephen E. Goetzinger, Jr. Steelcase Inc.
+Priority 2016-12-15 • Filed 2017-12-13 • Granted 2019-01-15 • Published 2019-01-15
+a plurality of remotely located affordance configurations, each of the affordance configurations for use by at least one collaboration session attendee, each affordance configuration including at least a first emissive surface, at least a first camera and at least a first sensor, each camera having …
+Systems and methods for invoking chatbots in a channel based communication …
+
+US US9647968B2 Richard Smullen Pypestream Inc
+Priority 2015-03-25 • Filed 2016-10-14 • Granted 2017-05-09 • Published 2017-05-09
+claim 8 , the method further comprising: aggregating the net promotor score associated with each conversation in a plurality of conversations associated with the first sub-channel or the first primary communication channel thereby forming an aggregate net promotor score; and making the aggregate net …
+Behavior control device, behavior control method, and program
+WO EP US US12397438B2 Randy Gomez Honda Motor Co., Ltd.
+Priority 2020-06-24 • Filed 2021-06-22 • Granted 2025-08-26 • Published 2025-08-26
+5. A communication robot comprising: a perception unit configured to acquire person information on a person, extract feature information on the person from the acquired person information, perceive an action that occurs between a communication device performing communication and the person, and …
+Autonomous monitoring robot systems
+
+WO EP US CN US11662722B2 Michael J. Dooley Irobot Corporation
+Priority 2016-01-15 • Filed 2019-09-09 • Granted 2023-05-30 • Published 2023-05-30
+4. The method of claim 1 , wherein the autonomous mobile robot captures the imagery representing at least the portion of the electronic device during a patrol routine, wherein the representation of the imagery represents a view of the environment from a vantage point of the autonomous mobile robot.
+Smart workstation method and system
+
+US US11330647B2 Darrin Sculley Steelcase Inc.
+Priority 2016-06-03 • Filed 2019-09-18 • Granted 2022-05-10 • Published 2022-05-10
+further including detecting movement of an additional affordance into a first zone associated with the workstation and, upon moving the additional affordance into the first zone, detecting the additional affordance, identifying an affordance setting in the database for the additional affordance and …
+Systems and methods for navigating nodes in channel based chatbots using …
+US US20260039612A1 Richard Smullen Pypestream Inc.
+Priority 2015-03-25 • Filed 2025-10-10 • Published 2026-02-05
+illustrates a multimedia human interface module in accordance with an embodiment of the present disclosure. FIG. 24 illustrates a sample aggregated report from a survey chat bot that collects numeric survey data in accordance with an embodiment of the present disclosure. FIG. 25 illustrates a …
+Method and system for non-causal zone search in video monitoring
+
+WO US US9779307B2 Jason N. Laska Google Inc.
+Priority 2014-07-07 • Filed 2014-10-08 • Granted 2017-10-03 • Published 2017-10-03
+claim 13 , wherein the definition of the zone of interest includes a plurality of vertices specified in the scene of the video recording. 17. The computer-readable medium of claim 13 , wherein the operations further comprise: after receiving the definition of the zone of interest: processing a live …
+Natural language control of a robot
+WO EP US JP KR AU CA WO2023192497A1 Karol HAUSMAN Google Llc
+Priority 2022-03-30 • Filed 2023-03-30 • Published 2023-10-05
+Implementations process, using a large language model, a free-form natural language (NL) instruction to generate to generate LLM output. Those implementations generate, based on the LLM output and a NL skill description of a robotic skill, a task-grounding measure that reflects a probability of …
+Creative Camera
+WO EP CN JP KR AU CN113114970B M·万欧斯 苹果公司
+Priority 2018-05-07 • Filed 2018-09-28 • Granted 2025-01-21 • Published 2025-01-21
+Effect affordances indicate; detecting a gesture directed toward the effect affordance; In response to detecting the gesture directed toward the effect affordance, displaying a plurality of effect options for applying an effect to the media item simultaneously with the representation of the media …
+… devices and methods for identifying and inducing topological states formed …
+
+WO EP US US12073313B2 Stephen L. Thaler Stephen L. Thaler
+Priority 2014-01-07 • Filed 2023-06-22 • Granted 2024-08-27 • Published 2024-08-27
+39. The system of claim 17 wherein said thalamobot further includes at least one buffer to capture ordinality of chain formations. 40. A system for avoiding processing bottlenecks from occurring while providing data about states of a plurality of interconnecting neural modules representing an …
+Machine learning control of object handover
+US CN JP DE JP7619784B2 ヤン ウェイ エヌビディア コーポレーション
+Priority 2020-07-28 • Filed 2020-10-26 • Granted 2025-01-22 • Published 2025-01-22
+The processor of claim 1 , wherein the one or more processors generate the point cloud from the three-dimensional image. the set of gripping poses are poses for a robot gripper of the robot; The processor of claim 1 , wherein the robotic gripper has two opposing fingers that perform the gripping.
+Recording and sending pictograms
+
+EP US JP KR AU DK JP6967610B2 フレディ アレン アンズアーズ アップル インコーポレイテッドApple Inc.
+Priority 2017-05-16 • Filed 2018-05-16 • Granted 2021-11-17 • Published 2021-11-17
+Sending the generated animated virtual avatar to a remote user in response to receiving an input that selects the send affordance. The method according to any one of claims 1 to 6, further comprising. Displaying a confirmation affordance instead of the recorded affordance in response to the …
+Operating an in-line legged robot vehicle in ballistic flight
+
+WO US GB US9089968B2 John R. Goulding John R. Goulding
+Priority 2010-03-22 • Filed 2013-12-05 • Granted 2015-07-28 • Published 2015-07-28
+FIELD OF THE INVENTION The present invention relates to a legged mobile robot and, more particularly, to a legged mobile robot having a plurality of legs arranged in a narrow profile to walk and maneuver along paths by placing successive footfalls in a generally single-track or inline fashion.
+Column interface for navigating in the user interface
+WO EP US CN JP AU TW CN111782130B M·范欧斯 苹果公司
+Priority 2014-06-24 • Filed 2015-06-22 • Granted 2024-03-29 • Published 2024-03-29
+7. The method of claim 1, further comprising displaying, via the display device, a plurality of affordances corresponding to content items, the plurality of affordances comprising: an affordance corresponding to a respective content item; and an affordance corresponding to a group of content items …
+Emoji recording and sending
+
+WO EP CN EP3529779B1 Freddy Allen Anzures Apple Inc.
+Priority 2017-05-16 • Filed 2018-01-23 • Granted 2024-12-18 • Published 2024-12-18
+… illustrates exemplary user interfaces for generating and modifying a rabbit virtual avatar. FIG. 14A-14D illustrate exemplary user interfaces for generating and modifying a robot virtual avatar. FIG. 15A-15B illustrate exemplary user interfaces for generating and modifying a unicorn virtual avatar.
+Recording and sending Emoji
+US CN DK DK179948B1 V. King Nicholas Apple Inc.
+Priority 2017-05-16 • Filed 2017-09-22 • Granted 2019-10-22 • Published 2019-10-22
+[0027] FIG. 13 illustrates exemplary user interfaces for generating and modifying a rabbit virtual avatar. [0028] FIG. 14A-14D illustrate exemplary user interfaces for generating and modifying a robot virtual avatar. [0029] FIG. 15A-15B illustrate exemplary user interfaces for generating and …
+Context-based rendering of virtual avatars
+
+WO EP US CN JP KR AU CA IL JP2023076633A マーシャル ミラー ザ フォース トーマス マジック リープ， インコーポレイテッド
+Priority 2017-12-14 • Filed 2023-04-05 • Published 2023-06-01
+Modern computing and display technologies are driving the development of systems for so-called "virtual reality," "augmented reality," or "mixed reality" experiences, in which digitally reproduced images, or portions thereof, are , is presented to the user in a manner that appears or can be …
+Creative camera
+
+US US20200045245A1 Marcel van Os Apple Inc.
+Priority 2018-05-07 • Filed 2019-10-11 • Published 2020-02-06
+claim 10 , the one or more programs further including instructions for: after deactivating the first visual effect: detecting, via the one or more input devices, subsequent selection of the effects mode affordance; and in response to detecting the subsequent selection of the effects mode affordance:
+Creative camera
+
+US US20250024134A1 Marcel van Os Apple Inc.
+Priority 2018-05-07 • Filed 2024-10-01 • Published 2025-01-16
+claim 1 , wherein the camera user interface further includes a second affordance associated with a second camera display mode, the one or more programs further including instructions for: while the subject is positioned within the field of view of the camera and the representation of the subject and …
+Avatar integration with multiple applications
+WO EP CN JP KR AU KR102862275B1 니콜라스 스카펠 애플 인크.
+Priority 2019-05-06 • Filed 2020-03-31 • Granted 2025-09-19 • Published 2025-09-19
+The present invention generally relates to user interfaces for displaying and using avatars. In some embodiments, avatars are used to create stickers for transmission in a content-creation user interface. In some embodiments, avatars are used to create a representation of a contactable user in a …
+Rendering location specific virtual content in any location
+WO EP US CN JP US20250251785A1 Jonathan Brodsky Magic Leap, Inc.
+Priority 2018-10-05 • Filed 2025-04-25 • Published 2025-08-07
+memory storing a first saved scene comprising a representation of a plurality of subcomponents of one or more virtual objects, a node, and position information indicating a position of the plurality of subcomponents relative to the node, the plurality of subcomponents forming a first virtual …
+Voice Command Integration into Augmented Reality Systems and Virtual Reality …
+
+US US20230128422A1 Mengxi LI Meta Platforms, Inc.
+Priority 2021-10-27 • Filed 2022-10-26 • Published 2023-04-27
+Developers may have issues initially adding voice interactions to their applications. To reduce the complexity and improve upon the developer experience, the voice SDK may include voice interactions that allow users to maintain immersion, enable multitasking, and make content more accessible. As an …
+Adaptive graphic user interfacing system
+
+WO US US20220276770A1 Bryan Jonathan Davis EyeCam Inc.
+Priority 2017-10-21 • Filed 2022-03-19 • Published 2022-09-01
+A system and method for an adaptive graphic user interface (AGUI) (501) that can identify the characteristics of one or more users and display candidates and dynamically select display content and generate an interface (502-506 . . . ) customized to one or more users and display candidates and …
+USER INTERFACE FOR AVATAR CREATION
+US KR AU DK DK180078B1 Guzman Aurelio Apple Inc.
+Priority 2018-05-07 • Filed 2018-06-12 • Granted 2020-03-31 • Published 2020-03-31
+The method of any one of claims 1-12, wherein displaying the representation of the first accessory option located on the avatar includes: displaying a representation of one or more shadows formed by the first accessory option or avatar hair. The method of any one of claims 1-13, wherein: the first …
+Avatar creation user interface
+
+WO CN JP JP6735325B2 オーエス， マルセル ヴァン アップル インコーポレイテッドＡｐｐｌｅ Ｉｎｃ．
+Priority 2018-05-07 • Filed 2018-09-28 • Granted 2020-08-05 • Published 2020-08-05
+In response to detecting the selection of the second affordance corresponding to the second avatar feature, Updating the first option selection area to display an updated first set of feature options corresponding to the set of candidate values for the first characteristic of the second avatar …
+Avatar integration with multiple applications
+US AU DK AU2020269590B2 Guillaume Pierre André BARLIER Apple Inc.
+Priority 2019-05-06 • Filed 2020-03-31 • Granted 2022-11-17 • Published 2022-11-17
+11. The method of any of claims 1-10, further comprising: prior to receiving the request to transmit the first message to the set of contactable users, concurrently displaying: the first message, and an affordance that, when selected, causes the electronic device to display a user interface that …
+Use text as avatar animation
+WO EP US CN CN113256768B A·S·E·D·哈森·阿布德拉齐兹 苹果公司
+Priority 2020-02-07 • Filed 2021-02-07 • Granted 2025-04-11 • Published 2025-04-11
+… a more realistic avatar that more accurately conveys the desired message to the recipient. Thus, generating a speech data set and a set of parameters representing one or more actions of an avatar in this manner provides greater flexibility and accuracy, resulting in a more pleasant user experience.
+System and method for distanced interactive experiences
+
+US US11137601B2 Mark D. Wieczorek Mark D. Wieczorek
+Priority 2014-03-26 • Filed 2021-01-13 • Granted 2021-10-05 • Published 2021-10-05
+1. A method of operating a virtual experience, comprising: operating a server to communicate with a first user computing environment, the first user computing environment coupled to a first display, the first user computing environment configured to generate a first camera view corresponding to a …
+Dynamically preserving scene elements in augmented reality systems
+
+WO EP US CN EP2972686B1 Gene Fein Elwha LLC
+Priority 2013-03-15 • Filed 2014-03-13 • Granted 2019-04-17 • Published 2019-04-17
+circuitry for generating at least one proxy affordance of the real-world object in response to at least one output of the circuitry for determining that a first presentation associated with the real-world object has a limited period of viability for interaction relative to the field of view of the …
+Avatar creation user interface
+
+US US20230343053A1 Nicolas SCAPEL Apple Inc.
+Priority 2018-05-07 • Filed 2023-04-24 • Published 2023-10-26
+The present disclosure generally relates to creating and editing avatars, and navigating avatar selection interfaces. In some examples, an avatar feature user interface includes a plurality of feature options that can be customized to create an avatar. In some examples, different types of avatars …
+Method and system for cluster-based video monitoring and event categorization
+
+US US9489580B2 Jason N. Laska Google Inc.
+Priority 2014-07-07 • Filed 2015-09-24 • Granted 2016-11-08 • Published 2016-11-08
+memory having instructions stored thereon, the instructions, when executed by the one or more processors, cause the processors to perform operations comprising: forming one or more clusters comprising respective pluralities of motion vectors, the motion vectors corresponding to respective motion …
+Surround scene perception using multiple sensors for autonomous systems and …
+
+US CN DE US20240020953A1 Minwoo Park Nvidia Corporation
+Priority 2022-07-15 • Filed 2023-07-17 • Published 2024-01-18
+a system for performing operations using a large language model; a system for performing deep learning operations; a system implemented using an edge device; a system implemented using a robot; a system for performing conversational AI operations; a system for generating synthetic data; a system …
+Camera-less representation of users during communication sessions
+
+US US12267623B2 Justin G. BINDER Apple Inc.
+Priority 2022-02-10 • Filed 2022-05-23 • Granted 2025-04-01 • Published 2025-04-01
+the input corresponds to a selection of an affordance displayed in a user interface of a second application configured to provide the communication session. 37. The method of claim 36 , further comprising: in response to receiving the input corresponding to the selection of the affordance, disabling …
+User interfaces, systems and methods for configuring smart devices for …
+
+US US10397013B1 Edward Hill Google Llc
+Priority 2012-04-11 • Filed 2015-11-12 • Granted 2019-08-27 • Published 2019-08-27
+displaying by the client-side application a first user interface for adding a new smart device to the smart home environment, the first user interface including a first affordance that when selected causes the electronic device to initiate one of a plurality of commissioning options for adding a …
+sensing glasses
+
+WO EP US CN JP KR AU CA IL CN109923462B E·布洛伊 奇跃公司
+Priority 2016-09-13 • Filed 2017-09-12 • Granted 2021-07-09 • Published 2021-07-09
+Modern computing and display technologies have facilitated the development of systems for so-called "virtual reality", "augmented reality", or "mixed reality" experiences, in which digitally reproduced images, or portions thereof, are presented to a user in a manner in which they appear to be, or …
+User interfaces, systems and methods for configuring smart devices for …
+
+US US10142122B1 Edward Hill Google Llc
+Priority 2012-04-11 • Filed 2015-11-12 • Granted 2018-11-27 • Published 2018-11-27
+The smart device adding method further includes displaying by the client-side application a first user interface for adding a new smart device. The first user interface includes a first affordance that when selected causes the electronic device to initiate a plurality of commissioning options. The …
+Systems and methods for commissioning a smart hub device
+
+US US10075334B1 John Kozura Google Llc
+Priority 2012-04-11 • Filed 2015-11-12 • Granted 2018-09-11 • Published 2018-09-11
+The smart device adding method further includes displaying by the client-side application a first user interface for adding a new smart device. The first user interface includes a first affordance that when selected causes the electronic device to initiate a plurality of commissioning options. The …
+Methods and Systems for Person Detection in a Video Feed
+
+US US20200380265A1 Rizwan Ahmed Chaudhry Google Llc
+Priority 2016-07-11 • Filed 2020-05-18 • Published 2020-12-03
+in accordance with a determination that the event category matches the predefined notification filter definition, issuing an alert notification to a user client device; and in accordance with a determination that the event category does not match the predefined notification filter definition, …
+Computer graphics processing and selective visual display system
+WO EP US CN JP AU US20260094328A1 Richard Christopher DeCharms Richard Christopher DeCharms
+Priority 2023-02-15 • Filed 2025-09-27 • Published 2026-04-02
+… , section, subchapter, and chapter. 13 . The method of claim 11 , wherein at least some content elements comprise hybrid-language text formed from portions of a first natural language at a first proportion and portions of a second natural language at a second proportion. 14 . The method of claim 11 , …
+Methods and systems for camera-side cropping of a video feed
+
+US US10789821B2 Jason N. Laska Google Llc
+Priority 2014-07-07 • Filed 2018-09-27 • Granted 2020-09-29 • Published 2020-09-29
+5. The client device of claim 1 , wherein the one or more programs further comprise instructions for: after displaying the second video feed, providing an affordance for resetting the camera to display the first video feed. 6. A non-transitory computer-readable storage medium storing one or more …
+Method and device for processing motion events
+
+WO EP US AU CA US10127783B2 Jason N. Laska Google Llc
+Priority 2014-07-07 • Filed 2015-06-10 • Granted 2018-11-13 • Published 2018-11-13
+having one or more processors and memory. The method includes receiving a definition of a zone of interest within the scene depicted in the video steam. In response to receiving the definition of the zone of interest, the method includes: determining, for each motion event detected in the video …
+DISABILITY OF ATTENTION-ATTENTIVE VIRTUAL ASSISTANT
+EP US CN KR AU DK DK180639B1 Tran Trungtin Apple Inc
+Priority 2018-06-01 • Filed 2018-06-12 • Granted 2021-11-04 • Published 2021-11-04
+If a user is engaged with the virtual assistant session, automatic deactivation of the virtual assistant may be forgone or delayed so the virtual assistant session does not deactivate while the user is engaged. In this manner, user experience operating virtual assistants is improved. [0032] …
+Utilization of passenger attention data captured from vehicles for localization …
+
+WO US CN KR DE GB KR102470217B1 타이고 마리아 보난니 모셔널 에이디 엘엘씨
+Priority 2019-01-15 • Filed 2020-01-15 • Granted 2022-11-23 • Published 2022-11-23
+… is transmitted to the autonomous vehicle's output device (eg, display) and /or displayed on the passenger's personal device (eg, smart phone, tablet computer, wearable device). The passenger is asked to confirm that he or she sees the physical feature being described by manipulating an affordance ( …
+Systems, methods, and devices for managing coexistence of multiple transceiver …
+
+US US9794522B2 Mikko Pekka Sannala Google Inc.
+Priority 2015-02-06 • Filed 2016-03-30 • Granted 2017-10-17 • Published 2017-10-17
+A camera assembly includes an enclosed housing having a rear surface, a front surface, and a periphery. The camera assembly also includes a lens module located within the housing and configured to receive light via the front surface, and a circuit board comprising communication circuitry located …
+Temporal element restoration in augmented reality systems
+
+WO EP US CN US10109075B2 Gene Fein Elwha Llc
+Priority 2013-03-15 • Filed 2013-03-15 • Granted 2018-10-23 • Published 2018-10-23
+… the AR device or on another device like a television in proximity to the user. In another example, if an e-reader such as a kindle device is open during a book-shopping experience, that may be used as a constraint to tell the system to look for books in the environment during the recognition step.
+Systems and methods for data-driven movement skill training
+
+WO EP US CN US20190009133A1 Bérénice Mettler May Icuemotion Llc
+Priority 2017-07-06 • Filed 2018-07-06 • Published 2019-01-10
+wherein the apparatus comprises: a ball machine configured to throw balls with different trajectories selected for the subject to form a new stroke technique or adapt an existing stroke technique; or an assistive robotic device or robot manipulator used to physically guide movements of the subject.
+Graphic package editing machine based on physics
+WO EP US CN CN104583946B J·柯德斯盖 美国国家仪器有限公司
+Priority 2012-08-03 • Filed 2013-03-19 • Granted 2018-03-13 • Published 2018-03-13
+Examples of various aspects of the graphics program are provided below. The following examples and discussions are not intended to limit the above definition of a graphics program, but rather provide examples of what is encompassed by the term "graphics program": Nodes in a graphics program may be …
+System and method for handling assets for fabrication
+
+WO US US20210287451A1 Patrick M Baudisch Patrick M Baudisch
+Priority 2016-07-18 • Filed 2017-07-18 • Published 2021-09-16
+The present disclosure introduces the concept of 3D editors that treat contents as a set of “assemblies” that interact with each other and the world governed by physics, such as inertia. Based on this general concept we introduce a range of tools for manipulating such assemblies. We then automate …
+Determine user intent from chatbot interactions
+WO EP US CN KR CN120752659A 希丽亚·妮科尔·穆尔库扬尼斯 斯纳普公司
+Priority 2023-01-24 • Filed 2024-01-23 • Published 2025-10-03
+The advertising content is transmitted to the client system for display to the user during a second interactive session. 9. The machine of claim 8, wherein the first interactive session is a chat session with a chat robot and the second interactive session is not a chat session with a chat robot. …
+Powered furniture assembly
+
+US US10614694B1 Joel Zwier Steelcase Inc.
+Priority 2014-06-06 • Filed 2015-06-01 • Granted 2020-04-07 • Published 2020-04-07
+The sensor that determines if a person is within the space and/or the location of a chair within a space may take any of several different forms including a simple presence sensor, an entry and exit counter, a movement sensor, a camera that processes high definition images, etc. In at least some …
+Emoji recording and sending
+
+EP CN KR AU CN110520901B F·A·安祖里斯 苹果公司
+Priority 2017-05-16 • Filed 2018-05-16 • Granted 2021-01-05 • Published 2021-01-05
+and in accordance with a determination that the input includes activation of a recording affordance in the virtual avatar generation interface, generating an animated virtual avatar representing a sequence of changes in facial expression in a field of view of the camera over a period of time, …
+Patient monitoring using drug administration devices
+
+WO EP US CN US12051495B2 Frederick E. Shelton, IV Janssen Pharmaceuticals, Inc.
+Priority 2020-05-06 • Filed 2020-10-13 • Granted 2024-07-30 • Published 2024-07-30
+through the drug holder 110 manually. In other instances, the drive element 124 may be advanced through the drug holder 110 under control of a robotic surgical system. In other instances, the drive mechanism 126 may include a stored energy source 127 which advances the drive element 124 without …
+Multi-view deep neural network for LiDAR perception
+
+EP US JP JP2021089723A スモルヤンスキー ニコライ エヌビディア コーポレーション
+Priority 2019-11-15 • Filed 2020-11-13 • Published 2021-06-10
+In some embodiments, the input to the DNN is LiDAR data (eg, LiDAR range image, projection of LiDAR point cloud, etc.) and / or data from other sensors (eg, images from any number of cameras). The first stage can be formed from, and the first stage can extract classification data (eg, class …
+System and method for robotic ticket scratching via live remote mobile interface
+
+US US11554314B1 Paresh K. Patel PayRange Inc.
+Priority 2021-07-27 • Filed 2022-05-06 • Granted 2023-01-17 • Published 2023-01-17
+14. The method of claim 13 , wherein the one or more controllers are further configured to: receive user-provided signing data from the application server; and cause a robotic signature device to sign a signature area of the ticket in accordance with the user-provided signing data. 15. The method of
+Deep neural network for detecting obstacle instances using RADAR sensors in …
+
+EP US CN JP JP2021082293A ポポフ アレクサンダー エヌビディア コーポレーション
+Priority 2019-11-21 • Filed 2020-11-20 • Published 2021-05-27
+For example, the systems and methods described herein include robotics (eg, course planning for robots), aviation systems (eg, course planning for drones or other aircraft), ship systems (eg, boats or). It can be used in other technical areas such as course planning for other surface vessels) and / …
+Interactive transcription system and method
+
+US US8358320B2 Steven ZhiYing Zhou National University Of Singapore
+Priority 2007-11-02 • Filed 2008-11-03 • Granted 2013-01-22 • Published 2013-01-22
+1. An interactive system for providing a mixed or augmented reality experience to a user, the system comprising: an object having a transcription surface, the transcription surface for receiving a user's transcription; a tracker having a known position and orientation relative to the transcription …
+Deep neural network for detecting obstacle instances using RADAR sensors in …
+
+EP CN JP JP2021082294A ポポフ アレクサンダー エヌビディア コーポレーション
+Priority 2019-11-21 • Filed 2020-11-20 • Published 2021-05-27
+… from the set of lidar labels. By transmitting the set of lidar labels, the transmitted lidar label is formed, and the method is: A step of removing the transmitted set of lidar labels containing the radar detection less than the threshold number and leaving the remaining set of lidar labels.
+Devices, methods, and graphical user interfaces for interacting with user …
+US JP KR AU DK AU2020239726B1 Craig M. Federighi Apple Inc.
+Priority 2020-03-10 • Filed 2020-09-24 • Published 2021-08-05
+A computer system or electronic device displays, at a first time, a first user interface that includes a placement location and is configured to spatially accommodate a respective user interface object of a plurality of user interface objects, including first and second user interface objects. At …
+Systems, devices, and methods for enterprise system integration using machine …
+
+WO US US20240419950A1 Richard Chia Tsing Tong Neural Enterprises Inc.
+Priority 2023-06-16 • Filed 2024-06-14 • Published 2024-12-19
+claim 6 , wherein the DSL definition of the ML agent comprises an indication of an ability to generate a DSL script for the particular domain associated with the request. 8 . The method of claim 6 , wherein the DSL definition of the ML agent is specified via a manifest file definition of the ML agent.
+Augmented reality display with frame modulation
+
+WO EP US CN JP CN112567287A B·K·史密斯 奇跃公司
+Priority 2018-06-18 • Filed 2019-06-18 • Published 2021-03-26
+Modern computing and display technologies have facilitated the development of systems for so-called "virtual reality", "augmented reality", or "mixed reality" experiences, in which a digitally-rendered image, or a portion thereof, is presented to a user in some manner, where they appear or may be …
+Indicating observation or visibility patterns in augmented reality systems
+
+WO EP US CN US20140267411A1 Gene Fein Elwha Llc
+Priority 2013-03-15 • Filed 2013-03-15 • Published 2014-09-18
+circuitry for presenting an augmented reality representation in association with at least one affordance by which a user may filter the response data. 15 . The system of claim 14 wherein the circuitry for presenting an augmented reality representation in association with at least one affordance by …
+Method for providing augmented reality and virtual reality and electronic …
+
+US KR US20170011557A1 Olivia LEE Samsung Electronics Co., Ltd
+Priority 2015-07-06 • Filed 2016-07-06 • Published 2017-01-12
+may be formed of SoC, for example. Although some elements such as the cellular module 221 (e.g., the CP), the memory 230 , or the power management module 295 are shown as separate elements being different from the AP 210 in FIG. 2 , the AP 210 may be formed to have at least part (e.g., the cellular …
+Matching grid for avatars
+
+WO EP US CN JP AU CA CN111771231A S·M·科默 奇跃公司
+Priority 2018-02-27 • Filed 2019-02-13 • Published 2020-10-13
+In FIG. 1 , an MR scene 100 is shown in which a user of MR technology sees a real-world park-like setting 110 featuring people, trees, buildings in the background, and a concrete platform 120 . In addition to these items, the user of the MR technology also perceives that he "sees" a robot statue …
+Digital ledger-based health data sharing and management
+
+WO EP US JP KR CA KR20230054368A 빅토리아 르뮤 빅토리아 르뮤
+Priority 2020-07-20 • Filed 2021-07-20 • Published 2023-04-24
+Increased regulation reflects growing individual concerns about sharing health data. However, these regulations, if left untouched, create barriers for health care investigators and providers to access the real-world health data needed for AI-driven health advancement. Therefore, the inventors …
+Wordflow annotation
+WO EP US CN JP KR AU CA IL JP2019531538A ジェフリー ソマーズ， マジック リープ， インコーポレイテッドＭａｇｉｃ Ｌｅａｐ，Ｉｎｃ．
+Priority 2016-08-12 • Filed 2017-08-10 • Published 2019-10-31
+In everyday utterances in the modern world, they refer to ideas or concepts that are not common, ideas or concepts from a particular problem area, or because they are appropriate references to people or things unknown to the listener, It is common for a listener to encounter a new name or reference …
+Touch-sensitive keyboard
+WO US CN JP DE JP2019537084A フォーラインズ，クリフトン タクチュアル ラブズ シーオー．
+Priority 2016-09-16 • Filed 2017-09-15 • Published 2019-12-19
+A touch-sensitive keyboard is disclosed. In one embodiment, a touch-sensitive keyboard is provided having a touchpad area remote from keyboard keys. The keyboard is configured to override the sensitivity of the touchpad when a particular touch signal is received. In another embodiment, a touch- …
+Hmi-based pattern modification for robotic palletizing
+
+WO EP US US20200233553A1 Harold Roper Intelligrated Headquarters, Llc
+Priority 2016-07-26 • Filed 2020-04-03 • Published 2020-07-23
+21 . A method of creating a multidrop pattern of articles for robotic placement in layers on a pallet, the method comprising: receiving a first user input indicating a first placement position of a first subset of more than one article for placement on the pallet; receiving a second user input …
+Systems and Methods for an Autonomous Mobile Robot Fleet Coordination
+US US20250278100A1 Benjie Holson Robust AI, Inc.
+Priority 2024-03-01 • Filed 2024-08-29 • Published 2025-09-04
+determining routing information for the autonomous mobile robot, the routing information including a nominal route from a source location to a destination location, the autonomous mobile robot being configured to autonomously navigate the physical environment to execute the plurality of tasks based …
+Motion taxonomy for manipulation embedding and recognition
+
+US US20220012901A1 Yu Sun University Of South Florida
+Priority 2020-07-10 • Filed 2021-07-12 • Published 2022-01-13
+DETAILED DESCRIPTION The detailed description set forth below in connection with the appended drawings is intended as a description of various configurations and is not intended to represent the only configurations in which the concepts described herein may be practiced. The detailed description …
+Automatic bond on to energized power line for remote operations
+WO US WO2025144527A1 William Naber Altec Industries, Inc.
+Priority 2023-12-26 • Filed 2024-11-21 • Published 2025-07-03
+4. The system of claim 1 , further comprising: a plurality of tools stored at the remote assembly, wherein a first tool of the plurality of tools is a pin puller tool for decoupling a first end of an insulator from the phase, and wherein the robot unit further comprises at least one robotic arm …
+creative camera
+
+CN JP JP7349044B2 オーエス， マルセル ヴァン アップル インコーポレイテッド
+Priority 2018-05-07 • Filed 2023-05-22 • Granted 2023-09-21 • Published 2023-09-21
+A method, In an electronic device having a display device, displaying a media user interface via the display device, the media user interface including a media display area including a display of media items, and an effect affordance; detecting a gesture directed to the effect affordance; in …
+Authoring context aware policies with real-time feedforward validation in …
+
+US US20240078004A1 Xun Qian Meta Platforms Technologies, Llc
+Priority 2022-09-07 • Filed 2023-09-07 • Published 2024-03-07
+In many activities undertaken via AR. MR, AR, or VR, users are free to roam through simulated and physical environments that contain information and objects whose visualization and/or sound may be important to a user's experience within the simulated and physical environments. For example, an …
+Composition assistant manager for applications
+WO EP US CN KR CN121753030A 黃安莉 谷歌有限责任公司
+Priority 2023-08-25 • Filed 2024-08-26 • Published 2026-03-27
+To access features of the composition assistant manager 110, the composition assistant manager 110 includes a trigger engine 112 configured to render a call feature 138 on the display 126 of the user device 102. The call out affordance 138 may be a User Interface (UI) element, object, menu item, or …
+Risk Evaluation and Threat Mitigation Using Artificial Intelligence
+US US20260017743A1 Abhijit R. Nesarikar Abhijit R. Nesarikar
+Priority 2018-10-02 • Filed 2025-09-16 • Published 2026-01-15
+comprising at least one of: ANN, and reinforcement agent. AIE 105 may be capable of agency comprising at least one of: autonomy, locomotion, and in general the ability of an AIE to act on or influence its domain; an example of agency is manipulation of robotic arm 108 . AIE 105 may be for the most …
+System and method for haptic interactive experiences
+
+US US20220252881A1 Mark D. Wieczorek Mark D. Wieczorek
+Priority 2014-03-26 • Filed 2022-02-15 • Published 2022-08-11
+In one aspect, the invention is directed towards a method of operating a virtual experience, including: operating a server to communicate with a first user computing environment, the first user computing environment coupled to a first display, the first user computing environment configured to …
+Memory in personal intelligence
+
+WO EP US CN JP KR AU CA CN114127748A M·萨加尔 索美智能有限公司
+Priority 2019-07-08 • Filed 2020-07-08 • Published 2022-03-01
+querying an experience memory store to retrieve a second representation of the experience for a second modality; and The behavior of the embodied agent is guided using the second representation of the second modality. 37. A method-implementing system for selectively storing experiences experienced …
+Display control device, display control method, and program
+
+WO US WO2022224522A1 都夢 田原 ソニーグループ株式会社
+Priority 2021-04-21 • Filed 2022-01-28 • Published 2022-10-27
+The output control unit, as the display control, changes the state of the real object corresponding to the real space node forming the first combination to a state where the degree of conformity higher than the second degree of conformity is calculated. 2. The display control device according to …
+Interactive play apparatus
+WO EP US CN WO2019076845A1 Erik Hansen Lego A/S
+Priority 2017-10-16 • Filed 2018-10-16 • Published 2019-04-25
+In some embodiments, the play action may be indicative of a user-perceptible representation of an output or result of the play experience, e.g. a representation of a behaviour of a game character or another object that is part of the play experience, a representation of a game state, and/or the …
+Electronic device, computer-readable storage medium, and method executed at …
+
+CN CN110046020B M·万欧斯 苹果公司
+Priority 2018-05-07 • Filed 2018-09-28 • Granted 2021-01-15 • Published 2021-01-15
+The invention provides an avatar creation user interface. The present disclosure relates generally to creating and editing avatars and navigating avatar selection interfaces. In some examples, the avatar feature user interface includes a plurality of feature options that may be customized to …
+Methods and user interfaces for monitoring sound reduction
+
+US US12008290B2 Nicholas D. FELTON Apple Inc.
+Priority 2022-05-16 • Filed 2023-05-09 • Granted 2024-06-11 • Published 2024-06-11
+The present disclosure generally relates to user interfaces and techniques for managing and visualizing sound reduction using a computer system. In accordance with some embodiments, the computer system displays an indication that a second noise level is less than a first sound level when the …
+Methods and apparatus to automatically tune reinforcement learning …
+
+US US20240289639A1 James Brennan WORTH Substrate Artificial Intelligence Sa
+Priority 2023-02-23 • Filed 2023-02-23 • Published 2024-08-29
+Some example implementations can include applications in trading and finance, autonomous driving of automobiles, robotics, automation of equipment in industries, natural language processing including machine translation, speech recognition, speech generation, conversation generation, customer- …
+Controlling interactions with virtual objects
+
+WO EP US CN TW US20230140550A1 Brandon Furtwangler Meta Platforms Technologies, Llc
+Priority 2021-10-29 • Filed 2021-10-29 • Published 2023-05-04
+501 (or the surface of some other virtual item 108 ), the virtual environment 500 may display an affordance 504 that helps the user know where they have contacted the user interface. Within the virtual environment 500 , a virtual object may contact another virtual object when the tracked physical …
+System and method for distanced interactive experiences
+
+US US20220043263A1 Mark D. Wieczorek Mark D. Wieczorek
+Priority 2014-03-26 • Filed 2021-10-22 • Published 2022-02-10
+1 . A method of operating an augmented reality experience, comprising: operating a server to receive data about a maze from a first user computing environment as a first user traverses the maze, the first user computing environment coupled to a first augmented reality display, and wherein the …
+Avatar navigation, library, editing and creation user interface
+EP KR AU AU2023201250A1 Guillaume Pierre Andre Barlier Apple Inc.
+Priority 2018-05-07 • Filed 2023-03-01 • Published 2023-04-06
+18. The method of any of claims 1-17, the method further comprising: in accordance with a determination that the avatar navigation user interface does not include an avatar of the first type, displaying an avatar initiation user interface having an affordance associated with generating a new avatar …
+Systems and methods for sleep tracking
+
+US US20230389861A1 Nicholas D. FELTON Apple Inc.
+Priority 2022-06-03 • Filed 2023-06-01 • Published 2023-12-07
+claim 7 , wherein: the comparison interface includes: a third affordance corresponding to the first health metric; and a fourth affordance corresponding to a second health metric different from the first health metric, and the one or more programs further including instructions for: while displaying …
+System and Method for Digitally Simulated Ticket Scratching
+
+US US20250114690A1 Paresh K. Patel Payrange Llc
+Priority 2021-07-27 • Filed 2024-12-17 • Published 2025-04-10
+25 . The non-transitory computer readable storage medium of claim 21 , wherein the user-provided scratching input includes selection of an affordance on the user interface that causes the digital simulation to display a preconfigured or random scratching pattern. 26 . The non-transitory computer …
+Matching the navigation road map with the perception lane map
+US CN DE CN120403670A R·涅维亚多姆斯基 辉达公司
+Priority 2024-02-01 • Filed 2025-02-05 • Published 2025-08-01
+Systems for performing digital twin operations; Systems for performing deep learning operations; Systems implemented using edge devices; Systems implemented using robots; A system comprising one or more virtual machines VM; A system implemented at least in part in a data center; a system for …
+User interfaces for navigation
+WO US WO2023225129A1 Christopher B. Fleizach Apple Inc.
+Priority 2022-05-17 • Filed 2023-05-17 • Published 2023-11-23
+… to navigate from a first physical location to a second physical location. Enhancing the user’s interactions with the computer system improves the user's experience with the computer system and decreases user interaction time, which is particularly important where input devices are battery-operated.
+Microscope system and corresponding system, method and computer program
+WO EP EP4308990A1 Peter TEN HAVE Leica Instruments (Singapore) Pte Ltd
+Priority 2021-03-18 • Filed 2022-03-16 • Published 2024-01-24
+The surgical microscope system 100 shown in Fig. lb comprises a number of optional com ponents, such as a base unit 105 (comprising the system 110) with a (rolling) stand, the touch-screen 130, a (robotic or manual) arm 160 which holds the microscope 120 in place, and which is coupled to the base …
+Verification method, system, electronic device and storage medium based on …
+CN CN118583173B 蒋风洋 山东新一代信息产业技术研究院有限公司
+Priority 2024-07-31 • Filed 2024-07-31 • Granted 2024-12-13 • Published 2024-12-13
+the verification of scene graph navigation based on the output experience probability comprises the following steps: Determining whether the action instruction is reasonable or not based on the output experience probability, if so, executing the action instruction, and if not, returning to a …
+Targeted mentions for user correlation to a search term
+WO US WO2018085120A1 Anand Kumar Joshi Microsoft Technology Licensing, Llc
+Priority 2016-11-01 • Filed 2017-10-27 • Published 2018-05-11
+SUMMARY [0002] This Summary is provided to introduce a selection of concepts in a simplified form that are further described below in the Detailed Description. This Summary is not intended to identify key features or essential features of the claimed subject matter, nor is it intended to be used as …
+Threshold configuration and system for space
+
+US US11238382B1 Francis Gerard Graziano Steelcase Inc.
+Priority 2015-06-05 • Filed 2016-05-27 • Granted 2022-02-01 • Published 2022-02-01
+A system comprising a database storing schedule information associated with different meeting spaces, at least a first threshold display located proximate at least a first meeting space, an employee tracking system, a processor programmed to perform the steps of receiving employee tracking …
+System and method for trusted media origination
+US US20250247252A1 Scott Honji Scott Honji
+Priority 2024-01-26 • Filed 2024-01-26 • Published 2025-07-31
+BRIEF OVERVIEW This brief overview is provided to introduce a selection of concepts in a simplified form that are further described below in the Detailed Description. This brief overview is not intended to identify key features or essential features of the claimed subject matter. Nor is this brief …
+Information processing apparatus and information processing
+
+WO US US12217370B2 Tomu Tahara Sony Group Corporation
+Priority 2019-11-15 • Filed 2020-11-10 • Granted 2025-02-04 • Published 2025-02-04
+Furthermore, there is also a problem in that AR experiences available from one template AR content are fixed to only one experience unless the AR application scene is changed. For the purpose of coping with variations in scene in which the user experiences AR or changes in conditions, or display as …
+Natural language control of robots
+CN CN118900751A 卡罗尔·豪斯曼 谷歌有限责任公司
+Priority 2022-03-30 • Filed 2023-03-30 • Published 2024-11-05
+Generate a large language model (LLM) prompt based on the instruction; processing the LLM prompt using an LLM to generate an LLM output that models a probability distribution over candidate word formations that is dependent on the LLM prompt; For each of a plurality of robot skills each capable of …
+Design system and method using affordance feature repository
+
+WO US KR WO2014035079A1 김용세 성균관대학교산학협력단
+Priority 2012-08-30 • Filed 2013-08-12 • Published 2014-03-06
+A design system according to the present invention includes: a storage unit storing a plurality of affordances, one or more affordance features matched to each of the plurality of affordances, and design constraints respectively corresponding to each of the affordance features; a search unit that …
+System and method for controlling a smart gripping apparatus
+WO EP WO2024130377A1 Jingyang PENG Nexera Robotics Corporation
+Priority 2022-12-20 • Filed 2022-12-20 • Published 2024-06-27
+21. The method of Claim 20 wherein the one or more affordances is selected from a list consisting of affordance of being picked up, (i.e. the labeled region is on an item to be picked instead of on the bin or table top), affordance of being reached by the gripper without collision, affordance of …
+Creative camera
+
+KR AU KR20240024351A 마르셀 반 오스 애플 인크.
+Priority 2018-05-07 • Filed 2019-03-26 • Published 2024-02-23
+detecting a first gesture on the avatar selection area; and In response to detecting the first gesture on the avatar selection area, the method further includes displaying an avatar creation affordance associated with a function for adding a new avatar option to the plurality of avatar options.
+
+
+Systems and methods for simulating surgical procedures
+
+WO US US20240355219A1 Richard Vincent Fvrvs Limited
+Priority 2023-03-28 • Filed 2024-03-27 • Published 2024-10-24
+In some embodiments of the system, the haptic and/or visual feedback is computed using an algorithm based on one or more input parameters associated with the hand-held component and the simulated object, a visual effect on the simulated object, an affordance value of a simulated surgical instrument …
+Panelized artificial intelligence (ai) walls, furniture, and structures
+US US20250306560A1 Richard Chia Tsing Tong Edlen Habitat & Technologies
+Priority 2024-03-29 • Filed 2025-03-28 • Published 2025-10-02
+Technical Benefit or Technical Effect Core Innovations The major new ideas in this disclosure are based on three core innovations: 1. Manufacturing, construction and repair are one system. Instead of each having their own workflow and architecture, all things that are physical may be managed …
+… the manipulation performance of articulated objects of dexterous arm-hand robot
+CN CN119347799A 阚震 中国科学技术大学
+Priority 2024-12-25 • Filed 2024-12-25 • Published 2025-01-24
+The invention discloses a method, equipment and medium for optimizing the operation performance of a flexible arm hand robot articulated object, and belongs to the field of robot control. The method comprises the steps of 1, building an environment point cloud data set, complementing robot …
+Avatar integration with multiple apps
+
+CN CN111897614B 张宰祐 苹果公司
+Priority 2019-05-06 • Filed 2020-03-31 • Granted 2021-07-06 • Published 2021-07-06
+… programs further comprising instructions for: Simultaneously displaying: the first message, and An affordance that, when selected, causes the device to display a user interface including one or more options for configuring whether the first contactable user corresponds to an approved recipient.
+Algebraic device and methods of use thereof
+US US9092317B2 Dov Jacobson Dov Jacobson
+Priority 2009-10-26 • Filed 2010-10-26 • Granted 2015-07-28 • Published 2015-07-28
+This invention provides a novel affordance to algebra. It combines the immediacy of a manipulative with the power of a computer algebra system. Operations are executed in-place on a mutable expression, by direct manipulation of its terms by the user. Terms, whether simple or complex, can be …
+Stretchable fabric sensor, wearable electronic device including the same, and …
+
+US US20250102327A1 Huanbo SUN Yale University
+Priority 2022-09-15 • Filed 2024-09-20 • Published 2025-03-27
+BACKGROUND OF THE INVENTION In recent years, a growing interest in wearable electronic devices has turned continuous health monitoring into an achievable and mainstream concept, with revolutionary implications for human health, safety, and performance. While wearable commercial devices currently …
+Scene-to-text conversion
+WO US WO2021061450A1 Qsinx Management Llc
+Priority 2019-09-27 • Filed 2020-09-15 • Published 2021-04-01
+[0031] In some implementations, the setting 108 includes various objects 112, such as a character object 112a, a character object 112b, a robot object 112c, and a drone object 112c (collectively referred to as objects 112). In some implementations, the objects 112 are physical objects in a physical …
+System and method for runtime retargeting
+US US20250095261A1 Eray MOLLA Take-Two Interactive Software, Inc.
+Priority 2023-09-15 • Filed 2024-09-13 • Published 2025-03-20
+… the runtime constraints solver further comprises: forming, by the computing system at the runtime of the video game, one or more interaction islands, wherein said one or more interaction islands involve sets of entities that are interdependent based on one or more of the animation constraints;
+Method and electronic device to provide private information in response to …
+WO EP US CN KR US12499282B2 Jongtae KIM Samsung Electronics Co., Ltd.
+Priority 2021-07-16 • Filed 2022-06-21 • Granted 2025-12-16 • Published 2025-12-16
+based on the affordance feedback being applied to the second external device, providing the second private information based on an event occurrence time at which the private information-related event occurs; and based on the affordance feedback not being applied to the second external device, …
+Avatar creation user interface
+EP EP3584679B1 Nicolas Scapel Apple Inc.
+Priority 2018-05-07 • Filed 2019-05-02 • Granted 2023-04-19 • Published 2023-04-19
+A method (1200), comprising: at an electronic device having a display apparatus: displaying (1202), via the display apparatus, an avatar editing user interface that includes displaying: an avatar having a plurality of avatar features including (1204) avatar hair having a selected avatar hairstyle, …
+Avatar creation user interface
+AU AU2020100675B4 Guillaume Pierre André BARLIER Apple Inc.
+Priority 2018-05-07 • Filed 2020-05-01 • Granted 2020-07-09 • Published 2020-07-09
+A method, comprising: at an electronic device having a display apparatus and one or more cameras: displaying, via the display apparatus, a virtual avatar, having a plurality of avatar features, that changes appearance in response to detected changes in pose of a face in a field of view of the one …
+System and method for remote interaction between electronic devices
+WO EP US CN CN119856151A C·B·弗莱扎克 苹果公司
+Priority 2022-05-17 • Filed 2023-05-17 • Published 2025-04-18
+… by a first electronic device through image interaction with content on a second electronic device. Enhancing these interactions may improve the user's experience of using the device and reduce user interaction time, which is particularly important where the input device is battery powered.
+Surround scene perception using multiple sensors for autonomous systems and …
+WO WO2024015632A1 Minwoo Park Nvidia Corporation
+Priority 2022-07-15 • Filed 2023-07-17 • Published 2024-01-18
+The systems and methods described herein may be used for a variety of purposes, by way of example and without limitation, for machine control, machine locomotion, machine driving, synthetic data generation, model training, perception, augmented reality, virtual reality, mixed reality, robotics, …
+Object detection using polygons for autonomous systems and applications
+CN CN118503922A 郑阳 辉达公司
+Priority 2023-02-16 • Filed 2024-02-07 • Published 2024-08-16
+… one or more detected objects represented by one or more classifications in the scene correspond to one or more of a feature, a dynamic object, a static object, a crosswalk, a lane marker, a road boundary marker, a road marker, a sign, a traffic light, a vehicle, a pedestrian, a cyclist, or a robot.
+System and method for robotic ticket scratching via live remote mobile interface
+WO WO2023009670A1 Paresh K. PATEL Payrange, Inc.
+Priority 2021-07-27 • Filed 2022-07-27 • Published 2023-02-02
+What is claimed is: 1. A robotic ticket scratching system comprising: a controller configured to: receive a dispense command for a ticket dispensing machine; cause the ticket dispensing machine to dispense, based on the dispense command, a ticket having a scratching area; and receive user-provided …
+Construction method of VLA large model for hinged object manipulation
+CN CN119785010B 胡睿晗 哈尔滨工业大学
+Priority 2024-12-30 • Filed 2024-12-30 • Granted 2025-10-17 • Published 2025-10-17
+A method for constructing a large VLA model for manipulating articulated objects belongs to the field of embodied intelligent technology. The method is as follows: using a geometric center representation method to describe the Action Affordance of an articulated object; constructing an instruction …
+Systems and methods for navigating paths
+
+WO US US20250109950A1 Matthew J. Allen Apple Inc.
+Priority 2023-09-30 • Filed 2024-09-28 • Published 2025-04-03
+… THE DISCLOSURE Providing efficient ways of navigating predetermined and impromptu paths may improve the user's experience with the electronic device and reduce the number of inputs needed to reach a destination, thereby reducing power usage and improving the battery life of the electronic device.
+Systems, methods, and devices for managing coexistence of multiple transceiver …
+WO EP EP3308471B1 Mikko Pekka SANNALA Google LLC
+Priority 2015-06-14 • Filed 2016-06-14 • Granted 2025-03-26 • Published 2025-03-26
+A camera assembly, comprising: an enclosed housing (2901) comprising a plastic material; a lens module located within the enclosed housing (2901) and configured to receive light via a front surface; a circuit board (2926) comprising communication circuitry located within the enclosed housing (2901 …
+Object environment`s e.g. sea, temporal evolution simulation device for …
+FR FR2871262A1 Marc Parenthoen Cervval Sarl
+Priority 2004-06-02 • Filed 2004-12-01 • Published 2005-12-09
+… , that visualization of the medium (here the sea) is only an option offered by the device D according to the invention. This results from the fact that a user (or observer) is placed at the same conceptual level as the entities that carry out the animation, and thus constitutes an autonomous entity.
+Management of psychiatric or mental conditions using digital reality with …
+WO US WO2024081432A9 Roward AGULTO BehaVR, LLC
+Priority 2022-10-13 • Filed 2023-10-13 • Published 2024-07-18
+15. The method of any preceding claim, wherein the interactive DR scene further comprises a third affordance region different from the first affordance region and the second affordance region, wherein the third affordance region comprises a chart depicting a progression of the subject through the …
+Bipedal action model for humanoid robot
+US US20260070221A1 Corey Lynch Figure Ai Inc.
+Priority 2024-09-10 • Filed 2025-09-10 • Published 2026-03-12
+The present disclosure provides a system for generating motor control commands for a humanoid robot, comprising an alpha model with over 1 billion parameters that processes visual observations and language instructions at a first frequency to generate contextual embeddings, and a beta model …
+Systems and methods for modeling morphogenesis
+WO WO2025213096A1 Michael Levin Trustees Of Tufts College
+Priority 2024-04-04 • Filed 2025-04-04 • Published 2025-10-09
+… NCA developing to reach the target pattern based on the local update rules and the set of parameters; and outputting to a user a report of the characterized evolutionary process of the NCA, in which the report allows the user to relate the evolutionary process to morphogenetic pattern formation.
+Cross-scene object marking method, device, equipment, medium and product
+CN CN121880926A 曹瑞 星环信息科技(上海)股份有限公司
+Priority 2025-12-25 • Filed 2025-12-25 • Published 2026-04-17
+Along with the development of deep learning and computer vision technology, multi-mode object recognition has become one of the core capabilities of intelligent systems, and is widely applied to the fields of robot operation, automatic driving, intelligent monitoring, augmented reality and the like …
+Intelligent agent task execution methods, intelligent agents, storage media and …
+CN CN121117993A 王琛 上海智位机器人股份有限公司
+Priority 2025-08-25 • Filed 2025-08-25 • Published 2025-12-12
+The autonomous agents such as robots are enabled to master complex skills by mimicking learning (Imitation Learning, IL). Imitate learning, in particular its mainstream model behavioral clone (Behavioral Cloning, BC), aims at enabling agents to reproduce task strategies by learning expert …
+Creative camera
+
+KR AU KR20210129250A 마르셀 반 오스 애플 인크.
+Priority 2018-05-07 • Filed 2019-03-26 • Published 2021-10-27
+detecting a gesture for an effect affordance; and in response to detecting the gesture for the effect affordance, displaying a plurality of effect options for applying effects to the media item concurrently with presentation of the media item, determining that the media item is associated with …
+Real-time 3D robot status
+WO EP US CN JP KR JP2024536119A スタチュルスキー・メリッサ オーリス ヘルス インコーポレイテッド
+Priority 2021-09-28 • Filed 2022-09-14 • Published 2024-10-04
+25. The robotic medical system of claim 24, wherein the manual action includes docking each of the robotic arms to a respective cannula corresponding to the robotic arm. 25. The robotic medical system of claim 24, wherein the manual action includes attaching at least one of the robotic arms with a …
+Teleoperation method for body-building robot, body-building robot and system
+CN CN121912391A 李建刚 卧安科技(深圳)有限公司
+Priority 2026-02-14 • Filed 2026-02-14 • Published 2026-04-24
+10. The embodied robot according to claim 9, characterized in that, before receiving the task instruction for the target virtual object marked in the virtual scene, the embodied robot is further configured to: Collect attribute information of the target real object in the real scene; Based on the …
+Method and user interface for monitoring sound reduction
+WO EP US CN CN119183555A N·D·费尔顿 苹果公司
+Priority 2022-05-16 • Filed 2023-05-11 • Published 2024-12-24
+The present disclosure as a whole relates to user interfaces and techniques for managing and visualizing sound reduction using a computer system. According to some embodiments, when the computer system is using a sound reduction device, the computer system displays an indication that a second …
+The interactive hypnotherapeutic computer-implemented system based on …
+WO WO2025252323A1 Anna Helena MALINOWSKA Uniwersytet Slaski W Katowicach
+Priority 2024-06-04 • Filed 2024-06-14 • Published 2025-12-11
+The idea behind the system according to the invention was to create an abstract Artificial Intelligence (Al) modality: one which does not reflect the prevailing isomorphic models based on mimicry, but one that negotiates the human-AI experience with regard to respective phenomenologies. The idea …
+A smart suturing system and method for cesarean section scar uterus
+CN CN120959820A 梁海霞 中国人民解放军空军军医大学
+Priority 2025-08-07 • Filed 2025-08-07 • Published 2025-11-18
+Therefore, a new generation of suture reinforcement architecture capable of performing deep fusion and forming a "perception-decision-execution" synergistic effect on a plurality of advanced technologies is needed clinically, so as to fundamentally solve the problems of accuracy, safety and …
+Device for training motor cortical areas of a brain of a human subject
+
+WO EP EP4552575A1 Thierry POZZO Université de Bourgogne
+Priority 2023-11-07 • Filed 2023-11-07 • Published 2025-05-14
+The device of anyone of claims 1 to 5, wherein the visual and/or auditory stimuli are produced using computer graphics tools and methods for activating a perceptual property of the brain, the perceptual property being selected among a motor resonance, an affordance, a visual inference allowing …
+Head-mounted device displaying screen corresponding to content and method for …
+
+EP US US20250037389A1 Hungi PARK Samsung Electronics Co., Ltd.
+Priority 2023-07-25 • Filed 2024-07-25 • Published 2025-01-30
+display at least one affordance related to a second safety zone corresponding to the second space through the display based on the execution condition of the second space being not satisfied; and based on an input corresponding to the at least one affordance, provide the content corresponding to …
+Head mounted device displaying screen corresponding to content and operating …
+
+KR KR20250015689A 박훈기 삼성전자주식회사
+Priority 2023-07-25 • Filed 2023-10-17 • Published 2025-02-03
+At least one processor (810; 120) of the above: As at least a part of an operation of displaying at least one affordance (1400; 1500; 1600; 1710, 1720, 2200) that induces the input, displaying at least one affordance (1400; 1500; 1600; 1710, 1720, 2200) that induces the gaze input of the user (U), …
+Head-mounted device for displaying screen corresponding to content, and …
+
+WO WO2025023581A1 박훈기 삼성전자주식회사
+Priority 2023-07-25 • Filed 2024-07-12 • Published 2025-01-30
+An operation (2370) of displaying at least one affordance (1400; 1500; 1600; 1710, 1720, 2200, affordance) related to a second safe area (Z2) corresponding to the second space (S2) through the display (830; 160; 225) based on not satisfying the execution condition of the second space (S2) above ( …
+Systems and methods for sleep tracking
+WO EP CN CN119365933A N·D·费尔顿 苹果公司
+Priority 2022-06-03 • Filed 2023-06-02 • Published 2025-01-24
+7. The method according to any one of claims 1 to 6, further comprising: displaying a sleep stage user interface including a comparison affordance representation; detecting, via the one or more input devices, a selection of the comparison affordance while displaying the sleep stages user interface;
+System and method for training and using a bipedal spatial perception model
+US US20260084314A1 Hao Wu Figure Ai Inc.
+Priority 2024-09-26 • Filed 2025-09-26 • Published 2026-03-26
+22 . The humanoid robot system of claim 1 , wherein the synthetic dataset is further supplemented with specific target domain data to bolster specific inaccuracies of the bipedal spatial perception model. 23 . The humanoid robot system of claim 1 , wherein training of the bipedal spatial perception …
+Synchronous Rendering
+EP CN CN119301557A V·卡萨拉巴达 苹果公司
+Priority 2022-06-04 • Filed 2023-05-31 • Published 2025-01-10
+9. The method of claim 7, wherein the particular layout is a layout last used by the first device for the second device. 10. The method of any of claims 1 to 9, wherein the layout comprises a definition of an initial position of at least one user interface element. 11. The method of any one of …
+Electronic device and method for providing virtual iot environment
+WO EP US CN US20250280054A1 Kyoungae KIM Samsung Electronics Co., Ltd.
+Priority 2022-11-21 • Filed 2025-05-16 • Published 2025-09-04
+, wherein at least one processor, individually and/or collectively, is configured to cause the electronic device to: display an affordance item corresponding to the virtual IoT device; and provide a purchase screen for purchasing an IoT device corresponding to the virtual IoT device, based on an …
+Electronic device and method for providing virtual iot environment thereof
+
+KR KR20240074600A 김경애 삼성전자주식회사
+Priority 2022-11-21 • Filed 2022-12-08 • Published 2024-05-28
+According to any one of claims 1 to 6, The processor, An electronic device configured to display an affordance item corresponding to the virtual IoT device. According to clause 7, An electronic device configured to provide a purchase screen for purchasing an IoT device corresponding to the virtual …
+Method and apparatus for providing interface to control external device
+
+KR KR20230132324A 구본헌 삼성전자주식회사
+Priority 2022-03-08 • Filed 2022-03-11 • Published 2023-09-15
+The method of claim 18, wherein the displaying operation is: and providing a corresponding visual affordance based on detecting a trigger related to control of the external device, The visual affordance is, A method comprising a representative image and/or text capable of identifying the external …
+Method and apparatus for providing interface for controlling external device
+WO WO2023172064A1 구본헌 삼성전자 주식회사
+Priority 2022-03-08 • Filed 2023-03-08 • Published 2023-09-14
+An electronic device configured to provide the visual affordance through an area adjacent to a physical input device of the electronic device. The method of claim 7, wherein the processor: An electronic device configured to provide the visual affordance as a pop-up based on a designated area on a …
+System and method for robotic ticket scratch processing via live remote mobile …
+EP JP ES JP2024508208A キッチン，マイケル ペイレンジ インコーポレイテッド
+Priority 2021-07-27 • Filed 2022-07-27 • Published 2024-02-26
+the controller is further configured to receive user-provided signature data from the application server; The robotic ticket scratch processing system further comprises a robotic signature mechanism configured to sign a signature field of the ticket according to the user-provided signature data.
+Method and apparatus for providing interface for controlling external device
+
+EP US EP4468133A1 Bonheon Koo Samsung Electronics Co., Ltd.
+Priority 2022-03-08 • Filed 2023-03-08 • Published 2024-11-27
+The method of claim 14, wherein the displaying comprises providing, based on the detection of the trigger related to control of the external device, a corresponding visual affordance, and wherein the visual affordance comprises a representative image and/or text which enables the external device …
+Hierarchical datastore for an agent
+US US11379471B1 Daniel Laszlo Kovacs Apple Inc.
+Priority 2019-09-26 • Filed 2020-08-20 • Granted 2022-07-05 • Published 2022-07-05
+, wherein the second data type corresponds to skills, tasks or animations. 9. The method of claim 8 , wherein the second storage hierarchy stores events and experiences associated with the CGR representation of the agent. 10. The method of claim 8 , wherein the second storage hierarchy stores facts …
+Systems and methods for navigating paths
+CN122003580A M·J·艾伦 苹果公司
+Priority 2023-09-30 • Filed 2024-09-28 • Published 2026-05-08
+… Providing an efficient way to navigate the predetermined path and the presence path may improve the user's experience with the electronic device and reduce the number of inputs required to reach the destination, thereby reducing power usage and extending battery life of the electronic device.
+Using text for avatar animation
+SG SG10202001701YA Serag El Din Hussen Abdelaziz Ahmed Apple Inc
+Priority 2020-02-26 • Filed 2020-02-26 • Published 2021-09-29
+… that more accurately conveys the desired message to the recipient. Accordingly, generating the speech data set and the set of parameters representing one or more movements of the avatar in this manner provides for greater flexibility and accuracy, resulting in a more enjoyable user experience.
+User interface for detecting objects
+WO EP US CN CN119301565A A·莱蒂尔 苹果公司
+Priority 2022-05-17 • Filed 2023-05-17 • Published 2025-01-10
+… devices, etc. In some cases, a user may want to use such a device to detect an object. Enhancing the user's interaction with the device improves the user's experience with the device and reduces the user's interaction time, which is particularly important when the input device is battery powered. …
+Contextual speech interpretation using large language models
+WO WO2025212445A1 Joel Ruben Antony MONIZ Apple Inc.
+Priority 2024-04-05 • Filed 2025-03-28 • Published 2025-10-09
+An example process includes receiving a speech input from a user and obtaining a representation of the speech input. The process further includes in accordance with a determination that at least one entity within the representation requires disambiguation: adjusting the representation by adding an …
+Contextual speech interpretation using large language models
+US US20250316262A1 Joel Ruben Antony MONIZ Apple Inc.
+Priority 2024-04-05 • Filed 2025-01-16 • Published 2025-10-09
+An example process includes receiving a speech input from a user and obtaining a representation of the speech input. The process further includes in accordance with a determination that at least one entity within the representation requires disambiguation: adjusting the representation by adding an …
+Systems and methods for generating physical activity related data based on …
+US US20260012701A1 Benjamin Neal Bethurum Meta Platforms Technologies, Llc
+Priority 2022-06-09 • Filed 2025-09-09 • Published 2026-01-08
+Additionally, conventional wearable devices that include a display require a user to bring up their device and/or physically interact with the wearable device to capture or review an image, which takes away from the user's experience and can lead to accidental damage caused to such devices after …
+
+"object action effect" AND concept AND robot AND abstraction：无
+
+robot AND "concept hierarchy" AND experience AND interaction：
+
+
+Intelligent adaptive retrieval enhancement system, method and storage medium
+CN CN118210983B 张其来 山东浪潮科学研究院有限公司
+Priority 2024-05-22 • Filed 2024-05-22 • Granted 2024-07-30 • Published 2024-07-30
+1. An intelligent adaptive search enhancement system, comprising: the interaction module is used for performing man-machine interaction; a knowledge base for storing a knowledge graph composed of a plurality of triples obtained by extracting text data of each field; a data source for providing …
+Resistive touch sensor system and method
+WO US CN JP KR CA CN105934733B 伊利亚·丹尼尔·罗森伯格 森赛尔股份有限公司
+Priority 2013-09-27 • Filed 2014-09-27 • Granted 2019-02-22 • Published 2019-02-22
+Therefore, it is necessary to can highly precisely track to touch and can biography with reasonable prices point to manufacture over a large area Sensor.Finally, user needs the extra dimension of interaction.The technology can not only provide essence on a large surface with reasonable prices point …
+Method and system for embedding visual intelligence
+
+US US9129158B1 Swarup Medasani Hrl Laboratories, Llc
+Priority 2012-03-05 • Filed 2012-03-05 • Granted 2015-09-08 • Published 2015-09-08
+illustrates a spatio-temporal representation of video flow according to the present invention; FIG. 4A illustrates an action-concept hierarchy according to the present invention; FIG. 4B illustrates a Partially Dynamic Bayesian Network (PDBN) representing static and dynamic nodes according to the …
+Any-To-Any System For Doing Computing
+
+WO EP US US20100257507A1 Peter D. Warren Warren Peter D
+Priority 2008-12-05 • Filed 2008-12-05 • Published 2010-10-07
+A method for constructing software in the form of an Any-to-Any computing system by making an Any-to-Any data machine and an Any-to-Any computer code machine harmoniously interact when executed by a computing-capable host so as to produce useful results, consisting of a Boss Module recorded on …
+… customer service processing method and system based on personalized robot
+CN CN118433311B 谢仕梅 深圳市海那边科技有限公司
+Priority 2024-07-05 • Filed 2024-07-05 • Granted 2024-09-13 • Published 2024-09-13
+7. A telephone customer service processing device based on a personalized robot, used to execute the telephone customer service processing method based on a personalized robot as described in any one of claims 1 to 6, characterized in that the device comprises: The acquisition module is used to …
+Developmental Network Two, Its Optimality, and Emergent Turing Machines
+
+US US20190392321A1 Juyang Weng Juyang Weng
+Priority 2018-02-01 • Filed 2019-02-01 • Published 2019-12-26
+shows properties of each neuron according to its location. 11 ) A maximum likelihood optimization property of claim 3 where each neuron is optimal based on limited computational resources and limited learning experience. 12 ) A process of claim 1 where the neurons are generated incrementally through …
+A kind of method and device of creation of knowledge collection of illustrative …
+CN CN107665252A 毛瑞彬 深圳证券信息有限公司
+Priority 2017-09-27 • Filed 2017-09-27 • Published 2018-02-06
+… a series of A variety of figures, it can be used for presenting between knowledge resource, knowledge resource carrier, excavation, analysis, structure and explicit knowledge Incidence relation.Knowledge mapping can be used for the intelligent answer of intelligent robot, and application is wider.
+Intelligent auxiliary processing method for legal affairs and multi-intelligent …
+CN CN120256605B 屈昭 贵州中汇科技发展有限公司
+Priority 2025-06-05 • Filed 2025-06-05 • Granted 2025-09-12 • Published 2025-09-12
+Based on the multi-case relationship perception preference mapping, a planning tree PLANTOR framework is constructed by combining a large language model with Prolog-based knowledge management technology to generate a robot-oriented knowledge base and planning program, and convert them into a …
+Interactive concept editing in computer-human interactive learning
+WO EP US CN KR WO2015006630A2 Patrice Y. Simard Microsoft Corporation
+Priority 2013-07-12 • Filed 2014-07-11 • Published 2015-01-15
+INTERACTIVE CONCEPT EDITING IN COMPUTER-HUMAN INTERACTIVE LEARNING BACKGROUND [0001] A collection of data that is extremely large can be difficult to search and/or analyze. For example, in the case of the Web, a large fraction of the data is unstructured and value is locked in the data itself. It …
+An intelligent data management system and method based on multi-source data …
+CN CN120257113A 孙广芝 中国标准化研究院
+Priority 2025-06-05 • Filed 2025-06-05 • Published 2025-07-04
+The equipment health management system is connected to various sensors on core production equipment such as CNC (computer numerical control) machine tools, injection molding machines, robots and the like through an industrial sensor acquisition unit, acquires equipment operation parameters in real …
+Semantic-based industrial production equipment predictive maintenance system
+
+CN CN111178603A 耿道渠 重庆邮电大学
+Priority 2019-12-19 • Filed 2019-12-19 • Published 2020-05-19
+The invention discloses a semantic-based predictive maintenance system for industrial production equipment. The overall architecture of the system: the original information layer includes equipment maintenance documents, equipment parameter indicators, expert experience related to equipment …
+Method, device and equipment for processing event role in text and storage …
+
+CN CN110781302A 刘知远 清华大学
+Priority 2019-10-23 • Filed 2019-10-23 • Published 2020-02-11
+… natural language, the language that people use on a daily basis, so it has a strong connection to linguistics. Natural language processing technology usually includes text processing, semantic understanding, machine translation, robot question answering, knowledge graph and other technologies.
+Systems and methods for processing data for storing in a feature store and for …
+WO US KR US12591790B2 Timothy Schoenharl Coupang Corp.
+Priority 2020-12-10 • Filed 2021-12-07 • Granted 2026-03-31 • Published 2026-03-31
+Internal front end system 105 , in some embodiments, may be implemented as a computer system that enables internal users (e.g., employees of an organization that owns, operates, or leases system 100 ) to interact with one or more systems in system 100 . For example, in embodiments where system 100
+Risk warning method, device, equipment and computer storage medium
+
+CN CN114462742A 吴杰 腾讯科技（深圳）有限公司
+Priority 2020-11-10 • Filed 2020-11-10 • Published 2022-05-10
+Through the embodiment of the application, the system and the method, the possibility of risk of the client can be rapidly and accurately positioned by the auditor, the auditing efficiency and accuracy are greatly improved, and meanwhile, the requirement on the experience of the auditor is also …
+Knowledge graph construction method, device, electronic device and storage …
+CN CN117633245B 张正萍 重庆赛力斯新能源汽车设计院有限公司
+Priority 2023-11-24 • Filed 2023-11-24 • Granted 2024-12-06 • Published 2024-12-06
+Obtaining all entity pairs in the feature vector, and calculating global interaction matrix confidences of all entity pairs; Using a multi-head attention mechanism algorithm to update the global interaction matrix confidence; Based on the updated global interaction matrix confidence, the entity …
+Intelligent design method for ship structure welding process based on examples …
+CN CN117763705A 黄勇 南京理工大学
+Priority 2023-08-07 • Filed 2023-08-07 • Published 2024-03-26
+The three-dimensional MBD representation of the part based on the CATIA realizes the BOM structure tree expression of all information, and the information related to the welding seam can be exported to a welding process design module by utilizing the CATIA interactive interface to carry out …
+Method for learning task skill and robot using thereof
+
+KR KR20130010182A 서일홍 한양대학교 산학협력단
+Priority 2011-07-18 • Filed 2011-07-18 • Published 2013-01-28
+The present invention relates to a method for learning a work technique and a robot according to the present invention, the method for learning a work technique according to the present invention, raw information sensed from the surrounding environment according to a method (method) and a method …
+Equipment operation and maintenance method and device based on knowledge graph …
+CN CN118041802A 李度 武汉烽火技术服务有限公司
+Priority 2024-02-19 • Filed 2024-02-19 • Published 2024-05-14
+In the prior art, the operation and maintenance of the communication equipment are often performed manually, but the equipment in the optical communication network is numerous, so that the operation and maintenance are extremely dependent on the experience of operation and maintenance personnel, …
+Entity relationship extraction method, device and equipment for building …
+CN CN120832942A 张晟 腾讯医疗健康(深圳)有限公司
+Priority 2024-04-17 • Filed 2024-04-17 • Published 2025-10-24
+… . Artificial intelligence infrastructure technologies generally include, for example, sensors, dedicated artificial intelligence chips, cloud computing, distributed storage, big data processing technologies, pre-training model technologies, operation/interaction systems, mechatronics, and the like.
+A method and system for condensing safety knowledge through self-reflection of …
+CN CN120217358A 李挥 北京大学深圳研究生院
+Priority 2025-02-18 • Filed 2025-02-18 • Published 2025-06-27
+In 2024, 11 months, the first real case of large-model "corpus pollution" occurs, a user builds an auxiliary transaction robot through ChatGPT programming, but the code generated in ChatGPT calls a malicious API address, and directly provides the private key plaintext for malicious API processing, …
+Intelligent coaching method and device, electronic equipment and storage medium
+
+CN CN113407703A 张其科 北京明略昭辉科技有限公司
+Priority 2021-07-14 • Filed 2021-07-14 • Published 2021-09-17
+FIG. 2 is a schematic diagram of a scenario of an embodiment of the present invention, as shown in FIG. 2, illustrating an intelligent robot, in which the intelligent coaching method of the present invention is implemented. The small and clear role is a communication robot which has the function of …
+Priority-based virtual environment
+
+WO EP US JP KR DE TW US6329986B1 Doreen Yining Cheng U.S. Philips Corporation
+Priority 1998-02-21 • Filed 1998-02-21 • Granted 2001-12-11 • Published 2001-12-11
+further comprising an attention component that enables the participant to interact with one or more virtual objects, in whole and via one or more features thereof, and wherein the priority component includes as a base parameter the circumstance of any such interaction and associates a weight …
+Robot-based knowledge graph library construction method and device, robot and …
+
+CN CN115687653A 张忠海 北京航天测控技术有限公司
+Priority 2022-11-08 • Filed 2022-11-08 • Published 2023-02-03
+This application relates to a robot-based knowledge map library construction method, device, robot and medium, and relates to the field of robot technology. The data layer contains entity structured data, which is abstractly identified and processed according to the entity structured data to …
+Learning Machines that Are Free from Post-Selections
+US US20250284935A1 Juyang Weng Juyang Weng
+Priority 2022-05-05 • Filed 2022-05-05 • Published 2025-09-11
+) wherein the performance is compared based on four conditions, (1) a body including sensors and effectors, (2) a set of restrictions of learning framework, including whether task-specific or task-nonspecific, batch learning or incremental learning, (3) a training experience and (4) a limited amount …
+Information processing apparatus, information processing method, and program
+
+JP JP4539149B2 康治 浅野 ソニー株式会社
+Priority 2004-04-14 • Filed 2004-04-14 • Granted 2010-09-08 • Published 2010-09-08
+However, in a conventional interactive process using a hierarchical scenario, in order to select an optimal scenario among scenarios suitable for a plurality of topics, a scenario of a higher hierarchy such as a root scenario is: You must have a complete understanding of the content of the scenario …
+Explainable neural network, related computer-implemented method, and system for …
+TW TWI810549B 安杰羅 達利 馬爾他商優奈有限公司
+Priority 2021-04-16 • Filed 2021-04-16 • Granted 2023-08-01 • Published 2023-08-01
+An architecture for an explainable neural network may implement a number of layers to produce an output. The input layer may be processed by both a conditional network and a prediction network. The conditional network may include a conditional layer, an aggregation layer, and a switch output layer …
+Intelligent analysis method for complex text open source data based on deep …
+CN CN121766303A 鞠铖 贵州财经大学
+Priority 2026-02-27 • Filed 2026-02-27 • Published 2026-03-31
+This invention discloses an intelligent analysis method for complex open-source text data based on deep semantic parsing. It collects multi-source heterogeneous text data through adaptive web crawling, applies T-matrix approximation techniques to handle data scattering problems, and constructs a …
+Method and Apparatus for Adjusting Natural Language Sentence
+WO EP US CN US20250284885A1 Zhen Hua Zhou Siemens Aktiengesellschaft
+Priority 2022-04-28 • Filed 2022-04-28 • Published 2025-09-11
+A corresponding language generation system is a computer model based on language information processing, which operates in a process opposite to natural language analysis, starts from an abstract concept hierarchy, and generates a text by selecting and executing specific semantic and grammatical …
+Methods, apparatus, computer equipment, storage media, and computer program …
+CN CN121144627A 浦宪功 中铁高新工业股份有限公司
+Priority 2025-11-18 • Filed 2025-11-18 • Published 2025-12-16
+And performing incremental updating on the initial knowledge graph through user interaction feedback and/or new data input, and detecting and eliminating knowledge conflict and redundant information in the knowledge graph based on a mechanism combining a rule base and a machine learning model to …
+Domain language processing method and storage medium based on word network and …
+CN CN116502651A 董华来 电子科技大学长三角研究院(湖州)
+Priority 2023-04-21 • Filed 2023-04-21 • Published 2023-07-28
+For example, the invention patent CN103514157B (Li Xinde, Zhang Xiulong, Wang Fengyu, etc. A path natural language processing method for indoor intelligent robot navigation, 2014.) realizes in the field of indoor intelligent robot navigation by analyzing the syntactic structure and noun entity …
+
+"cross embodiment" AND concept AND transfer AND robot：
+
+
+Apparatus for processing and grading food articles and related methods
+WO EP US US11344036B2 Helgi Hjalmarsson Valka Ehf
+Priority 2015-03-02 • Filed 2016-03-02 • Granted 2022-05-31 • Published 2022-05-31
+or any combination of (i)-(iii). 14. The grading device of claim 1 , wherein the surface of the conveyor is configured to move in a direction that is perpendicular to the parallel orientation of the portions of the food article. 15. The grading device of claim 1 , wherein the portion of the food …
+Glass separation apparatus and methods of separating a glass ribbon
+WO TW TW202222718A 傑瑞德席曼 艾登伯格 美商康寧公司
+Priority 2020-09-10 • Filed 2021-08-30 • Published 2022-06-16
+by a third connecting conduit 137 . In some embodiments, molten material 121 may be gravity fed from mixing chamber 131 to transfer vessel 133 via third connecting conduit 137 . For example, in some embodiments, gravity may drive molten material 121 through the interior path of third connecting …
+Bipedal action model for humanoid robot
+US US20260070221A1 Corey Lynch Figure Ai Inc.
+Priority 2024-09-10 • Filed 2025-09-10 • Published 2026-03-12
+2 - 3 . (canceled) 4 . The system of claim 1 , wherein the alpha model is deployed on a remote server and the beta model is deployed on local processors integrated within the robot. 5 - 8 . (canceled) 9 . The system of claim 1 , wherein the alpha model operates at between 1 μHz to 10 hz and includes between …
+ChronoSymbolic Operating System for Temporal Cognition, Narrative Memory, …
+US US20260004196A1 Samuel Odeh Samuel Odeh
+Priority 2025-07-18 • Filed 2025-07-18 • Published 2026-01-01
+2 . A semantic cognition layer for AGI agents, comprising: a language processing module configured to compress input and output into symbolic concept graphs; a memory anchoring engine configured to assign event-weighted symbolic tags to cognitive memories; and a decision referencing mechanism …
+Method and apparatus for reinforcement learning
+WO WO2025227355A1 Hang SU Robert Bosch Gmbh
+Priority 2024-04-30 • Filed 2024-04-30 • Published 2025-11-06
+FIG. 2 illustrates a schematic diagram of a framework for cross-embodiment unsupervised RL according to one or more aspects of the present disclosure. The framework 200 of the cross-embodiment unsupervised RL may comprise a cross embodiment pre-training stage 210, a fine-tuning stage 220 and a pre- …

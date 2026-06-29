@@ -1,0 +1,822 @@
+﻿"concept label" AND "typical pattern" AND experience AND robot：无
+"concept update" AND robot AND experience AND consequence：无
+"concept matching" AND situation AND transfer AND experience：
+
+Physician scheduling systems for matching medical providers and patients
+
+US US9996666B1 Eric Wilson MD Insider, Inc.
+Priority 2013-09-10 • Filed 2016-09-23 • Granted 2018-06-12 • Published 2018-06-12
+In one embodiment, a matching-engine system may receive a set of physician-selection parameters from an administrator. The physician-selection parameters may comprise a range of acceptable performance-scores and experience-scores for physicians. The matching-engine system may receive, from a user, …
+Search engine systems for matching medical providers and patients
+
+US US9977866B2 David Lee Norris MD Insider, Inc.
+Priority 2013-09-10 • Filed 2014-09-10 • Granted 2018-05-22 • Published 2018-05-22
+receiving, by one or more computing devices of a matching-engine system, from an administrator of the matching-engine system a set of physician-selection parameters comprising: a performance-score-range for physicians; and an experience-score-range for physicians; storing, by one or more of the …
+Systems and methods for multi-tier resource and subsystem orchestration and …
+
+US US11736412B1 William Dan Roberts C/Hca, Inc.
+Priority 2019-05-23 • Filed 2021-11-08 • Granted 2023-08-22 • Published 2023-08-22
+indicia of device interactions or data changes that correspond to operation performances by operation-performing resources; indicia of conditions of loads corresponding to exceeding a threshold, exhibiting an above-threshold change, or having a particular value; or indicia of operations associated …
+Ontology mapping method and apparatus
+
+WO EP US CN JP KR AU CA IL SG US20240152542A1 Albert Donald Tonkin Semantic Technologies Pty Ltd
+Priority 2014-04-02 • Filed 2023-12-22 • Published 2024-05-09
+U.S. Pat. No. 7,464,099 provides a method of transferring content from a file and a database. In this case, the file includes content instances, each content instance being associated with a respective field, and each field having a respective type. The transfer is achieved by determining the type …
+Ontology aligner method, semantic matching method and apparatus
+
+WO US JP IL SG US11625424B2 Albert Donald Tonkin Semantic Technologies Pty Ltd.
+Priority 2014-04-24 • Filed 2015-04-24 • Granted 2023-04-11 • Published 2023-04-11
+FIG. 4 is a schematic diagram of an example of an computer system; FIG. 5 is a flow chart of an example of a method for use in generating a mapping for transferring content between source and target data structures; FIG. 6 is a flow chart of an example of a method of generating a putative ontology;
+Systems and methods of clinical trial evaluation
+
+WO EP US US20200381087A1 Jonathan Ozeran Tempus Labs
+Priority 2019-05-31 • Filed 2020-06-01 • Published 2020-12-03
+Thus, what is needed is a system that is capable of efficiently capturing all relevant clinical trial and patient data, including disease/condition data, trial eligibility criteria, trial site features and constraints, and/or clinical trial status (recruiting, active, closed, etc.). Further, what …
+Putative ontology generating method and apparatus
+
+US US11556578B2 Albert Donald Tonkin Semantic Technologies Pty Ltd
+Priority 2014-05-12 • Filed 2019-11-22 • Granted 2023-01-17 • Published 2023-01-17
+The term “content instance” refers to an individual piece of content that is being extracted from a source and/or transferred to a target and is also not intended to be limiting. For example the term content instance could refer to a database record having values stored in a number of different …
+Customizable real-time electronic whiteboard system
+
+US US11029913B1 Vincent Doyle, III C/Hca, Inc.
+Priority 2015-02-03 • Filed 2017-06-19 • Granted 2021-06-08 • Published 2021-06-08
+identify roles for each of the at least one other user in the set of users based on the configuration settings; generate a second request for information that characterizes a medical condition of the target user, the second request for information including an indication of the identified roles; …
+Predictive modeling for user condition prediction
+
+US US11901080B1 Eric Matt C/Hca, Inc.
+Priority 2019-12-30 • Filed 2020-12-29 • Granted 2024-02-13 • Published 2024-02-13
+Techniques are disclosed for determining a risk assessment corresponding to a level of risk that a user of a service organization has or will develop a condition. The techniques include receiving user data associated with a user record of a user. The techniques further include inputting the user …
+Systems and methods for multi-tier network adaptation and resource …
+
+US US11283690B1 Sammie Mosier C/Hca, Inc.
+Priority 2019-09-13 • Filed 2020-09-14 • Granted 2022-03-22 • Published 2022-03-22
+Systems, methods, and machine-readable media to orchestrate process-performing resources are disclosed. Collected data items may correspond to assignments of process-performing resources, and device interactions or data changes that correspond to process or operation performances, conditions of …
+Data stream processing to facilitate conferencing based on protocols
+
+US US11146599B1 Edmund Jackson C/Hca, Inc.
+Priority 2019-02-04 • Filed 2020-02-04 • Granted 2021-10-12 • Published 2021-10-12
+the operations further comprising: identifying an action plan based at least in part on the load condition, the action plan specifying one or more actions responsive to the load condition, where: the load condition corresponds to at least one condition indicated by one or more of the data changes;
+Systems and methods for facilitating accessible virtual education
+
+US US11307667B2 Ayan Banerjee Arizona Board Of Regents On Behalf Of Arizona State University
+Priority 2019-06-03 • Filed 2020-06-03 • Granted 2022-04-19 • Published 2022-04-19
+deriving guard conditions for each cluster of the gesture. 2. The method of claim 1 , wherein the step of generating an expert reach set for a gesture further comprises: deriving a plurality of initial conditions for the gesture as performed by the tutor by performing a statistical analysis of the …
+Multi-tier resource and load orchestration
+
+US US10817342B1 Gabriel O. Perez C/Hca, Inc.
+Priority 2014-12-04 • Filed 2019-04-29 • Granted 2020-10-27 • Published 2020-10-27
+causing transmission, to at least one resource-controlling device, of an instruction to perform the process at the one or more performance times, where the transmission initiates one or more actions of a plan of transfer corresponding to the electronic composite and the content indicates the one or …
+Systems and methods for switch stack emulation, monitoring, and control
+
+US US11374847B1 Timothy Beacham C/Hca, Inc.
+Priority 2018-12-10 • Filed 2020-10-02 • Granted 2022-06-28 • Published 2022-06-28
+106 ) manufactured by company A, located within a first premises (e.g., premises 110 ), and belonging to a first client, may save and transfer data in a first format. An imaging machine (e.g., one of one or more components 106 ) manufactured by company B, located within the first premises (e.g., …
+Predictive resource management
+
+US US12272448B1 Tyler Forehand C/Hca, Inc.
+Priority 2020-02-18 • Filed 2024-01-17 • Granted 2025-04-08 • Published 2025-04-08
+16. The one or more non-transitory computer-readable storage devices of claim 15 , wherein the classification of each patient of the plurality of patients is based at least in part on a predicted future condition of each patient. 17. The one or more non-transitory computer-readable storage devices …
+Providing notifications to authorized users
+
+US US9203814B2 Gabriel O. Perez HCA Holdings, Inc.
+Priority 2014-02-24 • Filed 2015-02-24 • Granted 2015-12-01 • Published 2015-12-01
+in response to receiving the authorization request, determining that the second user device is authorized to receive the notifications specifying the one or more decisions made or actions performed in relation to responding to the current conditions, the determining based at least in part on …
+Providing notifications to authorized users
+
+US US11552952B1 Gabriel O. Perez C/Hca, Inc.
+Priority 2014-02-24 • Filed 2019-12-31 • Granted 2023-01-10 • Published 2023-01-10
+106 ) manufactured by company A, located within a first medical care facility (e.g., the medical care facility 110 ), and belonging to a first medical provider organization, may save and transfer data in a first format. An MRI machine (e.g., one of the one or more components 106 ) manufactured by …
+Differential processing of data streams based on protocols
+
+US US9525606B1 Ryan Staggs HCA Holdings, Inc.
+Priority 2014-09-04 • Filed 2015-09-02 • Granted 2016-12-20 • Published 2016-12-20
+102 ) manufactured by company A, located within a first facility (e.g., facility 110 ), and belonging to a first client, may save and transfer data in a first format. An imaging machine (e.g., one of one or more components 102 ) manufactured by company B, located within the first facility (e.g., …
+Testing using deidentified production data
+
+US US9892281B1 Alan Scott HCA Holdings, Inc.
+Priority 2015-07-28 • Filed 2016-07-28 • Granted 2018-02-13 • Published 2018-02-13
+102 ) manufactured by company A, located within a first facility (e.g., facility 110 ), and belonging to a first client, may save and transfer data in a first format. An imaging machine (e.g., one of one or more components 102 ) manufactured by company B, located within the first facility (e.g., …
+Contextual assessment of current conditions
+
+US US10311701B1 Christian Krayer HCA Holdings, Inc.
+Priority 2014-12-22 • Filed 2018-02-22 • Granted 2019-06-04 • Published 2019-06-04
+), and belonging to a first client, may save and transfer data in a first format. An imaging machine (e.g., one of one or more components 102 ) manufactured by company B, located within the first facility (e.g., facility 110 ), and belonging to the first client, may save and transfer data in a second …
+Clinical Concept Identification, Extraction, and Prediction System and Related …
+
+WO EP US AU CA US20200176098A1 Michael Lucas Tempus Labs
+Priority 2018-12-03 • Filed 2019-12-03 • Published 2020-06-04
+… degree of specificity is based at least in part on a metadata of the second concept. 24 . The method of claim 21 , wherein the predetermined degree of specificity is based at least in part on a hierarchical position of the second concept within the second list of concepts. 25 . The method of claim 21 ,
+Hierarchical, parallel models for extracting in real time high-value …
+
+WO EP US US20210157858A1 Luis F. Stevens Target Brands, Inc.
+Priority 2017-12-30 • Filed 2020-06-30 • Published 2021-05-27
+To address the aforementioned problems with conventional automatic topic discovery techniques, systems and methods are described herein that greatly increase the speed of topic discovery such that, in some circumstances, it can be used to discover, for example, social media topics in near real-time …
+Transaction lifecycle management
+
+US US10033611B1 Kevin Ronald Linkous HCA Holdings, Inc.
+Priority 2015-02-06 • Filed 2016-02-04 • Granted 2018-07-24 • Published 2018-07-24
+In one example, a method and system for tracking message transactions is provided. The messages represent a variety of different types of digital messages that may be transferred between nodes of a network. Each message that is transferred within the network may constitute a single transaction. The …
+End-to-end transaction tracking engine
+
+US US9973465B1 Kevin Ronald Linkous HCA Holdings, Inc.
+Priority 2015-02-06 • Filed 2017-08-07 • Granted 2018-05-15 • Published 2018-05-15
+In one example, a method and system for tracking message transactions is provided. The messages represent a variety of different types of digital messages that may be transferred between nodes of a network. Each message that is transferred within the network may constitute a single transaction. The …
+Systems and methods for assigning tasks based on usage patterns and resource …
+
+US US9614784B1 Michael HOUSTON HCA Holding, Inc.
+Priority 2014-09-24 • Filed 2015-09-23 • Granted 2017-04-04 • Published 2017-04-04
+evaluating the initial task-performance duration based on the usage data and a modification condition; and when it is determined that the modification condition is satisfied, identifying the task-performance duration, the task-performance duration being longer than the initial task-performance …
+System, methods, and user interface for information searching, tagging, …
+
+US US9449080B1 Guangsheng Zhang Guangsheng Zhang
+Priority 2010-05-18 • Filed 2013-07-26 • Granted 2016-09-20 • Published 2016-09-20
+claim 11 , further comprising: identifying a positional attribute associated with the term, wherein the positional attributes includes the position of a term in the text content, or in a sentence or a paragraph, or the position of the sentence or paragraph in the text content; and determining the …
+Cutter unit and linkage unit and hair cutter
+WO EP US CN JP RU CN204585267U J·莫尔玛 皇家飞利浦有限公司
+Priority 2013-11-22 • Filed 2014-11-21 • Granted 2015-08-26 • Published 2015-08-26
+WO2013/150412A1 discloses the respective blade group of hair cutter and hair cutter.Set of blades comprises fixed blade and removable blade, and wherein removable blade reciprocally can move so that hair cut relative to fixed blade.This set of blades is particularly suited for making it possible to …
+Classification of diseases coding method and system based on raw diagnostic …
+CN CN107577826B 吴军 山东众阳软件有限公司
+Priority 2017-10-25 • Filed 2017-10-25 • Granted 2018-05-15 • Published 2018-05-15
+The otherness of order of the keyword with diagnosing keyword in ICD-10 is diagnosed in the raw diagnostic data, is：Count first Calculate same position of the diagnosis keyword in raw diagnostic data and in ICD-10 position sequence difference, then calculate all Diagnose the sum of absolute value …
+Blade set, hair cutting appliance and related method of manufacture
+WO EP US CN JP TR CN106470807B S·萨布拉特斯钱 皇家飞利浦有限公司
+Priority 2014-07-04 • Filed 2015-06-24 • Granted 2019-03-15 • Published 2019-03-15
+14. A blade set (20) for a hair cutting appliance (10), the blade set (20) being arranged to move in a direction of movement through hair to cut the hair, the blade set (20) comprising: - a stationary blade (22) according to any of claims 1-13, and - a movable cutter blade (24) comprising at least …
+Container-based knowledge graphs for determining entity relations in non- …
+
+US US11823798B2 Corville O. Allen Merative Us L.P.
+Priority 2016-09-28 • Filed 2016-09-28 • Granted 2023-11-21 • Published 2023-11-21
+Generate and evaluate hypothesis Weigh and evaluate responses that are based only on relevant evidence Provide situation-specific advice, insights, and guidance Improve knowledge and learn with each iteration and interaction through machine learning processes Enable decision making at the point of …
+Management of conversations
+
+WO EP US CN JP KR AU BR CA MX RU US8000973B2 David Williams Microsoft Corporation
+Priority 2003-02-11 • Filed 2009-02-03 • Granted 2011-08-16 • Published 2011-08-16
+… interactions using an intuitive administrator user interface. Unlike traditional self-service systems that are incapable of quickly adapting to ever-changing business conditions, the system described here can rapidly model typical question and answer pairs and automate future conversations.
+The automatic merogenesis mark of Concept-driven test
+US CN KR CN104516942B P·E·布兰南 国际商业机器公司
+Priority 2013-09-26 • Filed 2014-09-19 • Granted 2018-04-17 • Published 2018-04-17
+For example, in a QA system that operates on patient-specific data, the discussion of medical condition X in the "History of Present Illness" subsection of the patient's medical record should be more specific than in the patient's medical record that primarily deals with describing medical …
+Knowledge graph data structures and uses thereof
+
+EP US US11687801B2 Mohsen Rais-Ghasem Qliktech International Ab
+Priority 2018-04-23 • Filed 2019-04-23 • Granted 2023-06-27 • Published 2023-06-27
+106 will continue to present the correct results from the logical inference of those selections. In contrast to a traditional join model database, the associative model provides an interactive associative experience to the user. Based on current selections and possible rows in data tables a …
+User interface for an evidence-based, hypothesis-generating decision support …
+
+US US9153142B2 Sugato Bagchi International Business Machines Corporation
+Priority 2011-05-26 • Filed 2012-04-17 • Granted 2015-10-06 • Published 2015-10-06
+In a clinical setting, for example, it can be used to develop a diagnostic support tool that uses the context of an input case, a rich set of observations about a patient's medical condition and generates a ranked list of diagnoses (differential diagnosis) with associated confidences based on …
+Automated self-service user assistance based on ontology analysis
+
+WO US CN CA DE TW DE112012001750B4 Currie P. Boyle International Business Machines Corporation
+Priority 2011-05-27 • Filed 2012-05-17 • Granted 2025-01-16 • Published 2025-01-16
+the ontology analyzer (306) and an ontology concept matching unit (408) for detecting, via an ontology model, elements of a perfect or complete query having information related to the user's problem; the ontology concept matching unit (408) and the user interface system (302) for identifying a …
+Systems and methods for determining information and knowledge relevancy, …
+
+WO US US9430570B2 Simon James Button Matthew Jeremy Kapp
+Priority 2009-07-01 • Filed 2010-06-30 • Granted 2016-08-30 • Published 2016-08-30
+Today's systems lack an ability to condition and rank immense corpuses of online information based on a relevancy weighting that is unique to each individual user and therefore a user typically enjoys a lower personalised return on attention impacting on a user's efficiency and effectiveness in …
+Various methods and apparatus for moving thumbnails with metadata
+
+EP US US8196045B2 Suranga Chandratillake Blinkx Uk Limited
+Priority 2006-10-05 • Filed 2007-01-23 • Granted 2012-06-05 • Published 2012-06-05
+The statistics include position information, those derived from the frequency of occurrence, length of time devoted to a segment on that key term from scene change to scene change, and other statistical information associated with the key terms, at both the individual word used level and sum of the …
+System and method for indicating implications and contradictions
+
+EP US JP JP5121296B2 エス．クラウチ リチャード パロ・アルト・リサーチ・センター・インコーポレーテッド
+Priority 2006-05-01 • Filed 2007-04-25 • Granted 2013-01-16 • Published 2013-01-16
+And concept matching manager that matches the corresponding concept between said knowledge being determined by the expression manager, the conclusion packed knowledge representation and the premise packed knowledge representation, Wherein the concept matching manager, the concept of premise packed …
+User interfaces for navigating structured content
+
+US US8584034B2 Thomas D. Holt Surfwax, Inc.
+Priority 2010-04-27 • Filed 2011-02-17 • Granted 2013-11-12 • Published 2013-11-12
+, wherein the viewport is further configured to allow a user to select any of the multi-dimensional cells displayed in the viewport without changing the position of the displayed multi-dimensional cells in the viewport and regardless of the position in the viewport of the displayed multi-dimensional …
+Method for realizing master-slave communication by single link equipment
+CN CN118118325A 刘震 南京恒星自动化设备有限公司
+Priority 2024-04-01 • Filed 2024-04-01 • Published 2024-05-31
+… comprises step S46 of introducing an intelligent fault diagnosis method based on knowledge graph and reinforcement learning, specifically comprising the steps of: S461, constructing a communication fault knowledge graph through mining historical operation and maintenance data and expert experience;
+Multi-tier resource, subsystem, and load orchestration
+US US12438826B1 William Gregg C/Hca, Inc.
+Priority 2020-07-01 • Filed 2024-07-02 • Granted 2025-10-07 • Published 2025-10-07
+Electronic communications received via a network from a plurality of electronic devices may include signals of device interactions or data changes that correspond to process performances by process-performing resources, signals of conditions of loads, or signals of processes associated with the …
+Decentralized mobile device control
+
+US US11422830B1 Daniel Hefley C/Hca, Inc.
+Priority 2020-03-05 • Filed 2021-03-05 • Granted 2022-08-23 • Published 2022-08-23
+19. The method to facilitate adaptive operational control of a mobile device as recited in claim 18 , where at least one of the one or more operational metrics, the operational degradation condition, and/or the operating parameters are determined based at least in part on a matrix code. 20. The …
+Authorized user modeling for decision support
+
+US US11289200B1 William Michael Gregg C/Hca, Inc.
+Priority 2017-03-13 • Filed 2018-03-09 • Granted 2022-03-29 • Published 2022-03-29
+using, by the centralized server, (i) the updated machine learning model, (ii) the specific profile, and (iii) the identified medical condition to determine a second condition experience score of the authorized user, the second condition experience score approximating a second level of experience …
+Message customization and routing
+
+US US9973455B1 David Fowler HCA Holdings, Inc.
+Priority 2016-03-31 • Filed 2017-03-31 • Granted 2018-05-15 • Published 2018-05-15
+wherein the change in medical responsibility for the patient comprises at least one of: (i) transfer of care for the patient from a first medical facility to a second medical facility, (ii) termination of care for the patient, or (iii) transfer of care for the patient from a first medical provider …
+Intermediate check points and controllable parameters for addressing process …
+
+US US11237937B1 Ravi S. Chari C/Hca, Inc.
+Priority 2013-06-14 • Filed 2020-10-02 • Granted 2022-02-01 • Published 2022-02-01
+Once check-point indicators are identified (e.g., for a particular care line, which can relate to a patient condition, treatment type, surgery type, etc.), the check-point indicators can then be automatically monitored. The monitoring can occur promptly and/or in real-time, such that (for example) …
+Music transcription method, system and device
+WO EP US CN JP ES PL CN102610222B R·D·陶布 缪斯亚米有限公司
+Priority 2007-02-01 • Filed 2008-02-01 • Granted 2014-08-20 • Published 2014-08-20
+… with each with reference to clapping the lasting time span of speed; Determine that clapping speed extracts window, described bat speed is extracted window and is represented that described sound signal is extended to the continuous part of the second time location from very first time position; By …
+Visual search and three-dimensional results
+WO EP US CN JP KR AU BR CA SG TW CN102483760B Z.M.古特 微软公司
+Priority 2009-08-31 • Filed 2010-08-24 • Granted 2014-09-24 • Published 2014-09-24
+Generation comprises the results set of the list of described visual search link and URL(uniform resource locator); With Described result and the link of described visual search are transferred to described user; Wherein, when user accesses described visual search link, generate graphic user …
+Adaptive authentication and notification system
+
+US US11539817B1 Gabriel O. Perez C/Hca, Inc.
+Priority 2018-09-27 • Filed 2019-09-27 • Granted 2022-12-27 • Published 2022-12-27
+BACKGROUND Providing effective notifications under changing conditions of transmitters, receivers, and the devices, applications, and systems therebetween, while maintaining protection of sensitive information, may prove difficult using conventional systems. Generating effective notifications while …
+Blade set and hair cutting appliance
+WO EP US CN JP CN204954880U S·萨布拉特斯钱 皇家飞利浦有限公司
+Priority 2014-04-18 • Filed 2015-04-17 • Granted 2016-01-13 • Published 2016-01-13
+10. the set of blades (20) according to any one of claim 1-5, it is characterized in that, at least one induction element (122) of described second wall portion (102) of described fixed blade (22) limits the lengthwise position of described movable cutting blade (24) relative to described fixed …
+Hardware-accelerated context-sensitive filtering
+
+US US20130304742A1 Jorge Hugo Roman Los Alamos National Security, Llc
+Priority 2012-03-12 • Filed 2013-03-12 • Published 2013-11-14
+4 . The method of claim 3 wherein at least one of the filter rules specifies a locality condition, the method further comprising: determining whether the locality condition is met, wherein the determining comprises processing the indicated locations of the word patterns within the document. 5 . The …
+Set of blades and hair cutting appliance
+WO EP US CN JP ES PL RU CN204585269U M·B·斯塔佩尔布罗克 皇家飞利浦有限公司
+Priority 2013-10-01 • Filed 2014-09-29 • Granted 2015-08-26 • Published 2015-08-26
+Object of the present disclosure is to provide the set of blades as an alternative making it possible to scrape and cut with pruning.Especially, can be provided in scrape cut with cut operation in both can promote the set of blades of happy Consumer's Experience.More preferably, such as, the …
+The fixed blade of hair cutting appliance, the set of blades for hair cutting …
+WO EP US CN JP ES PL RU TR CN204640252U M·B·斯塔佩尔布罗埃克 皇家飞利浦有限公司
+Priority 2013-10-01 • Filed 2014-09-30 • Granted 2015-09-16 • Published 2015-09-16
+1. the fixed blade (22) of the segmentation of the set of blades for hair cutting appliance (10) (20), it is characterized in that, described set of blades is arranged to move through hair with hair cut on moving direction (28), and described blade comprises First wall section (50), the second …
+Enterprise application integrated working flow management method and system
+CN CN101655943B 刘志阳 南京中兴软件有限责任公司
+Priority 2009-09-14 • Filed 2009-09-14 • Granted 2016-12-07 • Published 2016-12-07
+The present embodiment is the Web service set searching out and meeting matching condition, the most each Web service set meeting demand Not being empty situation, now according to Web service evaluation model, service broker preferentially chooses service quality QoS from set The service that ( …
+Signal processing for making predictive determinations
+
+US US10783998B1 Jonathan Perlin C/Hca, Inc.
+Priority 2015-10-21 • Filed 2017-08-10 • Granted 2020-09-22 • Published 2020-09-22
+obtaining a set of rules that define thresholds of condition scores assigned to each condition specified by a corresponding outcome of the set of outcomes to determine, using the predictive condition engine, composite abnormality score based on the weight values of the identified subjective …
+Process action determination
+
+US US10296187B1 William Michael Gregg Hca Holdings, Inc
+Priority 2016-04-04 • Filed 2017-04-04 • Granted 2019-05-21 • Published 2019-05-21
+102 ) manufactured by company A, located within a first facility (e.g., facility 110 ), and belonging to a first client, may save and transfer data in a first format. An imaging machine (e.g., one of one or more components 102 ) manufactured by company B, located within the first facility (e.g., …
+Contextual assessment of current conditions
+
+US US11276293B1 Christian Krayer C/Hca, Inc.
+Priority 2014-12-22 • Filed 2020-06-01 • Granted 2022-03-15 • Published 2022-03-15
+, and belonging to a first client, may save and transfer data in a first format. An imaging machine (e.g., one of one or more components 102 ) manufactured by company B, located within the first facility (e.g., facility 110 ), and belonging to the first client, may save and transfer data in a second …
+Installation unit and hair cutting utensil
+WO EP US CN JP ES CN204913964U J·莫尔玛 皇家飞利浦有限公司
+Priority 2013-11-22 • Filed 2014-11-24 • Granted 2015-12-30 • Published 2015-12-30
+4. installation unit according to claim 3 (30), is characterized in that, described first position of rotation is centre position, and at least one second position of rotation described is at least one end position, and wherein, described first height and position (l o1 ) be the position raised, …
+E-mail Systems
+
+US US20130166657A1 Saied Tadayon Saied Tadayon
+Priority 2011-12-27 • Filed 2011-12-27 • Published 2013-06-27
+: Email stored by CPU, for a later time 120 : Event Information retrieved from the Internet 130 : CPU checking the timer/clock, or other internal conditions, e.g. checking the calendar or user's notebook or file, e.g. from a database 140 : Instruction and data exchange between CPU and CPU memory 150 :
+Image Search with Embedding-based Models on Online Social Networks
+
+US US20190188285A1 Cristina Scheau Facebook, Inc.
+Priority 2017-12-19 • Filed 2017-12-19 • Published 2019-06-20
+170 ), and the web browser 132 may generate a Hyper Text Transfer Protocol (HTTP) request and communicate the HTTP request to server. The server may accept the HTTP request and communicate to a client system 130 one or more Hyper Text Markup Language (HTML) files responsive to the HTTP request. The …
+System and method for concept discovery with online information environments
+
+WO US US10482427B2 George Abraham Worldone, Inc.
+Priority 2013-03-14 • Filed 2014-03-10 • Granted 2019-11-19 • Published 2019-11-19
+13. The method according to claim 12 , wherein generating and displaying the list of suggested clinical terms comprises communicating with an ontology database storing medical terms organized by concept and matching the at least one text fragment with concepts from the ontology database. 14. The …
+Computerized system and method for rapid data entry of past medical diagnoses
+
+US US20160354154A1 Ahmed Ghouri Safemed Inc.
+Priority 2002-06-12 • Filed 2009-11-03 • Published 2016-12-08
+4 . The method according to claim 3 , the concept matching step further comprising: establishing a categorical collection of clinically meaningful groups; associating recognized indication terminology with each group; associating specific diagnoses to a particular group in accordance with a …
+User interfaces for navigating structured content
+
+WO US US20150177928A1 Thomas D. Holt Surfwax, Inc.
+Priority 2010-04-27 • Filed 2015-02-19 • Published 2015-06-25
+a cluster cell belonging to only a single unique position in the grid, the cluster cell being configured to: represent a set of two or more of the multiple cells which all belong to a single unique intersection position that is identical to the single unique position of the cluster cell in the grid …
+Integrated patient information viewer interface
+
+US US20120130741A1 Michael Sparandara General Electric Company
+Priority 2010-11-24 • Filed 2010-11-24 • Published 2012-05-24
+… be specified for data. Default views, categories, filters, rules, and/or ranges can be provided. In certain examples, default values can be modified by a user and/or based on operating conditions. In certain examples, new views, categories, filters, rules, ranges, etc., can be created by a user.
+Patient information timeline viewer
+
+US US20120131507A1 Michael Sparandara General Electric Company
+Priority 2010-11-24 • Filed 2010-11-24 • Published 2012-05-24
+… be specified for data. Default views, categories, filters, rules, and/or ranges can be provided. In certain examples, default values can be modified by a user and/or based on operating conditions. In certain examples, new views, categories, filters, rules, ranges, etc., can be created by a user.
+Container-Based Knowledge Graphs for Determining Entity Relations in Medical …
+
+US US20180089383A1 Corville O. Allen International Business Machines Corporation
+Priority 2016-09-29 • Filed 2016-09-29 • Published 2018-03-29
+Generate and evaluate hypothesis Weigh and evaluate responses that are based only on relevant evidence Provide situation-specific advice, insights, and guidance Improve knowledge and learn with each iteration and interaction through machine learning processes Enable decision making at the point of …
+… generating multimedia recommendations by using artificial intelligence concept …
+
+US US20120123992A1 Charles Anthony Randall Rovi Technologies Corporation
+Priority 2010-11-11 • Filed 2010-11-11 • Published 2012-05-17
+Today, multimedia content, such as movies, television shows, and the like, can be obtained by users and viewed in a variety of forms. Due to the vast amount of available content, users can experience difficulty selecting content. For example, if a user wishes to watch or obtain a movie, then that …
+Utilizing predictive modeling to identify anomaly events
+US US12548666B1 Scott Murray C/Hca, Inc.
+Priority 2016-07-18 • Filed 2025-01-17 • Granted 2026-02-10 • Published 2026-02-10
+102 ) manufactured by company A, located within a first facility (e.g., facility 110 ), and belonging to a first client, may save and transfer data in a first format. An imaging machine (e.g., one of one or more components 102 ) manufactured by company B, located within the first facility (e.g., …
+Dialogue Query Response System
+
+US CN AU DE GB CN110647618A W·W·常 奥多比公司
+Priority 2018-06-27 • Filed 2019-02-18 • Published 2020-01-03
+For example, consider a situation where a user wants to remove red eyes from a digital photo, but the user does not know the term "redeyes". Instead, the user types the following into the search assistant: "How do I remove devil eyes?" If this unusual way of expressing the query has never been …
+Search engine systems for matching medical providers and patients
+
+US US9946839B1 Eric Wilson MD Insider, Inc.
+Priority 2013-09-10 • Filed 2016-09-23 • Granted 2018-04-17 • Published 2018-04-17
+7. The method of claim 1 , wherein each physician in the set is associated with: a performance-score associated with the base-concept within a range of acceptable performance-scores; and an experience-score associated with the base-concept within a range of acceptable experience-scores. 8. The …
+Putative ontology generating method and apparatus
+
+WO EP US JP AU EA IL US20170083547A1 Albert Donald Tonkin Semantic Technologies Pty Ltd.
+Priority 2014-05-12 • Filed 2015-05-08 • Published 2017-03-23
+is a schematic diagram of an example of an computer system; FIGS. 5A and 5B are a flow chart of an example of a method for use in generating a mapping for transferring content between source and target data structures; FIG. 6A is a flow chart of an example of a method of generating a putative …
+Multi-tier resource, subsystem, and load orchestration
+
+US US12003426B1 William Gregg C/Hca, Inc.
+Priority 2018-08-20 • Filed 2023-02-28 • Granted 2024-06-04 • Published 2024-06-04
+using device specifications identified as a function of a device identifier to identify one or more applications and/or configuration data that are specified for the mobile device and mapping the one or more applications and/or the configuration data to the operational degradation condition of the …
+Data derived user behavior modeling
+
+US US11711327B1 William Michael Gregg C/Hca, Inc.
+Priority 2013-05-24 • Filed 2020-10-14 • Granted 2023-07-25 • Published 2023-07-25
+14. The non-transitory computer-readable storage device of claim 8 , wherein comprehensiveness of the first set of decision support elements depends on historical experience of the authorized user responding to the present condition with respect to other dependent users. 15. A centralized server …
+A kind of tourism service system for providing recommendation tourism route
+CN CN106779146A 周世平 广州铁路职业技术学院
+Priority 2016-11-15 • Filed 2016-11-15 • Published 2017-05-31
+There is unique kernel item in the middle of current path, then the kernel item is the core of this paths；Such as fruit part core Item occurs in the middle of path, then then need to judge do not have whether the project for occurring possesses adsorption capacity in the middle of core；Condition
+Method and device for semantic knowledge transfer
+
+WO EP US CN CN109804371B 萨拉瓦南·莫汉 瑞典爱立信有限公司
+Priority 2016-08-10 • Filed 2016-08-10 • Granted 2023-05-23 • Published 2023-05-23
+A method (100) for transferring semantic knowledge between domains of a network comprising a first domain and a second domain is disclosed. The method includes establishing a semantic knowledge base (110) for the first domain, the semantic knowledge base includes concepts of the first domain, …
+Ontology browser and grouping method and apparatus
+
+WO US JP IL SG JP2017514257A トンキン，アルバート・ドナルド セマンティック・テクノロジーズ・プロプライエタリー・リミテッド
+Priority 2014-04-24 • Filed 2015-04-23 • Published 2017-06-01
+Patent Document 1 provides a method for transferring content from a file and a database. In this case, the file contains content instances, each content instance is associated with a respective field, and each field has a respective type. Transfer is accomplished by determining the type of each …
+A kind of automatic programming method and its system of natural language mind …
+CN CN109800344A 王立山 王立山
+Priority 2019-01-28 • Filed 2019-01-28 • Published 2019-05-24
+It is natural language like predicate calculus form clause set text by natural language description text conversion: according to the form to be created Definition select morphosis structure, concept matching in the form of natural language is like predicate calculus each component part accordingly …
+Disease automatic coding and system
+CN CN107705839A 吴军 山东众阳软件有限公司
+Priority 2017-10-25 • Filed 2017-10-25 • Published 2018-02-16
+The otherness of order of the keyword with diagnosing keyword in ICD-10 is diagnosed in the raw diagnostic data, is：Count first Calculate same position of the diagnosis keyword in raw diagnostic data and in ICD-10 position sequence difference, then calculate all Diagnose the absolute value sum of …
+Novel method, flow and device for patient diagnosing and healthy adjusting …
+
+CN CN102654890A 阮刚 阮刚
+Priority 2011-01-24 • Filed 2011-01-24 • Published 2012-09-05
+The invention relates to the field of medical treatment, in particular relates to a diagnosis mode, and in particular relates to a traditional Chinese medicine diagnosis mode. Medical services and medical resources can be rationally configured, and accumulation of human medical experiences and …
+Personnel information storage methods, devices, electronic equipment and …
+CN CN117216107A 甘丽清 北京国电通网络技术有限公司
+Priority 2023-09-12 • Filed 2023-09-12 • Published 2023-12-12
+firstly, the matching degree is determined through keyword matching and a matching rule set by human subjectiveness, the considered situation is single, the matching rule set by human subjectiveness has certain subjectivity, the matching rule set by human subjectiveness cannot be updated in real …
+Risk assessment and event detection
+
+US US10665348B1 Christian Krayer C/Hca, Inc.
+Priority 2015-05-18 • Filed 2016-05-17 • Granted 2020-05-26 • Published 2020-05-26
+In some examples, structured and unstructured data is analyzed to determine whether a user is at risk for a certain condition. The results of this analysis can be included in a risk assessment. In some examples, structured and unstructured data is analyzed to determine whether a particular event …
+A kind of method that body for constructing REST style marks visualization …
+CN CN104462460B 宋华珠 武汉理工大学
+Priority 2014-12-16 • Filed 2014-12-16 • Granted 2017-09-05 • Published 2017-09-05
+The invention relates to a method for constructing a REST-style ontology annotation visualization system. The method includes: S100 system processing with ontology as the basic object of processing, so that the machine understands the logical meaning of the data itself; S200 uses a relational …
+A method and system for recommending medical popular science articles based on …
+CN CN120179918A 高翠翠 北京圆心科技集团股份有限公司
+Priority 2025-05-23 • Filed 2025-05-23 • Published 2025-06-20
+… space of the real scene through a preference component of the non-real scene based on the nonlinear projection relation, separating a scene noise component irrelevant to the user medical cognition level from the feature space, and reserving a core preference component which keeps stable transfer in …
+Assessing completion of events
+
+US US11394601B1 Wesley Boles C/Hca, Inc.
+Priority 2017-10-25 • Filed 2021-02-22 • Granted 2022-07-19 • Published 2022-07-19
+102 ) manufactured by company A, located within a first facility (e.g., facility 110 ), and belonging to a first client, may save and transfer data in a first format. An imaging machine (e.g., one of one or more components 102 ) manufactured by company B, located within the first facility (e.g., …
+Biased task assignments based on geotracking of discharge vehicles
+
+US US10319056B1 Gabriel O. Perez HCA Holdings, Inc.
+Priority 2014-12-04 • Filed 2015-12-03 • Granted 2019-06-11 • Published 2019-06-11
+106 ) manufactured by company A, located within a first medical care facility (e.g., the medical care facility 110 ), and belonging to a first medical provider organization, may save and transfer data in a first format. An MRI machine (e.g., one of the one or more components 106 ) manufactured by …
+Data processing for making predictive determinations
+
+US US10970635B1 Jonathan Perlin C/Hca, Inc.
+Priority 2015-10-21 • Filed 2016-10-20 • Granted 2021-04-06 • Published 2021-04-06
+In some examples, structured and unstructured data is evaluated using one or more predictive models to determine whether a dependent user is at risk for a certain condition. In other examples, structured and unstructured data is evaluated using one or more predictive models to determine a contact …
+Search method, device, electronic device and storage medium
+CN CN116628327A 程洲 百度在线网络技术（北京）有限公司
+Priority 2023-02-16 • Filed 2023-02-16 • Published 2023-08-22
+wherein said performing a search operation according to said target associated concept and said demand information comprises: and executing search operation according to the target associated concept and the requirement information under the condition that the intention type of the input text is a …
+Data stream processing for dynamic resource scheduling
+
+US US10425355B1 Steven V. Manoukian HCA Holdings, Inc.
+Priority 2013-02-04 • Filed 2016-10-05 • Granted 2019-09-24 • Published 2019-09-24
+associating the priority tag to the individual data element, identifying a communication protocol associated with the priority tag, the communication protocol including a first communication trigger for a target task associated with the condition of the patient represented by the first composite, …
+System and method for medical information analysis using de-identification and …
+
+WO EP JP CA JP2015533437A ロジャース，ロバート，ダワード アピシオ，インク．
+Priority 2012-10-19 • Filed 2013-10-18 • Published 2015-11-24
+… . Item 8. The method according to Item 7. 2. The method of claim 1, further comprising providing an indication that includes at least one of patient illness, patient condition, patient risk stratification, patient care quality measure fitness, and patient available care disparity. the method of.
+Signal processing for making predictive determinations
+
+US US11676725B1 Jonathan Perlin C/Hca, Inc.
+Priority 2015-10-21 • Filed 2021-08-04 • Granted 2023-06-13 • Published 2023-06-13
+generating a report corresponding to the first entity that comprises the selected subset of data; assigning a response time boundary to the report based on a condition specification of an assessment of at least the subset of data corresponding to the report; where the subset of data comprises …
+Randomized compliant searching
+
+US US11645330B1 John William Benton Morrow C/Hca, Inc.
+Priority 2014-12-19 • Filed 2022-05-19 • Granted 2023-05-09 • Published 2023-05-09
+accessing, from a second data store, a set of scheduling rules that have been previously generated by a native scheduling application based in part on a portion of the scheduling configuration data, the set of scheduling rules defining conditions under which appointments can be scheduled for the …
+Methods and systems for service discovery and selection
+
+US SG US20130173388A1 Duy Ngan LE Duy Ngan LE
+Priority 2011-12-28 • Filed 2012-12-28 • Published 2013-07-04
+Internet Protocol Television (IPTV), which deals with multimedia services delivered over IP based networks managed to provide the required level of quality of service and experience, security, interactivity and reliability, involves IPTV services (such as linear TV, Video on Demand (VoD), SMS, or e …
+Disparate data aggregation for user interface customization
+
+US US12124861B1 Cae Swanger C/Hca, Inc.
+Priority 2018-08-20 • Filed 2021-09-15 • Granted 2024-10-22 • Published 2024-10-22
+identifying, in accordance with a strictness criteria, a strictest rule from among the first rule and the second rule as exchange condition data, the exchange condition data comprising a plurality of exchange classes, wherein each user of the set of users is assigned to a respective exchange class …
+Suggestion engine
+
+US US10642958B1 Jonathan Perlin C/Hca, Inc.
+Priority 2014-12-22 • Filed 2015-12-11 • Granted 2020-05-05 • Published 2020-05-05
+102 ) manufactured by company A, located within a first facility (e.g., facility 110 ), and belonging to a first client, may save and transfer data in a first format. An imaging machine (e.g., one of one or more components 102 ) manufactured by company B, located within the first facility (e.g., …
+Hybrid graph neural network
+
+US US20220237446A1 Chuan Lei International Business Machines Corporation
+Priority 2021-01-28 • Filed 2021-01-28 • Published 2022-07-28
+wherein the method further comprises updating, responsive to the predictive score being indicative of the first unified concept matching the second unified concept, a mapping file that maps concepts of the target ontology to concepts of the source ontology, the updating comprising adding an …
+An NFC-based clothing intelligent order exhibition management system and method
+CN CN104182885A 张昕明 黑龙江大学
+Priority 2014-08-26 • Filed 2014-08-26 • Published 2014-12-03
+6. the intelligent clothing based on NFC according to claim 5 is ordered goods and is exhibited and sold management system, it is characterized in that, NFC label module for reading and writing reads the identifying information of NFC mobile phone and is transferred to order management platform …
+Intelligent question-answering method and system for low-altitude economic …
+CN CN120234398A 黎博 湖南工程学院
+Priority 2025-05-29 • Filed 2025-05-29 • Published 2025-07-01
+And S131, carrying out multi-level knowledge matching in a low-altitude economic education knowledge base according to the problem feature set, wherein the multi-level knowledge matching comprises a core concept matching layer, an application scene matching layer and a technical standard matching …
+A speech recognition method for power grid dispatching
+CN CN113869040B 陆彦青 国网甘肃省电力公司天水供电公司
+Priority 2021-06-22 • Filed 2021-06-22 • Granted 2024-12-06 • Published 2024-12-06
+Method based on characteristic template The statistical machine learning method regards NER as a sequence labeling task, and learns a labeling model by utilizing a large-scale corpus, so that each position of a sentence is labeled. Common models applied to the NER task include generative models HMM …
+Systems for creating and/or maintaining databases and a system for facilitating …
+
+US US20210304260A1 Heiko Beier relemind GmbH
+Priority 2019-05-24 • Filed 2021-06-11 • Published 2021-09-30
+As the selection of the advertising campaigns is based on weighted content criteria (concept matching between advertising campaigns and of target such as websites), the placement of the advertising campaigns may be achieved with higher target accuracy. This is facilitated by taking into account …
+Automated content generation
+
+US US8798989B2 Anthony J. DelRocco Raytheon Company
+Priority 2011-11-30 • Filed 2011-11-30 • Granted 2014-08-05 • Published 2014-08-05
+can include a plurality of storage devices and/or the computing device 310 can include a plurality of storage devices (e.g., a position storage device, an absolute satellite position device, etc.). The storage device 395 can include, for example, long-term storage (e.g., a hard drive, a tape …
+System and method for displaying electronic health records
+WO EP US CN EP3682451A1 Eric Thomas Carlson Koninklijke Philips N.V.
+Priority 2017-09-13 • Filed 2018-09-06 • Published 2020-07-22
+However, this inadvertently produces a blind spot situation in which the significant contents of these documents relevant to the prevailing clinical scenario may not appear in the displayed snippets, or meaningful information in historical records may be hidden while less-meaningful information …
+
+
+Learning kits and method for tutoring and teaching learners
+
+US US20070172798A1 Catherine H. Thomas Thomas Catherine H
+Priority 2006-01-23 • Filed 2007-01-22 • Published 2007-07-26
+… a learner of just one Kit is sufficient to produce positive results. It has been found that, depending on a learner's starting position and coupled with his or her individual needs, that maximum results are realized from the engagement of all those Kits necessary for a learner's individual needs.
+Behavior planning method and device based on knowledge graph and behavior tree
+CN CN118297149A 任禾 云知声智能科技股份有限公司
+Priority 2024-02-28 • Filed 2024-02-28 • Published 2024-07-05
+3. The method according to claim 1, wherein determining the target behavior concept matching the node from the pre-built knowledge graph comprises: For different behavior concepts in the knowledge graph, if the number of parameters contained in the execution result of the behavior concept is the …
+Providing user-centric data feeds via non-personalized devices
+
+US US12189643B1 Aaron Montlary C/Hca, Inc.
+Priority 2020-11-12 • Filed 2021-11-10 • Granted 2025-01-07 • Published 2025-01-07
+Techniques are disclosed for providing a data feed, associated with a servicing of a particular user, to a device assigned to a particular location within a service facility for presentation of the data feed to a display at the particular location. In one example, the techniques include a system …
+Fast display method, fast display apparatus and terminal
+CN CN105955716A 聂送桃 奇酷软件（深圳）有限公司
+Priority 2016-04-19 • Filed 2016-04-19 • Published 2016-09-21
+Specifically, introduce range of tolerable variance concept matching relationship is illustrated, range of tolerable variance refer to from User's input angle allows the fluctuation range of input quality characteristic value, such as inputs when system prompts user During the finger print …
+Methods of determining a state of a dependent user
+
+US US11462322B1 Jeffrey Cuthbert C/Hca, Inc.
+Priority 2018-12-07 • Filed 2019-12-02 • Granted 2022-10-04 • Published 2022-10-04
+102 ) manufactured by company A, located within a first facility (e.g., facility 110 ), and belonging to a first client, may save and transfer data in a first format. An imaging machine (e.g., one of one or more components 102 ) manufactured by company B, located within the first facility (e.g., …
+Unmanned aerial vehicle fault traceability analysis method, unmanned aerial …
+CN CN121365745A 王连清 中国人民解放军国防科技大学
+Priority 2025-12-22 • Filed 2025-12-22 • Published 2026-01-20
+Specific fault examples are extracted from flight data and maintenance records, such as abnormal motor speed in 2025-05-13 tasks due to bearing abrasion, and then the attributes of the examples are extracted, such as occurrence conditions, environmental factors, influence ranges, diagnosis means …
+Preventing vulnerable configurations in sensor-based devices
+
+US US20210243217A1 Marco Aurelio Stelmar Netto International Business Machines Corporation
+Priority 2020-01-31 • Filed 2020-01-31 • Published 2021-08-05
+Each mitigation action requires time to complete. Therefore, depending on the situation, it may be faster to disable a system capability, rather than changing it to a more secure capability. For example, in the context of an IoT camera, it may be faster to disable the capability to transmit images …
+Aggregating data to identify diversion events
+
+US US20200075150A1 Scott Murray Scott Murray
+Priority 2016-07-18 • Filed 2019-09-09 • Published 2020-03-05
+102 ) manufactured by company A, located within a first facility (e.g., facility 110 ), and belonging to a first client, may save and transfer data in a first format. An imaging machine (e.g., one of one or more components 102 ) manufactured by company B, located within the first facility (e.g., …
+Continuous employee experience and efficiency evaluation based on collaboration …
+WO US WO2022103976A1 David Yan Yva.Ai, Inc.
+Priority 2020-11-11 • Filed 2021-11-11 • Published 2022-05-19
+An example method of employee experience and efficiency evaluation based on the employee's collaboration circles comprises: identifying, by a computer system, based on processing a plurality of documents reflecting communications of a specified person, a collaboration circle of the specified …
+Providing notifications to authorized users
+US US12526279B1 Gabriel O. Perez C/Hca, Inc.
+Priority 2013-02-04 • Filed 2023-01-09 • Granted 2026-01-13 • Published 2026-01-13
+106 ) manufactured by company A, located within a first medical care facility (e.g., the medical care facility 110 ), and belonging to a first medical provider organization, may save and transfer data in a first format. An MRI machine (e.g., one of the one or more components 106 ) manufactured by …
+Psychological consultation interaction method and device based on autonomous …
+CN CN120636701A 肖锡尧 北京聆心智能科技有限公司
+Priority 2025-05-28 • Filed 2025-05-28 • Published 2025-09-12
+Based on the amplitude of emotional changes, the degree of cognitive perspective change, and the narrative theme conversion index, the key scores of multiple conversation trajectories are calculated, and the key conversation trajectory points whose key scores meet the set conditions are selected …
+AI-based adaptive scene intelligent interaction system
+CN CN120704532B 王鹏 河南中信科大数据科技有限公司
+Priority 2025-06-25 • Filed 2025-06-25 • Granted 2026-02-06 • Published 2026-02-06
+4. The AI-based adaptive scene intelligent interaction system of claim 1, wherein during execution of the embedded encoding, each type of modal data is processed through an encoding channel, wherein a voice channel adopts a bidirectional GRU encoder and a superposition position encoding mechanism, …
+Method, apparatus and system for optimizing clothing patterns based on user …
+KR KR102604294B1 서정오 주식회사 스탠다드에러
+Priority 2023-07-27 • Filed 2023-07-27 • Granted 2023-11-20 • Published 2023-11-20
+The present invention relates to a method, an apparatus, and a system for optimizing clothing patterns, which can automatically determine whether a design element intended when a designer designed clothing at the beginning has been equally transferred to a user, and automatically determine whether …
+Processing delay predictions based on queue assessments
+
+US US10673784B1 Gabriel O. Perez Rodreguez C/Hca, Inc.
+Priority 2016-08-25 • Filed 2017-08-22 • Granted 2020-06-02 • Published 2020-06-02
+identifying, based on the first communication, a medical condition being experienced by the incoming patient; identifying at least one resource type that is associated with the medical condition being experienced by the incoming patient, wherein the at least one resource type comprises at least one …
+Customizable real-time electronic whiteboard system
+
+US US12001749B1 Vincent Doyle, III C/Hca, Inc.
+Priority 2015-02-03 • Filed 2021-06-03 • Granted 2024-06-04 • Published 2024-06-04
+106 ) manufactured by company A, located within a first medical care facility (e.g., the medical care facility 110 ), and belonging to a first medical provider organization, may save and transfer data in a first format. An MRI machine (e.g., one of the one or more components 106 ) manufactured by …
+Event triggering utilizing segment assignments
+
+US US12080425B1 Andy Corts C/Hca, Inc.
+Priority 2020-01-28 • Filed 2021-01-27 • Granted 2024-09-03 • Published 2024-09-03
+determining, by the segmentation model, a score for the user, the score corresponding to a level of confidence that a classification of the user corresponds to a segment associated with the present condition or the present service status of the user, the segment being one of a plurality of …
+Predictive model for generating paired identifiers
+
+US US10810187B1 Lisa Nolan C/Hca, Inc.
+Priority 2018-10-01 • Filed 2019-09-30 • Granted 2020-10-20 • Published 2020-10-20
+102 ) manufactured by company A, located within a first facility (e.g., facility 110 ), and belonging to a first client, may save and transfer data in a first format. An imaging machine (e.g., one of one or more components 102 ) manufactured by company B, located within the first facility (e.g., …
+System and Method for Text Editing Using Large Language Models
+
+US US20250077762A1 Adam SCHAUER Jasper AI, Inc.
+Priority 2023-09-03 • Filed 2024-09-03 • Published 2025-03-06
+These typically include font and font size, text color, background color (or texture), and so on. These settings are designed to give the user a customized and optimal reading experience. These systems are based around the recognition that every user is different and may have different preferences.
+Predictive modeling for enhanced decision making
+US US12412669B1 Edmund Jackson C/Hca, Inc.
+Priority 2019-05-28 • Filed 2020-05-26 • Granted 2025-09-09 • Published 2025-09-09
+102 ) manufactured by company A, located within a first facility (e.g., facility 110 ), and belonging to a first client, may save and transfer data in a first format. An imaging machine (e.g., one of one or more components 102 ) manufactured by company B, located within the first facility (e.g., …
+Contextual assessment of current conditions
+
+US US11735026B1 Christian Krayer C/Hca, Inc.
+Priority 2013-02-04 • Filed 2022-02-01 • Granted 2023-08-22 • Published 2023-08-22
+facilitating one or more user interfaces provided via the first set of one or more devices and/or a second set of one or more devices; accessing data storage to identify a set of one or more specifications of one or more process actions and/or one or more conditions mapped to the particular entity; …
+Data stream processing for dynamic resource scheduling
+
+US US11985075B1 Steven V. Manoukian C/Hca, Inc.
+Priority 2013-02-04 • Filed 2019-08-07 • Granted 2024-05-14 • Published 2024-05-14
+selecting a particular navigator device from a plurality of navigator devices to facilitate navigating the first patient into a program upon determining that the first severity of the first medical condition for the first patient is greater than the second severity of the first medical condition …
+Hybrid graph neural network
+
+US US12333425B2 Chuan Lei International Business Machines Corporation
+Priority 2021-01-28 • Filed 2021-01-28 • Granted 2025-06-17 • Published 2025-06-17
+13. The computer usable program product of claim 12 , wherein the stored program instructions are stored in a computer readable storage device in a data processing system, and wherein the stored program instructions are transferred over a network from a remote data processing system. 14. The …
+Systems and methods incorporating animated widgets in a virtual learning …
+
+US US9633570B2 Matthew R. Peterson Mind Research Institute
+Priority 2012-12-28 • Filed 2012-12-28 • Granted 2017-04-25 • Published 2017-04-25
+stores a position in response to the first operation performed by the user, and conveys the GUI Widget in response to receipt of a second operation performed by the user, thereby displaying the changed functional operation between the first position and the second position as a potential solution …
+Providing user interfaces based on data source semantics
+
+US US10705861B1 Robert Lloyd Kincaid Tableau Software, LLC
+Priority 2019-03-28 • Filed 2019-03-28 • Granted 2020-07-07 • Published 2020-07-07
+… visualizations; and instantiating a UI engine to perform actions, including: generating a UI that styles one or more of a position, appearance or geometry of the one or more visualizations in the UI based on the weight value that is associated with each of the portion of the one or more concepts.
+The method and system for operating photo studio using mining token based on …
+KR KR102632124B1 이호익 주식회사 엘케이벤쳐스
+Priority 2021-07-22 • Filed 2022-09-28 • Granted 2024-02-01 • Published 2024-02-01
+Figure 3 is a diagram illustrating the configuration of a shooting concept control unit according to an embodiment. Figure 4 is a diagram illustrating an example of a concept matching table according to an embodiment. Figure 5 is a flowchart of a shooting concept control method according to an …
+Method of Extracting Vulnerability Information from Unstructured Text
+CN CN107871078A 达小文 北京计算机技术及应用研究所
+Priority 2016-09-27 • Filed 2016-09-27 • Published 2018-04-03
+If the vocabulary exists in the Chinese vocabulary, it will be recorded as a word segmentation, and try to move one word backward. If it is still a meaningful vocabulary, then Continue to move forward until the vocabulary composed of multiple characters cannot be queried in the Chinese vocabulary, …
+Information processing analysis system for sorting and scoring text
+US US5371673A David P. Fan Fan; David P.
+Priority 1987-04-06 • Filed 1993-04-07 • Granted 1994-12-06 • Published 1994-12-06
+FIG. 4.33 illustrates opinion on Democratic candidates when infons were scored by name only. FIG. 4.34 illustrates persuasive forces from AP paragraphs favoring better, same and worse economic conditions. FIG. 4.35 illustrates population conversion model for actions of infons favoring better, same …
+Method and system using information written in a wrapper description language …
+WO EP US CN JP KR AT AU CA IL NZ SG US6085186A David Christianson Netbot, Inc.
+Priority 1996-09-20 • Filed 1997-09-19 • Granted 2000-07-04 • Published 2000-07-04
+96-103; Pattie Maes, 1994, Agents that reduce work and information overload, Comm. of the ACM 37(7):31-40, 146; Tom Mitchell et al., 1994, Experience with a learning personal assistant, Comm. of the ACM 37(7):81-91), and agents that perform internet-related tasks (O. Etzioni et al., 1994, A softbot …
+Management of conversations
+WO EP US AT DE EP1602102B1 Jeffrey Hill Microsoft Corporation
+Priority 2003-02-11 • Filed 2004-02-11 • Granted 2010-12-29 • Published 2010-12-29
+… interactions using an intuitive administrator user interface. Unlike traditional self-service systems that are incapable of quickly adapting to ever-changing business conditions, the system described here can rapidly model typical question and answer pairs and automate future conversations.
+Metasearch technique that ranks documents obtained from multiple collections
+
+US US6795820B2 Russell Clark Barnett Nextpage, Inc.
+Priority 2001-06-20 • Filed 2001-06-20 • Granted 2004-09-21 • Published 2004-09-21
+c . In some cases, the two search engines could operate with different sets of heuristics. In such a situation the two search engines might produce different results, e.g., different rankings within the respective documents of the same collection. In the particular situation depicted in FIG. 1, …
+Using concepts to target ads
+
+WO EP US CN JP KR AU BR CA JP5074037B2 コニングステイン、ロス グーグル インコーポレイテッド
+Priority 2003-11-24 • Filed 2004-11-23 • Granted 2012-11-14 • Published 2012-11-14
+2) The computer system uses the received advertisement information to determine at least one of (1) a candidate concept and (2) a candidate concept index; 3) transferring the determined at least one candidate concept and candidate concept index to the advertiser by the computer system; 4) receiving …
+Natural language processing for developing queries
+US US7797303B2 Frederic Roulland Xerox Corporation
+Priority 2006-02-15 • Filed 2006-02-15 • Granted 2010-09-14 • Published 2010-09-14
+1. A troubleshooting system comprising: memory which stores instructions comprising: instructions for identifying normalized forms of at least some of the words of a natural language user query input by a user, the user query describing a problem experienced with a machine, instructions for …
+Various methods and apparatuses for moving thumbnails
+
+US US8078603B1 Suranga Chandratillake Blinkx Uk Ltd
+Priority 2006-10-05 • Filed 2006-11-07 • Granted 2011-12-13 • Published 2011-12-13
+The statistics include position information, those derived from the frequency of occurrence, length of time devoted to a segment on that key term from scene change to scene change, and other statistical information associated with the key terms, at both the individual word used level and sum of the …
+Method and system for valuing intellectual property
+
+WO US AU US20050071174A1 Christopher Seebregts Leibowitz Mark Harold
+Priority 2001-07-31 • Filed 2002-07-31 • Published 2005-03-31
+The first, transaction database preferably contains data of transactions relating to royalty rates, license fees and intellectual property valuations or sales as well as transfers concluded as part of a sale of a business. The weightings and ratings attached to specific transaction determinants are …
+An Intelligent Search Method
+
+US CN CN100495392C 梁平 西安迪戈科技有限责任公司
+Priority 2003-12-29 • Filed 2004-12-28 • Granted 2009-06-03 • Published 2009-06-03
+… of the feature of file, the class categories of file, search or the happiness of different Search Results are disliked; And When following one or more conditions are set up, show with said at least one specified file in the relevant Search Results of one or more searching element that extracts; A …
+Personalization services for entities from multiple sources
+
+US US20040220791A1 Allan Lamkin Interactual Technologies, Inc. A California Corpor
+Priority 2000-01-03 • Filed 2004-06-02 • Published 2004-11-04
+[0041] In one exemplary embodiment, the network content may be transferred over a network that supports Universal Plug and Play (UPnP). The UPnP standard brings the PC peripheral Plug and Play concept to the home network. Devices that are plugged into the network are automatically detected and …
+Personalization services for entities from multiple sources
+
+US US20040220926A1 Allan Lamkin Interactual Technologies, Inc., A California Cpr[P
+Priority 2000-01-03 • Filed 2004-06-02 • Published 2004-11-04
+[0041] In one exemplary embodiment, the network content may be transferred over a network that supports Universal Plug and Play (UPnP). The UPnP standard brings the PC peripheral Plug and Play concept to the home network. Devices that are plugged into the network are automatically detected and …
+Corporate content management and delivery system
+
+WO EP US AU US20040015408A1 Philip Rauen Rauen Philip Joseph
+Priority 2002-07-18 • Filed 2002-10-11 • Published 2004-01-22
+The DRE™ performs the core information operations: [0034] Concept matching: The DRE™ accepts a piece of content* or reference (identifier) as an input and returns references to conceptually related documents ranked by relevance, or contextual distance. This is used to generate automatic …
+Method and system for automatically adding graphics to a document to illustrate …
+
+US US6021412A Rosanna Ho Microsoft Corporation
+Priority 1996-04-02 • Filed 1996-04-02 • Granted 2000-02-01 • Published 2000-02-01
+A representative concept synonym corresponding to one of the descriptive words stored for the instances of graphics stored in the graphics library is preferably specified for each listed concept matching word, such that several different concept matching words may map to the same representative …
+Ontology based medical patient evaluation method for data capture and knowledge …
+US US20060020466A1 Leo Cousineau Cousineau Leo E
+Priority 2004-07-26 • Filed 2005-01-14 • Published 2006-01-26
+As used above, the term “processing” should be read to broadly cover any combination of hardware and/or software functionality capable of implementing the data manipulation, transfer or conversion operations, as well as any logical, mathematical, or access operations necessary to accomplish the …
+Concept-based system for representing and processing multimedia objects with …
+US US20030041047A1 Yuan-Chi Chang International Business Machines Corporation
+Priority 2001-08-09 • Filed 2001-08-09 • Published 2003-02-27
+… -level concept into low-level queries by using system pre-defined high-level concepts; and transferring said low-level queries to a low level comprising one or more search engines; said one or more search engines performing a query of the stored multimedia information using said low-level queries.
+Ontology based system for data capture and knowledge representation
+
+WO US US20060020465A1 Leo Cousineau Cousineau Leo E
+Priority 2004-07-26 • Filed 2005-01-14 • Published 2006-01-26
+As used above, the term “processing” should be read to broadly cover any combination of hardware and/or software functionality capable of implementing the data manipulation, transfer or conversion operations, as well as any logical, mathematical, or access operations necessary to accomplish the …
+Multi-tier resource, subsystem, and load orchestration
+US US12519738B1 William Gregg C/Hca, Inc.
+Priority 2019-08-20 • Filed 2024-03-18 • Granted 2026-01-06 • Published 2026-01-06
+Electronic communications received via a network from a plurality of electronic devices may include signals of device interactions or data changes that correspond to process performances by process-performing resources, signals of conditions of loads, or signals of processes associated with the …
+Personalization services for entities from multiple sources
+WO EP CA EP1709550A4 Allan Lamkin Sonic Solutions Inc
+Priority 2003-12-19 • Filed 2004-12-15 • Published 2009-08-12
+… media content, the presentation engine displaying the combined network content and media content on the display. In one exemplary embodiment, the network content may be transferred over a network that supports Universal Plug and Play (UPnP) or other methodology for connecting devices on a network.
+Memory enhancement and reasoning methods and systems for intelligent …
+CN121998106A 仝亮 上海明奇网络科技有限公司
+Filed 2026-04-10 • Published 2026-05-08
+Inputting the interaction situation knowledge set into a memory-enhanced reasoning network to perform situation knowledge coding processing to generate a situation knowledge coding vector, performing semantic fusion processing on the situation knowledge coding vector and interaction content …
+Product popularization method, system and equipment based on cross-source time …
+CN121981805A 季白杨 浙江工业大学
+Filed 2026-01-30 • Published 2026-05-05
+… association relations; And acquiring the change condition of the group emotion state nodes corresponding to the internal popularization concept nodes in different time windows based on the text release time in the standardized data set, and obtaining the time constraint and evolution relation.
+Data stream processing to facilitate conferencing based on protocols
+US US12445508B1 Edmund Jackson C/Hca, Inc.
+Priority 2019-02-04 • Filed 2021-09-28 • Granted 2025-10-14 • Published 2025-10-14
+monitoring for data changes in one or more data streams comprising data that is generated by a device; detecting a load condition from the data changes based on one or more trigger events that specify criteria for detecting the load condition; and selecting the interactive checklist from a …
+Method for producing color-matched paint and apparatus used therefor
+WO EP US CN JP KR AU CA MX JP2007505202A ブラセ ジョセフ ロドリーグ アラン イー・アイ・デュポン・ドウ・ヌムール・アンド・カンパニー
+Priority 2003-05-07 • Filed 2004-05-06 • Published 2007-03-08
+Theory and Implementation of Modern Techniques of Color Concept, Matching and Contest, A. B. Rodrigues, Theory and Implementation of Modern Techniques of Color Concept, Matching and Control Fifth International Conference in Organic Coatings Science and Technology Proceedings, Volume 3, Advances in …
+A friend recommendation method and system based on social graph and interest …
+CN CN120578821B 王喜宾 贵州理工学院
+Priority 2025-08-04 • Filed 2025-08-04 • Granted 2025-09-30 • Published 2025-09-30
+Background With the popularization of social networks, friend recommendation becomes important content for improving social experience of users, and potential friends are identified and recommended for the users by analyzing relevant information of the users. At present, the degree of association …
+System, method, and computer-readable medium for course structure design to …
+
+US US7677896B1 Nishikant Sonwalkar Nishikant Sonwalkar
+Priority 2002-02-19 • Filed 2003-02-19 • Granted 2010-03-16 • Published 2010-03-16
+Research has also demonstrated that, with regard to education, the modes used most often are sound (i.e., listening comprehension), sight (i.e., ocular comprehension), and touch (i.e., haptic comprehension). However, the combination used by a student in a particular learning situation often depends …
+Creating Semantic Knowledge Relationships for Electronic Health Record Systems …
+US US20260099732A1 Natalee Agassi Oracle International Corporation
+Priority 2024-10-09 • Filed 2025-08-14 • Published 2026-04-09
+10 . The non-transitory computer readable medium of claim 1 , wherein the operations further comprise: generating automated summaries of patient records by extracting salient details about a patient's conditions, medications, and recent clinical events using the knowledge graph. 11 . The non- …
+A method and system for predicting enterprise technology demand based on a …
+CN CN120950566A 张镇鑫 广州数志科技有限公司
+Priority 2025-07-28 • Filed 2025-07-28 • Published 2025-11-14
+1. A large model driven enterprise technical demand prediction method is characterized by breaking through the limitation of traditional keyword matching and expert experience judgment, adopting a four-stage progressive technical demand mining concept of unstructured problem, structured …
+Collaborative software development support methods, devices, electronic …
+CN CN121051001A 张瑞 深圳市明心数智科技有限公司
+Priority 2025-10-31 • Filed 2025-10-31 • Published 2025-12-02
+Acquiring hardware resource configuration information of a target deployment environment for running a software code to be generated; taking the hardware resource configuration information as a constraint condition; and inputting the requirement document and the constraint condition into the …
+Data processing method and electronic equipment
+CN CN120743417A 李涛 联想(北京)有限公司
+Priority 2025-06-30 • Filed 2025-06-30 • Published 2025-10-03
+Obtaining a screen image corresponding to a target screen, wherein the first interface is displayed on the target screen; determining position information of the first target content in the target screen according to the screen image; A target image is superimposed and displayed on the first target …
+Computer system to constitute natural language base and automatic dialogue …
+
+CN CN1952928A 梁威 梁威
+Priority 2005-10-20 • Filed 2005-10-20 • Published 2007-04-25
+… ; Second step: the evaluating objects notion in chapter to be selected probability of occurrence and chapter to be selected in contain sentence group's distribution situation of target concept, the degree that chapter to be selected is contained target concept is carried out preliminary assessment;
+Utilization of competencies as drivers in a learning network
+
+US US20020087346A1 Scott Harkey Harkey Scott T.
+Priority 2000-11-28 • Filed 2001-11-28 • Published 2002-07-04
+[0011] As an individual acquires more experience in an environment, the relationships between nodes strengthen, resulting in aggregation of information commonly defined as a “chunk”, as shown in FIG. 2. As additional experience is obtained, these “chunks” are further interconnected to form more …
+Automated transformation documentation of medical data
+US US20220189592A1 Margaret M. Jackson Cerner Innovation, Inc.
+Priority 2020-12-10 • Filed 2021-10-08 • Published 2022-06-16
+. Electronic clinical documents may contain various types of information relevant to the condition and/or treatment of a particular patient and can include information relating to, for example, patient identification information, images, alert history, previously consumed neuropsychiatric drugs, …
+Contextual assessment of current conditions
+
+US US12080145B1 Christian Krayer C/Hca, Inc.
+Priority 2013-02-04 • Filed 2023-08-21 • Granted 2024-09-03 • Published 2024-09-03
+generating a plurality of reconciliation items to resolve a plurality of inconsistencies or other errors identified based at least in part on the evaluating the first set of specifications of one or more process actions, the second set of specifications of one or more conditions, and/or the third …
+Signal processing for making predictive determinations
+US US12387844B1 Jonathan Perlin C/Hca, Inc.
+Priority 2013-02-04 • Filed 2023-06-12 • Granted 2025-08-12 • Published 2025-08-12
+wherein the predictive model corresponds to a natural language processing model. 3. The system as recited in claim 2 , wherein the natural language processing model is trained based at least in part on a corpus of the unstructured data mapped to a condition. 4. The system as recited in claim 3 ,
+An apparatus and method for determining emotional and conceptual context from a …
+WO AU WO2001038959A2 Robert Simon Hairman Talkie, Inc.
+Priority 1999-11-22 • Filed 2000-11-21 • Published 2001-05-31
+But computers remain intimidating to a wide variety of potential users, and almost no one would characterize a computer session as resembling a typical human interaction. In customer service situations, consumers resent being funneled through a computer attendant before reaching a "real person." …
+Intelligent question-answering method and system for epidemic prevention …
+CN CN121233826A 邹文 中国人民解放军疾病预防控制中心
+Priority 2025-09-25 • Filed 2025-09-25 • Published 2025-12-30
+performing word segmentation on a text input by a user by adopting a field self-adaptive word segmentation algorithm, performing concept matching and cross-layer reasoning through a built ontology model, and dynamically updating semantic analysis rules and model parameters based on an active …
+Innovative method, device and computer readable medium
+CN CN120930783A 王楠 北京如易堂科技有限公司
+Priority 2025-07-24 • Filed 2025-07-24 • Published 2025-11-11
+The method comprises the steps of carrying out deep analysis on each innovation method, aiming at the mapping situation of various known innovation methods, and carrying out detailed arrangement and discussion so as to give out relevant dimensional situation description, wherein as shown in fig. 4, …
+An OCR-based receipt verification method, system, medium, and product
+CN CN121747144A 郭伟峰 北京柏砚科技有限公司
+Priority 2025-12-15 • Filed 2025-12-15 • Published 2026-03-27
+And when the actual bargain price is larger than the price deviation rate in the regional sales promotion rule and the commodity coding change relation accords with a preset change condition, obtaining the cross-regional circulation risk analysis result based on the preset commodity knowledge graph …
+Apparatus for achieving a predetermined transfer characteristic
+
+US JP AT BE CA CH FR GB NL SE US3965338A Petrus Josephus van Gerwen U.S. Philips Corporation
+Priority 1973-06-13 • Filed 1975-09-02 • Granted 1976-06-22 • Published 1976-06-22
+1. An apparatus for producing a predetermined transfer characteristic of information-containing signals, comprising clock means for generating a clock pulse, input means for supplying digital representations of said information-containing signals; coefficient generator means for supplying a first …
+Method and system for determining and graphically communicating the relative …
+WO WO2016081922A1 Kevin D. MCGUSHION Mcgushion Kevin D
+Priority 2014-11-20 • Filed 2015-11-20 • Published 2016-05-26
+a position within a web document, a number of impressions per unit time, an increase in the number of impressions per unit time, a number of social likes, a number of social shares, a number of comments, a length of time displayed in the web document, and a length of time related subject matter …
+An interdisciplinary virtual simulation platform and intelligent recommendation …
+CN CN121615203A 郭佳涵 郭佳涵
+Priority 2025-11-28 • Filed 2025-11-28 • Published 2026-03-06
+Predict the probability distribution of the next element; where, Indicates a given sequence of historical operations Under the condition of predicting the next element is the first The probability of each component Indicates the next element to be predicted. This indicates the number of steps the …
+Computer-implemented color adjustment method and program using stored color …
+WO EP JP JP2008529104A トッド エム ブレナー イー・アイ・デュポン・ドウ・ヌムール・アンド・カンパニー
+Priority 2004-11-05 • Filed 2005-11-01 • Published 2008-07-31
+The color values stored in the color movement table 12T must be created for each color. The movement caused by each colorant addition can be determined by visual experience. The red, green and blue (R, G, B) values for each movement are color selections provided by a number of commercial programs …
+Ontology based medical system for data capture and knowledge representation
+
+US US20060020444A1 Leo Cousineau Cousineau Leo E
+Priority 2004-07-26 • Filed 2005-01-14 • Published 2006-01-26
+As used above, the term “processing” should be read to broadly cover any combination of hardware and/or software functionality capable of implementing the data manipulation, transfer or conversion operations, as well as any logical, mathematical, or access operations necessary to accomplish the …
+Ontology based method for data capture and knowledge representation
+
+US US20060020447A1 Leo Cousineau Cousineau Leo E
+Priority 2004-07-26 • Filed 2005-01-14 • Published 2006-01-26
+As used above, the term “processing” should be read to broadly cover any combination of hardware and/or software functionality capable of implementing the data manipulation, transfer or conversion operations, as well as any logical, mathematical, or access operations necessary to accomplish the …
+Clinical Laboratory Result Analysis Methods and Systems Based on Medical …
+CN CN121583569A 周月乔 德化县医院
+Priority 2026-01-27 • Filed 2026-01-27 • Published 2026-02-27
+… in an initial analysis focus as a starting point, defining a heuristic expansion rule, starting from the starting point entity, iteratively applying the heuristic expansion rule, selecting a next entity node to be accessed until reaching a preset path depth or meeting a path termination condition, …
+ML-Based Selection Of Components Of A Graphical User Interface Based On User- …
+US US20260119585A1 Jennifer Darmour Oracle International Corporation
+Priority 2024-10-28 • Filed 2025-09-10 • Published 2026-04-30
+… based on different fields, such as patient_id, observation_type, timestamp, or data_type. Semantic indexes may include data structures that organize concepts or codes (e.g., SNOMED CT, LOINC, ICD-10) for fast lookup, hierarchy traversal, or concept matching based on ontological relationships.
+Ontology normalization and cross-standard mapping method for electric power …
+CN CN121743363A 高明 广州城市理工学院
+Priority 2025-12-15 • Filed 2025-12-15 • Published 2026-03-27
+According to the general hierarchical relation of definition semantics and concepts in the field, the system keeps the upper-lower relation of switching equipment and isolating switch, deletes the opposite side, and performs transfer closing operation on the hierarchical structure on the basis, so …
+Augmenting Knowledge Not Available in Electronic Health Record System Patient …
+US US20260100257A1 Amitabh Saikia Oracle International Corporation
+Priority 2024-10-09 • Filed 2025-08-08 • Published 2026-04-09
+claim 6 , wherein generating the care recommendation comprises one or more of: suggesting alternative medications considering one or more of condition, diagnosis, and known allergies, optimizing treatment options based on factors such as cost or side effects, and identifying potential gaps in …
+Emergency nurse intelligent examination and culture method and system based on …
+CN CN121835844A 周志英 浙江大学医学院附属第一医院(浙江省第一医院)
+Priority 2025-12-31 • Filed 2025-12-31 • Published 2026-04-10
+Further, an attribute extraction algorithm (parameter: attribute analysis rule set based on dependency syntax analysis) is adopted to extract relevant attribute information of the identified entity, including execution conditions, dose parameters, monitoring indexes, time requirements and the like, …
+Apparatus and method for matching natural language based on morphological …
+
+KR KR102215091B1 박미경 주식회사 포시에스
+Priority 2019-03-29 • Filed 2019-03-29 • Granted 2021-02-10 • Published 2021-02-10
+… , reception, or deletion processing for a previously created electronic document according to the intention of the user; An electronic document search device that provides a list of electronic documents that meet a search condition included in a user input according to the user's intention; And
+Knowledge graph-based search request processing method, device, equipment and …
+CN CN119884384A 李洁 天翼物联科技有限公司
+Priority 2024-11-25 • Filed 2024-11-25 • Published 2025-04-25
+Background The search engine technology is developed along with the development of the Internet technology, and has the main function of coping with the retrieval of massive information under the condition of information explosion and meeting the requirement of people for acquiring the information.
+Computer-implemented color adjustment method and program using multidimensional …
+WO EP JP JP2008519296A アラン ブレイズ ジョセフ ロドリゲス イー・アイ・デュポン・ドウ・ヌムール・アンド・カンパニー
+Priority 2004-11-05 • Filed 2005-11-01 • Published 2008-06-05
+The update candidate color point is defined by the addition of a color adjustment vector to a vector ending at the position of the candidate color in the multi-dimensional color space, and the color adjustment vector includes a predetermined adjustment amount of the selected tint. Representing the …

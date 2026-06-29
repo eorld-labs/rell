@@ -1,0 +1,48 @@
+{
+  "plan_id": "plan_demo_001",
+  "actor_id": "agent_demo_001",
+  "task_goal": "organize_project_materials",
+  "steps": [
+    {
+      "step_id": "step_001",
+      "action_type": "read_metadata",
+      "target": "inbox",
+      "risk_level": "low"
+    },
+    {
+      "step_id": "step_002",
+      "action_type": "move_file",
+      "target": "file_001",
+      "target_region": "region_docs",
+      "risk_level": "low"
+    },
+    {
+      "step_id": "step_003",
+      "action_type": "move_file",
+      "target": "file_002",
+      "target_region": "region_archive",
+      "risk_level": "low"
+    },
+    {
+      "step_id": "step_004",
+      "action_type": "move_file",
+      "target": "file_003",
+      "target_region": "region_docs",
+      "risk_level": "high"
+    },
+    {
+      "step_id": "step_005",
+      "action_type": "candidate_tag",
+      "target": "file_004",
+      "target_region": "region_candidates",
+      "risk_level": "medium"
+    },
+    {
+      "step_id": "step_006",
+      "action_type": "move_file",
+      "target": "file_005",
+      "target_region": "region_archive",
+      "risk_level": "unknown"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+﻿"knowledge graph" AND "concept formation" AND "interaction experience"：无
+"affordance learning" AND robot AND concept AND abstraction：无
+"concept discovery" AND robot AND "reinforcement learning" AND transfer：
+
+Intelligent discovery multi-turn open dialogue agent
+
+US US20220050972A1 Iurii Usov Iurii Usov
+Priority 2020-08-14 • Filed 2021-08-14 • Published 2022-02-17
+The RL agent chooses appropriate action at every moment of time in order to maximize the value of user-agent interaction. The reinforcement-learning (RL) core agent is dedicated to make decisions in the multimodal system. It interacts with many other models that can measure the other party's …

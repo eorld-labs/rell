@@ -1,0 +1,1204 @@
+﻿"experience replay" AND robot AND manipulation AND prediction：
+
+
+System and method for deep reinforcement learning
+
+US CA US20200143206A1 Bilal KARTAL Royal Bank Of Canada
+Priority 2018-11-05 • Filed 2019-11-05 • Published 2020-05-07
+, wherein the terminal state prediction control loss is determined by using mean squared error between the predicted probability of closeness to a terminal state of any given state. 3 . The system as claimed in claim 2 , wherein the neural network is configured to utilize a terminal state prediction …
+Generating computer simulations of manipulations of materials based on machine …
+
+US US20210110089A1 Carolyn Linjon Chen Nvidia Corporation
+Priority 2019-10-10 • Filed 2020-06-29 • Published 2021-04-15
+28 . The robotic pouring assembly of claim 24 , wherein the granular physical characteristics values comprise one or more of a shape, a coefficient of sliding friction, a coefficient of rolling friction, and a coefficient of restitution. 29 . The robotic pouring assembly of claim 24 , wherein the …
+Collaborative multi-robot tasks using action primitives
+
+US DE US20210229281A1 Venkat Natarajan Venkat Natarajan
+Priority 2021-03-26 • Filed 2021-03-26 • Published 2021-07-29
+An apparatus for robotics machine learning training, the apparatus comprising: means for identifying a set of action primitives applicable to the set of independent robots from an action primitive library, each action primitive of the set of action primitives defining a control action for a robot …
+Paint repair process by scenario
+
+WO EP US CN JP KR US12275038B2 Nicholas D. Richardson 3M Innovative Properties Company
+Priority 2019-02-05 • Filed 2019-08-23 • Granted 2025-04-15 • Published 2025-04-15
+What is claimed is: 1. A method of automated abrasive repair, comprising: receiving, by one or more processors, pre-inspection data comprising: (i) coordinates of a defect in a substrate such that a robot manipulator can bring an end effector mounted on the robot manipulator into close proximity …
+System for voice communication with ai agents in an environment
+
+US US20210019642A1 John Andrew O'Malia Wingman AI Agents Limited
+Priority 2019-07-17 • Filed 2020-07-10 • Published 2021-01-21
+AI Agents are designed to predict and learn. For example, AI Agents may operate or learn through independent exploration of an environment (autonomous agents), and/or have been designed to follow or mimic the actions of another agent or element in the same or in a similar environment (imitation …
+… computer-readable storage medium for complex assemblies using autonomous robots …
+
+US DE DE102020106714B4 Natarajan Intel Corporation
+Priority 2019-05-28 • Filed 2020-03-12 • Granted 2023-12-14 • Published 2023-12-14
+Procedure which includes: Determine, by executing a computer-readable instruction with one or more processors of a robot (102), sequences (1600, 1700) of reinforcement learning action primitives (BL) based on object position goals and associated assembly goals determined for the respective objects …
+Method and device for disassembling electronics
+
+WO EP US CA FI US20220322592A1 Tero RINNE 3R-Cycle Oy
+Priority 2019-08-12 • Filed 2020-08-07 • Published 2022-10-06
+… ECM. 7 . The device of claim 1 , wherein the transporting means, the holding means, the removal means and/or the recovery means comprises one or more robot arm(s). 8 . The device of claim 1 , wherein the transporting means and/or the holding means are arranged to be adaptable to the received object.
+Method and system for determining action of device for given state using model …
+US JP KR KR102622243B1 최진영 네이버 주식회사
+Priority 2020-12-23 • Filed 2020-12-23 • Granted 2024-01-08 • Published 2024-01-08
+The first model is learned to predict the action that maximizes the reward predicted from the second model as the next action of the device. According to clause 8, The device is a self-driving robot, The first model and the second model predict the behavior of the device and the reward, …
+A method and system for intelligent locomotive manipulation based on deep …
+CN CN106842925B 赵曦滨 清华大学
+Priority 2017-01-20 • Filed 2017-01-20 • Granted 2019-10-11 • Published 2019-10-11
+5 . The intelligent locomotive manipulation method based on deep reinforcement learning according to claim 4 , wherein the intelligent locomotive manipulation method further comprises a strategy update mechanism, and the optimized control strategy can be implemented by applying the strategy update …
+Jointly learning exploratory and non-exploratory action selection policies
+
+WO EP US US11714990B2 Adrià Puigdomènech Badia Deepmind Technologies Limited
+Priority 2019-05-23 • Filed 2020-05-22 • Granted 2023-08-01 • Published 2023-08-01
+, wherein training the embedding neural network comprises jointly training the embedding neural network with an action prediction neural network, wherein: the action prediction neural network is configured to generate a prediction for an action that caused the state of the environment to transition …
+Graph neural networks representing physical systems
+WO EP US CN US12499359B2 Martin Riedmiller Gdm Holding Llc
+Priority 2018-04-12 • Filed 2019-04-12 • Granted 2025-12-16 • Published 2025-12-16
+receiving, as an input, robotic data characterizing the robotic system and action data, wherein the robotic system comprises bodies coupled by joints, wherein the robotic data comprises (i) dynamic data representing a dynamic state defined by motions of at least one of the bodies of the robotic …
+Reinforcement learning with adaptive return computation schemes
+WO EP US CN JP KR CA EP4100881B1 Adrià Puigdomènech BADIA GDM Holding LLC
+Priority 2020-02-07 • Filed 2021-02-08 • Granted 2025-12-03 • Published 2025-12-03
+(iii) the environment is a simulated environment and the agent (104) is implemented as one or more computers interacting with the simulated environment, the method further comprising deploying the agent (104) to control a robot or vehicle in a real-world environment after training the agent in the …
+Data-efficient hierarchical reinforcement learning
+
+WO EP US CN US11992944B2 Honglak LEE Google Llc
+Priority 2018-05-18 • Filed 2019-05-17 • Granted 2024-05-28 • Published 2024-05-28
+13. A method implemented by one or more processors, the method comprising: identifying a current state observation of a robot; determining, using a higher-level policy model of a hierarchical reinforcement learning model, a higher-level action for transitioning from the current state observation to …
+Diagnostic method, method for validation of diagnostic method, and treatment …
+
+US JP US11304673B2 Yoshitaka Itou Terumo Kabushiki Kaisha
+Priority 2017-10-31 • Filed 2018-10-31 • Granted 2022-04-19 • Published 2022-04-19
+In a method for diagnosing and treating a patient having lesions in both arteries of left and right lower limbs. By determining that a larger lesion curvature to be treated first, catheters and an operation time can be reduced is to be treated first on a priority basis based on diagnostic data, …
+Diagnostic method, method for validation of diagnostic method, and treatment …
+
+US JP US11900660B2 Yoshiyuki Saito Terumo Kabushiki Kaisha
+Priority 2017-10-30 • Filed 2018-10-30 • Granted 2024-02-13 • Published 2024-02-13
+A method for diagnosing, validation of diagnosis and treating a patient having lesions in both arteries of left and right lower limbs. By determining that a larger vessel diameter lesion to be treated first, catheters and an operation time can be reduced is to be treated first on a priority basis …
+Artificial intelligence-actuated robot
+
+US US11787050B1 Adrian L. KAEHLER Sanctuary Cognitive Systems Corporation
+Priority 2019-01-01 • Filed 2020-07-01 • Granted 2023-10-17 • Published 2023-10-17
+21. The robot of claim 18 , including a plurality of joint angle sensors disposed in the kinematic chain to generate joint angle sensor data, wherein the feedback data includes the joint angle sensor data. 22. The robot of claim 18 , wherein the first end effector comprises an end effector root joint …
+Diagnostic method, method for validation of diagnostic method, and treatment …
+
+US JP US12036059B2 Yoshitaka Itou Terumo Kabushiki Kaisha
+Priority 2017-10-25 • Filed 2022-05-31 • Granted 2024-07-16 • Published 2024-07-16
+In a method for diagnosing and treating a patient having lesions in both arteries of left and right lower limbs. By determining that a lesion distal to an aortailiac bifurcation is to be treated first, catheters and an operation time can be reduced. The lesion to be treated first can be on a …
+Diagnostic method, method for validation of diagnostic method, and treatment …
+
+US JP US11723541B2 Mitsuteru Yasunaga Terumo Kabushiki Kaisha
+Priority 2017-10-25 • Filed 2018-10-25 • Granted 2023-08-15 • Published 2023-08-15
+A method is disclosed for diagnosing and treating a patient having lesions in both arteries of left and right lower limbs. By determining that a lesion distal to an aortailiac bifurcation is to be treated first, catheters and an operation time can be reduced is to be treated first on a priority …
+Apparatus and systems for power system protective relay control using …
+
+US US20210334441A1 Dongqi WU The Texas A&M University System
+Priority 2020-04-28 • Filed 2021-04-28 • Published 2021-10-28
+Last few years have seen significant progresses in deep neural networks based RL approaches for controlling unknown dynamical systems, with applications in many areas like playing games [7] and robotic hand manipulation [8]. This has also led to addressing many power systems problems using the …
+System and method for location determination and robot control
+
+US US12162169B2 Tara BOROUSHAKI Massachusetts Institute Of Technology
+Priority 2020-11-30 • Filed 2021-11-19 • Granted 2024-12-10 • Published 2024-12-10
+claim 1 wherein: determining the optimized trajectory of the robot arm to the tagged target object comprises determining a trajectory of the robot arm to grasp the tagged target object; and generating a control signal to perform a robot arm operation comprises generating a control signal to perform …
+Autonomous driving methods and systems
+
+WO US US20240160945A1 Chen LYU Nanyang Technological University
+Priority 2021-03-17 • Filed 2022-03-17 • Published 2024-05-16
+… . 8 . The method according to claim 1 , wherein the deep reinforcement learning model comprises a priority experience replay buffer for storing, for a series of time points: the state information; the agent action; a reward value; and an indicator as to whether a human input signal is received. 9 .
+Intelligent digital twin simulation system for steel production process
+CN CN117930786B 王一 山东星科智能科技股份有限公司
+Priority 2024-03-21 • Filed 2024-03-21 • Granted 2024-06-11 • Published 2024-06-11
+The control strategy submodule carries out a model prediction control method based on a preliminary dynamic model, builds a control and prediction framework to predict future production trend, adjusts a control strategy according to the model prediction control method, sets a control target by …
+Methods, systems, articles of manufacture and apparatus to optimize resources …
+WO EP US NL NL2030226B1 Pablo Munoz Juan Intel Corp
+Priority 2020-12-24 • Filed 2021-12-22 • Granted 2023-08-04 • Published 2023-08-04
+… input data to generate an output based on patterns and/or associations previously learned by the model via a training process. As used herein, data is information in any form that may be ingested, processed, interpreted and/or otherwise manipulated by processor circuitry to produce a result. The …
+REINFORCING LEARNING FOR MULTIPLE ACCESS TRAFFIC MANAGEMENT
+
+US CN DE DE102022200847A1 Shilpa Talwar Intel Corporation
+Priority 2021-03-22 • Filed 2022-01-26 • Published 2022-09-22
+… the provided RLM being used to derive the actions by the corresponding multiple access UEs, the corresponding multiple access UEs using the provided RLM to implement the respective traffic management strategies according to their individually collected observations from interactions with to predict …
+Building control system using reinforcement learning
+
+US US20230168649A1 Michael M. Huber Johnson Controls Tyco IP Holdings LLP
+Priority 2021-11-29 • Filed 2021-11-29 • Published 2023-06-01
+obtain a prediction model for the control policy based on the building operation data of the previous time period; and operate the building equipment using the prediction model. 17 . The building management system of claim 16 , wherein the prediction model comprises a neural network trained using at …
+A Multi-Agent Deep Reinforcement Learning Agent Method Based on Smart Grid
+
+WO CN CN110945542B 侯韩旭 东莞理工学院
+Priority 2018-06-29 • Filed 2018-06-29 • Granted 2023-05-05 • Published 2023-05-05
+[29]Hernández L,Baladron C,Aguiar J M,et al.A multi-agent system architecture for smart grid management and forecasting of energy demand in virtual power plants[J].IEEE Communications Magazine,2013,51(1):106-113. [30]Niu D,Wang Y,Wu D D.Power load forecasting using support vector machine and ant …
+System for mapless navigation based on dqn and slam considering characteristic …
+
+KR KR102303432B1 유승열 한국기술교육대학교 산학협력단
+Priority 2019-11-25 • Filed 2019-11-25 • Granted 2021-09-16 • Published 2021-09-16
+However, in order to perform SLAM, it is necessary to train by manipulating the location of obstacles and the movable space in the initial stage. This is necessary, thus reducing efficiency. In addition, since robots used in factories and warehouses are premised on cooperating in the same space as …
+Efficiency improvement for machine learning of vehicle control using traffic …
+
+US US11279361B2 Ippei NISHITANI Toyota Motor Engineering & Manufacturing North America, Inc.
+Priority 2019-07-03 • Filed 2019-07-03 • Granted 2022-03-22 • Published 2022-03-22
+BACKGROUND Field Certain aspects of the present disclosure generally relate to autonomous vehicle technology and, more particularly, to a system and method for improving machine learning of vehicle control using traffic state estimation. Background Autonomous agents (e.g., vehicles, robots, etc.) …
+Systems and methods for adaptive path planning
+
+WO US US20210103286A1 Binyu Wang Hong Kong Applied Science And Technology Research Institute Co., Ltd.
+Priority 2019-10-04 • Filed 2019-10-04 • Published 2021-04-08
+, a planned path through a dynamic environment from a start location to a selected destination is provided with respect to an automated vehicle (AV), such as a self-piloted car, robotic delivery vehicle, automated guided vehicle (AGV), a drone, an unmanned aerial vehicle (UAV), etc., operating in …
+Method, computer system, and computer program for learning offline robot skill
+
+KR KR102758259B1 이태윤 네이버 주식회사
+Priority 2022-03-15 • Filed 2022-03-15 • Granted 2025-01-23 • Published 2025-01-23
+A method, a computer system, and a computer program for offline robot skill learning are disclosed. The robot skill learning method may include a step of collecting robot behavior data using a haptic device; and a step of learning a robot skill using the behavior data.
+AI Serving Hardware and Software Frontier Enhancements
+US US20250390352A1 Jason Crabtree Qomplx Llc
+Priority 2024-02-08 • Filed 2025-08-24 • Published 2025-12-25
+implementing a hardware abstraction layer providing standardized interfaces across heterogeneous platforms; implementing a prediction and speculation layer with neural-path analysis and quantum-inspired path exploration; orchestrating system-wide resources through a comprehensive resource …
+Image processing neural network systems and methods with scene understanding
+
+US US11386655B2 Dimitris Metaxas Rutgers, The State University Of New Jersey
+Priority 2019-02-15 • Filed 2020-02-13 • Granted 2022-07-12 • Published 2022-07-12
+, further comprising: determining whether to output a final prediction for the scene assignment using the confidence score for the scene assignment, when the confidence score does not satisfy a criterion for sufficient confidence for predicting the scene assignment, determining whether a scene of …
+Autonomous vehicle simulation using machine learning
+
+EP US CN EP3742343A1 Fabio TOZETO RAMOS NVIDIA Corporation
+Priority 2019-05-20 • Filed 2020-04-03 • Published 2020-11-25
+illustrates an example of a robot that performs a fetch-slide task in which the robot has limited access to a table, in accordance with an embodiment; FIG. 3 illustrates an example of a robot that performs a fetch-push task in which the robot has limited access to a table, in accordance with an …
+Predictive path coordination in multi-robot systems
+
+US US20240319750A1 Zixiang Nie University Of South Florida
+Priority 2023-03-23 • Filed 2024-03-25 • Published 2024-09-26
+executing, by the first robot, the at least one transportation task in accordance with the determined optimal path. 14 . The method of claim 13 , further comprising: initiating, by the first robot, a token-passing based resolution to resolve potential collisions with the at least one additional robot …
+Artificial intelligence framework
+
+US US20190108448A1 John Andrew O'Malia VAIX Limited
+Priority 2017-10-09 • Filed 2018-10-08 • Published 2019-04-11
+and the observed state of the environment. This may be done by applying, for example, a conditional GAN algorithm as described in “High-Resolution Image Synthesis and Semantic Manipulation with Conditional GANs by Ting-Chun Wang et al. In other words, the sequence of outputs from the generative …
+Machine learning system
+
+WO EP US US20200302322A1 Aleksi TUKIAINEN Prowler ,Io Limited
+Priority 2017-10-04 • Filed 2018-10-04 • Published 2020-09-24
+… ; and the probabilistic model comprises a distribution of a stochastic intensity function, wherein an integral of the stochastic intensity function over a sub-region of the domain corresponds to a rate parameter of a Poisson distribution for a predicted number of events occurring in the sub-region.
+ROV thrust distribution and reinforcement learning-based motion control method
+
+CN CN111966118A 孙玉山 哈尔滨工程大学
+Priority 2020-08-14 • Filed 2020-08-14 • Published 2020-11-20
+Taking the position quantity in the satellite coordinate system as the controlled state quantity s={x r , y r , yaw r }, according to the state quantity {s k-1 , s k } and the control quantity {u k-1 at two sampling moments ,u k }Use the SVR method to estimate the state sk+1 of the underwater robot …
+Controlling an agent to explore an environment using observation likelihoods
+
+WO EP US JP EP3915053B1 Bilal PIOT DeepMind Technologies Limited
+Priority 2019-01-23 • Filed 2020-01-23 • Granted 2024-07-31 • Published 2024-07-31
+Optionally, the value of H may be equal to one. Alternatively, the value of H may be greater than one, so that the reward function encodes the value of the observation o t to predicting the observation o t + H relating to a time multiple time steps later. Thus, the reward function rewards the neural …
+Diagnostic Method, Method for Validation of Diagnostic Method, and Treatment …
+
+US JP US20190117090A1 Shota Ishii Terumo Kabushiki Kaisha
+Priority 2017-10-25 • Filed 2018-10-25 • Published 2019-04-25
+A method is disclosed for diagnosing and treating a patient having lesions in both arteries of left and right lower limbs. By determining that a longer lesion to be treated first, catheters and an operation time can be reduced is to be treated first on a priority basis based on diagnostic data, …
+Automatic Pilot method and device
+CN CN109901574A 王滨 华为技术有限公司
+Priority 2019-01-28 • Filed 2019-01-28 • Published 2019-06-18
+… feedback and execution second act newly Observation state, and the second initial observation state, the second movement, execution second are acted into corresponding feedback, the second new observation State is stored as second sample data, and by second sample data to experience replay pond.
+Deep reinforcement learning-based decision-making method
+
+WO CN CN112295237A 张昊迪 深圳大学
+Priority 2020-10-19 • Filed 2020-10-19 • Published 2021-02-02
+… to interpret and perform poorly for a long period of time at the beginning of training. Furthermore, for applications in robotics and critical decision support systems, making decisions that are catastrophic even with deep reinforcement learning can result in cost-prohibitive consequences.
+… system, and non-transitory computer-readable record medium for learning robot …
+
+WO US US12337478B2 Taeyoon Lee Naver Corporation
+Priority 2022-03-15 • Filed 2024-09-13 • Granted 2025-06-24 • Published 2025-06-24
+7. The robotic painting method of claim 6 , wherein the stroke-level image transition model is configured using an outcome stroke image model and a pixel-level color blending model. 8. The robotic painting method of claim 6 , wherein the learning further comprises planning a painting skill sequence …
+Predictive motor control system based on hierarchical tactile memory …
+JP JP2025128338A 村上由宇 ニューヨークゼネラルグループインク
+Priority 2025-06-14 • Filed 2025-06-14 • Published 2025-09-02
+A predictive motor control system with hierarchical tactile memory integration, equipped with a high-density tactile sensor array, a time-series tactile memory storage unit, a tactile pattern prediction engine, a preemptive trajectory optimization unit, and a dynamic environmental adaptation …
+Flexible manipulation device and method for fabricating the same
+WO US WO2020072767A1 Jonathan King Carnegie Mellon University
+Priority 2018-10-03 • Filed 2019-10-03 • Published 2020-04-09
+43. The method of claim 41 , further comprising: receiving, as input, at least one desired manipulation; and determining a position and orientation of at least one end portion of at least one appendage based on the input, wherein the at least one tendon is initialized based on the at least one …
+An auto-adaptive controller tuning system for wastewater treatment process …
+KR KR102715372B1 유창규 경희대학교 산학협력단
+Priority 2022-02-25 • Filed 2022-02-25 • Granted 2024-10-14 • Published 2024-10-14
+Figure 5 is a graphical representation of an automatic adaptive controller tuning system based on an offline reinforcement learning algorithm with online fine-tuning. Figure 6 is a schematic diagram of the DQN algorithm consisting of a Deep Q network and an experience replay buffer. Figure 7 is a …
+Diagnostic Method, Method for Validation of Diagnostic Method, and Treatment …
+
+US JP US20190117181A1 Shota Ishii Terumo Kabushiki Kaisha
+Priority 2017-10-25 • Filed 2018-10-25 • Published 2019-04-25
+A method is disclosed for diagnosing and treating a patient having lesions in both arteries of left and right lower limbs. By determining that a higher stenosis rate lesion to be treated first, catheters and an operation time can be reduced is to be treated first on a priority basis based on …
+Action model for robot
+US US20260111032A1 Corey Lynch Figure Ai Inc.
+Priority 2024-09-04 • Filed 2025-12-10 • Published 2026-04-23
+5 . The robot of claim 4 , wherein the robot is configured to generate a second set of X, Y, Z coordinates and a second set of X, Y, Z rotations before the robot moves the extent of said robot to the first set of X, Y, Z coordinates and the first set of X, Y, Z rotations. 6 . The robot of claim 1 ,
+Multi-mode instruction-based live working atomic action sequence generation …
+CN CN120781964A 王景川 上海交通大学
+Priority 2025-06-20 • Filed 2025-06-20 • Published 2025-10-14
+4. The method for generating a live-action atomic motion sequence based on a multimodal instruction according to claim 3, wherein the step S3 includes guiding the robot to perform task decomposition in the absence of information by assisting the robot to perform task decomposition based on task …
+Robotic arm control method, device, equipment and medium based on pre-training …
+CN CN118418134A 周林 华侨大学
+Priority 2024-05-31 • Filed 2024-05-31 • Published 2024-08-02
+The execution unit is used to control the execution of the robot arm according to the predicted next action of the robot arm. 7. A robotic arm control device based on a pre-trained model, applied to a robotic arm, characterized in that it includes a processor and a memory, wherein a computer …
+Diagnostic method, method for validation of diagnostic method, and treatment …
+
+US JP US11786131B2 Atsushi Nomura Terumo Kabushiki Kaisha
+Priority 2017-10-25 • Filed 2018-10-25 • Granted 2023-10-17 • Published 2023-10-17
+A method is disclosed for diagnosing and treating a patient having lesions in both arteries of left and right lower limbs. By determining that a lower stenosis rate lesion to be treated first, catheters and an operation time can be reduced is to be treated first on a priority basis based on …
+Method for controlling a robot device
+
+US CN DE DE102022204724B4 Gerhard Neumann Robert Bosch Gesellschaft mit beschränkter Haftung
+Priority 2022-05-13 • Filed 2022-05-13 • Granted 2024-10-31 • Published 2024-10-31
+, wherein the environment of the robot device (101) comprises a plurality of objects (113, 114) and the action parameter values indicate whether an object (113, 114) is to be moved or rotated and/or indicate directions, displacement ranges and/or rotation angles. Robot control device (106) which is …
+A robot trajectory tracking control method, electronic device and storage medium
+
+CN CN114967686A 刘佳 中国科学院深圳先进技术研究院
+Priority 2022-05-23 • Filed 2022-05-23 • Published 2022-08-30
+3. The robot trajectory tracking control method according to claim 2, wherein the experience pool stores states, actions and rewards, and the actor network and critic network parameters are updated according to the playback samples, and Outputting actions according to the current state vector …
+Automatic grabbing and stacking method and system based on mechanical arm
+
+CN CN111331607A 张伟 山东大学
+Priority 2020-04-03 • Filed 2020-04-03 • Published 2020-06-26
+predicting a height of the pile at a pixel level using information obtained from a stacking network aware layer; feature learning centered on the item to ensure that items disappearing from the grip area are similar to items at the feature level and added to the stack. 4. The robotic-arm-based …
+Diagnostic Method, Method for Validation of Diagnostic Method, and Treatment …
+
+US US20200155101A1 Mitsuteru Yasunaga Terumo Kabushiki Kaisha
+Priority 2018-11-19 • Filed 2018-11-19 • Published 2020-05-21
+In a method for diagnosing, validating and treating a patient having lesions in both arteries of left and right lower limbs. By determining that a harder lesion to be treated first, catheters and an operation time can be reduced is to be treated first on a priority basis based on diagnostic data, …
+Methods and apparatus to automatically tune reinforcement learning …
+
+US US20240289639A1 James Brennan WORTH Substrate Artificial Intelligence Sa
+Priority 2023-02-23 • Filed 2023-02-23 • Published 2024-08-29
+can be implemented, for example, in a financial environment and used to generate and manage agents configured to carry out analysis of market conditions, analyze market value and/or predicted trends in value of securities, such as stocks, bonds, currencies, commodities, services, and/or the like, …
+System and method for autonomous vehicle navigation in mixed-autonomy traffic …
+US US20250249932A1 Yaser Pourmohammadi Fallah University Of Central Florida Research Foundation, Inc.
+Priority 2024-02-02 • Filed 2024-12-02 • Published 2025-08-07
+13 . The system of claim 12 , wherein the step of synthesizing a plurality of future hypotheses of the executed instructions further comprises the step of, generating, via the HPN, a multi-step prediction chain to transmit at least one of the plurality of future hypotheses to the VFN. 14 . The method …
+Quick mold changing method and system
+CN CN118690925A 朱贤舟 宁波顺兴福尔威液压科技有限公司
+Priority 2024-08-26 • Filed 2024-08-26 • Published 2024-09-24
+Based on the historical mold change data, determine the training samples of the mold change time prediction model, initialize the parameters of the mold change time prediction model, and determine the initial prediction result; Based on the initial prediction results, a feature point histogram is …
+Mechanical arm progressive training method based on deep reinforcement learning …
+CN CN118254170A 王赞 河南大学
+Priority 2024-03-22 • Filed 2024-03-22 • Published 2024-06-28
+The present invention discloses a method for progressive training of a robot arm based on deep reinforcement learning, a storage medium and an electronic device, which specifically include the following steps: constructing a simulated working environment of a robot arm according to a real scene, …
+Upside-down reinforcement learning
+
+WO EP US US20240386328A1 Juergen Schmidhuber Nnaisense SA
+Priority 2019-09-24 • Filed 2024-06-12 • Published 2024-11-21
+BACKGROUND Traditional reinforcement learning (RL) is based on the notion of learning how to predict rewards based on previous actions and observations and transforming those predicted rewards into subsequent actions. Traditional RL often involves two networks, each of which may be a recurrent …
+Exploration method and device based on reinforcement learning and intelligent …
+
+CN CN114859932A 牛建伟 郑州大学产业技术研究院有限公司
+Priority 2022-05-20 • Filed 2022-05-20 • Published 2022-08-05
+Construct map information of the space to be explored based on the obtained radar data; According to the map information, a local map within a preset range is constructed with the current position of the robot as the center, and the local boundary points of the local map are obtained; Importing the …
+Transceiver with machine learning for generation of communication parameters …
+
+US US11490273B2 Jithin Jagannath ANDRO Computational Solutions, LLC
+Priority 2020-04-30 • Filed 2021-04-30 • Granted 2022-11-01 • Published 2022-11-01
+… With the recent advancements in various types of machine learning such as deep reinforcement learning, artificial neural network (ANN) based reinforcement learning solutions, etc., the ability to provide increased autonomy in a number of software and robotics applications has become a realization.
+A method and ai-driven system for determining and monitoring parameters for …
+WO EP WO2025122016A1 Amin S. Azar 3D-Components As
+Priority 2023-12-06 • Filed 2024-12-02 • Published 2025-06-12
+In this welding example, the AM apparatus comprises a robotic arm configured for welding, a user interface, a sensor, one or more means for communicatively connecting to processor 106 (e.g., Wi-Fi, Bluetooth, or a wired connection), a welding power source, or a laser source or a combination thereof …
+Attention Neural Networks with Short-Term Memory Units
+
+WO EP US CN JP KR JP7648779B2 アンドレア・バニーノ ディープマインド テクノロジーズ リミテッド
+Priority 2021-02-05 • Filed 2022-02-07 • Granted 2025-03-18 • Published 2025-03-18
+processing a masked input vector that masks the respective input value at each of the one or more input positions of a plurality of input positions in an input sequence to generate a prediction of the respective input value at each of the one or more input positions of the plurality of input …
+Diagnostic method, method for validation of diagnostic method, and treatment …
+
+US JP US11723615B2 Yusuke SEKINE Terumo Kabushiki Kaisha
+Priority 2017-10-31 • Filed 2018-10-31 • Granted 2023-08-15 • Published 2023-08-15
+In a method for diagnosing, validating and treating a patient having lesions in both arteries of left and right lower limbs. By determining that a smaller curvature of lesion to be treated first, catheters and an operation time can be reduced is to be treated first on a priority basis based on …
+Diagnostic Method, Method for Validation of Diagnostic Method, and Treatment …
+
+US US20200155079A1 Kohtaroh Kusu Terumo Kabushiki Kaisha
+Priority 2018-11-19 • Filed 2018-11-19 • Published 2020-05-21
+In a method for diagnosing, validating, and treating a patient having lesions in both arteries of left and right lower limbs. By determining that a softer lesion to be treated first, catheters and an operation time can be reduced is to be treated first on a priority basis based on diagnostic data, …
+Diagnostic method, method for validation of diagnostic method, and treatment …
+
+US JP US20190125192A1 Kohtaroh Kusu Terumo Kabushiki Kaisha
+Priority 2017-10-30 • Filed 2018-10-30 • Published 2019-05-02
+In a method for diagnosing, validation of diagnosis and treating a patient having lesions in both arteries of left and right lower limbs. By determining that a smaller vessel diameter lesion to be treated first, catheters and an operation time can be reduced is to be treated first on a priority …
+Diagnostic Method, Method for Validation of Diagnostic Method, and Treatment …
+
+US JP US20190117088A1 Atsushi Nomura Terumo Kabushiki Kaisha
+Priority 2017-10-25 • Filed 2018-10-25 • Published 2019-04-25
+A method is disclosed for diagnosing, validating and treating a patient having lesions in both arteries of left and right lower limbs. By determining that a shorter lesion to be treated first, catheters and an operation time can be reduced is to be treated first on a priority basis based on …
+Temporal difference scaling when controlling agents using reinforcement …
+
+WO EP US US20240104388A1 Tom Schaul Deepmind Technologies Limited
+Priority 2021-02-04 • Filed 2022-02-04 • Published 2024-03-28
+maintaining an experience replay memory that stores experience tuples generated as a result of the agent interacting with the environment, wherein the experience tuples identify, for each of a plurality of the time steps, at least: the observation, the action selected, the reward received, and a …
+Systems and methods for responsive neurorehabilitation
+WO WO2014025772A2 Babak Mahmoudi University Of Miami
+Priority 2012-08-06 • Filed 2013-08-06 • Published 2014-02-13
+In addition, brain-machine interfaces (BMI) utilize neural decoding to give users direct control over a robotic, communication, or functional electrical stimulation systems using only their neural activity. These achievements have been supported by numerous studies of neural decoding using single …
+Methods and devices for reinforcement learning
+WO EP US CN CN105637540A 沃洛季米尔·姆尼赫 谷歌公司
+Priority 2013-10-08 • Filed 2014-10-07 • Published 2016-06-01
+… . 6. The method of claim 5, further comprising: storing empirical data from the system, wherein the empirical data is manipulated by operating on the system with the action selected using the second neural network is generated, and wherein said training data includes said stored empirical data. 7. …
+Method for generating reinforcement learning multi-mode body-building …
+CN CN120373498A 林余楚 深译信息科技(珠海)有限公司
+Priority 2025-04-17 • Filed 2025-04-17 • Published 2025-07-25
+Background In the field of artificial intelligence and robotics, body-building agents (Embodied AI) gradually become a core technology for implementing complex tasks (e.g., autonomous navigation, object manipulation) through real-time interactions with physical or virtual environments. Whereas body …
+Synthesizing multi-operator data transformation pipelines
+WO EP US WO2022240571A1 Yeye He Microsoft Technology Licensing, Llc
+Priority 2021-05-14 • Filed 2022-04-22 • Published 2022-11-17
+SYNTHESIZING MULTI-OPERATOR DATA TRANSFORMATION PIPELINES BACKGROUND Data preparation, sometimes also known as data wrangling, refers to the process of building sequences of table-manipulation steps (e.g., Transform, Join, Pivot, etc.) in order to prepare raw data into a form that is ready for …
+Modulating agent behavior to optimize learning progress
+
+US US20210089908A1 Tom Schaul Deepmind Technologies Limited
+Priority 2019-09-25 • Filed 2020-09-25 • Published 2021-03-25
+For example in the case of a robot the observations may include data characterizing the current state of the robot, e.g., one or more of: joint position, joint velocity, joint force, torque or acceleration, for example gravity-compensated torque feedback, and global or relative pose of an item held …
+Deep model reference adaptive controller
+
+US US20210405659A1 Girish Chowdhary The Board Of Trustees Of The University Of Illinois
+Priority 2020-06-23 • Filed 2021-06-22 • Published 2021-12-30
+Deep Neural Networks (DNN) have shown tremendous empirical performance in many applications and various fields such as computer vision, speech recognition, translation, natural language processing, robotics, autonomous driving and many more [1] (of note, various numbers in square brackets, e.g., “[ …
+Building control system using reinforcement learning
+
+US US20240329610A1 Michael M. Huber Tyco Fire & Security Gmbh
+Priority 2021-11-29 • Filed 2024-06-14 • Published 2024-10-03
+4 . The automation system of claim 1 , wherein the instructions further cause the one or more processors to determine a second prediction model based on the first artificial intelligence model, and wherein the automation system is operated using the second prediction model. 5 . The automation system …
+Fluid-solid coupling system control method based on multitasking reinforcement …
+CN CN115202210B 任博 南开大学
+Priority 2022-07-29 • Filed 2022-07-29 • Granted 2024-10-29 • Published 2024-10-29
+Reinforcement learning has made great progress in the fields of robot control and game AI in recent years. Using end-to-end neural network methods, reinforcement learning has been used in the field of computer graphics to control the movement of complex animated characters, manipulate granular …
+Deep reinforcement learning-enabled cryo-em data collection
+
+US US20230288354A1 Michael Cianfrocco Regents Of The University Of Michigan
+Priority 2022-03-08 • Filed 2023-03-08 • Published 2023-09-14
+Methods and systems for performing electron microscopy are provided. Microscopy images candidate sub-regions at different magnification levels are captured and provided to a trained sub-region quality assessment application trained to output a quality score for each candidate sub-region. From the …
+Pin hole assembly DDPG reinforcement learning acceleration method based on …
+
+CN CN115598975A 臧雅静 哈尔滨工业大学（Cn）
+Priority 2022-09-22 • Filed 2022-09-22 • Published 2023-01-13
+Step five and six, using redundant variables θ and The s′ obtained in step 55 and the ax T ho obtained in step 52 obtain the inverse kinematics solution of the robot, and realize the position control of the robot in the simulation environment or on the real robot, and obtain the actual s′ and the …
+Dialysis scheduling system with integrated telemedicine and machine learning …
+WO US US20260094702A1 James E. Kemler Centient Software LLC
+Priority 2023-12-14 • Filed 2025-12-09 • Published 2026-04-02
+analyze a plurality of dialysis parameters associated with the patient; predict, based on the plurality of dialysis parameters, patient complications; automatically generating a recommendation for adjusting dialysis machine parameters including ultrafiltration profiles to preemptively prevent the …
+Device and method for controlling an agent
+
+US CN DE US20230090127A1 Jan Guenter Woehlke Robert Bosch Gmbh
+Priority 2021-09-22 • Filed 2022-08-30 • Published 2023-03-23
+A method for controlling an agent. The method includes obtaining numerical values of a first and second set of state variables, which together represent a current full state of the agent, and the numerical values of the first set of state variables represent a current partial state of the robot;
+Systems and methods of reinforced learning in neuronal cultures for assessment …
+WO EP US IL WO2024100667A1 Nisim PERETS Itayandbiond Ltd
+Priority 2022-11-09 • Filed 2023-11-09 • Published 2024-05-16
+The method of claim 45, wherein classifying the brain organoid, and/or the neuronal culture, is based on a degree of similarity of the learning-behavior response to a predicted learning-behavior response of a PD-derived brain organoid and/or of a heathy organoid, and/or to a predicted learning- …
+Demonstration-driven reinforcement learning
+
+WO EP US US20240412063A1 Oleg O. Sushkov Deepmind Technologies Limited
+Priority 2021-10-05 • Filed 2022-10-05 • Published 2024-12-12
+108 can be one or more first-person, ego-centric images of the environment, i.e., images captured by one or more cameras (or other image generation unit(s)) of the robot. The cameras may be mounted on the robot so as to move with the robot as the agent navigates in the environment. The goal …
+Deep reinforcement learning-based method for optimizing 6D grabbing pose of …
+CN CN119741379B 沈捷 南京工业大学
+Priority 2024-12-04 • Filed 2024-12-04 • Granted 2025-12-16 • Published 2025-12-16
+Step S1: Build an experimental platform for 6D pose grasping of the robotic arm in a simulation environment, construct a policy network πθ and a value network Qφ . The policy network is responsible for deciding the 6D pose grasping action of the robotic arm, and the value network is responsible for …
+Learning device, control device, control system, learning method, and storage …
+
+WO WO2024180656A1 凜 高野 日本電気株式会社
+Priority 2023-02-28 • Filed 2023-02-28 • Published 2024-09-06
+The learning device according to claim 5, wherein the high-level controller learning unit learns the high-level controller using the operation parameters related to the control result data as input and the control parameters as output. The robot; the high level controller; A control system …
+Model training method and apparatus, and computer device, computer-readable …
+WO CN WO2025228010A1 胡欢 腾讯科技（深圳）有限公司
+Priority 2024-04-30 • Filed 2025-03-25 • Published 2025-11-06
+The adjustment module is configured to adjust the parameters of the first prediction model to be trained based on the reward information of multiple execution results, so as to obtain a trained first prediction model, wherein the reward information is determined based on the multiple execution …
+Controlling agents using state associative learning for long-term credit …
+
+WO EP US CN US20240086703A1 Samuel RITTER Deepmind Technologies Limited
+Priority 2021-02-05 • Filed 2022-02-04 • Published 2024-03-14
+, episodic memory 120 , and a synthetic return neural network system 130 . In some implementations the system may also include experience replay memory 150 . In some implementations the synthetic return neural network system 130 is used to select actions and there is no separate action selection neural …
+A data processing method and related equipment
+
+CN CN115879565A 刘悦丞 华为技术有限公司
+Priority 2022-09-27 • Filed 2022-09-27 • Published 2023-03-31
+16. The apparatus of any of claims 9 to 15, wherein the training samples further comprise: a benefit corresponding to the state data, the hybrid control information, or the predicted state. 17. A data processing apparatus, characterized in that the apparatus comprises a memory and a processor; the …
+Computer system and method for utilizing variational inference
+
+EP EP4057188B1 Brian COYLE Quantinuum Ltd
+Priority 2021-03-10 • Filed 2022-03-10 • Granted 2024-12-25 • Published 2024-12-25
+, describes variational quantum circuits for deep reinforcement learning, specifically, where classical deep reinforcement learning algorithms like experience replay and target network are reshaped into a representation of variational quantum circuits, and describes using a quantum information …
+A ship automatic berthing path planning method based on improved DDQN and …
+CN CN118483999A 朱齐丹 哈尔滨工程大学
+Priority 2024-05-06 • Filed 2024-05-06 • Published 2024-08-13
+The problem of automatic ship berthing involves the slow movement of ships in shallow waters. The interference from wind, waves, currents and shore effects is relatively large, making it difficult to manipulate and control the ship. The berthing path planning problem is one of the key issues in …
+Solving sparse reward tasks using self-balancing shaped rewards
+
+US US11620572B2 Alexander Richard Trott Salesforce.Com, Inc.
+Priority 2019-05-16 • Filed 2019-08-20 • Granted 2023-04-04 • Published 2023-04-04
+In some examples, goal-oriented task module 140 may solve goal-oriented tasks such as point-maze navigation, ant maze navigation using hierarchical reinforcement learning, image manipulation, 3D construction using blocks, and/or the like as is described in further detail below. In some examples, …
+Mahjong matching game level generation method, medium and device based on …
+CN CN119425055A 章牧 成都橙风趣游科技有限公司
+Priority 2024-11-22 • Filed 2024-11-22 • Published 2025-02-14
+Training a value network based on minimizing a loss function between the predicted value and the actual value, and training data including characteristic information of the related cards and corresponding player feedback or expert scores, the trained value network evaluating new card designs, …
+Sample-Generated Robotics Skill Learning Method and Device
+CN CN121104981A 鲁涛 中国科学院自动化研究所
+Priority 2025-10-13 • Filed 2025-10-13 • Published 2025-12-12
+This invention provides a robot operation skill learning method and apparatus based on sample generation, comprising: robot interaction with the environment, collecting real samples and storing them in a real experience playback buffer; training a self-verifying sample generator using real samples;
+Bipedal action model for humanoid robot
+US US20260070221A1 Corey Lynch Figure Ai Inc.
+Priority 2024-09-10 • Filed 2025-09-10 • Published 2026-03-12
+22 . The system of claim 21 , wherein the bipedal action model includes a single beta model with a single set of neural network weights that are configured to allow the humanoid robot to perform a plurality of dexterous whole body behaviors without using a second set of neural network weights. 23 . …
+Dexterous Manipulation Methods and Electronic Devices Based on Mean Flow …
+CN CN121492041A 潘飞 南京埃斯顿酷卓科技有限公司
+Priority 2025-12-24 • Filed 2025-12-24 • Published 2026-02-10
+3. The robot smart operation method of claim 1, wherein when the robot operation data is collected, the collected data set is recorded as Wherein For the visual observation of the robot, In the state of the robot, the robot is provided with a plurality of sensors, In order to respond to the action …
+Bipedal action model for humanoid robot
+US20260126796A1 Corey Lynch Figure Ai Inc.
+Filed 2025-10-20 • Published 2026-05-07
+10 . The humanoid robot system of claim 1 , wherein the BAM is reusable across different robot embodiments by sharing the Delta and Gamma models across platforms and retraining only the Beta and Alpha models to account for embodiment-specific kinematics. 11 . The humanoid robot system of claim 1 ,
+Bipedal action model for humanoid robot
+US20260126804A1 Corey Lynch Figure Ai Inc.
+Filed 2025-10-20 • Published 2026-05-07
+10 . The humanoid robot system of claim 1 , wherein the BAM is reusable across different robot embodiments by sharing the Delta and Gamma models across platforms and retraining only the Beta and Alpha models to account for embodiment-specific kinematics. 11 . The humanoid robot system of claim 1 ,
+Bipedal action model for humanoid robot
+US20260126805A1 Corey Lynch Figure Ai Inc.
+Filed 2025-10-20 • Published 2026-05-07
+The present disclosure provides a humanoid robot system comprising a mechanical structure including a torso, two arms, and two legs providing at least 30 degrees of freedom, actuators coupled to the degrees of freedom, a sensor suite comprising at least one camera and proprioceptive sensors …
+Annotation model for humanoid robot data
+US US20260097492A1 Corey Lynch Figure Ai Inc.
+Priority 2024-10-04 • Filed 2025-10-06 • Published 2026-04-09
+processing the multimodal input data through the hierarchical BAM to generate a plurality of annotation types at different abstraction levels, wherein the Beta models generate semantic annotations describing task objectives and the Alpha models generate motor command annotations specifying robotic …
+Bipedal action model for humanoid robot
+US20260124750A1 Corey Lynch Figure Ai Inc.
+Filed 2025-11-03 • Published 2026-05-07
+The present disclosure provides a control system for a humanoid robot comprising a bipedal action model (BAM) with hierarchical architecture including a beta model executing cognitive tasks at lower frequency, ingesting multimodal sensory inputs including visual data and natural language …
+Training and use of a bipedal action model for humanoid robot
+US20260124746A1 Corey Lynch Figure Ai Inc.
+Filed 2025-11-03 • Published 2026-05-07
+The present disclosure provides a method for controlling a humanoid robot using a hierarchical bipedal action model (BAM), the method comprising obtaining a base controller by training in simulation with reinforcement learning, instantiating an initial BAM including a Gamma model configured to …
+
+
+A reinforcement learning control method for optimal global performance of robot …
+CN CN121340255A 徐智浩 广东省科学院智能制造研究所
+Priority 2025-10-23 • Filed 2025-10-23 • Published 2026-01-16
+2. The reinforcement learning control method for achieving global optimal performance in robot dexterity operation as described in claim 1, characterized in that the strategy for obtaining the optimal dexterity angle for the current control cycle of the robot through reinforcement learning includes …
+Target object control method and device, computing device, and storage medium
+CN CN115284285B 徐家卫 腾讯科技（深圳）有限公司
+Priority 2022-07-29 • Filed 2022-07-29 • Granted 2025-01-14 • Published 2025-01-14
+4. The method according to claim 3, wherein the determining the sampling priority of the candidate sample data by using the consistency of multiple predicted reward values corresponding to the candidate sample data comprises: Determining a variance of a plurality of predicted reward values of the …
+… with Harris Corner Detector To Improve the Behavioral Efficiency of Robots in …
+KR KR20250142698A 이경창 국립부경대학교 산학협력단
+Priority 2024-03-22 • Filed 2024-03-22 • Published 2025-09-30
+In the 14th paragraph, in the step of selecting the action execution point, Using the Q-map and corner and center masks output from the DQN network, the execution points of push and grasp are predicted. A method for pushing and grasping control using a Harris corner detector to improve the …
+System and method for performing reinforcement learning by setting hindsight …
+
+KR KR20230091821A 유창동 한국과학기술원
+Priority 2021-12-16 • Filed 2022-12-16 • Published 2023-06-23
+Reinforcement learning (RL) is getting more and more attention as a result of its success in high-profile tasks involving performance exceeding human levels, such as gaming, robotics, and autonomous driving. However, despite many achievements, significant difficulties have been encountered in …
+Neural network model training and character control methods, devices, and …
+CN CN117421589A 李世迪 腾讯科技（深圳）有限公司
+Priority 2022-07-07 • Filed 2022-07-07 • Published 2024-01-19
+4. The method according to claim 1, characterized in that, based on the first state vector and the second state vector, calling a first neural network model to perform action prediction processing to obtain the first action instruction, and Call the action control model to perform action prediction …
+Apparatus and method for learning temporal distance cognitive representation
+KR20260061951A 이영운 연세대학교 산학협력단
+Filed 2024-10-28 • Published 2026-05-06
+The present invention relates to robot learning technology, and more specifically, to a temporal distance-cognitive representation learning device and method that provides an unsupervised GCRL method utilizing a temporal distance-cognitive representation (TLDR) to improve both goal-oriented search …
+Artificial intelligence enhanced functional electrical stimulation for central …
+WO WO2025217735A1 Yi Guo Neural Automations Ltd.
+Priority 2024-04-17 • Filed 2025-04-16 • Published 2025-10-23
+[0004] Conventional systems in the art include: US10376389 (showing a prosthesis that uses EMG activity in residual muscle to drive a prosthetic device); US20230086004 (showing an AI-Enabled prosthesis that uses residual periphery nerve signal to perform feedback control of robotic actuators); …
+A vision-strain fusion-based aerial flexible arm pose estimation and online …
+CN CN121521156B 崔玉康 深圳大学
+Priority 2026-01-15 • Filed 2026-01-15 • Granted 2026-03-24 • Published 2026-03-24
+Wherein, the Is the first Local residual vectors predicted by individual experts; 3) And step three, self-adaptive fusion output: Using amplitude-based Adaptive weights of (a) Fusing the baseline vector with a residual vector predicted by the neural network: Finally obtaining the yaw angle predicted …
+Experience selection in reinforcement learning
+US US20250013871A1 Jacob White Wells Fargo Bank, N.A.
+Priority 2023-04-04 • Filed 2024-09-25 • Published 2025-01-09
+9 . The computing system of claim 1 , wherein the error value associated with each of the instances of experience data is a difference between an observed reward received during a simulation and an expected reward based on a prediction made by the reinforcement learning model. 10 . The computing …
+Method and system for safeguarding data privacy and security against …
+WO WO2026050683A1 Hunter David MOORE Origin Research And Innovation Llc
+Priority 2024-08-30 • Filed 2025-08-29 • Published 2026-03-05
+… degradation of performance can cause a loss of trust in the system, while directed misclassification or prediction can provide calculated damage to larger organizational mission directives. [0004] Evasion attacks seek to degrade model performance or cause directed misclassification or prediction.
+Methods and Device for Autonomous Missile Control
+US US20260009622A1 Brian Haney Brian Haney
+Priority 2024-07-04 • Filed 2024-07-04 • Published 2026-01-08
+generating instructions for commanding thrust vector controls by a reinforcement learning algorithm, manipulating the missile body in attitude, roll, pitch, and yaw by thrust vector controls, optimizing guidance and enabling collision avoidance using artificial intelligence technology, the …
+Device and method for executing work instructions to autonomous robot and …
+KR KR20260038845A 이진식 주식회사 모빌리오
+Priority 2024-09-12 • Filed 2025-09-12 • Published 2026-03-19
+A method for performing work instructions for a humanoid robot characterized by including, and providing monitoring and reporting of the robot's work. In Article 4, Verification of the above physical constraints includes the reachability of the robot within the workspace, compliance with the range …
+Apparatus and method for learning temporal distance cognitive representation
+US US20260119898A1 Youngwoon LEE Uif (University Industry Foundation), Yonsei University
+Priority 2024-10-28 • Filed 2024-10-31 • Published 2026-04-30
+The present disclosure also provides an apparatus and method for learning temporal distance-aware representations (TLDR), by which a goal-conditioned policy is updated by learning action data using Hindsight Experience Replay (HER) technique to maximize a probability of reaching a goal through the …
+A Smart Navigation Control Method and System Based on an Unmanned Fishery …
+CN CN121349097A 宋利飞 武汉理工大学
+Priority 2025-11-10 • Filed 2025-11-10 • Published 2026-01-16
+Based on the aforementioned hull optimization model, a speed prediction sub-model and a heading prediction sub-model are constructed. In the joint control phase of the speed prediction sub-model and the speed prediction sub-model, a speed-heading decoupled control strategy is adopted to coordinate …
+Optimizing the timing of intelligent facilitation
+US US12423923B1 Aakar Gupta Meta Platforms Technologies, Llc
+Priority 2021-12-20 • Filed 2022-12-19 • Granted 2025-09-23 • Published 2025-09-23
+claim 1 , wherein determining the probability that the potential action within the user interface is the intended action comprises: providing, as input to an intention prediction model, at least one user behavior; and receiving, as output from the intention prediction model, the probability that the …
+Intelligent charging control methods, devices, equipment, and storage media
+CN CN121871414A 杨康 智域云科(上海)科技有限公司
+Priority 2025-12-30 • Filed 2025-12-30 • Published 2026-04-17
+The predicted action parameters of each group are input into the critic network to determine the target action parameters. 4. The intelligent charging control method according to claim 3, characterized in that, inputting each group of predicted action parameters into the critic network to determine …
+Controlling computing devices using hierarchical agents
+
+US US20240265264A1 Gheorghe Tiberi Comanici Deepmind Technologies Limited
+Priority 2023-02-02 • Filed 2023-02-02 • Published 2024-08-08
+BACKGROUND This specification relates to processing data using machine learning models. Machine learning models receive an input and generate an output, e.g., a predicted output, based on the received input. Some machine learning models are parametric models and generate the output based on the …
+Collaborative agent model based on modularized network, learning method and …
+CN CN117332814B 黄凯奇 中国科学院自动化研究所
+Priority 2023-12-01 • Filed 2023-12-01 • Granted 2024-08-09 • Published 2024-08-09
+Background Art In recent years, Multi-Agent Reinforcement Learning (MARL) has attracted more and more researchers' interest because it can help model many real-world cooperation problems, such as cooperative games, traffic light control, and robot fleet coordination problems. However, learning …
+Goods loading method, device, equipment and storage medium
+CN CN121590938A 张晨阳 澳门科技大学
+Priority 2024-08-21 • Filed 2024-08-21 • Published 2026-03-03
+In logistics warehouse and transfer centers, the goods are typically transported by conveyor belts where all packages are time-sequentially moved into the loading process. Meanwhile, automated plants typically use robotic arms to load cargo into cargo loading spaces provided by cargo carriers. The …
+Adaptive monitoring of operational technology networks
+US US20260064854A1 Erik Nilsen Tautuk, Inc.
+Priority 2024-08-27 • Filed 2025-08-27 • Published 2026-03-05
+… traditional industrial sensors, often in the range of 1 to 10 Hz, are insufficient to capture high-frequency anomalies indicative of certain attack types. Additionally, SCADA data represents the logical view of the system, which sophisticated attackers can manipulate to hide malicious activities.
+Obstacle avoidance method and system for intelligent inspection vehicle in …
+CN CN119396143A 周梦婷 中国农业科学院北京畜牧兽医研究所
+Priority 2024-10-23 • Filed 2024-10-23 • Published 2025-02-07
+Background With the rapid development of large-scale cage poultry raising technology and in-house agricultural technical equipment, mobile robots in houses have been developed. The mobile robot has flexible action, strong adaptability to the ground environment, low cost and capability of acquiring …
+Methods and systems of facilitating trading non-negotiable financial assets …
+US US20260080473A1 Shawn William ORR Shawn William ORR
+Priority 2021-07-23 • Filed 2025-09-16 • Published 2026-03-19
+determining, using the processing device enhanced with intelligent maturity prediction algorithms, a maturity status of the at least one DTR CD, wherein the intelligent maturity prediction algorithms incorporate sentiment indicators into valuation models to provide more accurate pricing and risk …
+Reinforcement learning-based autonomous driving system capable of adapting to …
+WO KR KR20260031826A 박준영 주식회사 유엑스팩토리
+Priority 2024-08-30 • Filed 2024-08-30 • Published 2026-03-09
+… driver intervention. Recently, autonomous driving technology has been utilized not only in automobiles but also in small mobility devices such as smart delivery systems and security robots, leading to a surge in demand for autonomous driving technology across mobility devices, robots, and vehicles.
+Number of users forecast based scaling of api and resource
+WO US US20260050499A1 Illan Poreh Kunato Inc.
+Priority 2024-08-13 • Filed 2025-08-13 • Published 2026-02-19
+receive, via the processor, a request to use the machine learning engine through an API interface, from a user from a plurality of users; forecast, by the processor, number of users at a geographical location; detect, by the processor, a surge in the number of users at the geographical location …
+
+"case-based reasoning" AND robot AND action AND consequence：
+
+
+Robotic manipulation methods and systems for executing a domainspecific …
+WO EP US CN JP KR AU CA RU SG AU2022279521A1 Mark Oleynik Mbl Limited
+Priority 2014-09-02 • Filed 2022-12-01 • Published 2023-02-02
+… with the outside world to arrive at a desirable function (stirring the liquid, striking the bow on the violin, etc.) to achieve a desirable outcome ( … 22. The robotic system of claim 1, wherein each of the plurality of mini-manipulations comprises one or more parameters affecting operation of a mini …
+Methods and Systems for Food Preparation in a Robotic Cooking Kitchen
+WO EP US CN JP KR AU CA DK RU AU2022201845A1 Mark Oleynik Mark Oleynik
+Priority 2014-02-20 • Filed 2022-03-16 • Published 2022-04-07
+determine whether a particular set of key parameter combinations produces the predetermined functional outcome; and if the determination is positive, store the particular set of key parameter combinations. 26. The robotic kitchen of claim 20, wherein the memory stores additional executable …
+Robotic kitchen systems and methods in an instrumented environment with …
+
+US US12257711B2 Mark Oleynik Mbl Limited
+Priority 2015-08-18 • Filed 2022-07-30 • Granted 2025-03-25 • Published 2025-03-25
+… with the outside world to arrive at a desirable function (stirring the liquid, striking the bow on the violin, etc.) to achieve a desirable outcome ( … determine a predetermined duration for the robotic cooking operation with the particular parameter combination; and store the robotic cooking …
+Robot kitchen comprising a robot, a storage device and a container therefor
+
+WO EP US CN JP AU CA SG CN108778634B M·奥利尼克 Mbl有限公司
+Priority 2015-12-16 • Filed 2016-12-16 • Granted 2022-07-12 • Published 2022-07-12
+17. The storage device in the robotic kitchen system according to claim 1, wherein at least one of the storage units is provided with a humidity sensor to sense humidity within the storage unit. 18. The storage device in the robotic kitchen system according to claim 1, wherein at least one of the …
+Clustering, explainability, and automated decisions in computer-based reasoning …
+
+WO US US11494669B2 Christopher James Hazard Diveplane Corporation
+Priority 2018-10-30 • Filed 2019-10-22 • Granted 2022-11-08 • Published 2022-11-08
+One issue with current systems is, however, that those predicted outcomes appear without any indication of why a particular outcome has been … In some embodiments, in addition to or instead of a cluster being returned 150 as the suggested result or action, the explanation data determined 140
+Context aware interactive robot
+US US11151992B2 Run Cui AIBrain Corporation
+Priority 2017-04-06 • Filed 2018-12-20 • Granted 2021-10-19 • Published 2021-10-19
+sending the speech recognition result to a reasoning engine, wherein the reasoning engine includes an adaptive interactive cognitive reasoning engine utilizing an artificial intelligence memory data structure that includes a robotic system part and a user part, and the artificial intelligence …
+Monitoring system and method for monitoring facilities, and computer program …
+WO EP US CN CN114494768B 伯恩哈德·麦茨勒 赫克斯冈技术中心
+Priority 2018-10-29 • Filed 2018-10-29 • Granted 2025-09-26 • Published 2025-09-26
+The triggered action (117, 120, 130) is to acquire data about the facility component (105-108, 150-152), wherein the data is Third monitoring data of a third monitoring sensor (104) of the monitoring system (103), the third monitoring sensor (104) not being part of the monitoring robot (100), …
+Methods and systems for an autonomous robotic platform
+US US8682485B2 David Anhalt Leidos, Inc.
+Priority 2006-12-28 • Filed 2012-11-20 • Granted 2014-03-25 • Published 2014-03-25
+9. The method of claim 1 , further comprising executing the determined action. 10. The method of claim 9 , further comprising receiving feedback based on the executed action. 11. A robotic platform comprising: a perceiver for: receiving team member information from a plurality of team members within …
+A kind of robot depth interaction and inference method and device based on …
+CN CN106056207B 闵华松 武汉科技大学
+Priority 2016-05-09 • Filed 2016-05-09 • Granted 2018-10-23 • Published 2018-10-23
+5. A deep interaction and reasoning device for robots based on natural language, characterized in that it includes: The point cloud acquisition module is used to fuse the map depth information and color information collected by Kinect to generate 3D point cloud data, after preprocessing, key point …
+Explanation and interpretation generation system
+
+WO EP US US11443164B2 Angelo Dalli UMNAI Limited
+Priority 2020-10-14 • Filed 2021-10-13 • Granted 2022-09-13 • Published 2022-09-13
+further comprising an identity-assess-resolve framework configured to identify one or more risks, scenarios, objectives, and/or goals, and assess a plurality of impacts, costs, and/or consequences of the identified risks, scenarios, objectives or goals, and recommend a ranked resolution and action …
+Systems and methods for operating a robotic system and executing robotic …
+
+WO EP US CN AU CA SG US11345040B2 Mark Oleynik Mbl Limited
+Priority 2017-07-25 • Filed 2018-07-25 • Granted 2022-05-31 • Published 2022-05-31
+34. The robotic system as claimed in claim 21 , wherein the one or more markers include the physical marker disposed on the target object, wherein the physical marker is a chessboard-shaped marker, and wherein the one or more processors adjusts position of the one or more end effectors by:
+Knowledge learning and transfer method and system for epidemic prevention robots
+CN CN112231489B 高洪波 中国科学技术大学
+Priority 2020-10-19 • Filed 2020-10-19 • Granted 2021-11-02 • Published 2021-11-02
+3. The epidemic prevention robot knowledge learning and migration method according to claim 1, wherein the step 4 comprises: extracting data characteristics based on a knowledge inference engine, priori knowledge and a trained subtask network model; outputting data characteristics at the …
+Iot sensor network artificial intelligence warning, control and monitoring …
+
+US US20200364583A1 Robert D. Pedersen Robert D. Pedersen
+Priority 2019-05-14 • Filed 2019-05-14 • Published 2020-11-19
+wherein said first sensor network remote sensor station is implemented in a drone. 17 . The first sensor network remote sensor station of claim 1 wherein the one or more of said transceivers may communicate with a robot. 18 . The first sensor network remote sensor station of claim 1 wherein said …
+Trained human-intention classifier for safe and efficient robot navigation
+
+US US9776323B2 Carol Ann O'sullivan Disney Enterprises, Inc.
+Priority 2016-01-06 • Filed 2016-01-06 • Granted 2017-10-03 • Published 2017-10-03
+152 along with the tracked trajectory 154 for each identified entity 110 in the space 104 . As explained below, this data 152 is used by the robot controller 140 to compute a robot trajectory 170 to facilitate navigation of the robot 130 through the workspace 104 . In some cases, the robot controller
+Graphical rendition of multi-modal data
+
+WO US US9586314B2 David J. Bruemmer 5D Robotics, Inc.
+Priority 2011-08-30 • Filed 2015-05-20 • Granted 2017-03-07 • Published 2017-03-07
+… error, measurement accuracy limitations and other factors known to those of skill in the art, may occur in amounts that do not preclude the effect … These changes and anomalies are reinforced over iterative time steps by subsequent actions and inputs that build on (or cancel) one another, leading …
+Robotic tattooing and related technologies
+WO EP US US12539407B2 Yan Azdoud Blackdot, Inc.
+Priority 2021-01-25 • Filed 2022-01-25 • Granted 2026-02-03 • Published 2026-02-03
+What is claimed is: 1 . A computer-implemented method for identifying skin features in a robotic tattooing operation, the method comprising: performing a scan of skin of a subject to detect skin features of the subject; analyzing at least one of the detected skin features; assigning each analyzed …
+Robotic tattooing systems and related technologies
+
+WO EP US US11547841B2 Yan Azdoud Blackdot, Inc.
+Priority 2019-07-25 • Filed 2022-06-09 • Granted 2023-01-10 • Published 2023-01-10
+8. The tattoo apparatus of claim 1 , wherein the tattoo apparatus is configured to detect an adverse event, and in response to detection of the adverse event, the controller is programmed to cause the tattoo apparatus to take a corrective action for the adverse event. 9. The tattoo apparatus of
+Assembly line with integrated electronic visual inspection
+WO EP US CN JP KR AU CA EA IL MX MY SG US12561795B2 Jason Eugene Smith Regeneron Pharmaceuticals, Inc.
+Priority 2016-07-29 • Filed 2023-10-12 • Granted 2026-02-24 • Published 2026-02-24
+Methods and systems are disclosed for obtaining a first image of a tray, determining a presence or absence of one or more first patterns in the first image, determining a rotation of each the one or more first patterns in the first image, and performing an action based on the presence or absence …
+Automated robotic microscopy systems
+WO EP US JP CA CA2893590C Steven M. Finkbeiner The J. David Gladstone Institutes
+Priority 2012-12-14 • Filed 2013-12-13 • Granted 2023-10-10 • Published 2023-10-10
+86. The system according to any one of claims 50 to 85, further comprising a processor in communication with the imaging device and the robotic arm device; and memory operably coupled to the processor, wherein the memory operably coupled to the processor includes instructions stored thereon that, …
+A method and system for malware identification based on the presumption of …
+WO US CN JP KR CN115943613B B·J·库特 帕洛阿尔托网络公司
+Priority 2020-06-04 • Filed 2021-06-03 • Granted 2026-04-10 • Published 2026-04-10
+performing the static analysis using the classifier, and Determining that the sample is malicious based at least in part on a static analysis of content associated with the sample and, in response to determining that the sample is malicious, performing an action based on a security policy, and A …
+Deep learning for malicious URL classification (URLC) with the innocent until …
+US US12063248B2 Brody James Kutt Palo Alto Networks, Inc.
+Priority 2020-06-04 • Filed 2021-08-20 • Granted 2024-08-13 • Published 2024-08-13
+… includes using at least one stored IUPG model; and determine that the sample is malicious based at least in part on the static analysis of the one or more URLs associated with the sample, and in response to determining that the sample is malicious, perform an action based on a security policy; and
+Systems, methods, and apparatuses for intrusion detection and analytics using …
+WO EP US CN JP US9411009B1 Carlos R. Aguayo Gonzalez Power Fingerprinting Inc.
+Priority 2015-05-22 • Filed 2015-10-13 • Granted 2016-08-09 • Published 2016-08-09
+… not limited to: acoustic and vibration detectors, temperature detectors, electro-magnetic (such as electric current (e.g. current probes, hall effect … The response module 210 triggers automatic actions that affect the target device in response to integrity violations. Some of the actions/responses …
+Learning user preferences in a conversational system
+US US10417567B1 Tanya M. Miller Verint Americas Inc.
+Priority 2013-02-14 • Filed 2014-02-14 • Granted 2019-09-17 • Published 2019-09-17
+… . Learned preferences may be identified in near real-time on large collections of data for a large population of users. Further, the learned preferences may be based at least in part on previous conversations and actions between the system and the user as well as user-defined occurrence thresholds.
+Method and system for robot generation
+WO EP US CN US9671786B2 Hansjorg Baltes White Magic Robotics Inc.
+Priority 2007-01-12 • Filed 2012-02-17 • Granted 2017-06-06 • Published 2017-06-06
+For a better understanding of embodiments of the system and methods described herein, and to show more clearly how they may be carried into effect, reference will be made by way of example, to the accompanying drawings in which: FIG. 1 is a block diagram illustrating components of a robot …
+Method and system for embedding visual intelligence
+US US9129158B1 Swarup Medasani Hrl Laboratories, Llc
+Priority 2012-03-05 • Filed 2012-03-05 • Granted 2015-09-08 • Published 2015-09-08
+Described is a method and system for embedding unsupervised learning into three critical processing stages of the spatio-temporal visual stream. The system first receives input video comprising input video pixels representing at least one action and at least one object having a location.
+… planning strategies knowledge including treatment planning states and actions
+US US11358004B2 Qingrong Wu Duke University
+Priority 2019-05-10 • Filed 2020-05-11 • Granted 2022-06-14 • Published 2022-06-14
+116 , the treatment action(s) 118 associated with the treatment state(s) 116 , and rewards 120 associated with the treatment action(s) associated with the treatment state(s) 116 . The radiation therapy planner 112 can also receive (e.g., via the user interface 112 ) selection of a treatment action 118
+… , prognostic, and health management system and method for a humanoid robot
+US JP DE US8369992B2 Leandro G. Barajas GM Global Technology Operations LLC
+Priority 2009-09-22 • Filed 2009-09-22 • Granted 2013-02-05 • Published 2013-02-05
+6. The robotic system of claim 1 , further comprising multiple hardware control modules each providing a different dedicated function for execution by the humanoid robot, wherein a corresponding one of the DPHM modules is embedded within each of the hardware control modules. 7. The robotic system of
+Clustering, explainability, and automated decisions in computer-based reasoning …
+EP US US11823080B2 Christopher James Hazard Diveplane Corporation
+Priority 2018-10-30 • Filed 2022-10-10 • Granted 2023-11-21 • Published 2023-11-21
+One issue with current systems is, however, that those predicted outcomes appear without any indication of why a particular outcome has been … 130 the suggested action. After the certainty score has been determined 140 , the suggested action and the certainty score may be sent in response 150
+Bot network orchestration to provide enriched service request responses
+
+US US10812343B2 Andreas Balzer Microsoft Technology Licensing, Llc
+Priority 2017-08-03 • Filed 2017-08-03 • Granted 2020-10-20 • Published 2020-10-20
+116 . The orchestration service 114 may include an integrated orchestrator 118 , which may be configured to perform bot network orchestration in order to provide enriched responses to service requests. The orchestration service 114 may be configured to interoperate with a client application 106
+Explainable and automated decisions in computer-based reasoning systems
+
+US US12067467B2 Christopher James Hazard Howso Incorporated
+Priority 2018-11-13 • Filed 2023-07-05 • Granted 2024-08-20 • Published 2024-08-20
+One issue with current systems is, however, that those predicted outcomes appear without any indication of why a particular outcome has been … 130 the suggested action. After the certainty score has been determined 140 , the suggested action and the certainty score may be sent in response 150
+Methods and systems for facilitating interactions between a robot and user
+US US9846843B2 Ayanna Howard Georgia Tech Research Corporation
+Priority 2013-10-30 • Filed 2014-10-27 • Granted 2017-12-19 • Published 2017-12-19
+claim 3 , wherein the first task and the second task are different tasks, wherein the robot performs the solution associated with the first task, and wherein, responsive to the robot receiving the data and performing the solution associated with the second task, the new task-solution pair is stored.
+Adaptive, interactive, and cognitive reasoner of an autonomous robotic system …
+US US10839017B2 Hong Shik Shinn AIBrain Corporation
+Priority 2017-04-06 • Filed 2018-08-30 • Granted 2020-11-17 • Published 2020-11-17
+An autonomous robotic system using an adaptive, interactive, and cognitive reasoner utilizing an advanced memory graph structure receives a natural language input. The natural language input is processed to identify components. At least a portion of the components of the natural language input is …
+Personal helper bot system
+
+US US20160044380A1 Bertrand Barrett Bertrand Barrett
+Priority 2014-06-12 • Filed 2015-06-11 • Published 2016-02-11
+According to various embodiments of the present invention, the personal helper BOT system coordinates the individual activities of autonomous web robots (each of which specializes in its own function) such that the net effect is teamwork and the owner's ultimate personal help solution. In short, …
+System and method for simulating expression of message
+US TW US8285552B2 Wen-Nan WANG Institute For Information Industry
+Priority 2009-11-10 • Filed 2009-12-04 • Granted 2012-10-09 • Published 2012-10-09
+2. Description of Related Art Currently, the interactive entertainment device, such as the electronic doll, the electronic pet, robot or the device with low level calculation capability, can interact with the user to achieve the entertaining effect. For instance, the electronic pet, such as the …
+Multilevel constraint-based randomization adapting case-based learning to fuse …
+
+US US9396441B1 Stuart H. Rubin The United States Government As Represented By The Secretary Of The Navy
+Priority 2013-09-30 • Filed 2013-09-30 • Granted 2016-07-19 • Published 2016-07-19
+. However, as a consequence of this “System of Systems” being deterministic, an outputted action token, or sequence of tokens, may incidentally overwrite correct tokens at all levels. Alternatively, if the best-matched case was squelched (as discussed below), then the action token is used to create …
+Solution for controlling a target system
+WO US US20200150601A1 Harri Valpola Curious Ai Oy
+Priority 2018-11-09 • Filed 2019-11-08 • Published 2020-05-14
+Model predictive control (MPC) methods are used in numerous control applications in robotics, control systems and automation. In MPC methods, a model of the controlled process is used to predict the process state and the effect of control signals to the process, and control signals can then be …
+Method and apparatus for determining critical care parameters
+WO EP US CN IL US20120245439A1 David Andre David Andre
+Priority 2008-11-20 • Filed 2009-11-20 • Published 2012-09-27
+… is also adaptable or applicable to calculating derivations of such parameters. A oxygen debt measuring embodiment is directed predicting an outcome in response to injury and illness. The technique allows for closed-loop resuscitation, early identification of illness and early corrective action.
+Meeting timeline management tool
+WO US US20180232705A1 Casey James Baker Microsoft Technology Licensing, Llc
+Priority 2017-02-15 • Filed 2017-02-15 • Published 2018-08-16
+the user may elect to join or not join the meeting. Alternatively, rather than receiving a meeting request, the meeting may be posted to a global timeline or group forum and a user may elect to join the meeting (e.g., by registration or otherwise). At bot setup operation 206 , a bot may be …
+A case-based reasoning method for robot agent skill learning and generalization
+CN CN116992964A 黄攀峰 西北工业大学
+Priority 2023-07-20 • Filed 2023-07-20 • Published 2023-11-03
+Map the current task scenario to action vectors that have the same effect in known task scenarios; This yields the correspondence between the state vectors and action vectors of the current task scenario and the known task scenarios. 4. The method for robot agent skill learning and generalization …
+Entropy-Based Techniques for Improved Automated Selection in Computer-Based …
+
+US US20240112047A1 Christopher James Hazard Howso Incorporated
+Priority 2018-06-05 • Filed 2023-12-11 • Published 2024-04-04
+may include determining ( 120 and 130 ) candidate actions based on the context data and two or more computer-based reasoning models. A surprisal associated with each candidate action (or set of actions) can then be determined ( 140 ). The action(s) to take (among candidate actions) is then chosen 150 ,
+Humanoid Robotic Surgery System
+CN CN119770180A 谢永召 北京柏惠维康科技股份有限公司
+Priority 2024-12-20 • Filed 2024-12-20 • Published 2025-04-08
+5. The robotic surgical system according to claim 1, wherein the number of robotic arms is at least two, each robotic arm being connected in series by more than 5-axis joints, the distal end of each of the robotic arms forming a wrist, wherein the wrist of one robotic arm is mounted with a primary …
+Robotic systems and methods
+US US12508715B1 Daniel Abrams Daniel Abrams
+Priority 2016-08-15 • Filed 2024-03-13 • Granted 2025-12-30 • Published 2025-12-30
+, such as a gripper or an artificial hand, configured to manipulate objects (e.g., pick up, modify, destroy or otherwise have an effect on objects). In some embodiments, the robot further comprises a mobile base configured to move the robot, and mobile base may comprise one or more wheels (e.g., …
+Computer-based reasoning system for operational situation control of …
+US US12443863B1 Christopher James Hazard Howso Incorporated
+Priority 2017-11-20 • Filed 2024-03-11 • Granted 2025-10-14 • Published 2025-10-14
+Additional examples of processing the context and action data before storing 130 the vehicle control rules include training a machine learning system to determine the vehicle control rules (not depicted in FIG. 1 ). The context data (input) and action data (outcome) may be used as training data in …
+A reinforcement learning method combined with knowledge transfer and its …
+CN CN109740741A 丁子凡 上海理工大学
+Priority 2019-01-09 • Filed 2019-01-09 • Published 2019-05-10
+… when calculating the state behavior value function are initialized to zero, that is, the state behavior value function is all 0 at this time. At this point each state has the same effect on the choice of action, and each action has the same priority when the agent chooses which action to perform.
+Robot cable manufacturing process optimization method and system based on deep …
+CN CN120235319A 应存世 宁波日月电线电缆制造有限公司
+Priority 2025-05-30 • Filed 2025-05-30 • Published 2025-07-01
+Constructing an evaluation function comprising rule compliance and optimization effect, calculating an evaluation score of a candidate process … 8. A robotic cable manufacturing process optimization system based on deep reinforcement learning for implementing the method of any of the preceding …
+Internet of things appliance providing extended-capability messaging
+US US20240267251A1 David J. Mishelevich Kinnected Ai Inc
+Priority 2022-07-24 • Filed 2024-04-14 • Published 2024-08-08
+… to change the characteristics of a sensor (such as its sampling rate or what constitutes an alarm condition), determine processing, or to effect a … where one or a plurality of triggering actions selected from but not limited to one or a plurality of the group consisting of initiation and …
+Optimization to the automation process by Robot Selection and crawl object
+EP US CN CN109500809A 马蒂亚斯·维特 西门子股份公司
+Priority 2017-09-15 • Filed 2018-07-05 • Published 2019-03-22
+1. A method of optimizing an automated process for the selection and grasping of objects by robots in an arrangement consisting of a plurality of robots with respect to preset optimization criteria, wherein the objects potentially to be grasped Regarding the position of the object in space and the …
+System and method for performing actions based on location information
+WO EP US CN AU GB TW CN109564100A 柏景文 北京嘀嘀无限科技发展有限公司
+Priority 2016-11-21 • Filed 2017-05-15 • Published 2019-04-02
+… itself).Accordingly, it may be desirable to research and develop can to ISP provide remind with quickly and have The system and method for effect … The present application discloses a system and method for performing an action based on location information. The method may include obtaining, by an …
+Personal helper bot system
+
+US US20200410391A1 Bertrand Barrett Bertrand Barrett
+Priority 2019-06-26 • Filed 2019-06-26 • Published 2020-12-31
+According to various embodiments of the present invention, the personal helper BOT system coordinates the individual activities of autonomous web robots (each of which specializes in its own function) such that the net effect is teamwork and the owner's ultimate personal help solution. In short, …
+A wind turbine predictive maintenance decision-making method and system using …
+CN CN120563110A 朱江皓 兰州理工大学
+Priority 2025-07-11 • Filed 2025-07-11 • Published 2025-08-29
+… maintenance rules and experience; s53, designing an experience learning algorithm, and optimizing a decision model from a history maintenance effect; … , step S3 specifically includes: s31, a Markov decision process model is built, and a state space, an action space and a reward function are defined;
+A chat method, system and chat robot for topics related to intellectual …
+CN CN118152542B 朱峰 广东知得失网络科技有限公司
+Priority 2024-05-09 • Filed 2024-05-09 • Granted 2024-07-16 • Published 2024-07-16
+Based on the satisfaction analysis log, the question and answer flow and the content of the chat robot are adjusted, the expression and the content of legal opinions are optimized according to user feedback, the service quality and the user satisfaction are optimized, and user satisfaction feedback …
+Dredging operation and maintenance method, system, equipment and medium for …
+CN CN118188022A 佘帅龙 中国铁建重工集团股份有限公司
+Priority 2023-12-22 • Filed 2023-12-22 • Published 2024-06-14
+The dredging effect is difficult to maintain, the operation and maintenance are frequent, the maintenance cost is high, the equipment efficiency … When the speed of the dredging robot changes, the control parameters of the dredging robot are adjusted to control the dredging robot to continue …
+Baggage and parcel loading end effectors, system, and methods of use
+
+US US20210283780A1 Velibor Kilibarda Leidos Security & Automation Limited
+Priority 2020-03-12 • Filed 2021-03-12 • Published 2021-09-16
+… whether the engaging end effector was successful in engaging and transferring the object, and train the machine learning model based on the outcome. … 9 . The system of claim 8 , wherein the first robot comprises: a wrist; and an extension arm having a first end connected to the wrist and a second end …
+Case reasoning optimization method and system of unmanned cluster action …
+CN CN118917409A 黄美根 中国人民解放军国防科技大学
+Priority 2024-06-25 • Filed 2024-06-25 • Published 2024-11-08
+In some implementations, the case usually includes three parts: problem description, solution, and solution effect. In the unmanned swarm action strategy recommendation problem, the problem description is a standardized representation of the mission, force, scenario, and other information of the …
+Resource self-allocation system
+EP US CN JP JP2020017278A ポーター ケジア アバイア インコーポレーテッド
+Priority 2018-07-24 • Filed 2019-07-22 • Published 2020-01-30
+In another embodiment, the system can learn how events affect the system. For example, a change that has a particular effect can be selected. Once … The term "event" as used herein is one in which the occurrence is not caused by, caused by, or caused by an action on a target system such as a …
+Methods to detect and mitigate drilling inefficiencies
+WO EP US CN BR CN103975125A C·佩纳 普拉德研究及开发股份有限公司
+Priority 2011-10-05 • Filed 2012-10-05 • Published 2014-08-06
+9. The method of claim 1 including controlling the rig to effect the adjustment. 10. A drilling system comprising: a communication component … The drilling system then instructs the drilling operator on the desired adjustment so that appropriate actions can be taken to mitigate the …
+Intent classification from multiple sources when building a conversational …
+
+US US10621976B2 Rajendra G. Ugrani International Business Machines Corporation
+Priority 2018-09-18 • Filed 2018-09-18 • Granted 2020-04-14 • Published 2020-04-14
+In some cases, a chat session can be initiated between the customer or client and a live agent (e.g., a human operator) or a virtual agent (e.g., a chat bot operated by a computing system) who can interact directly with the customer over any one or more available channels (e.g., web chat, instant …
+Method and apparatus for determining critical care parameters
+CA CA2744215A1 Kevin Ward Virginia Commonwealth University
+Priority 2009-11-20 • Filed 2009-11-20 • Published 2010-06-10
+… is also adaptable or applicable to calculating derivations of such parameters. A oxygen debt measuring embodiment is directed predicting an outcome in response to injury and illness. The technique allows for closed-loop resuscitation, early identification of illness and early corrective action.
+Method for conducting a speech dialogue
+
+DE DE102018002941A1 Galia Weidl Daimler Ag
+Priority 2018-04-11 • Filed 2018-04-11 • Published 2018-10-18
+… , for example, in the case of a predicted driver maneuver requirement of the own vehicle and the surrounding vehicles, whose maneuvers have an effect … This hierarchical logical representation allows a structured representation of knowledge-and-action relationships in order to correctly interpret the …
+Method for automatic enhancement of dynamic motion sequence with robots, …
+
+DE DE102011109144A1 Anmelder Gleich Thomas Schütt
+Priority 2011-08-02 • Filed 2011-08-02 • Published 2013-02-07
+Method for automatic improvement of dynamic motion sequences in robots by means of an artificial intelligence (AI) according to claim 1 and 2, characterized in that it contains a set of action proposals (Proposals) ( 8th ) each task or sub-task to be performed, each proposal containing as action …
+Automated package delivery in a risk-free walkway
+
+US US20240202644A1 Sudhanshu Sekher Sar International Business Machines Corporation
+Priority 2022-12-15 • Filed 2022-12-15 • Published 2024-06-20
+and thereby effect a computer-implemented method, such that the instructions thus executed will instantiate the methods specified in flowcharts and/ … claim 17 , wherein program instructions to deploy the robot further comprise: program instructions to unlock a security lock mechanism of the robot at …
+Baggage and parcel loading end effectors, system, and methods of use
+WO EP JP AU CA EP4117868A1 Velibor Kilibarda Leidos Security Detection & Automation U.K. Ltd
+Priority 2020-03-12 • Filed 2021-03-12 • Published 2023-01-18
+… whether the engaging end effector was successful in engaging and transferring the object, and train the machine learning model based on the outcome. … 9. The system of claim 8, wherein the first robot comprises: a wrist; and an extension arm having a first end connected to the wrist and a second end …
+Path determination method and device
+CN CN117289705B 贺春 国网天津市电力公司电力科学研究院
+Priority 2023-11-17 • Filed 2023-11-17 • Granted 2024-03-26 • Published 2024-03-26
+In response to the path determination request, determine the starting point of the position of the robot in the preset coordinate system and the target point of the target position included in the path determination request in the preset coordinate system, wherein the preset coordinates The system …
+Method and object-centric service delivery system
+
+US US20200090290A1 Alfred Cheung Alfred Cheung
+Priority 2018-09-17 • Filed 2018-09-17 • Published 2020-03-19
+… and inefficiencies. In effect, Billions of dollars, meant to help recipients, are being managed by inefficient, fractured and segregated systems. As … , wherein recommending the one or more service actions comprises: determining one or more candidate service actions, wherein a candidate service …
+Intelligent system for generating and executing a sheet metal bending plan
+
+WO EP US JP DE US6507767B2 David Alan Bourne Amada America, Inc.
+Priority 1994-11-09 • Filed 2001-08-16 • Granted 2003-01-14 • Published 2003-01-14
+in its bent state, before disengaging die 19 by lowering press brake 29 , robot arm 12 will reposition its robot arm gripper 14 to hold workpiece 16 . Once gripper 14 is holding workpiece 16 , die 19 will be disengaged by releasing press brake 29 . Robot 12 then maneuvers and repositions workpiece 16
+Intelligent system for generating and executing a sheet metal bending plan
+
+EP US DE US5969973A David Alan Bourne Amada Company, Ltd.
+Priority 1994-11-09 • Filed 1995-02-09 • Granted 1999-10-19 • Published 1999-10-19
+As shown in FIG. 2, robot arm 12 includes a robot arm gripper 14 which is used to grasp workpiece 16. As shown in FIG. 1, material loader/unloader 30 includes several suction cups 31 which create an upwardly directed suction force for lifting a sheet metal workpiece 16, thereby allowing L/UL 30 to …
+Graphical end-user interface for intelligent assistants
+
+EP US JP US5727174A Manuel Aparicio, IV International Business Machines Corporation
+Priority 1992-03-23 • Filed 1992-03-23 • Granted 1998-03-10 • Published 1998-03-10
+Clicking on the assistant's feet will cancel its presence. The assistant's feet are, in effect, its "cancel" button. Clicking on its feet will cause … 2. The method according to claim 1, further including the step of performing said suggested action in response to a selection thereof by said user …
+A model and system for reasoning with n-step lookahead in policy-based system …
+US CN TW TWI403962B John Davis Palmer Ibm
+Priority 2004-09-30 • Filed 2005-09-26 • Granted 2013-08-01 • Published 2013-08-01
+The resource implication r of an action is defined as r (existing state, percentage is called value) → new system state. Primarily, resources are used to quantify the impact of an action on the state of the system, that is, there is a second-order effect on the observed workload characteristics, …
+Active semiotic system for image and video understanding by robots and unmanned …
+
+US US7668797B2 Gary Kuvich Gary Kuvich
+Priority 2006-04-07 • Filed 2006-05-18 • Granted 2010-02-23 • Published 2010-02-23
+… converts from quantities to qualities, from qualities to objects, from objects to spatial situations. Temporal perceptual information converts from changes to actions, from actions and objects to events, from events to “cause and effect” links, and from them to algorithms and scenarios. Feedback …
+Unmanned cluster action strategy recommendation method based on case reasoning
+CN CN118917410A 黄美根 中国人民解放军国防科技大学
+Priority 2024-06-25 • Filed 2024-06-25 • Published 2024-11-08
+For CBR technology, the case usually includes three parts: problem description, solution and solution effect. When CBR technology is applied to the problem of recommending the action strategy of the unmanned swarm, the problem description is a standardized representation of the mission, force, …
+Artificial intelligence machine and artificial intelligence machine system
+WO JP WO1998032108A1 Tomoo Matsuda Komatsu Ltd.
+Priority 1997-01-20 • Filed 1998-01-20 • Published 1998-07-23
+An apparatus adapted to infer a proper outcome at a proper time while evaluating the environment properly. This apparatus is applied to an artificial … 1. An artificial intelligence machine that performs a predetermined inference based on data stored in a storage device and takes an action in …
+A method and device for inspecting substation rooms based on multimodal visual …
+CN CN121710523A 黄佳 国网北京市电力公司
+Priority 2025-11-25 • Filed 2025-11-25 • Published 2026-03-20
+In infrared image processing, the method can be used for inhibiting the thermal diffusion effect, so that the temperature difference meets the human … And integrating the risk list of the power equipment, the personalized operation and maintenance action scheme set and abnormal region information in …
+… dimensional detection system and method based on intelligent wall climbing robot
+CN CN121917414A 李伟 中国五冶集团有限公司
+Priority 2026-01-07 • Filed 2026-01-07 • Published 2026-04-24
+The magnetic attraction system is mainly used for reinforced concrete wall surfaces, and has remarkable magnetic attraction effect when the surface … The three-dimensional modeling of the wall surface comprises the steps of carrying a 3D laser scanner by a robot to quickly and fully scan the wall …
+Internet of things appliance providing extended-capability messaging
+US US20260019292A1 David J. Mishelevich Kinnected Ai Inc
+Priority 2022-07-24 • Filed 2025-09-01 • Published 2026-01-15
+… to change the characteristics of a sensor (such as its sampling rate or what constitutes an alarm condition), determine processing, or to effect a … Operating effectively in an increasingly prolific Internet of Things environment, one needs the ability to message, whether device status, actions …
+Multi-portal robotic system and multi-portal instrument holders
+WO WO2026035800A1 Andy Wonyong Choi Amplify Surgical, Inc.
+Priority 2024-08-06 • Filed 2025-08-06 • Published 2026-02-12
+… or more outcome scores of the one or more steps corresponding to the first surgical plan, modify the first surgical plan to include the one or more steps corresponding to the second surgical plan. 35. The multi-portal robotic system of claim 30, wherein the computer instructions cause the robotic …
+Internet of Things appliance providing extended-capability messaging
+US US12407543B2 David J. Mishelevich Kinnected Ai Inc.
+Priority 2022-07-24 • Filed 2024-12-30 • Granted 2025-09-02 • Published 2025-09-02
+… to change the characteristics of a sensor (such as its sampling rate or what constitutes an alarm condition), determine processing, or to effect a … where one or a plurality of messages output whose content is selected from the group consisting of status, comments, instructions including actions …
+Feature Analysis With Causal Discovery for Dataset Optimization
+US20260127153A1 Jacob Daniel Beel Howso Incorporated
+Filed 2025-11-05 • Published 2026-05-07
+… computing system can also automatically generate feature correction actions based on the identified asymmetries. These actions can help in optimizing the dataset. One example automatic feature correction action includes the removal of feature subsets that exhibit both low contribution to outcome …
+Intelligent installation collaborative operation system for glass curtain walls
+CN CN121047420A 杨书懿 上海北漠景观幕墙科技股份有限公司
+Priority 2025-11-03 • Filed 2025-11-03 • Published 2025-12-02
+receiving a voice control instruction of an operator through a voice recognition module, and generating an equipment control signal; Analyzing the action intention of an operator by adopting a gesture recognition algorithm, and generating an interaction response instruction; based on natural …
+Personal helper bot system with example applications in genealogy and music …
+
+US US20240346096A1 Bertrand Barrett Bertrand Barrett
+Priority 2019-06-26 • Filed 2024-03-04 • Published 2024-10-17
+According to various embodiments of the present invention, the Personal Helper BOT system coordinates the individual activities of autonomous web robots (each of which specializes in its own function) such that the net effect is teamwork and the owner's ultimate personal help solution. In short, …
+Method and system for robot generation
+HK1192196A 汉斯乔格．巴尔特斯 汉斯乔格．巴尔特斯
+Priority 2007-01-12 • Filed 2014-06-04 • Published 2014-08-15
+… understanding of embodiments of the systems and methods described herein, and to show more clearly how these embodiments may be carried into effect, … a) means for eliciting and receiving user input via a task specification module to determine task specifications for one or more tasks of the robotic …
+Path determination method and motion control method
+CN CN118311971B 刘力卿 国网天津市电力公司电力科学研究院
+Priority 2024-06-11 • Filed 2024-06-11 • Granted 2024-11-15 • Published 2024-11-15
+Wherein, the using of fuzzy algorithm to control the robot to move along the target path to the target position includes: When the robot is controlled to move to the kth path node, obstacle information of the kth path segment is acquired by the robot, wherein the k path segments represent a path …
+ASSEMBLY LINE WITH BUILT-IN ELECTRONIC VISUAL CONTROL
+EA051188B1 Джейсон Юджин Смит Ридженерон Фармасьютикалз, Инк.
+Priority 2016-07-29 • Filed 2017-07-25 • Published 2025-10-14
+In the case of drug packaging, one unintended consequence of improper packaging is that physicians or patients may be reluctant to use the drug … An operator (e.g., a human or a robot) located at the monitors 114-116 displaying the FAIL notification can perform a corrective action to correct …
+A collaborative construction management platform for building robots based on …
+CN CN120996410A 李吉 中国五冶集团有限公司
+Priority 2025-06-30 • Filed 2025-06-30 • Published 2025-11-21
+… configured, the energy consumption is saved, the whole life cycle management prolongs the service life of the building, and the win-win effect of … 5. A collaborative construction management platform for building robots based on digital twin technology according to claim 1, characterized in that …
+ASSEMBLY LINE WITH BUILT-IN ELECTRONIC VISUAL INSPECTION
+EA046107B1 Джейсон Юджин Смит Ридженерон Фармасьютикалз, Инк.
+Priority 2016-07-29 • Filed 2017-07-25 • Published 2024-02-07
+10. The method of claim 8, wherein generating the notification causes the machine to take corrective action with respect to the first object. 11. The method of claim 10, wherein the corrective action includes adding one or more first elements to the first object or removing one or more first …
+METHOD OF INSPECTION OF OBJECTS
+BR122020014835B1 Jason Eugene Smith Regeneron Pharmaceuticals, Inc
+Priority 2016-07-29 • Filed 2017-07-25 • Published 2025-02-04
+10. The method of claim 8, wherein generating the notification causes a machine to take corrective action with respect to the first object. 11. The method of claim 10, wherein the corrective action includes adding one or more first items to the first object or removing one or more first items from …
+ASSEMBLY LINE SYSTEM WITH INTEGRATED ELECTRONIC VISUAL INSPECTION AND METHOD
+BR112019000778B1 Jason Eugene Smith Regeneron Pharmaceuticals, Inc
+Priority 2016-07-29 • Filed 2017-07-25 • Published 2025-02-11
+The present invention relates to methods and systems for obtaining a first image of a tray, determining a presence or absence of one or more first patterns in the first image, determining a rotation of each of the one or more first patterns in the first image, and performing an action based on the …
+Structure and Method for Brain-inspired Hyperconnected and Distributed …
+
+US KR KR20200068077A 김상기 한국전자통신연구원
+Priority 2018-11-27 • Filed 2018-11-27 • Published 2020-06-15
+And the input signal corresponds to an action alternative request signal of the first node device received by the associated cortex of the second node device. The method of claim 4 The second node device receives the action alternative request signal of the first node device, Deriving actions based …
+Intelligent Seeding and Fertilization Control Method and System Based on …
+CN CN121420749A 贾国强 武汉邢仪新未来电力科技股份有限公司
+Priority 2025-11-14 • Filed 2025-11-14 • Published 2026-01-30
+… , and the fixed operation mode is difficult to meet the differential demands, so that the resource utilization rate is low and the operation effect is … The robot is controlled to move to the target work area, and the sensors on the robot are used to acquire environmental information of the target …
+Methods and Systems for Optimizing Dynamic Palletizing Path Planning of …
+CN CN121526016A 邱祉海 浙江佳鹏电脑科技股份有限公司
+Priority 2026-01-15 • Filed 2026-01-15 • Published 2026-02-13
+… , and temperature and humidity changes the pliability that can change the cardboard, and pile up neatly operation duration's extension then can enlarge deformation because of creep effect, and traditional pile up neatly system does not establish accurate deformation prediction model, and the action …
+A method for automatically collecting key information from manual feedback in …
+CN CN121616026A 刘姝玘 中煤科工集团重庆研究院有限公司
+Priority 2025-12-04 • Filed 2025-12-04 • Published 2026-03-06
+… channel, and are difficult to provide complete, accurate and objective on-site situation sensing at key moments, so that the efficiency and effect of … The voice robot interaction and information acquisition module is used for starting the voice robot to carry out batch calling on the target called …
+Substation equipment safety state diagnosis method, system, equipment and …
+CN CN120655270A 张历 贵州电网有限责任公司
+Priority 2025-06-20 • Filed 2025-06-20 • Published 2025-09-16
+… of complex time sequence features, realizes intelligent recognition and highlighting of key fault symptoms through the synergistic effect of time … The intelligent inspection robot carries out autonomous navigation based on a laser SLAM technology, is provided with a visible light camera, a …
+Automatic wire harness feeding equipment, method and system
+CN CN121626595A 金铸 上海它石智航技术有限公司
+Priority 2025-12-30 • Filed 2025-12-30 • Published 2026-03-10
+The clamping jaw mechanism moves to the initial position of the wire harness, performs pre-grabbing action, simultaneously detects a pre-grabbing force value in real time through the 3DoF force sensing unit, compares the pre-grabbing force value with a preset safety range, directly performs formal …
+Method for generating a virtual simulated patient
+WO WO2009153379A1 Juan Luís CASTRO PEÑA Universidad De Granada
+Priority 2008-06-18 • Filed 2009-06-18 • Published 2009-12-23
+… . Figure 8.- Shows the range of variation of the consequences of the dynamic rules. Figure 9.- Shows an interface of the Virtual Simulated Patient. … The invention relates to a virtual simulated patient (talk bot) simulating the behaviour of a patient during a medical consultation such that the …
+Cluster control method and system for multiple agents in three-dimensional …
+CN CN118022331A 郭慧 梧州学院
+Priority 2024-02-05 • Filed 2024-02-05 • Published 2024-05-14
+2. The method for controlling the clustering of multiple agents in a three-dimensional scene based on deep reinforcement learning according to claim 1, wherein when the discrete action space-based method is used to control the behavior of the agents, the method comprises: creating an actions.
+
+"trial and error" AND robot AND learning AND record AND retrieval：
+
+
+Machine learning apparatus, robot system, and machine learning system for …
+CN JP DE DE102016015873B3 Takashi Yamazaki Fanuc Corporation
+Priority 2015-07-31 • Filed 2016-07-26 • Granted 2020-10-29 • Published 2020-10-29
+Learning model generated by the machine learning device according to at least one of the Claims 1 to 3 is updated. A robot system for picking up an object, the robot system comprising: a robot comprising a hand unit for picking up the object; a measuring device (15) configured to measure …
+Teleoperation for training of robots using machine learning
+US US12561550B2 Jeff Kranski Sanctuary Cognitive Systems Corporation
+Priority 2021-09-14 • Filed 2022-12-31 • Granted 2026-02-24 • Published 2026-02-24
+generating a second training dataset from actions determined by the first trained machine learning model during controlling the robot to perform the second task; and second training the first trained machine learning model to receive robot sensor data and output robot commands using at least a …
+… robot generation using generative artificial intelligence / machine learning …
+US US20230393870A1 Prabhdeep Singh UiPath, Inc.
+Priority 2020-10-14 • Filed 2023-08-11 • Published 2023-12-07
+training the generative AI/ML model, a robotic process automation (RPA) designer application, or both, to associate user interactions with RPA activities. 6 . The computer-implemented method of claim 5 , further comprising: analyzing recorded real user interactions of a plurality of users with …
+… , and robot generation using artificial intelligence / machine learning models
+WO EP US CN JP US11340917B2 Prabhdeep Singh UiPath, Inc.
+Priority 2020-10-14 • Filed 2020-12-21 • Granted 2022-05-24 • Published 2022-05-24
+Use of artificial intelligence (AI)/machine learning (ML) models is disclosed to determine sequences of user interactions with computing systems, extract common processes, and generate robotic process automation (RPA) robots. The AI/ML model may be trained to recognize matching n-grams of user …
+Enterprise generative artificial intelligence architecture
+
+WO EP US CN US12111859B2 Thomas M. Siebel C3.Ai, Inc.
+Priority 2022-12-16 • Filed 2023-12-15 • Granted 2024-10-08 • Published 2024-10-08
+108 can make the appropriate function calls to retrieve disparate data records among other functions. As used herein, data records can include unstructured data records (e.g., documents and text data that is stored on a file system in a format such as PDF, DOCX, .MD, HTML, TXT, PPTX, image files, …
+3D object scanning method using structured light
+
+EP US CN CN110542390B 尼斯·恩格霍姆 环球扫描丹麦有限公司
+Priority 2018-05-29 • Filed 2019-05-29 • Granted 2022-09-06 • Published 2022-09-06
+a second image obtained by scanning the plurality of physical objects during a scanning operation comprising projecting the structured light and recording a sequence of images, an A respective third image obtained by applying segmentation on the second image; and enabling retrieval of the image …
+Workflow tracking and identification using an industrial monitoring system
+US US10401839B2 Sharon M. Billi-Duran Rockwell Automation Technologies, Inc.
+Priority 2016-09-26 • Filed 2017-03-21 • Granted 2019-09-03 • Published 2019-09-03
+can be configured to submit search queries to the federated data model and retrieve search results in response to explicit searches for relevant … In one or more embodiments, a system for learning industrial workflows is provided, comprising a discovery component configured to collect industrial …
+Data analytics on pre-processed signals
+EP US US11347967B2 Angel Cruz Teraki Gmbh
+Priority 2019-04-11 • Filed 2020-04-01 • Granted 2022-05-31 • Published 2022-05-31
+The vehicles may be autonomously operating/driving, such as a self-driving car, robot car, driverless car, or a non-autonomously operating/driving … determine a new dictionary based on a training data set using a dictionary learning scheme, wherein the training data set comprises the received …
+Systems and methods for refining identification of clinical study candidates
+US AU CA DE GB AU2007202746B2 Philip David Settimi General Electric Company
+Priority 2006-06-14 • Filed 2007-06-13 • Granted 2012-07-26 • Published 2012-07-26
+3. The method of claim 1, wherein said conditions correspond with codified terms of said codified electronic medical data. 25 4. The method of claim 1, further including allowing a user to select a sub-set of said pool of candidates to retrieve electronic medical records for said sub-set. 5. The …
+IOT blockchain DDOS detection and countermeasures
+US US12445470B2 Rani Yadav-Ranjan Telefonaktiebolaget Lm Ericsson (Publ)
+Priority 2022-08-01 • Filed 2022-08-01 • Granted 2025-10-14 • Published 2025-10-14
+… , and more. Reinforcement learning is a type of machine learning that utilizes the rewarding of desired behavior and punishing undesired behaviors. A reinforcement learning module or agent can typically interact with its environment and take actions and learn through a process of trial and error.
+System and methods for adaptive campaign management and predictive customer …
+US US11985270B2 Ashish Koul Acqueon Technologies Inc.
+Priority 2020-12-23 • Filed 2023-03-06 • Granted 2024-05-14 • Published 2024-05-14
+segregating the subset of customer data profiles into a training dataset and a test dataset; using the training dataset to train a deep reinforcement learning neural network configured to predict a probability of customer engagement; retrieving the unified customer data profile from the database; …
+Hardware aware machine learning model search mechanisms
+
+US CN DE DE102022118204A1 Sharath Nittur Sridhar Intel Corporation
+Priority 2021-10-19 • Filed 2022-07-21 • Published 2023-04-20
+… and/or ontology, automated planning, natural language processing (NLP), perception (e.g. computer vision, speech recognition, etc.), autonomous movement and manipulation (e.g. localization, robot movement/locomotion, autonomous driving, etc.), social intelligence, reinforcement learning, etc. In …
+Strategy optimization method, device, equipment and medium based on interaction …
+CN CN120654768A 张旭龙 平安科技（深圳）有限公司
+Priority 2025-05-30 • Filed 2025-05-30 • Published 2025-09-16
+Sending the action execution instruction to the robot execution module to drive the state transition of the environment; Record the action execution instructions of the current time step and the corresponding environmental state observations to form the action sequence data of the current time step …
+AI control and optimization of agent operations in warehouses
+WO EP US CN KR AU CA KR20250061724A 알렉산다르 크린자익 데마틱 게엠베하
+Priority 2022-08-04 • Filed 2023-08-04 • Published 2025-05-08
+A step for recording live work data while an agent performs order fulfillment activities; Step of outputting live work data to the storage module; Step of retrieving live operation data and simulated operation data stored in the storage module; A step of training the algorithm using retrieved live …
+… system for a security inspection robot that integrates subconscious learning
+CN CN121346807A 马超 无锡惠友信息科技有限公司
+Priority 2025-10-28 • Filed 2025-10-28 • Published 2026-01-16
+Record the time period of effective identification and the corresponding robot pose to generate a set of semantic navigation reference points. 6. A multimodal navigation system for a security inspection robot integrating subconscious learning according to claim 1, characterized in that the fusion …
+Method for using reinforcement learning to optimize order fulfillment
+WO EP US AU CA WO2024028839A1 Matthew Haley Dematic Corp.
+Priority 2022-08-04 • Filed 2023-08-04 • Published 2024-02-08
+[0003] The control of an order picking system with a variety of workers or agents (e.g., humanoid pickers, robotic pickers, item carrying vehicles, … METHOD FOR USING REINFORCEMENT LEARNING TO OPTIMIZE ORDER FULFILLMENT CROSS REFERENCE TO RELATED APPLICATION [0001] The present application claims …
+Method and system for machine learning using a derived machine learning …
+WO US US20220215248A1 Maurice A. Ramirez Covid Cough, Inc.
+Priority 2021-01-04 • Filed 2022-01-04 • Published 2022-07-07
+Many computer science applications have utilized deep learning such as computer vision, speech recognition, natural language processing, sentiment analysis, social network analysis, and robotics. The success of deep learning enabled the application of learning models such as reinforcement learning …
+Robot having a gait mechanism using learning and method for improving gait …
+KR KR20100065809A 김병수 (주)로보티즈
+Priority 2008-12-09 • Filed 2008-12-09 • Published 2010-06-17
+Storing data generated when walking in limited situations as learning data; And And walking in various situations using the learning data. The method of claim 7, wherein When the inertia factor affecting the walking of the robot by the external force is changed, further comprising the step of …
+Identifying patterns by applying a machine learning algorithm to the automation …
+US GB GB2604406A Botha Tielman Audet Magna Ltd
+Priority 2021-01-29 • Filed 2021-04-23 • Published 2022-09-07
+CLAIMSA computer implemented method for identifying patterns in the automation of one or more processes, comprising: a) recording workflow steps in a log document, the log document including data describing an execution history of processing of at least one workflow program document, where the …
+Methods and systems for optimizing culture-related processes
+WO EP US CN JP CN121034410A 小泽阳介 艾比思拓株式会社
+Priority 2021-08-31 • Filed 2022-08-30 • Published 2025-11-28
+… to the execution process in the execution environment; The evaluation result acquisition unit acquires the evaluation result of the execution result; and The database records the execution process, the variable parameter values, the execution results, and the evaluation results accordingly.
+Predictive motor control system based on hierarchical tactile memory …
+JP JP2025128338A 村上由宇 ニューヨークゼネラルグループインク
+Priority 2025-06-14 • Filed 2025-06-14 • Published 2025-09-02
+… through long-term learning. By accumulating a history of 10,000 operations, the accuracy of operation on the same object improves over time, ultimately achieving precision control that surpasses that of a skilled human. Learning efficiency is more than 100 times faster than conventional trial-and- …
+Education support system, method and program
+JP JP6705956B1 駿太 五十嵐 株式会社Ｗｉｔｈ Ｔｈｅ Ｗｏｒｌｄ
+Priority 2019-03-19 • Filed 2019-03-19 • Granted 2020-06-03 • Published 2020-06-03
+For example, learners with little experience, such as high school students, may find it difficult to facilitate discussions without the support of a teacher or the like. Then, as a result of trial and error, the inventor has found that by providing appropriate support and environment, for example, …
+Control device, control method, and recording medium having control program …
+EP US CN JP CN115079567A 后藤宏绍 横河电机株式会社
+Priority 2021-03-10 • Filed 2022-02-28 • Published 2022-09-20
+… position of a robot with respect to a disturbance applied to a motor that drives each joint of the robot, and controlling the taught position while correcting the taught position so as to suppress the disturbance when the robot moves to the taught position based on a result of the machine learning" …
+Method of controlling rehabilitation training robot and rehabilitation training …
+CN CN106618949A 冯亚磊 广东美的安川服务机器人有限公司
+Priority 2016-11-09 • Filed 2016-11-09 • Published 2017-05-10
+Robot cabinet； Robot arm, the robot arm is rotationally connected with the robot cabinet； Lower limb support component, the lower limb support component is located on the robot arm； For driving the drive component of the robot arm rotation； For recording the recorder of the position of the robot …
+… and Equipment for Tunnel Anomaly Detection and Response Based on Track Robots
+CN CN120688702B 刘懂县 捷迅技术(广州)有限公司
+Priority 2025-08-18 • Filed 2025-08-18 • Granted 2025-11-14 • Published 2025-11-14
+4. The tunnel anomaly detection and response method based on a track robot according to claim 1, characterized in that the application of a deep Q-learning network to dynamically adjust the scoring threshold of a preset quantization scoring model, and reclassifying the anomaly based on the adjusted …
+Automated, Non-Invasive Artificial Intelligence Machine Learning Method and …
+US US20240212804A1 David Lawrence Turock Therap Services, Llc
+Priority 2006-11-27 • Filed 2024-02-02 • Published 2024-06-27
+… image where the skeletal pose is overlaid on the redacted individual. FIG. 22 shows additional machine learning models for augmenting the capabilities of the monitoring system. FIG. 23 shows the process of learning to make decisions by trial and error represented by reinforcement learning. FIG. 24
+Computer-readable information recording carrier, evaluation method and control …
+US CN JP DE CN109143981A 猪饲聪史 发那科株式会社
+Priority 2017-06-15 • Filed 2018-06-06 • Published 2019-01-04
+In accordance with the invention it is possible to provide the computer-readable information recording carrier for having recorded evaluation program, evaluation Method and control device, the evaluation program can be such that the motor control part of lathe, robot or industrial machinery acts …
+Man-machine interaction dialogue method, system, equipment and medium based on …
+CN CN121257719A 吴小平 凯里学院
+Priority 2025-09-20 • Filed 2025-09-20 • Published 2026-01-02
+Although the prior art achieves a certain result in terms of natural language processing, such as that a part of chat robots can perform simple … Based on the intention feature vector and the history dialogue record, generating an upper element Wen Yuyi element and a lower element containing a …
+Recovery exercising robot
+CN CN206499627U 冯亚磊 广东美的安川服务机器人有限公司
+Priority 2016-11-09 • Filed 2016-11-09 • Granted 2017-09-19 • Published 2017-09-19
+Robot cabinet； Robot arm, the robot arm is rotationally connected with the robot cabinet； Lower limb support component, the lower limb support component is located on the robot arm； Drive component for driving the robot arm rotation； For the recorder for the position for recording the robot arm, …
+A hand activity recording system based on machine vision and deep learning
+CN CN116030499A 杜昊 上海术理智能科技有限公司
+Priority 2023-02-08 • Filed 2023-02-08 • Published 2023-04-28
+Hand activity recording system based on machine vision and deep learning Technical Field The invention belongs to the fields of robot system control, computer vision application, software recording and rehabilitation systems, and particularly relates to a hand activity recording system based on …
+Control method of organization by hellen needle depth method (h.n.d.m)
+JP JP2014121188A Koichi Suchi Koichi Suchi
+Priority 2012-12-18 • Filed 2012-12-18 • Published 2014-06-30
+Learn the results and gradually change the symptomatic treatment. Variable dynamic programming will improve the accuracy of coping therapy. It is an autonomous medical research robot with artificial intelligence that searches the latest medical papers on the medical database and the Internet, and …
+Content-Independent Dropped Call Detection
+
+US US20250220114A1 Heather Lourie Cx360, Inc.
+Priority 2023-12-29 • Filed 2023-12-29 • Published 2025-07-03
+, wherein the call metadata comprise metadata from a telephone carrier. 61 . The computer-implemented method of claim 58 , wherein featurizing the recorded calls comprises separating the recorded calls into channels. 62 . The computer-implemented method of claim 61 , wherein the channels comprise a …
+Control device, control system and machine learning device
+
+US CN JP DE DE102020003526A1 Yuusuke Fukushima Fanuc Corporation
+Priority 2019-06-21 • Filed 2020-06-12 • Published 2020-12-24
+A control device according to one aspect of the present invention solves the above-mentioned problems by trial and error learning an appropriate base speed of a motor for capping peaks in each state of the industrial machines based on the output power of the industrial machines, and the Sets the …
+An intelligent penetration testing system based on deep reinforcement learning …
+CN CN119293805A 刘京菊 中国人民解放军国防科技大学
+Priority 2024-12-12 • Filed 2024-12-12 • Published 2025-01-10
+Reinforcement learning is a machine learning method that is mainly used to solve those problems related to decision making and sequence action selection. Reinforcement learning can be used to maximize long-term rewards in a dynamic, trial-and-error manner by virtue of Agent interactions with the …
+Method for neural network control of motion using real-time environmental …
+
+US US5673367A Theresa M. Buckley Buckley; Theresa M.
+Priority 1992-10-01 • Filed 1994-09-15 • Granted 1997-09-30 • Published 1997-09-30
+15. The method of claim 13 wherein step i) includes the substep of simulating said movement of said robotic end effector by operating a simulation means to produce simulated input variable data as a function of time to be recorded as said input variable data as a function of time and to produce …
+System and method for optimization of a database for the training and testing …
+WO EP US JP US7711662B2 Massimo Buscema Bracco Imaging S.P.A.
+Priority 2003-01-15 • Filed 2004-01-13 • Granted 2010-05-04 • Published 2010-05-04
+… data will not be represented in the ANN. Selection of a good representative sample requires analysis of historical data and much trial and error. A … using the distribution of database associated with said selected prediction algorithm in performing supervised learning, said supervised learning …
+system
+JP2026073363A 勝野大輔 ソフトバンクグループ株式会社
+Filed 2024-10-18 • Published 2026-05-01
+… the skills of new and existing employees. However, on-the-job training remains largely trial-and-error, resulting in inconsistent training outcomes. … A means of distributing the generated training data to users and recording their learning progress, A means of analyzing recorded learning progress …
+System and method for real-time order projection and release
+WO EP US AU US20240239606A1 Matthew Haley Dematic Corp.
+Priority 2023-01-18 • Filed 2024-01-18 • Published 2024-07-18
+1 B include human pickers 202 , robotic pickers 204 (which usually come in the form of autonomous mobile robot (AMRs)), and item carrying vehicles 206 … The present invention thus provides an adaptable system and method for fulfilling orders that is operable to learn based on warehouse conditions to …
+Artificial intelligence system for facilitating interactions via digital …
+WO EP US AU WO2024220769A1 Robert Rodriguez Helix Virtual Medicine, Inc.
+Priority 2023-04-19 • Filed 2024-04-19 • Published 2024-10-24
+Such a trial and error process often leaves patients exhausted, confused, and many times non-compliant with the care recommended by a physician to … The present application relates to artificial intelligence technologies, machine learning technologies, digital representation and deepfake …
+Switchgear Status Prediction and Maintenance System Based on Digital Twin
+CN CN121529951A 马波 绵阳新天一电气科技发展有限公司
+Priority 2025-09-23 • Filed 2025-09-23 • Published 2026-02-13
+… full life cycle data of the switch cabinet, adopts a distributed database architecture to realize data inquiry and backup, and supports retrieval … Furthermore, the data management module stores key maintenance records by adopting a blockchain technology, each record comprises maintenance time, …
+An application of orchestration management methods, devices, equipment, media, …
+CN CN121808033A 高雨静 中移(苏州)软件技术有限公司
+Priority 2025-12-19 • Filed 2025-12-19 • Published 2026-04-07
+the retrieval unit is used for retrieving based on the task information, the overall plan and the similarity between the one or more retrieval keywords and the history records in the running log data to obtain experience data matched with the task information; the perception learning unit is used …
+Computer program and equipment for making character as artificial intelligence
+JP JP2008129845A Tadayuki Hattori Tadayuki Hattori
+Priority 2006-11-21 • Filed 2006-11-21 • Published 2008-06-05
+… as Actuator Control Technology There is no need to install artificial intelligence with a sense of value or intention in industrial robots. … That is, the artificial thought program internally stores input data as a situation record, processes it according to the situation, and outputs it.
+Machine learning signal processing techniques for generating physiological …
+US US20240090848A1 Sankalita Saha UnitedHealth Group Incorporation
+Priority 2022-09-21 • Filed 2023-09-20 • Published 2024-03-21
+For example, retrieval, loading, and execution of code may be performed sequentially such that one instruction is retrieved, loaded, and executed at … is a dataflow diagram showing example data structures and modules for training a machine learning model to interpret short term physiological signals …
+Enhanced training management of operators performing industrial processes
+CN FR CN116540880A M·卢茨 米其林集团总公司
+Priority 2022-06-22 • Filed 2023-06-21 • Published 2023-08-04
+… environment, the augmented reality technology can enable training of tasks related to an industrial production process to be better and more efficient, so that a training mode of doing learning at the same time is realized. For example, patent US 9,643,314 discloses a method of controlling a robot …
+
+"action consequence" AND record AND database AND robot:
+
+
+Method and system for simulating surgical procedures
+
+US US10178155B2 Mordechai Avisar Surgical Theater LLC
+Priority 2009-10-19 • Filed 2014-08-04 • Granted 2019-01-08 • Published 2019-01-08
+a database for storing data of physical characteristics of an organ and surrounding tissue; wherein one or more of said computers is configured to execute software instructions to generate, using said data of stored physical characteristics, a dynamic realistic image of the real organ and …
+Short-range device communications for secured resource access
+
+US US10008057B2 Kenneth Ives-Halperin Live Nation Entertainment, Inc.
+Priority 2014-08-08 • Filed 2015-11-24 • Granted 2018-06-26 • Published 2018-06-26
+identifying stimulus data for use by the attendee device, wherein the stimulus data is identified using the identifier associated with the attendee device, the venue entry code, or both the identifier associated with the attendee device and the venue entry code; and presenting the stimulus data on …
+Short-range device communications for secured resource access
+
+WO US US9898881B2 Kenneth Ives-Halperin Live Nation Entertainment, Inc.
+Priority 2014-08-08 • Filed 2015-11-24 • Granted 2018-02-20 • Published 2018-02-20
+an interface engine that facilitates presentation of a decryption key, wherein the decryption key is for decrypting the encrypted access-enabling code; and a display for presentation of data; wherein facilitating presentation of the decryption key to the electronic user device includes generating a …
+Method and system for simulating surgical procedures
+
+WO EP US JP US11024414B2 Mordechai Avisar Surgical Theater, Inc.
+Priority 2011-03-30 • Filed 2017-10-16 • Granted 2021-06-01 • Published 2021-06-01
+What is claimed is: 1. A method for manufacturing a surgical tool, comprising the steps of: storing tissue image information about biological tissues in a database; storing standardized tool parameters about a standardized surgical tool in the database; generating, using a computer system …
+Short-range device communications for secured resource access
+
+WO EP AU EP3380975B1 Kenneth Ives-Halperin Live Nation Entertainment, Inc.
+Priority 2015-11-24 • Filed 2016-11-17 • Granted 2022-08-10 • Published 2022-08-10
+The system of claim 1 wherein the electronic user device of claim 1, further comprising: an electronic data store (2225) for storage of user device data ;one or more transceivers for receiving and transmitting wireless signals, wherein a transceiver of the one or more transceivers is configured to …
+Systems and Methods for the Optimal Coordination of Manned and Unmanned …
+US US20250381428A1 Mahdi Al-Husseini U.S. DEVCOM Army Research Laboratory
+Priority 2024-06-14 • Filed 2024-07-18 • Published 2025-12-18
+15 . A method comprising: receiving, at a wildfire mitigation manager, from a surveillance agent, observation data and surveillance agent position data; generating, based at least partly on the observation data and the surveillance agent position data, a belief map; generating, based at least partly …
+Techniques to automatically detect regimes of exploratory neuromotor learning …
+WO WO2024092078A1 Elizabeth B. TORRES Rutgers, The State University Of New Jersey
+Priority 2022-10-27 • Filed 2023-10-26 • Published 2024-05-02
+[0038] In some embodiments, the learning detection module 150 includes one or more other modules, such as exploratory learning module 155 and one or more data files or databases (e.g., exploratory learning statistics data structure 156) that hold data that indicate one or more predetermined …
+
+robot AND "interactive perception" AND experience AND analogy:
+
+Robot control, training and collaboration in an immersive virtual reality …
+
+US US10350751B2 Kelleher Guerin The Johns Hopkins University
+Priority 2015-03-04 • Filed 2017-04-05 • Granted 2019-07-16 • Published 2019-07-16
+, wherein the real-world robot includes one of: an industrial robot, a domestic robot, an articulated welding robot, an autonomous robot, a military robot, or a medical robot. 16. The method of claim 1 , wherein the real-world robot is one of: remotely operated a distance from the user, located in a …
+

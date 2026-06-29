@@ -1,0 +1,427 @@
+﻿"preference decay" AND robot AND time AND weight：无
+"preference record" AND robot AND collaborative AND decision：
+
+
+Training method, action decision method and device of action decision model of …
+WO CN CN120297323A 白丰硕 腾讯科技（深圳）有限公司
+Priority 2024-01-09 • Filed 2024-01-09 • Published 2025-07-11
+When the current state is observed in the environment, the state is input into the action decision model of the agent, and the action decision model is used to decide the action that the agent should perform in a given state; Determining, by means of the action decision model, the execution …
+Article recommendation method, electronic device and medium based on generation …
+
+CN CN114202061A 张军欢 北京航空航天大学
+Priority 2021-12-01 • Filed 2021-12-01 • Published 2022-03-18
+In the collaborative filtering algorithm, the memory-based collaborative filtering method is the collaboration of items and users. The model-based collaborative filtering methods mainly include clustering models, Bayesian networks and singular value decomposition. The collaborative filtering …
+Configure classroom physical resources
+
+WO US CN JP DE GB CN110494874B N·拉特哈 国际商业机器公司
+Priority 2017-04-13 • Filed 2017-12-20 • Granted 2023-06-06 • Published 2023-06-06
+adjusting, by one or more processors, the physical classroom resource based on one or more detected physical classroom resource constraints, the adjusting comprising entering the classroom with a robotic device to repair the one or more of the physical classroom resources physical deficits in a …
+Knowledge-graph-based business data index full life cycle treatment method and …
+CN CN121169298A 陈宏炜 北京车智慧信息技术有限公司
+Priority 2025-09-01 • Filed 2025-09-01 • Published 2025-12-19
+In the digital transformation process, enterprises generally rely on massive service indexes to drive decisions, but the traditional index management platform still adopts a static blood margin and manual maintenance mode, wherein on one hand, downstream derivative indexes are required to be …
+Accompanying robot control system, control method thereof and electronic …
+CN CN121959416A 邝嘉隆 深圳市优必选科技股份有限公司
+Priority 2025-12-31 • Filed 2025-12-31 • Published 2026-05-01
+3. The companion robot control system of claim 1, further comprising: The memory updating module is used for carrying out memory extraction on the user behavior data to obtain first emotion memory data, and updating emotion memory data corresponding to the user in the emotion memory database …
+Staff welfare subsidy management method, system and medium based on big data …
+CN CN121810247A 陆根 北京摘鲜科技有限公司
+Priority 2025-12-24 • Filed 2025-12-24 • Published 2026-04-07
+The method comprises the steps of carrying out association analysis on the welfare types of a sub-area according to welfare function action, establishing a function association welfare matching mechanism, identifying welfare type combinations with collaborative excitation effects, complementary …
+Data confirmation method, apparatus, electronic device, readable storage medium …
+CN CN121364911A 李梁怡 深圳市欢太科技有限公司
+Priority 2025-10-11 • Filed 2025-10-11 • Published 2026-01-20
+The application relates to a data confirmation method, a data confirmation device, an electronic device, a readable storage medium and a program product. The method includes displaying a first interface including an operable area and an information display area, displaying key information of at …
+Laundry recommendations for smart wardrobes, smart wardrobes and smart home …
+CN CN121183541A 刘扬北 广东省嘉木丽家智能科技股份有限公司
+Priority 2025-08-05 • Filed 2025-08-05 • Published 2025-12-23
+… to the intelligent wardrobe through wireless communication to trigger a clothes conveying mechanism of the intelligent wardrobe. In one embodiment, the robotic arm scans the laundry position through a vision sensor, grabs the target laundry with a gripper and moves to the washing machine inlet.
+
+"feedback type" AND robot AND preference AND intensity：
+
+
+… methods for real-time data quantification, acquisition, analysis, and feedback
+WO EP US CN AU CA AU2017386412B2 John Douglas BioMech Sensor LLC
+Priority 2016-12-29 • Filed 2017-12-21 • Granted 2022-01-27 • Published 2022-01-27
+… profiles each describing a multi-dimensional representation of acceleration and orientation over time and each having an associated feedback type, the associated feedback type being unique for each of the template motion profiles and including one or more of auditory, haptic, and visual feedback;
+Configuring multi-sta sensing-specific feedback using ndpa and trigger frames
+WO EP US KR TW US20240291536A1 Satyanarayana Katla Interdigital Patent Holdings, Inc.
+Priority 2021-06-11 • Filed 2022-06-10 • Published 2024-08-29
+In some implementations, the indication of the feedback type includes an indication of a measurement metric. In some implementations, the indication of the feedback type includes an indication that feedback will indicate a time of flight (ToF), an indication that feedback will indicate a time …
+CSI feedback design for new radio
+
+WO EP US CN JP KR US11765603B2 Tianyi Xu Interdigital Patent Holdings, Inc.
+Priority 2016-08-11 • Filed 2021-06-14 • Granted 2023-09-19 • Published 2023-09-19
+… operations comprising: transmitting, via Radio Resource Control (RRC) signaling, a Channel State Information (CSI) report configuration indicating a feedback type for a CSI reference signal, the CSI report configuration being associated with first information indicating one or more antenna ports;
+… selection window on basis of information related to sidelink harq feedback in …
+WO EP US CN JP KR EP3706493A1 Jongyoul LEE LG Electronics Inc. -1-
+Priority 2018-10-25 • Filed 2019-10-25 • Published 2020-09-09
+… accordance with an embodiment of the present disclosure. FIG. 29 shows a robot, in accordance with an embodiment of the present disclosure. FIG. 30 … The method of claim 1, wherein adjusting the first region to a second region based on information related to sidelink HARQ feedback comprises:
+Sidelink feedback
+WO EP US CN JP KR US20250167915A1 Thomas Fehrenbach Fraunhofer-Gesellschaft Zur Foerderung Der Angewandten Forschung E.V.
+Priority 2018-09-27 • Filed 2024-10-31 • Published 2025-05-22
+request for one or more of the following: a Channel Quality Indicator (CQI), a Radio Signal Strength Indicator (RSSI), a Reference Signal Received … control signaling is shorter, by a remaining duration, than the frame duration, and receive from the UE, during the remaining duration, the feedback.
+Frame structure in NR
+WO EP US CN US12245262B2 Lakshmi R. Iyer Interdigital Patent Holdings, Inc.
+Priority 2016-11-03 • Filed 2023-11-16 • Granted 2025-03-04 • Published 2025-03-04
+RRH Remote Radio Head RS Reference Signal RSSI Received Signal Strength Indicator RSRP Reference Signal Received Power RSRQ Reference Signal Received … 11. The method of claim 10 , wherein the feedback is based upon a rank indication (RI) and/or a precoder Matrix indication (PMI). 12. The method of
+Receiver Feedback in Wireless Systems
+WO EP US CN JP KR CA CN115189816B 保罗·马里内尔 交互数字专利控股公司
+Priority 2017-01-04 • Filed 2018-01-03 • Granted 2024-11-26 • Published 2024-11-26
+Transmitting a second CBG-based HARQ feedback associated with the second downlink transmission, where the second DCI indicates that the CBG-based type HARQ feedback is to be provided for the second downlink transmission, wherein the second CBG-based HARQ feedback includes a number of bits …
+Multi channel multiple input multiple output beamforming training in millimeter …
+WO EP US CN JP US11916622B2 Hanqing Lou Interdigital Patent Holdings, Inc.
+Priority 2017-07-06 • Filed 2022-03-21 • Granted 2024-02-27 • Published 2024-02-27
+… STA of claim 13 , wherein the field in the first frame includes a feedback request bandwidth (FBCK REQ BW) or a feedback type bandwidth (FBCK TYPE BW). 15. The STA as is claim 13 , wherein the field in the first frame indicates one or both of a channel index or bandwidth requested for the feedback.
+Nr sl psfch transmission and monitoring
+
+WO EP US CN KR BR TW US20220201654A1 Moon-Il Lee Idac Holdings, Inc.
+Priority 2019-04-09 • Filed 2020-04-08 • Published 2022-06-23
+… display (HMD), a vehicle, a drone, a medical device and applications (e.g., remote surgery), an industrial device and applications (e.g., a robot and … Hybrid automatic repeat request (HARQ) timing may be determined. Physical SL feedback channel (PSFCH) resource pool selection may be performed. A …
+System and method for providing tactile feedback via a probe of a medical …
+
+US US20170086785A1 Steinar Bjaerum General Electric Company
+Priority 2015-09-30 • Filed 2015-09-30 • Published 2017-03-30
+positioning for the desired ultrasound protocol. In one embodiment, the tactile feedback emitted via the probe may mirror the aforementioned visual probe position accuracy gauge in that the type of feedback output may change as a user shifts from an incorrect to correct probe position. Accordingly, …
+Intelligent feedback type orthopedics rehabilitation guidance training system
+CN CN117954046A 彭丽鲜 中国人民解放军联勤保障部队第九二〇医院
+Priority 2023-12-26 • Filed 2023-12-26 • Published 2024-04-30
+1. An intelligent feedback type orthopedic rehabilitation guidance training system, which is characterized by comprising: Patient information input module: The module is used for collecting basic information of a patient, including age, sex, weight, injury type, injury part and operation history;
+Providing treatment-indicative feedback dependent on putative content treatment
+
+US US8984133B2 Edward K. Y. Jung The Invention Science Fund I, Llc
+Priority 2007-06-19 • Filed 2007-06-19 • Granted 2015-03-17 • Published 2015-03-17
+circuitry for including at least some hardware-type-dependent feedback in the provisional-update-responsive feedback. 9. The system of claim 6 in which the circuitry for adapting provisional-update-responsive feedback to depend at least partly on the content type indication of the remote system's …
+Intelligent modeling and control of automation
+
+WO US US7860596B2 Allon Guez Drexel University
+Priority 2003-10-17 • Filed 2009-03-04 • Granted 2010-12-28 • Published 2010-12-28
+The servo-feed back loop 204 uses the initial set point X 0 and at least one measurement obtained from the measuring device 206 to operate the automated device 212 . The measurement obtained is typically that of an optical feature or characteristic such as optical power, optical intensity, optical …
+Method and system for MIMO transmission in millimeter wave WLAN
+
+WO EP US CN KR CN116192208A 奥盖内科梅·奥泰里 交互数字专利控股公司
+Priority 2017-06-14 • Filed 2018-06-14 • Published 2023-05-30
+… -mounted displays (HMDs), vehicles, drones, medical devices and applications (e.g., tele-surgery), industrial devices and applications (e.g., robots … be configured based on the announcement frame. One or more sounding symbols may be sent and feedback may be provided based on the sounding symbols.
+Electromagnetic force feedback type puncture operation control system and robot …
+CN CN110623710A 杨学群 广州市美太贸易有限公司
+Priority 2019-10-15 • Filed 2019-10-15 • Published 2019-12-31
+The invention discloses an electromagnetic force feedback type puncture surgery control system, which comprises a puncture needle device and a force feedback type control device; the electric push rod is arranged on the robot through a connecting flange; the needle holding component comprises a …
+A multifunctional educational robot
+CN CN118079182A 李贤� 深圳市一探疆来科技有限公司
+Priority 2024-02-27 • Filed 2024-02-27 • Published 2024-05-28
+8. The multi-functional educational robot of claim 1, wherein the simulated social scene library comprises a multi-modal feedback mechanism that enhances the social scene experience of autistic children through audio, visual animation, tactile feedback, providing a customized interactive means for …
+Systems and methods for indirect control of processor enabled devices
+US US9067132B1 Bryan Bergeron Archetype Technologies, Inc.
+Priority 2009-07-15 • Filed 2013-06-07 • Granted 2015-06-30 • Published 2015-06-30
+, is incidental feedback inherent in the operation of the device. The second type of feedback, represented by the unidirectional output arrow [ 119 ] is the characteristic output of the device. As a concrete illustration of the distinction between these two types of feedback, consider the case where …
+Wearable control equipment and system for large-scale simulated bionic robot
+CN CN118024229A 刘志坚 大连博涛文化科技股份有限公司
+Priority 2024-02-29 • Filed 2024-02-29 • Published 2024-05-14
+6. The wearable control system of the large-scale simulated bionic robot according to claim 1, wherein the pressure distribution optimizing module comprises a neural network design sub-module, a pressure adjusting sub-module and a user feedback optimizing sub-module; The neural network design …
+Force feedback type control device and puncture needle control system
+
+CN CN211704775U 杨学群 广州市美太贸易有限公司
+Priority 2019-10-15 • Filed 2019-10-15 • Granted 2020-10-20 • Published 2020-10-20
+The utility model provides a force feedback type control device and a puncture needle control system, which comprise a control handle, a force feedback assembly and a main controller; the control handle comprises an operating rod and a base, the operating rod is rotatably or slidably mounted on …
+Electromagnetic force feedback type puncture operation control system and robot …
+
+CN CN211381652U 杨学群 广州市美太贸易有限公司
+Priority 2019-10-15 • Filed 2019-10-15 • Granted 2020-09-01 • Published 2020-09-01
+1. An electromagnetic force feedback type puncture surgery control system is characterized by comprising a puncture needle device and a force feedback type control device; the puncture needle device comprises an electric push rod, a needle holding component and a puncture needle, and the electric …
+Digitally controlled illumination methods and systems
+
+JP CA JP2015149302A ミューラー，ジョージ ジー フィリップス ソリッド−ステート ライティング ソリューションズ インコーポレイテッド
+Priority 1997-12-17 • Filed 2015-04-27 • Published 2015-08-20
+Schematic showing an application example with sensor / feedback format Some common block diagrams related to color display thermometers Figure showing a certain color display speedometer Diagram showing a color display inclinometer Diagram showing a certain color display magnetic field strength …
+Multi-signal feedback type electrical stimulation lower limb rehabilitation …
+CN CN114848396A 吴全玉 江苏理工学院
+Priority 2022-05-07 • Filed 2022-05-07 • Published 2022-08-05
+7. The multi-signal feedback type electrical stimulation lower extremity rehabilitation device according to claim 4, characterized in that, under the knee joint training mode of active training controlled by the control module, the toe and heel of the sole are used, the foot of the sole is Four-way …
+beam management
+WO EP US CN JP KR CN109792283A J·M·默里 康维达无线有限责任公司
+Priority 2016-08-11 • Filed 2017-08-11 • Published 2019-05-21
+… kinds it is different Sending mode.They are taken with regard to what reference signal for the specific structure of antenna mapping and (are respectively for demodulating The specific reference signal of cell or demodulated reference signal) and they rely on CSI feedback type for, be different.
+Media content enhancement based on user feedback of multiple variations
+
+US US12248949B2 Trisha MITTAL Adobe Inc.
+Priority 2021-11-04 • Filed 2021-11-04 • Granted 2025-03-11 • Published 2025-03-11
+determining a score for each variation of the plurality of variations based on explicit user feedback for each variation, wherein the explicit user feedback corresponds to a scaled user rating of aesthetic preference for a respective variation of the plurality of variations according to one or more …
+Feedback type automatic hemostasis system
+
+CN CN113729828A 齐鹏 同济大学
+Priority 2021-09-17 • Filed 2021-09-17 • Published 2021-12-03
+3. a kind of feedback type automatic hemostasis system according to claim 2, is characterized in that, when the pressure at hemostatic compression place is less than the rated hemostasis strength range, the motor of the compression device rotates to increase the pressure until the pressure reaches …
+Method for transmitting and receiving channel state information in wireless …
+WO US WO2019143226A1 정재훈 엘지전자 주식회사
+Priority 2018-01-22 • Filed 2019-01-22 • Published 2019-07-25
+DETAILED DESCRIPTION OF THE PREFERRED EMBODIMENT Hereinafter, preferred embodiments according to the present invention will be described in detail … The setting information comprises information about at least one effective region (valid region) associated with the calculation of the feedback …
+Sidelink feedback information
+
+WO US CN AR MX TW US20250056570A1 Renato Barbosa Abreu Nokia Technologies Oy
+Priority 2023-08-10 • Filed 2024-07-19 • Published 2025-02-13
+, wherein the feedback-type of feedback occasion is one of the following: a primary feedback transmission occasion of feedback information, or a secondary feedback transmission occasion of feedback information. 11 . The apparatus of claim 10 , wherein the primary feedback transmission occasion and the …
+Method and system for providing kinesthetic awareness
+
+US US20210118326A1 Jo Shattuck Pntc Holdings Llc
+Priority 2017-07-24 • Filed 2020-12-23 • Published 2021-04-22
+… data (for example, including but not limited to heart rate, brain waves, muscle activity) from several wearable/handheld devices, and to provide various delivery methods of feedback (e.g., audio, visual, texture, tactile and haptic) in multiple methods (dose, duration, frequency, intensity and type …
+Balance trainer simulator system and method
+WO EP US CN WO2021191902A1 Itshak Melzer B. G. Negev Technologies And Applications Ltd., At Ben-Gurion University
+Priority 2020-03-24 • Filed 2021-03-24 • Published 2021-09-30
+Aspects of the disclosure, according to some embodiments thereof, relate to a mechatronic perturbation stationary bicycle robotic system (also … 32. The system according to any one of claims 1-31, wherein the processing unit is configured to provide real-time feedback to the subject regarding …
+Administration services for managing group feedback
+
+US US20240112143A1 Eric Koslow Degree, Inc.
+Priority 2022-09-30 • Filed 2023-10-02 • Published 2024-04-04
+is a schematic of the Slack Bot displaying a list of system actions including adding a new 1:1 talking point. FIG. 88 is a schematic of the Slack Bot … A method of implementing administrative services for managing group feedback is disclosed. A selection of a feedback visibility setting for a …
+Systems and devices for navigation and procedural guidance of laser lobectomy …
+WO EP US CN CN117580509A V·S·帕伊赖卡尔 皇家飞利浦有限公司
+Priority 2021-06-29 • Filed 2022-06-29 • Published 2024-02-20
+… . Thus, any embodiment described herein as "exemplary" is not necessarily to be construed as preferred or advantageous over other embodiments. … a processor device configured to provide positional feedback regarding a position of the in-vivo ultrasound probe when the in-vivo ultrasound probe …
+CURRENT DOMAIN ANALOG FRONTTEND FOR INTENSITY MODULATED DIRECT RUNTIME LIDARS
+US CN DE DE102020214783A1 Sayyed Mahdi Kashmiri Robert Bosch Gesellschaft mit beschränkter Haftung
+Priority 2019-11-27 • Filed 2020-11-25 • Published 2021-05-27
+… representation of a regulated common gate input buffer and TIA. 8th Figure 3 is a schematic representation of a transimpedance amplifier (TIA) with capacitive feedback. 9 Figure 13 is a block diagram of an intensity modulated phase encoded LIDAR receive path illustrating intermediate signals. 10 is …
+Auxiliary stabilizing device for cross-frame type handheld welding gun based on …
+
+CN CN113977161A 郭楠楠 徐州迈斯特机械科技有限公司
+Priority 2021-11-25 • Filed 2021-11-25 • Published 2022-01-28
+8. The magnetic double adsorption-based straddle-type handheld welding gun auxiliary stabilizing device is characterized in that: the closed type side adjusting type dynamic feedback device (4) comprises a transverse sliding bearing (95), a closed type adjusting bottom plate (96), a closed type …
+A kind of healing robot control method based on myoelectric feedback impedance …
+CN CN106109174A 谢平 燕山大学
+Priority 2016-07-14 • Filed 2016-07-14 • Published 2016-11-16
+3. A kind of rehabilitation robot control method based on myoelectric feedback type impedance self-adaptation according to claim 1, it is characterized in that: in step 2, by the method for mirroring the healthy side of the affected side, the muscle of the affected side is described relative to the …
+A method for reproducing hardness tactile sensation based on the bionic …
+CN CN111897427B 吴涓 东南大学
+Priority 2020-07-29 • Filed 2020-07-29 • Granted 2025-05-27 • Published 2025-05-27
+… minimum value which is inversely related to vibration intensity, wherein PFP (x d ) is a function of PFP changing along with displacement, representing the value of PFP corresponding to different stages of a pressing process, and P cv is a critical PFP value for generating vibration feedback, namely …
+Assessment and training methods, systems, equipment and media for limb …
+CN CN118016238A 潘钰 清华大学
+Priority 2024-01-23 • Filed 2024-01-23 • Published 2024-05-10
+(2) The training process lacks feedback, and training actions and training schemes are difficult to adjust in time in a targeted manner; (3) The training intensity and time are difficult to control, the training quality depends on the ability of families, and standardized development is not …
+Systems and methods for manufacturing custom surgical instruments
+
+US US10398417B2 Michael J. O'Neil DePuy Synthes Products, Inc.
+Priority 2016-06-29 • Filed 2016-06-29 • Granted 2019-09-03 • Published 2019-09-03
+wherein the data set includes user preference information. 9. The method of claim 8 , wherein the user preference information indicates the user's preferences with respect to at least one of texture, modulus of elasticity, sensor inclusion, sensor type, sensor feedback type, bumps, recesses, balance …
+Design method of narrow-band achromatic superlens and superlens
+CN CN117406437B 马耀光 浙江大学杭州国际科创中心
+Priority 2023-12-14 • Filed 2023-12-14 • Granted 2024-04-23 • Published 2024-04-23
+Based on focusing results, the application simplifies the design method of the lens by a feedback type self-adaptive optimization algorithm to obtain the narrow-band achromatic superlens with better imaging effect, solves the problems of high design difficulty and poor imaging effect aiming at the …
+A method for enabling multi-link millimeter wave beam training
+WO EP CN JP TW JP2025540689A サード マームード インターデイジタル パテント ホールディングス インコーポレイテッド
+Priority 2022-11-21 • Filed 2023-11-17 • Published 2025-12-16
+… (PPDUs) on the mmW link based on the information included in the STA Info field, and transmitting, on the sub-7 GHz link, a beam training feedback … The method of claim 1, wherein the STA Info field includes at least one of an AID11 subfield, a Preferred Tx Sector ID subfield, a Preferred Rx …
+Method and system for adaptive CSI quantization
+WO EP CN JP JP2025538996A セルダル タン アフメット インターデイジタル パテント ホールディングス インコーポレイテッド
+Priority 2022-11-02 • Filed 2023-10-27 • Published 2025-12-03
+… at the WTRU and the network node. The criteria may be based on one or more of a reference signal received power (RSRP) measurement, a CSI measurement, the type of feedback report, the resources used to send the feedback report, and/or a metric associated with one or more encoded CSI measurements. …
+Automatic process and/or setup for welding-type systems
+
+WO EP US CN CN116393785A 布鲁斯·P·阿尔布雷克特 伊利诺斯工具制品有限公司
+Priority 2017-11-16 • Filed 2018-11-16 • Published 2023-07-07
+7. The welding-type system of claim 6 further comprising an input of at least one robotic setting coupled to the parameter setting module. 8. The welding-type system of claim 1, wherein the feedback circuit provides a feedback signal representative of the welding-type power output, a recommendation …
+Force feedback ankle joint rehabilitation robot based on tension structure
+CN CN116407424A 杨彦东 燕山大学
+Priority 2023-03-22 • Filed 2023-03-22 • Published 2023-07-11
+6. The force feedback type ankle joint rehabilitation robot based on tension structure according to claim 1, characterized in that, the first drive unit, the second drive unit and the third drive unit also include a drive motor, a rotating shaft, a synchronous Belt and motor bracket, and the …
+Force feedback control lever system for synchronous detection of emotion and …
+CN CN118444779A 彭聪 中国船舶集团有限公司综合技术经济研究院
+Priority 2024-04-29 • Filed 2024-04-29 • Published 2024-08-06
+When an operator holds a two-degree-of-freedom force feedback control lever with one hand to perform driving operation, a control lever system control software program of the emotion grip strength rotation angle information display module (400) respectively communicates through three serial ports …
+Method and system for providing kinesthetic awareness
+
+US US12100311B1 Jo Shattuck Panthertec Inc.
+Priority 2017-07-24 • Filed 2021-03-12 • Granted 2024-09-24 • Published 2024-09-24
+In another embodiment, the KAT is configured to provide various delivery methods of feedback (e.g., audio, visual, texture, tactile, haptic, or the like) in multiple methods (e.g., dose, duration, frequency, intensity, type, or the like) in response to the values (e.g., aggregated values or …
+Soft hybrid automatic repeat request configuration
+WO US WO2022047497A1 Konstantinos Dimou Qualcomm Incorporated
+Priority 2020-08-31 • Filed 2021-08-30 • Published 2022-03-03
+… feedback. 20. The UE of claim 15, wherein the information associated with link adaptation identifies at least one of: a channel quality indicator (CQI), a power offset, a modulation and coding scheme, a power control parameter, a signal to interference and noise ratio parameter, a link preference …
+Feedback motor automatic combustion control gas ratio device
+
+CN CN102200300A 章浩伟 上海理工大学
+Priority 2011-04-15 • Filed 2011-04-15 • Published 2011-09-28
+1. A feedback type motor self-controlled combustion gas ratio device, which includes a stove head (1) arranged on the gas stove panel (2) and a damper (4) arranged on the ejector pipe (7); it is characterized in that: A micro-pressure differential gauge (3) is set near the stove (1) described above …
+A state controlled training unit for physical training with cable drive
+
+EP ES EP3936197A1 Anders Stengaard Sørensen Anders Stengaard Sørensen
+Priority 2020-07-08 • Filed 2020-07-08 • Published 2022-01-12
+Multi-variable feedback motor control Within robotics, it is normal practice to use motor control systems, that does not aim to achieve either specific velocity or specific force, but rather aim at specific combinations of velocity, force, torque, position, acceleration or possibly other relevant …
+Assistance information for disaggregated network nodes
+
+US US20250097768A1 Toru Uchino Qualcomm Incorporated
+Priority 2023-09-15 • Filed 2023-09-15 • Published 2025-03-20
+claim 1 , wherein the ROHC information indicates one or more of: a feedback type including an acknowledgement (ACK) or a negative acknowledgement (NACK), UE related identity information associated with the UE, an indication of whether downlink data is a packet data convergence protocol (PDCP) data …
+Neurocomputer with analog signal bus
+WO EP US KR AU DE FI US5131072A Hideki Yoshizawa Fujitsu, Ltd.
+Priority 1988-08-31 • Filed 1989-02-23 • Granted 1992-07-14 • Published 1992-07-14
+An analogue neuron processor (ANP) performs an operation of sum-of-products of a time divisional analog input signal sequentially input from an analog signal bus and weight data and output an analog signal to an analog signal bus through a nonlinear circuit. A layered type or a feedback type …
+A Multi-Sensory Feedback Fusion Exoskeleton Robot Training System for Stroke …
+CN CN121337577A 徐文竹 宁波市康复医院
+Priority 2025-11-18 • Filed 2025-11-18 • Published 2026-01-16
+3. The multi-sensory feedback fusion stroke rehabilitation exoskeleton robot training system according to claim 1, characterized in that: the motion state monitoring module includes an inertial measurement unit, a pressure sensor and an angle sensor; the inertial measurement unit is installed at …
+Devices used to train and track movement and muscle memory
+EP US CN JP KR AU TW JP2026017522A 維育 劉 旭大実業股▲ふん▼有限公司
+Priority 2024-07-23 • Filed 2025-07-14 • Published 2026-02-04
+… implementations, retrieval of enhanced functionality and additional data or programming, e.g., downloaded actions or exercises, updates, etc. Other local data 330 may include tolerances for comparison of stored actions with different portions of user actions, preferences for feedback or feedback …
+… Optimization Method for Industrial Software Based on Positive Feedback
+CN CN121433794A 李倚天 昆明理工大学
+Priority 2025-11-03 • Filed 2025-11-03 • Published 2026-01-30
+The intensity of the emotional feedback in the behavioral feedback is optimized using the following formula: ; Where: F strength is the feedback strength; S is the social presence; P is the skin conductance response; γ1 and γ2 are the weighting coefficients of feedback strength with social presence …
+Data-driven-based intelligent private domain flow operation method and system
+CN CN121864406A 盛华 海南梦动科技有限公司
+Priority 2025-12-30 • Filed 2025-12-30 • Published 2026-04-14
+S45: Based on the feedback results for each field in the user authorization feedback log in the actual data set, the strength values of the corresponding components in the privacy preference benchmark are adjusted using reinforcement learning, and a time decay factor is introduced to smooth …
+Feedback Loop-Based Robotic System for Child Behavior Modification and …
+KR20260054669A 안범주 안범주
+Filed 2026-04-04 • Published 2026-04-22
+The present invention relates to a feedback loop-based robot system for supporting child behavior modification and development, and a method for controlling the same. The robot system (100) of the present invention includes a data input unit (110) that collects a child's movements, voice, and bio- …
+Disease diagnosis method, device, equipment and medium based on expert …
+CN CN121260426A 王启伟 季华实验室
+Priority 2025-12-08 • Filed 2025-12-08 • Published 2026-01-02
+A334, for the logic type feedback, if the conflicting rule conditions exist in the logic type feedback, preferentially adopting the rule conditions proposed by the expert with higher fusion weight, and if the rule conditions of the logic type feedback do not conflict, carrying out weighted …
+A Customer Interaction Method and System for a Smart Beverage Self-Service …
+CN CN121305733A 爱卡德·迈克·高索 宁波湃隆国际贸易有限公司
+Priority 2025-10-16 • Filed 2025-10-16 • Published 2026-01-09
+collecting feedback data of a user including explicit feedback and implicit feedback in real time; processing the feedback data to construct a feedback vector comprising feedback type, intensity and time stamp; associating feedback data with the current user dialogue state and the recommendation …
+Force feedback type wearable upper limb exoskeleton robot
+
+CN CN115284258A 张树欣 国网上海市电力公司
+Priority 2022-08-15 • Filed 2022-08-15 • Published 2022-11-04
+The invention discloses a force feedback type wearable upper limb exoskeleton robot which consists of a bearing bracket, a left exoskeleton robot body and a right exoskeleton robot body. The bearing bracket comprises a seat, a locking support frame, a fixing plate and an operator fixing device;
+Method and system for facilitating surgical procedures
+
+EP US CN JP JP2007144180A Prakash Mahesh General Electric Co
+Priority 2005-11-23 • Filed 2006-11-24 • Published 2007-06-14
+The cutout 304 may be formed based on varying intensity characteristics of the pixels and / or voxels, for example. Based on the intensity … The system (100, 700) of claim 6, wherein the feedback response comprises at least one of haptic feedback, thermal feedback, optical feedback, and …
+An intelligent feedback-based brain disease rehabilitation guidance and …
+CN CN120319400A 李水琴 西安医学院第一附属医院
+Priority 2025-04-01 • Filed 2025-04-01 • Published 2025-07-15
+The invention discloses an intelligent feedback type encephalopathy rehabilitation guidance training system, which is used for collecting physiological data of a patient in real time through a wearable device or a brain-computer interface, carrying out accurate assessment, generating a personalized …
+Early warning method, device, computer equipment and storage medium based on …
+CN CN120725200A 袁美璐 中国平安财产保险股份有限公司
+Priority 2025-05-26 • Filed 2025-05-26 • Published 2025-09-30
+Specifically, the client feedback event can be obtained from a relevant client service data platform, the client feedback event comprises feedback content information and event related information, the feedback content information comprises but is not limited to feedback content text, feedback type …
+Exchange method and device
+CN CN109614028A 赵毅 百度在线网络技术（北京）有限公司
+Priority 2018-12-17 • Filed 2018-12-17 • Published 2019-04-12
+Step 202, it is based on reference information, generates object feedback mode information, and be based on object feedback mode information, it will The corresponding feedback information of solicited message feeds back to user. In the present embodiment, the type of feedback includes display, …
+Data updating method and device for intelligent body memory and electronic …
+CN CN121560898A 王震 中电信人工智能科技(北京)有限公司
+Priority 2025-11-20 • Filed 2025-11-20 • Published 2026-02-24
+scoring the credibility of the target feedback information based on the feedback type of the first feedback information and the historical feedback accuracy of the target object to obtain a second scoring value; Comparing and analyzing the target feedback information and the target memory data to …
+A multi-source physiological information integrated feedback music therapy …
+CN CN120459484A 管子琪 安徽公安职业学院
+Priority 2025-03-24 • Filed 2025-03-24 • Published 2025-08-12
+1. A multi-source physiological information comprehensive feedback type music physiotherapy system, which is characterized by comprising: The physiological signal acquisition module is used for acquiring multisource physiological signals of a user in real time; The data processing and analyzing …
+Mixed memory management method and system for large model intelligent body
+CN CN121599075A 吴君麟 杭州半云科技有限公司
+Priority 2025-11-25 • Filed 2025-11-25 • Published 2026-03-03
+The method comprises the steps of taking a session gist abstract as input, identifying a task target, emotion expression and feedback attribute in the session gist abstract, judging among a consultation type, a preference expression type, a complaint feedback type and a task instruction type …
+A mutual-feedback emergency investigation, monitoring and early warning system …
+CN CN116625320A 代贞伟 中国地质调查局武汉地质调查中心(中南地质科技创新中心)
+Priority 2023-04-13 • Filed 2023-04-13 • Published 2023-08-22
+the remote control robot (3) is also used for sampling rocks and/or soil of the sudden geological disaster area and crushing boulders of the sudden geological disaster area in the moving process of the sudden geological disaster area. 2. The mutual feedback type emergency investigation and …
+A high-voltage cable grounding current abnormality monitoring system
+CN CN121410333A 邓林森 国能大渡河大岗山发电有限公司
+Priority 2025-12-12 • Filed 2025-12-12 • Published 2026-01-27
+setting a feedback trigger condition, defining an optimization action, setting an optimization period of a cooperative mechanism by combining the inspection period of the inspection robot, and generating a cooperative reasoning mechanism. Specifically, the operation and maintenance feedback step …
+Dialogue-guided target detection model training method, grasping pose …
+CN CN121438019A 徐光远 北京邮电大学
+Priority 2025-10-29 • Filed 2025-10-29 • Published 2026-01-30
+… in the fine adjustment process, enabling the visual layer to be frozen to conduct fine adjustment on the language layer and the middle layer, enabling cross entropy loss to be built according to the first prediction result and the corresponding guiding prompt, determining a prediction feedback type …
+… -axis synchronous control system and method based on articulated feedback robot
+CN CN120985107A 鲁金忠 江苏大学
+Priority 2025-08-21 • Filed 2025-08-21 • Published 2025-11-21
+Assuming that both industrial robots No. 1 and No. 2 have multi-axis systems comprising six motors, the position following error e<sub>i</sub>(t) of the i-th axis motor is calculated based on the commanded position θ <sub> ref </sub>(t) and the actual feedback position θ<sub> i </sub>(t) of the i- …
+Humanoid robot collaborative simulation control methods and related equipment …
+CN CN121857367A 李卫铳 广州里工实业有限公司
+Priority 2025-12-01 • Filed 2025-12-01 • Published 2026-04-14
+… cooperative communication among virtual modules crossing the simulation units; and according to the simulation performance data, executing feedback optimization operation on the function simulation of each simulation unit so as to realize cooperative control optimization of the humanoid robot.
+Active pressure feedback type steel ball pressing system for lubricating …
+
+CN CN112756948A 王正雨 苏州超莱斯机器人科技有限公司
+Priority 2021-01-11 • Filed 2021-01-11 • Published 2021-05-07
+The invention discloses an active pressure feedback type steel ball system for lubricating distributor assembly production line, relates to the technical field of lubricating distributor assembly, and includes a workbench, a first conveyor belt and a second conveyor belt. The bottom of the …
+End sensor, haptic feedback type interventional catheter and autonomous …
+CN CN119655905A 宋乐 天津大学
+Priority 2024-11-29 • Filed 2024-11-29 • Published 2025-03-21
+The end sensor is an end sensor structure of an autonomous navigation catheter based on large-sensing-angle tactile feedback. The tactile feedback type interventional catheter obtained by the end sensor assembly can be applied to cardiovascular interventional operation, and achieves the purposes of …
+A force feedback full-drive end effector
+CN CN222222649U 王金星 山东农业大学
+Priority 2024-04-15 • Filed 2024-04-15 • Granted 2024-12-24 • Published 2024-12-24
+7. The force feedback type full-driven end effector as set forth in claim 1, wherein the top end of the base (4) is provided with a downward extending groove, and a silica gel cushion is arranged on the bottom (7) of the groove. 8. The force feedback type full-drive end effector as claimed in claim …
+… , method, storage medium and computer program product for energy feedback type …
+CN CN121689127A 陈伟 合肥华思系统股份有限公司
+Priority 2025-10-29 • Filed 2025-10-29 • Published 2026-03-17
+The application discloses an energy management system, an energy management method, a storage medium and a computer program product of energy feedback type electromechanical equipment, and relates to the technical field of elevators; and the operation information is input into an S-scheduling …
+Welding gun
+CN CN118268680A 梁宝山 中车大同电力机车有限公司
+Priority 2024-04-23 • Filed 2024-04-23 • Published 2024-07-02
+1. The welding gun is characterized by comprising a bracket, a welding belt disc, a shape correction conducting tube, a feedback type precursor group wheel, a gun body and a control system; the welding belt disc is arranged on the bracket and is used for winding a welding belt; the gun body is of a …
+Distributed feedback type semiconductor laser and its driving method
+US JP KR JPH05167195A Junichi Kinoshita Toshiba Corp
+Priority 1991-12-17 • Filed 1991-12-17 • Published 1993-07-02
+Detailed Description of the Invention [0001] BACKGROUND OF THE INVENTION 1. Field of the Invention The present invention relates to a distributed feedback type semiconductor laser which performs optical feedback by a diffraction grating formed along an optical waveguide, and more particularly, a …
+Configuring multi-STA sensing specific feedback using NDPA and trigger frames
+CN CN117769849A 萨蒂亚纳拉亚纳·卡特拉 交互数字专利控股公司
+Priority 2021-06-11 • Filed 2022-06-10 • Published 2024-03-26
+15. The STA of claim 11, wherein the transmitter circuit is configured to transmit the indication of the feedback type in a Null Data Packet Announcement (NDPA) frame. 16. The STA of claim 11, wherein the indication of the feedback type comprises an indication of a type of sensing feedback …
+Underwater Structure Crack Detection Method Using Underwater Image Enhancement …
+CN CN121582175A 赵盈皓 广州航海学院
+Priority 2025-11-19 • Filed 2025-11-19 • Published 2026-02-27
+Performing fusion analysis processing on the local contrast gradient matrix and the Canny edge detection response graph, and extracting the intensity standard deviation characteristic of an edge region; And generating a feedback weight coefficient based on the relation between the intensity …
+Electroencephalic neurofeedback apparatus and method
+WO US JP AU DE GB WO1990015571A1 Margaret E. Ayers Ayers Margaret E
+Priority 1989-06-14 • Filed 1990-04-23 • Published 1990-12-27
+A number of different feedback-type methods and apparatus are known dating back to as early as 1960. Early studies by several researchers focused on bioelectrical feedback on persons suffering from hemiplegia, i.e., paralysis of one lateral half of the body resulting from injury to the motor …
+Harq type configuration for sidelink and downlink communications
+US US20230208564A1 Ahmed Elshafie Qualcomm Incorporated
+Priority 2021-12-29 • Filed 2021-12-29 • Published 2023-06-29
+transmitting the second control signaling via a master information block via a physical broadcast channel. 15 . The method of claim 13 , further comprising: receiving, from a base station, fourth control signaling indicating the default feedback mode. 16 . The method of claim 9 , further comprising:
+Real-time quality monitoring and control system of high collapsibility sodium …
+CN CN121385199A 王勇武 浙江武精机器制造有限公司
+Priority 2025-09-30 • Filed 2025-09-30 • Published 2026-01-23
+… molar ratio and sand sample crumbling degree, and corresponding control of the rotating speed of the sand mixer, the flow of the adhesive quantitative pump and the flow of the collapser quantitative pump by combining the evaluation model and the fuzzy control model, automatic negative feedback type …
+High-speed target fixed parameter optimized volumetric Kalman filter tracking …
+CN CN121880740A 张进宝 中国人民解放军63610部队
+Priority 2025-12-31 • Filed 2025-12-31 • Published 2026-04-17
+S3B, innovation feedback type dynamic covariance adjustment: 1) Calculating a measurement prediction value by integrating each point in the propagated volume point set By measuring functions describing the law of observation of the sensor Mapping to obtain measurement prediction volume point And …
+Methods and systems for adaptive csi quantization
+US20260128774A1 Ahmet Serdar Tan Interdigital Patent Holdings, Inc.
+Filed 2023-10-27 • Published 2026-05-07
+the second criteria may comprise the current state of the WTRU's current state velocity, received signal strength indicator (RSSI), or performance of … wherein the criteria are based on one or more of a reference signal received power (RSRP) measurement, a CSI measurement, a type of the feedback …
+Feedback-based neurorehabilitation device based on intracranial …
+CN CN121795928A 胥红来 博睿康技术(上海)股份有限公司
+Priority 2026-03-09 • Filed 2026-03-09 • Published 2026-04-07
+The invention belongs to the technical field of physiological electrical signals, and particularly relates to feedback type nerve rehabilitation equipment based on intracranial brain electrical signals, which decodes the brain electrical signals into training instructions to control a training …
+Harq overhead reduction
+WO EP CN EP4666472A1 Nazli KHAN BEIGI Interdigital Patent Holdings, Inc.
+Priority 2023-02-14 • Filed 2024-02-14 • Published 2025-12-24
+[0010] FIG. 1 D is a system diagram illustrating a further example RAN and a further example CN that may be used within the communications system illustrated in FIG. 1A according to an embodiment. [0011] FIG. 2 is a flow diagram illustrating an example of dynamic HARQ feedback type switching. [0012 …
+Stress elimination heat treatment method for heavy steel member
+CN CN120796640B 李文雪 山东辰泰重钢建设集团有限公司
+Priority 2025-09-16 • Filed 2025-09-16 • Granted 2025-12-12 • Published 2025-12-12
+The method can accurately identify the high-stress areas needing preferential treatment in the component, and ensure that the areas are timely and … Closed-loop feedback control step: In the partitioned heat treatment step, stress change data of at least some of the independent controllable …
+Human-guided rehabilitation system with dynamic feedback
+
+TW TWI805308B 張玉梅 亞東學校財團法人亞東科技大學
+Priority 2022-04-07 • Filed 2022-04-07 • Granted 2023-06-11 • Published 2023-06-11
+Simulator-guided rehabilitation system with dynamic feedback The invention relates to a rehabilitation system, in particular to a dynamic feedback-type simulated human-guided rehabilitation system. In the traditional rehabilitation course, the rehabilitation therapist needs to guide the …
+Automatic assembly equipment for small hooks of guide rail
+CN CN121244743B 徐紫星 宁波威武汽车零部件有限公司
+Priority 2025-12-05 • Filed 2025-12-05 • Granted 2026-03-10 • Published 2026-03-10
+The invention solves the precision problem caused by inaccurate positioning in the traditional assembly by introducing a closed-loop feedback type accurate positioning and calibrating mechanism, and has the advantages of high degree of automation, high positioning and processing precision and …
+Master/slave manipulator control device
+JP JPH04354679A Koichi Yoshida Nippon Telegr & Teleph Corp
+Priority 1991-05-31 • Filed 1991-05-31 • Published 1992-12-09
+##EQU00004## where Mop and Mob represent the masses of the operator and the target object, respectively, Fop represents the operator's muscular strength, and Fex represents the external force acting on the target object. [0005] The symmetrical type, force reversal type, and force feedback type …
+Low noise amplifier device and receiver in a wireless communication system
+
+KR KR20240145403A 남효현 삼성전자주식회사
+Priority 2023-03-27 • Filed 2024-03-08 • Published 2024-10-07
+Hereinafter, preferred embodiments of the present disclosure will be described in detail with reference to the attached drawings. At this time, it … A first feedback transformer, comprising: a first transistor, a gate of the first transistor being connected to a primary coil of the first feedback …
+
+
+
