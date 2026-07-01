@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/recovery_record.schema.json",
+  "title": "RecoveryRecord",
+  "type": "object",
+  "required": ["recovery_id", "failed_experience_ref", "deviation_context", "recovery_action", "recovery_outcome"],
+  "properties": {
+    "recovery_id": {
+      "type": "string"
+    },
+    "failed_experience_ref": {
+      "type": "string"
+    },
+    "deviation_context": {
+      "type": "object",
+      "properties": {
+        "deviation_type": {
+          "type": "string"
+        },
+        "observed_state": {
+          "type": "string"
+        },
+        "expected_state": {
+          "type": "string"
+        }
+      }
+    },
+    "recovery_action": {
+      "type": "object",
+      "required": ["action_type"],
+      "properties": {
+        "action_type": {
+          "type": "string"
+        },
+        "parameters": {
+          "type": "object"
+        },
+        "human_intervention": {
+          "type": "boolean"
+        }
+      }
+    },
+    "recovery_outcome": {
+      "type": "object",
+      "required": ["outcome_type"],
+      "properties": {
+        "outcome_type": {
+          "type": "string",
+          "enum": ["recovered", "partially_recovered", "failed", "escalated"]
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

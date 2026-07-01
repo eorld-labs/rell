@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/preference_record.schema.json",
+  "title": "PreferenceRecord",
+  "type": "object",
+  "required": ["preference_id", "context_ref", "preference_signal", "created_at"],
+  "properties": {
+    "preference_id": {
+      "type": "string"
+    },
+    "context_ref": {
+      "type": "string"
+    },
+    "experience_ref": {
+      "type": "string"
+    },
+    "preference_signal": {
+      "type": "string",
+      "enum": ["accept", "reject", "correct", "avoid", "prefer", "forbid"]
+    },
+    "human_feedback": {
+      "type": "string"
+    },
+    "applies_to": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "strength": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "created_at": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}

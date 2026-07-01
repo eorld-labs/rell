@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/concept_pattern.schema.json",
+  "title": "ConceptPattern",
+  "type": "object",
+  "required": ["pattern_id", "concept_labels", "source_experience_refs", "generalized_steps"],
+  "properties": {
+    "pattern_id": {
+      "type": "string"
+    },
+    "concept_labels": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "source_experience_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "generalized_steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["step_type", "expected_effect"],
+        "properties": {
+          "step_type": {
+            "type": "string"
+          },
+          "expected_effect": {
+            "type": "string"
+          },
+          "constraints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "transfer_scope": {
+      "type": "object",
+      "properties": {
+        "applicable_regions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excluded_conditions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

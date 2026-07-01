@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/space_object.schema.json",
+  "title": "SpaceObject",
+  "type": "object",
+  "required": ["object_id", "object_type", "semantic_labels", "region_ref"],
+  "properties": {
+    "object_id": {
+      "type": "string"
+    },
+    "object_type": {
+      "type": "string"
+    },
+    "display_name": {
+      "type": "string"
+    },
+    "semantic_labels": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "region_ref": {
+      "type": "string"
+    },
+    "relations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["relation_type", "target_ref"],
+        "properties": {
+          "relation_type": {
+            "type": "string"
+          },
+          "target_ref": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "sensitivity_level": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "critical"]
+    },
+    "governance_hook": {
+      "type": "object",
+      "properties": {
+        "candidate_required": {
+          "type": "boolean"
+        },
+        "audit_required": {
+          "type": "boolean"
+        },
+        "external_policy_ref": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

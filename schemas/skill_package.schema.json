@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/skill_package.schema.json",
+  "title": "SkillPackage",
+  "type": "object",
+  "required": ["skill_id", "name", "version", "applicable_context", "steps", "evidence"],
+  "properties": {
+    "skill_id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "applicable_context": {
+      "type": "object",
+      "properties": {
+        "space_types": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "robot_capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "constraints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["step_id", "action_type"],
+        "properties": {
+          "step_id": {
+            "type": "string"
+          },
+          "action_type": {
+            "type": "string"
+          },
+          "input_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expected_outcome": {
+            "type": "string"
+          },
+          "recovery_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "preference_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "governance_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "properties": {
+        "experience_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "evaluation_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "audit_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

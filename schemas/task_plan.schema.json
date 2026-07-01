@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/task_plan.schema.json",
+  "title": "TaskPlan",
+  "type": "object",
+  "required": ["task_id", "human_goal", "steps"],
+  "properties": {
+    "task_id": {
+      "type": "string"
+    },
+    "human_goal": {
+      "type": "string"
+    },
+    "space_context_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["step_id", "intent", "action_type"],
+        "properties": {
+          "step_id": {
+            "type": "string"
+          },
+          "intent": {
+            "type": "string"
+          },
+          "action_type": {
+            "type": "string"
+          },
+          "target_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expected_outcome": {
+            "type": "string"
+          },
+          "governance_policy_ref": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}
