@@ -48,11 +48,9 @@ python .\demo_runtime\run_demo.py
 ```text
 schemas/
 demo_runtime/
-技术库/
-研发记录/
 ```
 
-其中 `schemas/` 提供第一期核心对象格式，`demo_runtime/` 提供最小运行时闭环，`技术库/第一期开源范围与实施路线.md` 说明本期开源边界。
+其中 `schemas/` 提供第一期核心对象格式，`demo_runtime/` 提供最小运行时闭环。
 
 ## 商业边界
 
@@ -66,4 +64,3 @@ demo_runtime/
 4. 企业控制台。
 5. 商业治理策略引擎。
 6. 私有化部署方案。
-
