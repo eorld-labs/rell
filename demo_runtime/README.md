@@ -65,6 +65,52 @@ The demo generates:
 
 These files are intended as implementation evidence for the first phase.
 
+## Skill Co-Creation Demo
+
+Run the skill co-creation MVP:
+
+```powershell
+python .\demo_runtime\run_skill_cocreation.py
+```
+
+The script reads:
+
+```text
+demo_runtime/skill_data/scenario.json
+demo_runtime/skill_data/robot_capability.json
+```
+
+It writes reproducible outputs to:
+
+```text
+demo_runtime/output/skill_cocreation
+```
+
+Expected summary:
+
+```json
+{
+  "total_steps": 6,
+  "experiences": 6,
+  "recoveries": 1,
+  "preferences": 2,
+  "skill_steps": 5
+}
+```
+
+Generated files:
+
+1. `scenario_context.json`
+2. `robot_capability.json`
+3. `task_plan.json`
+4. `training_session.json`
+5. `experience_records.json`
+6. `recovery_records.json`
+7. `preference_records.json`
+8. `concept_patterns.json`
+9. `skill_package.json`
+10. `skill_audit.json`
+
 ## API Server
 
 Start the demo API server:

@@ -1,0 +1,41 @@
+{
+  "robot_id": "robot_demo_arm_001",
+  "robot_model": "generic_tabletop_robot",
+  "capabilities": [
+    {
+      "capability_id": "cap_scan",
+      "action_type": "scan_space",
+      "input_types": ["space_region"],
+      "risk_level": "low"
+    },
+    {
+      "capability_id": "cap_classify",
+      "action_type": "classify_object",
+      "input_types": ["space_object"],
+      "risk_level": "low"
+    },
+    {
+      "capability_id": "cap_move_light",
+      "action_type": "move_light_object",
+      "input_types": ["space_object", "target_region"],
+      "risk_level": "medium"
+    },
+    {
+      "capability_id": "cap_candidate",
+      "action_type": "create_candidate_action",
+      "input_types": ["space_object", "proposed_action"],
+      "risk_level": "low"
+    },
+    {
+      "capability_id": "cap_feedback",
+      "action_type": "request_human_feedback",
+      "input_types": ["experience_record"],
+      "risk_level": "low"
+    }
+  ],
+  "limits": {
+    "max_payload_kg": 1.5,
+    "forbidden_actions": ["move_high_sensitivity_document"],
+    "requires_human_confirmation": ["financial_document", "unknown_object"]
+  }
+}

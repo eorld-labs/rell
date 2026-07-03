@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/skill_audit.schema.json",
+  "title": "SkillAudit",
+  "type": "object",
+  "required": ["audit_id", "session_ref", "skill_ref", "summary", "evidence_refs", "created_at"],
+  "properties": {
+    "audit_id": {
+      "type": "string"
+    },
+    "session_ref": {
+      "type": "string"
+    },
+    "skill_ref": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "object",
+      "required": ["total_steps", "experiences", "recoveries", "preferences", "skill_steps"],
+      "properties": {
+        "total_steps": {
+          "type": "integer"
+        },
+        "experiences": {
+          "type": "integer"
+        },
+        "recoveries": {
+          "type": "integer"
+        },
+        "preferences": {
+          "type": "integer"
+        },
+        "skill_steps": {
+          "type": "integer"
+        }
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "created_at": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}
