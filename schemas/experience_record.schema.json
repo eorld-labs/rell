@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/experience_record.schema.json",
+  "title": "ExperienceRecord",
+  "type": "object",
+  "required": ["experience_id", "context", "action", "outcome", "created_at"],
+  "properties": {
+    "experience_id": {
+      "type": "string"
+    },
+    "context": {
+      "type": "object",
+      "required": ["task_ref", "space_refs"],
+      "properties": {
+        "task_ref": {
+          "type": "string"
+        },
+        "space_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "human_intent_ref": {
+          "type": "string"
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "required": ["action_type", "target_refs"],
+      "properties": {
+        "action_type": {
+          "type": "string"
+        },
+        "target_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "parameters": {
+          "type": "object"
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "required": ["outcome_type"],
+      "properties": {
+        "outcome_type": {
+          "type": "string",
+          "enum": ["success", "failed", "blocked", "candidate_created", "recovered", "unknown"]
+        },
+        "state_delta": {
+          "type": "string"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "governance_ref": {
+      "type": "object",
+      "properties": {
+        "decision_token_ref": {
+          "type": "string"
+        },
+        "audit_ref": {
+          "type": "string"
+        },
+        "source_chain_ref": {
+          "type": "string"
+        }
+      }
+    },
+    "created_at": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}

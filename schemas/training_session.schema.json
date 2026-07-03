@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/training_session.schema.json",
+  "title": "TrainingSession",
+  "type": "object",
+  "required": ["session_id", "scenario_ref", "robot_ref", "task_plan_ref", "events", "created_at"],
+  "properties": {
+    "session_id": {
+      "type": "string"
+    },
+    "scenario_ref": {
+      "type": "string"
+    },
+    "robot_ref": {
+      "type": "string"
+    },
+    "task_plan_ref": {
+      "type": "string"
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["event_id", "event_type", "ref"],
+        "properties": {
+          "event_id": {
+            "type": "string"
+          },
+          "event_type": {
+            "type": "string"
+          },
+          "ref": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "created_at": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}

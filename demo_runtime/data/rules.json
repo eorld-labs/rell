@@ -1,0 +1,51 @@
+[
+  {
+    "rule_id": "rule_001",
+    "name": "低风险说明文档可直接移动",
+    "condition": {
+      "sensitivity_level": ["low"],
+      "semantic_labels_any": ["specification", "project_doc"],
+      "source_state": "trusted"
+    },
+    "action_policy": {
+      "move": "allow",
+      "target_region": "region_docs"
+    }
+  },
+  {
+    "rule_id": "rule_002",
+    "name": "低风险临时文件可归档",
+    "condition": {
+      "sensitivity_level": ["low"],
+      "semantic_labels_any": ["temporary_note"],
+      "source_state": "trusted"
+    },
+    "action_policy": {
+      "move": "allow",
+      "target_region": "region_archive"
+    }
+  },
+  {
+    "rule_id": "rule_003",
+    "name": "高敏文件不得自动正式移动",
+    "condition": {
+      "sensitivity_level": ["high"]
+    },
+    "action_policy": {
+      "move": "candidate_only",
+      "confirmation_required": true
+    }
+  },
+  {
+    "rule_id": "rule_004",
+    "name": "来源不明文件不得自动处理",
+    "condition": {
+      "source_state": "unverified"
+    },
+    "action_policy": {
+      "move": "block",
+      "tag": "block",
+      "read_metadata": "allow"
+    }
+  }
+]

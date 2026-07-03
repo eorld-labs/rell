@@ -1,0 +1,16 @@
+{
+  "default": {
+    "root_authorization_ref": "auth_demo_001",
+    "parent_task_ref": "task_demo_001",
+    "input_sources": ["user_command_001"],
+    "tool_reason_ref": "reason_demo_001",
+    "previous_decision_refs": []
+  },
+  "step_006": {
+    "root_authorization_ref": "auth_demo_001",
+    "parent_task_ref": "task_demo_001",
+    "input_sources": ["unknown_doc_source"],
+    "tool_reason_ref": null,
+    "previous_decision_refs": []
+  }
+}

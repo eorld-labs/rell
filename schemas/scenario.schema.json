@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/scenario.schema.json",
+  "title": "Scenario",
+  "type": "object",
+  "required": ["scenario_id", "name", "space_type", "task_goal", "objects", "constraints"],
+  "properties": {
+    "scenario_id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "space_type": {
+      "type": "string"
+    },
+    "task_goal": {
+      "type": "string"
+    },
+    "objects": {
+      "type": "array",
+      "items": {
+        "$ref": "space_object.schema.json"
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "success_criteria": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": true
+}

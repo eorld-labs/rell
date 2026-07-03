@@ -1,0 +1,21 @@
+{
+  "budget_id": "budget_demo_001",
+  "actor_id": "agent_demo_001",
+  "authorized_scope": ["demo_workspace"],
+  "tool_budget": {
+    "read_metadata": 20,
+    "move_file": 3,
+    "candidate_tag": 5
+  },
+  "risk_budget": {
+    "low": 10,
+    "medium": 3,
+    "high": 0
+  },
+  "autonomy_level": "limited",
+  "revocation_conditions": [
+    "source_chain_break",
+    "high_risk_direct_modify_attempt",
+    "budget_exhausted"
+  ]
+}

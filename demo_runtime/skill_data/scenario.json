@@ -1,0 +1,47 @@
+{
+  "scenario_id": "scn_office_desk_001",
+  "name": "办公桌面整理技能共创样例",
+  "space_type": "office_desk",
+  "task_goal": "整理办公桌面，把普通物品归位，对敏感票据生成候选动作，遇到遮挡物时记录补救经验。",
+  "objects": [
+    {
+      "object_id": "obj_mug_001",
+      "object_type": "cup",
+      "display_name": "马克杯",
+      "semantic_labels": ["daily_object", "movable", "low_risk"],
+      "region_ref": "desk_surface",
+      "constraints": ["can_move_to_storage_zone"],
+      "sensitivity_level": "low"
+    },
+    {
+      "object_id": "obj_invoice_001",
+      "object_type": "document",
+      "display_name": "报销票据",
+      "semantic_labels": ["document", "financial", "sensitive"],
+      "region_ref": "desk_surface",
+      "constraints": ["candidate_only", "requires_human_confirmation"],
+      "sensitivity_level": "high"
+    },
+    {
+      "object_id": "obj_box_001",
+      "object_type": "storage_box",
+      "display_name": "收纳盒",
+      "semantic_labels": ["container", "blocked_path"],
+      "region_ref": "desk_surface",
+      "constraints": ["path_blocked", "needs_human_clearance"],
+      "sensitivity_level": "medium"
+    }
+  ],
+  "constraints": [
+    "high_sensitivity_objects_must_not_be_moved_directly",
+    "blocked_path_requires_recovery_action",
+    "human_feedback_must_be_recorded"
+  ],
+  "success_criteria": [
+    "low_risk_object_moved",
+    "high_sensitivity_object_candidate_created",
+    "blocked_path_recovery_recorded",
+    "human_preference_recorded",
+    "skill_package_generated"
+  ]
+}

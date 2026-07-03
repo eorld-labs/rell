@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/robot_capability.schema.json",
+  "title": "RobotCapability",
+  "type": "object",
+  "required": ["robot_id", "robot_model", "capabilities", "limits"],
+  "properties": {
+    "robot_id": {
+      "type": "string"
+    },
+    "robot_model": {
+      "type": "string"
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["capability_id", "action_type"],
+        "properties": {
+          "capability_id": {
+            "type": "string"
+          },
+          "action_type": {
+            "type": "string"
+          },
+          "input_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "risk_level": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "properties": {
+        "max_payload_kg": {
+          "type": "number"
+        },
+        "forbidden_actions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "requires_human_confirmation": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}
