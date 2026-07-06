@@ -1,0 +1,184 @@
+{
+  "$schema": "../causal_chain.schema.json",
+  "causal_facts": [
+    {
+      "fact_id": "cup_in_gripper",
+      "description": "杯子在末端执行器内且被稳定抓取",
+      "fact_type": "mechanical"
+    },
+    {
+      "fact_id": "kettle_has_water",
+      "description": "壶内含有足够倒出一杯的水",
+      "fact_type": "material"
+    },
+    {
+      "fact_id": "cup_has_water",
+      "description": "杯内含有水",
+      "fact_type": "material"
+    },
+    {
+      "fact_id": "cup_at_human_location",
+      "description": "杯子位于人类面前可拿取的位置",
+      "fact_type": "spatial"
+    },
+    {
+      "fact_id": "task_completed",
+      "description": "任务目标达成——人类获得了一杯水",
+      "fact_type": "informational"
+    },
+    {
+      "fact_id": "kettle_in_gripper",
+      "description": "壶在末端执行器内且被稳定抓取",
+      "fact_type": "mechanical"
+    },
+    {
+      "fact_id": "cup_kettle_aligned",
+      "description": "壶口位于杯口正上方",
+      "fact_type": "spatial"
+    }
+  ],
+  "process_signatures": [
+    {
+      "process_ref": "grasp_cup",
+      "requires": [],
+      "produces": [
+        {
+          "fact_ref": "cup_in_gripper",
+          "durability": "fragile",
+          "binding_hint": "被后续过程（如 serve_to_human 释放杯子）可能破坏"
+        }
+      ],
+      "destroys": []
+    },
+    {
+      "process_ref": "grasp_kettle",
+      "requires": [],
+      "produces": [
+        {
+          "fact_ref": "kettle_in_gripper",
+          "durability": "fragile"
+        }
+      ],
+      "destroys": []
+    },
+    {
+      "process_ref": "position_kettle_over_cup",
+      "requires": [
+        { "fact_ref": "kettle_in_gripper" },
+        { "fact_ref": "cup_in_gripper" }
+      ],
+      "produces": [
+        {
+          "fact_ref": "cup_kettle_aligned",
+          "durability": "fragile"
+        }
+      ],
+      "destroys": []
+    },
+    {
+      "process_ref": "pour_water",
+      "requires": [
+        {
+          "fact_ref": "kettle_has_water",
+          "binding_hint": "映射到具体水壶对象和当前水量",
+          "optional": false
+        },
+        {
+          "fact_ref": "cup_in_gripper",
+          "binding_hint": "倒水过程中杯子必须在手爪内保持稳定"
+        },
+        {
+          "fact_ref": "cup_kettle_aligned",
+          "binding_hint": "壶口必须在杯口正上方，否则水会洒到外面"
+        }
+      ],
+      "produces": [
+        {
+          "fact_ref": "cup_has_water",
+          "durability": "persistent"
+        }
+      ],
+      "destroys": [
+        {
+          "fact_ref": "cup_kettle_aligned",
+          "condition": "倒水完成后壶身回正，壶口不再对准杯口"
+        }
+      ]
+    },
+    {
+      "process_ref": "serve_to_human",
+      "requires": [
+        { "fact_ref": "cup_has_water" },
+        { "fact_ref": "cup_in_gripper" }
+      ],
+      "produces": [
+        {
+          "fact_ref": "cup_at_human_location",
+          "durability": "persistent"
+        },
+        {
+          "fact_ref": "task_completed",
+          "durability": "persistent"
+        }
+      ],
+      "destroys": [
+        {
+          "fact_ref": "cup_in_gripper",
+          "condition": "呈现阶段释放夹爪后杯子不再在手爪内"
+        }
+      ]
+    }
+  ],
+  "chains": [
+    {
+      "chain_id": "kitchen_pour_water_chain_001",
+      "task_goal": "给客人倒一杯水并端到面前",
+      "goal_fact": "task_completed",
+      "nodes": [
+        { "process_ref": "grasp_cup", "instance_id": "grasp_cup_1" },
+        { "process_ref": "grasp_kettle", "instance_id": "grasp_kettle_1" },
+        { "process_ref": "position_kettle_over_cup", "instance_id": "position_1" },
+        { "process_ref": "pour_water", "instance_id": "pour_1" },
+        { "process_ref": "serve_to_human", "instance_id": "serve_1" }
+      ],
+      "edges": [
+        {
+          "from_instance": "grasp_cup_1",
+          "produces_fact": "cup_in_gripper",
+          "to_instance": "position_1",
+          "satisfies": "requires[cup_in_gripper]"
+        },
+        {
+          "from_instance": "grasp_cup_1",
+          "produces_fact": "cup_in_gripper",
+          "to_instance": "pour_1",
+          "satisfies": "requires[cup_in_gripper]"
+        },
+        {
+          "from_instance": "grasp_kettle_1",
+          "produces_fact": "kettle_in_gripper",
+          "to_instance": "position_1",
+          "satisfies": "requires[kettle_in_gripper]"
+        },
+        {
+          "from_instance": "position_1",
+          "produces_fact": "cup_kettle_aligned",
+          "to_instance": "pour_1",
+          "satisfies": "requires[cup_kettle_aligned]"
+        },
+        {
+          "from_instance": "pour_1",
+          "produces_fact": "cup_has_water",
+          "to_instance": "serve_1",
+          "satisfies": "requires[cup_has_water]"
+        },
+        {
+          "from_instance": "grasp_cup_1",
+          "produces_fact": "cup_in_gripper",
+          "to_instance": "serve_1",
+          "satisfies": "requires[cup_in_gripper]"
+        }
+      ]
+    }
+  ]
+}

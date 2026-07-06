@@ -1,0 +1,59 @@
+{
+  "$schema": "../task_intent.schema.json",
+  "intent_id": "intent_20260706_001",
+  "human_utterance": "给客人倒一杯水端过去",
+  "translated_at": "2026-07-06T14:30:00Z",
+  "goal_fact": "task_completed",
+  "goal_hint": "人类面前有一杯可饮用的水",
+  "constraints": ["no_spill", "use_clean_cup"],
+  "constraint_details": [
+    {
+      "constraint_type": "safety",
+      "description": "搬运过程中不得洒水",
+      "hard_constraint": true,
+      "causal_fact_ref": "cup_has_water"
+    },
+    {
+      "constraint_type": "quality",
+      "description": "使用干净的杯子",
+      "hard_constraint": false,
+      "causal_fact_ref": null
+    },
+    {
+      "constraint_type": "spatial",
+      "description": "端到客厅客人位置",
+      "hard_constraint": true,
+      "causal_fact_ref": "cup_at_human_location"
+    }
+  ],
+  "context": {
+    "space_ref": "kitchen_01",
+    "available_objects": ["mug_ceramic_white", "kettle_stainless_1l"],
+    "human_location": "living_room_sofa",
+    "current_robot_state": {
+      "grippers_free": ["right_hand", "left_hand"],
+      "grippers_occupied": {},
+      "current_pose_ref": "home_position"
+    }
+  },
+  "preferences_ref": "home_a_kitchen_daytime",
+  "priority": "normal",
+  "llm_audit": {
+    "model": "llm_translation_v1",
+    "ambiguities_flagged": [
+      {
+        "utterance_segment": "一杯水",
+        "possible_interpretations": ["coffee", "tea", "plain_water"],
+        "resolved_to": "plain_water",
+        "confidence": 0.85
+      },
+      {
+        "utterance_segment": "端过去",
+        "possible_interpretations": ["to_living_room", "to_guest_location"],
+        "resolved_to": "to_guest_location",
+        "confidence": 0.9
+      }
+    ],
+    "unknowns_declared": []
+  }
+}

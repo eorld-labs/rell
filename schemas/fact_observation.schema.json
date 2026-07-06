@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/fact_observation.schema.json",
+  "title": "FactObservation",
+  "description": "因果事实的验证模型——如何通过双通道交叉验真来‘问世界’。每个因果事实声明：哪些质变量参与验证、数字通道和物理通道分别如何观测、两通道不一致时以谁为准。这也是中断恢复时重建上下文的机制——两个通道独立推断当前状态，碰头后得出同一结论。",
+  "type": "object",
+  "required": ["facts"],
+  "properties": {
+    "facts": {
+      "type": "object",
+      "description": "以因果事实 fact_id 为 key 的验证定义映射",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["fact_id", "observation_method"],
+        "properties": {
+          "fact_id": {
+            "type": "string",
+            "description": "对应 causal_chain 中定义的因果事实标识"
+          },
+          "description": {
+            "type": "string"
+          },
+          "observation_method": {
+            "type": "object",
+            "required": ["type"],
+            "oneOf": [
+              {
+                "properties": {
+                  "type": { "const": "dual_channel" },
+                  "digital": { "$ref": "#/definitions/channel_observation" },
+                  "physical": { "$ref": "#/definitions/channel_observation" },
+                  "cross_validation": { "$ref": "#/definitions/cross_validation" }
+                },
+                "required": ["type", "digital", "physical", "cross_validation"]
+              },
+              {
+                "properties": {
+                  "type": { "const": "single_channel" },
+                  "channel": { "$ref": "#/definitions/channel_observation" },
+                  "fallback_note": { "type": "string" }
+                },
+                "required": ["type", "channel"]
+              },
+              {
+                "properties": {
+                  "type": { "const": "execution_verified" },
+                  "note": { "type": "string" }
+                },
+                "required": ["type"]
+              }
+            ]
+          },
+          "falsified_by_failures": {
+            "type": "array",
+            "description": "该因果事实被哪些过程的哪些失败度证伪——即：如果这些失败发生，说明该事实不成立",
+            "items": {
+              "type": "object",
+              "required": ["process_ref", "failure_degree_ref"],
+              "properties": {
+                "process_ref": { "type": "string" },
+                "failure_degree_ref": { "type": "string" },
+                "reason": { "type": "string" }
+              }
+            }
+          },
+          "verified_by_completions": {
+            "type": "array",
+            "description": "该因果事实被哪些过程的成功完成证实",
+            "items": {
+              "type": "object",
+              "required": ["process_ref"],
+              "properties": {
+                "process_ref": { "type": "string" },
+                "stage_ref": { "type": "string" },
+                "degree_ref": { "type": "string" }
+              }
+            }
+          },
+          "recovery_fact": {
+            "type": "boolean",
+            "default": false,
+            "description": "标记该事实只用于中断恢复时的状态重建，不作为因果链的编排条件"
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "channel_observation": {
+      "type": "object",
+      "required": ["qualities"],
+      "properties": {
+        "qualities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["quality_ref", "condition"],
+            "properties": {
+              "quality_ref": {
+                "type": "string",
+                "description": "引用 process_necessity 中定义的质变量 quality_id"
+              },
+              "condition": {
+                "type": "object",
+                "required": ["operator", "threshold_ref"],
+                "properties": {
+                  "operator": { "type": "string", "enum": ["eq", "neq", "lt", "lte", "gt", "gte", "within", "outside"] },
+                  "threshold_ref": { "type": "string", "description": "引用偶然层的阈值参数" }
+                }
+              },
+              "accumulation_rule": {
+                "type": "string",
+                "enum": ["instant", "integral_over_time", "minimum_duration", "maximum_value", "trend"],
+                "default": "instant",
+                "description": "观测值的累积方式：instant=即时读数、integral_over_time=时间积分、minimum_duration=至少持续多久、trend=变化趋势"
+              },
+              "accumulation_param": {
+                "type": "object",
+                "description": "累积规则的参数，如积分时间窗口、最短持续时间、趋势方向",
+                "properties": {
+                  "window_ms": { "type": "number" },
+                  "direction": { "type": "string", "enum": ["increasing", "decreasing", "stable"] }
+                }
+              }
+            }
+          }
+        },
+        "combine": {
+          "type": "string",
+          "enum": ["all", "any", "majority"],
+          "default": "all",
+          "description": "该通道内多个 quality 条件的组合方式"
+        },
+        "channel_description": {
+          "type": "string",
+          "description": "该通道的物理含义：数字通道=执行器传感器（力矩、编码器、IMU），物理通道=外部观测（摄像头、深度、激光）"
+        }
+      }
+    },
+    "cross_validation": {
+      "type": "object",
+      "required": ["strategy"],
+      "properties": {
+        "strategy": {
+          "type": "string",
+          "enum": [
+            "both_must_agree",
+            "either_can_confirm",
+            "digital_primary_physical_confirm",
+            "physical_primary_digital_confirm"
+          ],
+          "description": "交叉验证策略。both_must_agree=两通道必须一致（最严格，用于安全关键事实）；either_can_confirm=任一通道确认即可（用于容错场景）；digital_primary_physical_confirm=数字为真但需要物理确认（如抓取力传感器读数需要摄像头确认杯子确实在移动）；physical_primary_digital_confirm=物理观测为真但需要数字确认（如摄像头看到水但需要流量传感器确认倒水正在进行）"
+        },
+        "on_conflict": {
+          "type": "string",
+          "enum": ["trust_digital", "trust_physical", "flag_for_human", "retry_observation", "use_last_consistent"],
+          "description": "两通道不一致时的处置策略"
+        },
+        "max_disagreement_duration_ms": {
+          "type": "number",
+          "description": "允许通道不一致的最大持续时间，超时触发 on_conflict 策略"
+        },
+        "tolerance": {
+          "type": "object",
+          "description": "两通道之间的数值容差。如：数字通道说倾角15°，物理通道也从视觉推断倾角大约15°±3°——这就是 tolerance",
+          "properties": {
+            "quality_refs": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "参与交叉验证的质变量对（第一个是数字通道的，第二个是物理通道的）"
+            },
+            "allowed_difference": { "type": "number" },
+            "unit": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

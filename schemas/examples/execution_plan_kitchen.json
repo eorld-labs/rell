@@ -1,0 +1,172 @@
+{
+  "$schema": "../engine_contract.schema.json",
+  "plan_id": "plan_kitchen_001",
+  "intent_ref": "intent_20260706_001",
+  "causal_chain_ref": "kitchen_pour_water_chain_001",
+  "contingency_binding_ref": "home_a_kitchen_daytime",
+  "goal_fact": "task_completed",
+  "process_sequence": [
+    {
+      "instance_id": "grasp_cup_1",
+      "process_ref": "grasp_cup",
+      "template_bindings": {
+        "object_ref": "mug_ceramic_white",
+        "gripper_ref": "right_hand",
+        "min_grip_force": 5,
+        "max_grip_force": 12
+      },
+      "execution_mode": "parallel",
+      "parallel_group": "group_initial_grasp",
+      "resource_claims": ["right_arm", "front_camera"],
+      "causal_dependencies": [],
+      "recovery_plan": {
+        "max_retries": 2,
+        "recovery_process_ref": "regrasp_object",
+        "on_recovery_failure": "request_human"
+      },
+      "verification_checkpoints": [
+        {
+          "fact_ref": "cup_in_gripper",
+          "verification_strategy": "dual_channel",
+          "blocking": true
+        }
+      ],
+      "estimated_duration_ms": 4000
+    },
+    {
+      "instance_id": "grasp_kettle_1",
+      "process_ref": "grasp_kettle",
+      "template_bindings": {
+        "object_ref": "kettle_stainless_1l",
+        "gripper_ref": "left_hand",
+        "min_grip_force": 8,
+        "max_grip_force": 15
+      },
+      "execution_mode": "parallel",
+      "parallel_group": "group_initial_grasp",
+      "resource_claims": ["left_arm", "front_camera"],
+      "causal_dependencies": [],
+      "recovery_plan": {
+        "max_retries": 2,
+        "recovery_process_ref": "regrasp_object",
+        "on_recovery_failure": "request_human"
+      },
+      "verification_checkpoints": [
+        {
+          "fact_ref": "kettle_in_gripper",
+          "verification_strategy": "dual_channel",
+          "blocking": true
+        }
+      ],
+      "estimated_duration_ms": 4000
+    },
+    {
+      "instance_id": "position_1",
+      "process_ref": "position_kettle_over_cup",
+      "execution_mode": "sequential",
+      "parallel_group": null,
+      "resource_claims": ["right_arm", "left_arm", "front_camera"],
+      "causal_dependencies": [
+        { "requires_fact": "cup_in_gripper", "produced_by_instance": "grasp_cup_1" },
+        { "requires_fact": "kettle_in_gripper", "produced_by_instance": "grasp_kettle_1" }
+      ],
+      "recovery_plan": {
+        "max_retries": 1,
+        "on_recovery_failure": "abort_chain"
+      },
+      "verification_checkpoints": [
+        {
+          "fact_ref": "cup_kettle_aligned",
+          "verification_strategy": "dual_channel",
+          "blocking": true
+        }
+      ],
+      "estimated_duration_ms": 2000
+    },
+    {
+      "instance_id": "pour_1",
+      "process_ref": "pour_water",
+      "execution_mode": "sequential",
+      "parallel_group": null,
+      "resource_claims": ["right_arm", "left_arm", "front_camera", "depth_sensor", "imu_right_wrist"],
+      "causal_dependencies": [
+        { "requires_fact": "kettle_has_water", "produced_by_instance": "__world_fact__" },
+        { "requires_fact": "cup_in_gripper", "produced_by_instance": "grasp_cup_1" },
+        { "requires_fact": "cup_kettle_aligned", "produced_by_instance": "position_1" }
+      ],
+      "recovery_plan": {
+        "max_retries": 1,
+        "recovery_process_ref": "check_kettle_water_or_unblock",
+        "on_recovery_failure": "request_human",
+        "alternative_process_ref": null
+      },
+      "verification_checkpoints": [
+        {
+          "fact_ref": "cup_has_water",
+          "verification_strategy": "dual_channel",
+          "blocking": true
+        }
+      ],
+      "estimated_duration_ms": 8000
+    },
+    {
+      "instance_id": "serve_1",
+      "process_ref": "serve_to_human",
+      "execution_mode": "sequential",
+      "parallel_group": null,
+      "resource_claims": ["right_arm", "front_camera", "depth_sensor"],
+      "causal_dependencies": [
+        { "requires_fact": "cup_has_water", "produced_by_instance": "pour_1" },
+        { "requires_fact": "cup_in_gripper", "produced_by_instance": "grasp_cup_1" }
+      ],
+      "recovery_plan": {
+        "max_retries": 1,
+        "recovery_process_ref": "wipe_spill_and_retry",
+        "on_recovery_failure": "request_human"
+      },
+      "verification_checkpoints": [
+        {
+          "fact_ref": "cup_at_human_location",
+          "verification_strategy": "dual_channel",
+          "blocking": true
+        },
+        {
+          "fact_ref": "task_completed",
+          "verification_strategy": "completion_implies_true",
+          "blocking": false
+        }
+      ],
+      "estimated_duration_ms": 10000
+    }
+  ],
+  "parallel_groups": [
+    {
+      "group_id": "group_initial_grasp",
+      "instances": ["grasp_cup_1", "grasp_kettle_1"],
+      "rationale": "双手同时抓取——右手拿杯子+左手拿壶。两者无因果依赖且使用不同资源（右臂vs左臂）。",
+      "critical_path_instance": "grasp_cup_1"
+    }
+  ],
+  "critical_path": ["grasp_cup_1", "position_1", "pour_1", "serve_1"],
+  "total_estimated_duration_ms": 24000,
+  "resource_schedule": {
+    "right_arm": {
+      "allocated_to_instance": "grasp_cup_1→position_1→pour_1→serve_1",
+      "from_stage": "grasp_cup_1.approach",
+      "to_stage": "serve_1.present",
+      "released_after": "serve_1"
+    },
+    "left_arm": {
+      "allocated_to_instance": "grasp_kettle_1→position_1→pour_1",
+      "from_stage": "grasp_kettle_1.approach",
+      "to_stage": "pour_1.recovering",
+      "released_after": "pour_1"
+    },
+    "front_camera": {
+      "allocated_to_instance": "shared",
+      "from_stage": "grasp_cup_1.approach",
+      "to_stage": "serve_1.present",
+      "released_after": "serve_1"
+    }
+  }
+}

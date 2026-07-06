@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/contingency_binding.schema.json",
+  "title": "ContingencyBinding",
+  "description": "偶然层——将过程的必然结构映射到特定环境、特定硬件、特定偏好。同一个过程在不同家庭中复用，只换偶然绑定。核心原则：必然决定做什么，偶然决定怎么做、在哪做、做到什么程度、用什么传感器验证。双通道标签（digital/physical）和交叉验证规则在此层定义，因为传感器选择是偶然的——同一个过程在不同机器人上可能用不同的传感器组合。",
+  "type": "object",
+  "required": ["binding_id", "environment_ref", "process_bindings"],
+  "properties": {
+    "binding_id": { "type": "string" },
+    "environment_ref": { "type": "string" },
+    "description": { "type": "string" },
+    "process_bindings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["process_ref"],
+        "properties": {
+          "process_ref": { "type": "string" },
+          "template_instance": {
+            "type": "object",
+            "description": "如果 process_ref 指向一个过程模板，在此提供参数绑定产生具体实例",
+            "properties": {
+              "instance_name": { "type": "string", "description": "实例标识，如 grasp_cup、grasp_kettle" },
+              "parameter_bindings": {
+                "type": "object",
+                "description": "模板参数的绑定值映射。key=参数名，value=绑定值。如 object_ref: mug_ceramic_white, gripper_ref: right_hand",
+                "additionalProperties": {}
+              }
+            }
+          },
+          "quality_bindings": {
+            "type": "object",
+            "description": "质变量到具体传感器的映射 + 通道标签",
+            "additionalProperties": {
+              "type": "object",
+              "required": ["source", "channel"],
+              "properties": {
+                "source": { "type": "string", "description": "传感器标识" },
+                "channel": {
+                  "type": "string",
+                  "enum": ["digital", "physical"],
+                  "description": "数字通道 = 执行器内置传感器（编码器、力矩、IMU），信息来自机器人自身；物理通道 = 外部感知传感器（摄像头、深度、激光），信息来自外部世界观测"
+                },
+                "transform": { "type": "string", "description": "raw、calibrated、filtered_lowpass、vision_inference" },
+                "sample_rate_hz": { "type": "number" },
+                "latency_ms": { "type": "number", "description": "传感器数据延迟——用于双通道时间对齐" }
+              }
+            }
+          },
+          "cross_validation_pairs": {
+            "type": "array",
+            "description": "跨通道交叉验证对——定义哪些数字质和物理质应该对同一物理状态达成一致。如：数字的 tilt_angle(IMU) 和物理的 inferred_tilt_angle(视觉) 应该一致。",
+            "items": {
+              "type": "object",
+              "required": ["digital_quality", "physical_quality", "description"],
+              "properties": {
+                "digital_quality": { "type": "string", "description": "数字通道的质变量" },
+                "physical_quality": { "type": "string", "description": "物理通道的质变量" },
+                "description": { "type": "string", "description": "这两个质变量应该观测到同一物理现实的什么方面" },
+                "consistency_rule": {
+                  "type": "object",
+                  "required": ["strategy"],
+                  "properties": {
+                    "strategy": {
+                      "type": "string",
+                      "enum": ["both_must_agree", "either_can_confirm", "digital_primary", "physical_primary"]
+                    },
+                    "allowed_deviation": { "type": "number" },
+                    "deviation_unit": { "type": "string" },
+                    "on_inconsistency": {
+                      "type": "string",
+                      "enum": ["trust_digital", "trust_physical", "flag_for_human", "retry_observation", "use_last_consistent", "pause_and_alert"]
+                    },
+                    "inconsistency_action": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "threshold_overrides": {
+            "type": "object",
+            "description": "度的阈值覆写",
+            "additionalProperties": { "type": ["number", "string", "boolean", "array"] }
+          },
+          "object_mappings": {
+            "type": "object",
+            "description": "过程引用的抽象对象到具体物体的映射",
+            "additionalProperties": {
+              "type": "object",
+              "required": ["object_id"],
+              "properties": {
+                "object_id": { "type": "string" },
+                "display_name": { "type": "string" },
+                "material": { "type": "string" },
+                "geometry_hint": { "type": "string" },
+                "weight_kg": { "type": "number" },
+                "fragility": { "type": "string", "enum": ["robust", "normal", "fragile", "critical"] }
+              }
+            }
+          },
+          "spatial_bindings": {
+            "type": "object",
+            "description": "空间坐标映射",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "x": { "type": "number" },
+                "y": { "type": "number" },
+                "z": { "type": "number" },
+                "frame_ref": { "type": "string" },
+                "tolerance_mm": { "type": "number" }
+              }
+            }
+          },
+          "preference_attachments": {
+            "type": "array",
+            "description": "人类偏好在此过程上的附着",
+            "items": {
+              "type": "object",
+              "required": ["degree_ref", "threshold_name", "default_value"],
+              "properties": {
+                "degree_ref": { "type": "string" },
+                "threshold_name": { "type": "string" },
+                "default_value": {},
+                "preference_type": { "type": "string", "enum": ["continuous", "discrete", "toggle"] },
+                "preference_label": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

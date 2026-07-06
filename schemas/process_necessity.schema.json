@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/process_necessity.schema.json",
+  "title": "ProcessNecessity",
+  "description": "过程的必然结构——由物理法则锁定的阶段序列、质·量·度。支持两种定义方式：(1) 具体过程——如 pour_water 直接定义所有参数；(2) 过程模板——如 grasp_object 定义抽象结构，参数由偶然层绑定填充。一个过程的必然结构只定义一次，跨所有场景复用。",
+  "type": "object",
+  "required": ["process_id", "process_name", "physical_basis", "stages"],
+  "properties": {
+    "process_id": {
+      "type": "string",
+      "description": "过程唯一标识，如 pour_water、grasp_object"
+    },
+    "process_name": {
+      "type": "string",
+      "description": "过程的人类可读名称，如 倒水"
+    },
+    "physical_basis": {
+      "type": "string",
+      "description": "该过程所依赖的物理机制，用于说明为什么这个过程的阶段序列是必然的"
+    },
+    "is_template": {
+      "type": "boolean",
+      "default": false,
+      "description": "是否为过程模板。模板定义抽象结构，由偶然层提供参数绑定产生具体实例。如 grasp_object 是一个模板，grasp(mug_ceramic, right_hand) 是一个实例。"
+    },
+    "template_parameters": {
+      "type": "array",
+      "description": "模板参数列表——仅当 is_template=true 时有效。每个参数需要在偶然层或执行计划中被绑定到具体值。",
+      "items": {
+        "type": "object",
+        "required": ["param_name", "param_type"],
+        "properties": {
+          "param_name": { "type": "string", "description": "参数标识，如 object_ref、gripper_ref" },
+          "display_name": { "type": "string", "description": "人类可读名称，如 操作对象" },
+          "param_type": { "type": "string", "enum": ["object_id", "gripper_id", "force_threshold", "distance_threshold", "angle_threshold", "speed_limit", "spatial_ref", "region_ref"] },
+          "description": { "type": "string" },
+          "default_value": { "description": "若偶然层未提供绑定时的默认值" }
+        }
+      }
+    },
+    "stages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["stage_id", "stage_order", "display_name", "qualities", "entry_conditions", "exit_degree"],
+        "properties": {
+          "stage_id": { "type": "string", "description": "阶段唯一标识" },
+          "stage_order": { "type": "integer", "minimum": 1 },
+          "display_name": { "type": "string", "description": "阶段的人类可读名称" },
+          "description": { "type": "string" },
+          "qualities": {
+            "type": "array",
+            "minItems": 1,
+            "description": "该阶段需要追踪的质变量",
+            "items": {
+              "type": "object",
+              "required": ["quality_id", "display_name", "physical_domain"],
+              "properties": {
+                "quality_id": { "type": "string" },
+                "display_name": { "type": "string" },
+                "physical_domain": {
+                  "type": "string",
+                  "enum": ["rotation", "translation", "force", "flow", "distance", "angle", "torque", "velocity", "pressure", "temperature", "contact", "state"]
+                },
+                "unit": { "type": "string" },
+                "role": { "type": "string", "enum": ["controlled", "observed", "both"] }
+              }
+            }
+          },
+          "entry_conditions": {
+            "type": "array",
+            "description": "进入该阶段必须满足的条件",
+            "items": {
+              "type": "object",
+              "required": ["description"],
+              "properties": {
+                "description": { "type": "string" },
+                "required_degree": { "type": "string" }
+              }
+            }
+          },
+          "exit_degree": {
+            "type": "object",
+            "required": ["degree_id", "display_name", "condition", "target_stage"],
+            "description": "触发阶段转换的度条件",
+            "properties": {
+              "degree_id": { "type": "string" },
+              "display_name": { "type": "string" },
+              "condition": {
+                "type": "object",
+                "required": ["predicate"],
+                "properties": {
+                  "predicate": {
+                    "type": "object",
+                    "oneOf": [
+                      {
+                        "required": ["quality_ref", "operator", "threshold_ref"],
+                        "properties": {
+                          "quality_ref": { "type": "string" },
+                          "operator": { "type": "string", "enum": ["eq", "neq", "lt", "lte", "gt", "gte", "within", "outside"] },
+                          "threshold_ref": { "type": "string", "description": "引用偶然层的阈值参数名" }
+                        }
+                      },
+                      {
+                        "required": ["all"],
+                        "properties": {
+                          "all": { "type": "array", "items": { "$ref": "#/properties/stages/items/properties/exit_degree/properties/condition/properties/predicate" } }
+                        }
+                      },
+                      {
+                        "required": ["any"],
+                        "properties": {
+                          "any": { "type": "array", "items": { "$ref": "#/properties/stages/items/properties/exit_degree/properties/condition/properties/predicate" } }
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              "target_stage": { "type": "string", "description": "目标阶段 stage_id，__terminal__ 表示过程结束" }
+            }
+          },
+          "failure_degrees": {
+            "type": "array",
+            "description": "该阶段可能发生的失败模式",
+            "items": {
+              "type": "object",
+              "required": ["failure_id", "description", "failure_type"],
+              "properties": {
+                "failure_id": { "type": "string" },
+                "description": { "type": "string" },
+                "failure_type": {
+                  "type": "string",
+                  "enum": ["mechanism_blocked", "object_absent", "object_slipped", "excessive_resistance", "boundary_exceeded", "sensor_blind", "unexpected_state", "timeout"]
+                },
+                "recovery": {
+                  "type": "object",
+                  "description": "结构化的恢复方案——替代原有的 recovery_hint 字符串。恢复本身也是一个过程，有独立的阶段和质量度。",
+                  "required": ["strategy"],
+                  "properties": {
+                    "strategy": {
+                      "type": "string",
+                      "enum": [
+                        "retry_current_stage",
+                        "retry_current_process",
+                        "inject_recovery_process",
+                        "skip_to_recovery_stage",
+                        "request_human_intervention",
+                        "abort_and_notify"
+                      ],
+                      "description": "恢复策略"
+                    },
+                    "recovery_process_ref": {
+                      "type": "string",
+                      "description": "引用的恢复过程 process_id（如 clear_blocked_spout、regrasp_object、wipe_spill）。恢复过程有自己独立的阶段和质量度定义。"
+                    },
+                    "recovery_injection_point": {
+                      "type": "string",
+                      "description": "恢复过程完成后从哪里继续：retry=重新执行被中断的同一阶段，next=跳过被中断的阶段进入下一个阶段，restart=重新执行整个过程"
+                    },
+                    "max_recovery_attempts": { "type": "integer", "default": 1 },
+                    "on_recovery_exhausted": {
+                      "type": "string",
+                      "enum": ["abort_process", "abort_chain", "request_human", "mark_as_permanent_failure"],
+                      "description": "所有恢复尝试均失败后的处置"
+                    },
+                    "recovery_hint": {
+                      "type": "string",
+                      "description": "给人类的辅助说明（保留原 recovery_hint 语义，用于审计日志和人工介入时的提示）"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

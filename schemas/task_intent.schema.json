@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/task_intent.schema.json",
+  "title": "TaskIntent",
+  "description": "LLM 翻译层的结构化产出——将人类自然语言指令映射为编排引擎可以直接消费的结构化任务意图。LLM 只做翻译（语义映射），不做规划、不做推理、不做后果预测。翻译结果必须包含：目标因果事实、约束条件、上下文对象列表、偏好引用。",
+  "type": "object",
+  "required": ["intent_id", "human_utterance", "goal_fact", "context"],
+  "properties": {
+    "intent_id": {
+      "type": "string",
+      "description": "任务意图唯一标识"
+    },
+    "human_utterance": {
+      "type": "string",
+      "description": "原始人类自然语言输入——保留原文以便审计追溯"
+    },
+    "translated_at": {
+      "type": "string",
+      "description": "翻译时间戳 ISO 8601"
+    },
+    "goal_fact": {
+      "type": "string",
+      "description": "目标因果事实——编排引擎的搜索终点。对应 causal_chain 中的因果事实标识"
+    },
+    "goal_hint": {
+      "type": "string",
+      "description": "目标的人类可读描述，用于审计和日志"
+    },
+    "constraints": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "任务执行约束。分为：安全约束（如 no_spill）、偏好约束（如 use_clean_cup）、时序约束（如 before_noon）、空间约束（如 in_kitchen）"
+    },
+    "constraint_details": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["constraint_type", "description"],
+        "properties": {
+          "constraint_type": {
+            "type": "string",
+            "enum": ["safety", "preference", "temporal", "spatial", "resource", "quality"]
+          },
+          "description": { "type": "string" },
+          "hard_constraint": { "type": "boolean", "default": true },
+          "causal_fact_ref": {
+            "type": "string",
+            "description": "如果该约束可被映射为对某个因果事实的要求，在此引用"
+          }
+        }
+      }
+    },
+    "context": {
+      "type": "object",
+      "required": ["space_ref"],
+      "properties": {
+        "space_ref": {
+          "type": "string",
+          "description": "任务所在空间标识"
+        },
+        "available_objects": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "环境中可见/可操作的物体列表（从空间语义层提取）"
+        },
+        "human_location": {
+          "type": "string",
+          "description": "人类的当前位置空间标识"
+        },
+        "current_robot_state": {
+          "type": "object",
+          "description": "机器人当前状态快照——双手占用情况、位置、可用工具",
+          "properties": {
+            "grippers_free": { "type": "array", "items": { "type": "string" } },
+            "grippers_occupied": { "type": "object", "additionalProperties": { "type": "string" } },
+            "current_pose_ref": { "type": "string" }
+          }
+        }
+      }
+    },
+    "preferences_ref": {
+      "type": "string",
+      "description": "引用的偶然绑定 ID——携带用户偏好（如倒八分满、弱火力等）"
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["normal", "elevated", "urgent", "background"],
+      "default": "normal",
+      "description": "任务优先级——影响编排引擎的资源分配和并行策略"
+    },
+    "llm_audit": {
+      "type": "object",
+      "description": "LLM 翻译的审计信息——记录翻译过程的关键决策点",
+      "properties": {
+        "model": { "type": "string" },
+        "ambiguities_flagged": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "utterance_segment": { "type": "string" },
+              "possible_interpretations": { "type": "array", "items": { "type": "string" } },
+              "resolved_to": { "type": "string" },
+              "confidence": { "type": "number" }
+            }
+          }
+        },
+        "unknowns_declared": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "LLM 主动声明无法翻译的部分，交由人工澄清"
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}
