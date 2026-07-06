@@ -6,7 +6,7 @@
   "process_bindings": [
     {
       "process_ref": "pour_water",
-      "quality_bindings": {
+      "state_variable_bindings": {
         "tilt_angle": {
           "source": "imu_right_wrist",
           "channel": "digital",
@@ -31,8 +31,8 @@
       },
       "cross_validation_pairs": [
         {
-          "digital_quality": "tilt_angle",
-          "physical_quality": "water_flow_rate",
+          "digital_variable": "tilt_angle",
+          "physical_variable": "water_flow_rate",
           "description": "数字的倾角读数应与物理的水流出现状态一致——倾角超过阈值时必须观察到水流",
           "consistency_rule": {
             "strategy": "digital_primary",
@@ -85,7 +85,7 @@
       },
       "preference_attachments": [
         {
-          "degree_ref": "water_near_rim",
+          "transition_condition_ref": "water_near_rim",
           "threshold_name": "stop_threshold",
           "default_value": 0.5,
           "preference_type": "continuous",
@@ -95,7 +95,7 @@
     },
     {
       "process_ref": "grasp_cup",
-      "quality_bindings": {
+      "state_variable_bindings": {
         "gripper_to_cup_distance": {
           "source": "camera_depth_front",
           "transform": "vision_inference",
@@ -153,7 +153,7 @@
     },
     {
       "process_ref": "serve_to_human",
-      "quality_bindings": {
+      "state_variable_bindings": {
         "cup_tilt": {
           "source": "imu_right_wrist",
           "transform": "calibrated",

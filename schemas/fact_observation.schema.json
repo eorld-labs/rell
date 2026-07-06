@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.org/worldmodels/fact_observation.schema.json",
   "title": "FactObservation",
-  "description": "因果事实的验证模型——如何通过双通道交叉验真来‘问世界’。每个因果事实声明：哪些质变量参与验证、数字通道和物理通道分别如何观测、两通道不一致时以谁为准。这也是中断恢复时重建上下文的机制——两个通道独立推断当前状态，碰头后得出同一结论。",
+  "description": "因果事实的验证模型，定义目标因果事实如何通过一个或多个独立观测通道生成成立判断，并在通道冲突时形成最终成立状态。该模型用于阶段推进、恢复执行、后续动作触发和经验回写。",
   "type": "object",
   "required": ["facts"],
   "properties": {
@@ -52,13 +52,13 @@
           },
           "falsified_by_failures": {
             "type": "array",
-            "description": "该因果事实被哪些过程的哪些失败度证伪——即：如果这些失败发生，说明该事实不成立",
+            "description": "该因果事实被哪些过程的哪些失败条件证伪，即如果这些失败发生，说明该事实不成立",
             "items": {
               "type": "object",
-              "required": ["process_ref", "failure_degree_ref"],
+              "required": ["process_ref", "failure_condition_ref"],
               "properties": {
                 "process_ref": { "type": "string" },
-                "failure_degree_ref": { "type": "string" },
+                "failure_condition_ref": { "type": "string" },
                 "reason": { "type": "string" }
               }
             }
@@ -72,9 +72,13 @@
               "properties": {
                 "process_ref": { "type": "string" },
                 "stage_ref": { "type": "string" },
-                "degree_ref": { "type": "string" }
+                "transition_condition_ref": { "type": "string" }
               }
             }
+          },
+          "final_establishment_state": {
+            "$ref": "#/definitions/final_establishment_state",
+            "description": "运行时形成的目标因果事实最终成立状态；静态事实定义中可省略，由执行轨迹或审计记录写入。"
           },
           "recovery_fact": {
             "type": "boolean",
@@ -88,25 +92,25 @@
   "definitions": {
     "channel_observation": {
       "type": "object",
-      "required": ["qualities"],
+      "required": ["continuous_state_variables"],
       "properties": {
-        "qualities": {
+        "continuous_state_variables": {
           "type": "array",
           "minItems": 1,
           "items": {
             "type": "object",
-            "required": ["quality_ref", "condition"],
+            "required": ["variable_ref", "condition"],
             "properties": {
-              "quality_ref": {
+              "variable_ref": {
                 "type": "string",
-                "description": "引用 process_necessity 中定义的质变量 quality_id"
+                "description": "引用过程模板中定义的连续状态变量 variable_id"
               },
               "condition": {
                 "type": "object",
                 "required": ["operator", "threshold_ref"],
                 "properties": {
                   "operator": { "type": "string", "enum": ["eq", "neq", "lt", "lte", "gt", "gte", "within", "outside"] },
-                  "threshold_ref": { "type": "string", "description": "引用偶然层的阈值参数" }
+                  "threshold_ref": { "type": "string", "description": "引用偶然绑定数据中的阈值参数" }
                 }
               },
               "accumulation_rule": {
@@ -130,7 +134,7 @@
           "type": "string",
           "enum": ["all", "any", "majority"],
           "default": "all",
-          "description": "该通道内多个 quality 条件的组合方式"
+          "description": "该通道内多个连续状态变量条件的组合方式"
         },
         "channel_description": {
           "type": "string",
@@ -165,15 +169,36 @@
           "type": "object",
           "description": "两通道之间的数值容差。如：数字通道说倾角15°，物理通道也从视觉推断倾角大约15°±3°——这就是 tolerance",
           "properties": {
-            "quality_refs": {
+            "variable_refs": {
               "type": "array",
               "items": { "type": "string" },
-              "description": "参与交叉验证的质变量对（第一个是数字通道的，第二个是物理通道的）"
+              "description": "参与交叉验证的变量对（第一个是数字通道的，第二个是物理通道的）"
             },
             "allowed_difference": { "type": "number" },
             "unit": { "type": "string" }
           }
         }
+      }
+    },
+    "final_establishment_state": {
+      "type": "object",
+      "description": "目标因果事实的最终成立状态，用于将事实验证结果回流到阶段推进、恢复执行、后续动作触发或经验回写。",
+      "required": ["state", "reflow_action"],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": ["established", "not_established", "conflicted", "unknown"]
+        },
+        "judgment_refs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "参与形成最终成立状态的观测通道判断记录"
+        },
+        "reflow_action": {
+          "type": "string",
+          "enum": ["advance_stage", "trigger_recovery", "trigger_next_physical_action", "write_experience_record", "request_human_confirmation"]
+        },
+        "reason": { "type": "string" }
       }
     }
   },

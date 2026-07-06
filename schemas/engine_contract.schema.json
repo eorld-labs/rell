@@ -194,25 +194,25 @@
               "type": "object",
               "description": "死区——偏差在这个范围内不纠正，避免过度抖动",
               "properties": {
-                "quality_ref": { "type": "string" },
+                "variable_ref": { "type": "string" },
                 "range": { "type": "object", "properties": { "min": { "type": "number" }, "max": { "type": "number" } } }
               }
             }
           }
         },
-        "degree_satisfaction_check": {
+        "transition_condition_check": {
           "type": "object",
-          "description": "每个循环周期检查度条件是否满足——如果满足，触发阶段转换",
+          "description": "每个循环周期检查阶段跃迁条件是否满足；满足确认窗口后，触发阶段跃迁",
           "required": ["check_frequency", "confirmation_window"],
           "properties": {
             "check_frequency": {
               "type": "string",
               "enum": ["every_cycle", "every_n_cycles", "on_significant_change"],
-              "description": "every_n_cycles=每N个循环检查一次（用于变化缓慢的度条件如水位上升）、on_significant_change=仅在质变量发生显著变化时检查"
+              "description": "every_n_cycles=每N个循环检查一次（用于变化缓慢的状态变量如水位上升）、on_significant_change=仅在连续状态变量发生显著变化时检查"
             },
             "confirmation_window": {
               "type": "object",
-              "description": "度条件需要持续成立多久才算真正满足（防抖动）",
+              "description": "阶段跃迁条件需要持续成立多久或连续确认多少次才算真正满足",
               "properties": {
                 "duration_ms": { "type": "number" },
                 "consecutive_checks": { "type": "integer" }
@@ -230,12 +230,12 @@
         "resume_strategy": {
           "type": "string",
           "enum": ["reobserve_and_match", "restart_current_stage", "restart_current_process", "restart_chain"],
-          "description": "reobserve_and_match=重新观测双通道数据，与过程的阶段度条件匹配，找到当前所在阶段入口（默认策略）"
+          "description": "reobserve_and_match=重新观测双通道数据，与过程模板中的阶段跃迁条件匹配，找到当前所在阶段入口（默认策略）"
         },
         "reobservation_protocol": {
           "type": "object",
           "properties": {
-            "step_1": { "type": "string", "description": "读取数字通道全部质变量的当前值" },
+            "step_1": { "type": "string", "description": "读取数字通道全部连续状态变量的当前值" },
             "step_2": { "type": "string", "description": "读取物理通道的视觉推断值" },
             "step_3": { "type": "string", "description": "双通道交叉验证确认当前实际状态" },
             "step_4": { "type": "string", "description": "将当前状态与各阶段的 entry_conditions 匹配，确定入口阶段" },
@@ -284,7 +284,7 @@
         },
         "execution_trace": {
           "type": "object",
-          "description": "执行过程的完整轨迹——记录每个阶段的实际观测值（质变量的时间序列）、每个度条件的触发时间和值、每次双通道交叉验证的结果",
+          "description": "执行过程的完整轨迹，记录每个阶段的实际观测值（连续状态变量的时间序列）、每个阶段跃迁条件的触发时间和值、每次独立观测通道验证的结果以及最终成立状态",
           "properties": {
             "schema_ref": { "type": "string", "const": "experience_record.schema.json (待修订为过程轨迹格式)" }
           }

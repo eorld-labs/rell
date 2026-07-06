@@ -9,16 +9,16 @@
       "stage_order": 1,
       "display_name": "稳定阶段",
       "description": "在移动之前确保手中物体姿态稳定。如果此阶段退出时杯中液体仍在晃动，表明上一过程（倒水）刚结束时或提起时引入了波动，需要等待液面平稳。",
-      "qualities": [
+      "continuous_state_variables": [
         {
-          "quality_id": "cup_tilt",
+          "variable_id": "cup_tilt",
           "display_name": "杯子倾角",
           "physical_domain": "angle",
           "unit": "degree",
           "role": "observed"
         },
         {
-          "quality_id": "liquid_surface_stability",
+          "variable_id": "liquid_surface_stability",
           "display_name": "液面稳定性",
           "physical_domain": "state",
           "unit": "boolean",
@@ -30,19 +30,19 @@
           "description": "杯子已在末端执行器内且杯内含水"
         }
       ],
-      "exit_degree": {
-        "degree_id": "stable_and_level",
+      "transition_condition": {
+        "condition_id": "stable_and_level",
         "display_name": "杯子水平且液面稳定",
         "condition": {
           "predicate": {
             "all": [
               {
-                "quality_ref": "cup_tilt",
+                "variable_ref": "cup_tilt",
                 "operator": "lte",
                 "threshold_ref": "max_serve_tilt"
               },
               {
-                "quality_ref": "liquid_surface_stability",
+                "variable_ref": "liquid_surface_stability",
                 "operator": "eq",
                 "threshold_ref": "stable_true"
               }
@@ -51,7 +51,7 @@
         },
         "target_stage": "transport"
       },
-      "failure_degrees": [
+      "failure_conditions": [
         {
           "failure_id": "liquid_spilling_in_hand",
           "description": "杯子倾斜过大——可能是之前过程结束时未回正或手爪角度有误",
@@ -65,23 +65,23 @@
       "stage_order": 2,
       "display_name": "搬运阶段",
       "description": "沿规划路径将杯子移动到目标位置。全程保持杯子水平且加速度不超过洒出阈值。此阶段的核心矛盾是速度（效率）与加速度（不洒）之间的物理权衡。",
-      "qualities": [
+      "continuous_state_variables": [
         {
-          "quality_id": "cup_tilt",
+          "variable_id": "cup_tilt",
           "display_name": "杯子倾角",
           "physical_domain": "angle",
           "unit": "degree",
           "role": "observed"
         },
         {
-          "quality_id": "distance_to_target",
+          "variable_id": "distance_to_target",
           "display_name": "到目标位置的距离",
           "physical_domain": "distance",
           "unit": "cm",
           "role": "observed"
         },
         {
-          "quality_id": "collision_risk",
+          "variable_id": "collision_risk",
           "display_name": "碰撞风险",
           "physical_domain": "state",
           "unit": "boolean",
@@ -93,19 +93,19 @@
           "description": "稳定阶段退出（杯子水平且液面稳定）"
         }
       ],
-      "exit_degree": {
-        "degree_id": "arrived_at_target",
+      "transition_condition": {
+        "condition_id": "arrived_at_target",
         "display_name": "到达目标位置",
         "condition": {
           "predicate": {
             "all": [
               {
-                "quality_ref": "distance_to_target",
+                "variable_ref": "distance_to_target",
                 "operator": "lte",
                 "threshold_ref": "arrival_threshold"
               },
               {
-                "quality_ref": "cup_tilt",
+                "variable_ref": "cup_tilt",
                 "operator": "lte",
                 "threshold_ref": "max_serve_tilt"
               }
@@ -114,7 +114,7 @@
         },
         "target_stage": "present"
       },
-      "failure_degrees": [
+      "failure_conditions": [
         {
           "failure_id": "collision_imminent",
           "description": "前方检测到障碍物——移动路径被阻挡",
@@ -134,16 +134,16 @@
       "stage_order": 3,
       "display_name": "呈现阶段",
       "description": "到达目标位置后，将杯子稳定地放在人类面前的放置面上，并释放夹爪。释放前必须确认杯子已完全接触放置面——在半空释放会导致杯子坠落。",
-      "qualities": [
+      "continuous_state_variables": [
         {
-          "quality_id": "cup_contact_with_surface",
+          "variable_id": "cup_contact_with_surface",
           "display_name": "杯子与放置面的接触状态",
           "physical_domain": "contact",
           "unit": "boolean",
           "role": "observed"
         },
         {
-          "quality_id": "cup_stability",
+          "variable_id": "cup_stability",
           "display_name": "杯子在放置面上的稳定性",
           "physical_domain": "state",
           "unit": "boolean",
@@ -155,19 +155,19 @@
           "description": "搬运阶段退出（到达目标位置且杯子水平）"
         }
       ],
-      "exit_degree": {
-        "degree_id": "cup_placed_and_released",
+      "transition_condition": {
+        "condition_id": "cup_placed_and_released",
         "display_name": "杯子已放置在桌面上且手爪已释放",
         "condition": {
           "predicate": {
             "all": [
               {
-                "quality_ref": "cup_contact_with_surface",
+                "variable_ref": "cup_contact_with_surface",
                 "operator": "eq",
                 "threshold_ref": "contact_true"
               },
               {
-                "quality_ref": "cup_stability",
+                "variable_ref": "cup_stability",
                 "operator": "eq",
                 "threshold_ref": "stable_true"
               }
@@ -176,7 +176,7 @@
         },
         "target_stage": "__terminal__"
       },
-      "failure_degrees": [
+      "failure_conditions": [
         {
           "failure_id": "premature_release",
           "description": "杯子未完全接触放置面就被释放——杯子可能倾倒或坠落",

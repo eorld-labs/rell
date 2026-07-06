@@ -1,0 +1,48 @@
+﻿# 2026-07-07 P016 字段收敛证据哈希清单
+
+生成方式：Get-FileHash -Algorithm SHA256
+
+README.md
+SHA256: DF5DDBD6DE3720B57E7F7EFC4DD3774CB412DA7E5D223243E71F7830D0B042EE
+
+schemas/process_necessity.schema.json
+SHA256: 2E28A8386EEB6E77679EE9272C5926933BC1F3FAB2D25472F600BCCBEAC9C301
+
+schemas/contingency_binding.schema.json
+SHA256: 70F461468D034D81AB0715989EB27DBCF8172DE4E1842C556A16FAD62A4D24C9
+
+schemas/fact_observation.schema.json
+SHA256: F15D53011B3A34BD5E1EA8D21A852F4F3DF811F1CF5912B19DB51676855B82E6
+
+schemas/engine_contract.schema.json
+SHA256: C3D117634C8D863AAFBB07411E45E7958D484097FBC44428349A79A961F46E3D
+
+schemas/examples/process_pour_water.json
+SHA256: C58334646780DE9C9EC596961DAB28963063EB9A0E71FA59D91B1CF1C04F28D7
+
+schemas/examples/process_grasp_cup.json
+SHA256: 8873D412A638FF5A71AB6C5995FD3DAF049D47C96B8EA6541BC7E2F5E0520227
+
+schemas/examples/process_serve_to_human.json
+SHA256: 24B563B827A049CE480B816AAACDB0C73A691CA7CAE10348C022BED79297D29B
+
+schemas/examples/contingency_home_a.json
+SHA256: 7222F26809D4B5980AE555F168CF91BB7921A3140EDBADECEF70D8D7453CA03B
+
+schemas/examples/contingency_home_b.json
+SHA256: 8E1A7542A019298F799389B47775047135CB824A1E7CCCEFE5A4CF855F647DF3
+
+schemas/examples/fact_observation_kitchen.json
+SHA256: FFBB04859ADC4B90BC466511658754D5283D3229CB08F84215BEB94C1131F4EC
+
+验证记录：
+- JSON 解析：通过。
+- demo_runtime/run_demo.py：通过。
+- demo_runtime/run_skill_cocreation.py：通过。
+
+技术对应：
+- 过程模板：schemas/process_necessity.schema.json
+- 偶然绑定数据：schemas/contingency_binding.schema.json
+- 连续状态变量与阶段跃迁：schemas/process_necessity.schema.json 及 process 示例
+- 目标因果事实与最终成立状态：schemas/fact_observation.schema.json
+- 执行轨迹与运行时契约：schemas/engine_contract.schema.json

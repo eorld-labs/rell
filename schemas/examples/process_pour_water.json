@@ -8,17 +8,17 @@
       "stage_id": "tilting",
       "stage_order": 1,
       "display_name": "倾斜阶段",
-      "description": "从初始姿态逐渐倾斜壶身，直至壶口出现连续水流。注意：壶口必须有水才可能出水——如果壶内无水，此阶段的度条件将永远不会被满足，触发 mechanism_blocked 失败。",
-      "qualities": [
+      "description": "从初始姿态逐渐倾斜壶身，直至壶口出现连续水流。注意：壶口必须有水才可能出水；如果壶内无水，此阶段的跃迁条件将无法满足，触发 mechanism_blocked 失败。",
+      "continuous_state_variables": [
         {
-          "quality_id": "tilt_angle",
+          "variable_id": "tilt_angle",
           "display_name": "壶口倾角",
           "physical_domain": "rotation",
           "unit": "degree",
           "role": "controlled"
         },
         {
-          "quality_id": "water_flow_rate",
+          "variable_id": "water_flow_rate",
           "display_name": "壶口水流速度",
           "physical_domain": "flow",
           "unit": "ml_per_second",
@@ -28,22 +28,22 @@
       "entry_conditions": [
         {
           "description": "壶口位于目标容器正上方",
-          "required_degree": null
+          "required_condition_ref": null
         }
       ],
-      "exit_degree": {
-        "degree_id": "flow_emerged",
+      "transition_condition": {
+        "condition_id": "flow_emerged",
         "display_name": "壶口出现连续水流",
         "condition": {
           "predicate": {
-            "quality_ref": "water_flow_rate",
+            "variable_ref": "water_flow_rate",
             "operator": "gte",
             "threshold_ref": "min_continuous_flow"
           }
         },
         "target_stage": "holding"
       },
-      "failure_degrees": [
+      "failure_conditions": [
         {
           "failure_id": "no_flow_after_max_tilt",
           "description": "倾角超过安全上限仍未检测到连续水流——壶内无水、壶口被堵、或倾角方向错误",
@@ -63,17 +63,17 @@
       "stage_id": "holding",
       "stage_order": 2,
       "display_name": "保持阶段",
-      "description": "保持壶口倾角不变，水流持续注入目标容器。此阶段唯一的变化是水面升高，机器人只观测不控制。度的阈值决定何时停止——这个阈值是偏好附着点。",
-      "qualities": [
+      "description": "保持壶口倾角不变，水流持续注入目标容器。此阶段主要观测水面升高。阶段跃迁条件中的阈值决定何时停止，该阈值可作为偏好附着点。",
+      "continuous_state_variables": [
         {
-          "quality_id": "tilt_angle",
+          "variable_id": "tilt_angle",
           "display_name": "壶口倾角",
           "physical_domain": "rotation",
           "unit": "degree",
           "role": "controlled"
         },
         {
-          "quality_id": "water_surface_gap",
+          "variable_id": "water_surface_gap",
           "display_name": "水面距杯口距离",
           "physical_domain": "distance",
           "unit": "cm",
@@ -85,19 +85,19 @@
           "description": "倾斜阶段成功退出（水流已出现）"
         }
       ],
-      "exit_degree": {
-        "degree_id": "water_near_rim",
+      "transition_condition": {
+        "condition_id": "water_near_rim",
         "display_name": "水面接近杯口",
         "condition": {
           "predicate": {
-            "quality_ref": "water_surface_gap",
+            "variable_ref": "water_surface_gap",
             "operator": "lte",
             "threshold_ref": "stop_threshold"
           }
         },
         "target_stage": "recovering"
       },
-      "failure_degrees": [
+      "failure_conditions": [
         {
           "failure_id": "water_spilling",
           "description": "水面距杯口距离小于0——水已溢出",
@@ -131,16 +131,16 @@
       "stage_order": 3,
       "display_name": "回正阶段",
       "description": "回正壶身至初始姿态，水流逐渐减小直至停止。当倾角回到0°附近且水流完全停止时，过程结束。",
-      "qualities": [
+      "continuous_state_variables": [
         {
-          "quality_id": "tilt_angle",
+          "variable_id": "tilt_angle",
           "display_name": "壶口倾角",
           "physical_domain": "rotation",
           "unit": "degree",
           "role": "controlled"
         },
         {
-          "quality_id": "water_flow_rate",
+          "variable_id": "water_flow_rate",
           "display_name": "壶口水流速度",
           "physical_domain": "flow",
           "unit": "ml_per_second",
@@ -152,19 +152,19 @@
           "description": "保持阶段成功退出（水面已达到目标位置）"
         }
       ],
-      "exit_degree": {
-        "degree_id": "flow_stopped_and_level",
+      "transition_condition": {
+        "condition_id": "flow_stopped_and_level",
         "display_name": "水流停止且壶身回正",
         "condition": {
           "predicate": {
             "all": [
               {
-                "quality_ref": "tilt_angle",
+                "variable_ref": "tilt_angle",
                 "operator": "lte",
                 "threshold_ref": "level_threshold"
               },
               {
-                "quality_ref": "water_flow_rate",
+                "variable_ref": "water_flow_rate",
                 "operator": "eq",
                 "threshold_ref": "zero_flow"
               }
@@ -173,7 +173,7 @@
         },
         "target_stage": "__terminal__"
       },
-      "failure_degrees": [
+      "failure_conditions": [
         {
           "failure_id": "flow_not_stopping",
           "description": "壶身已回正但水流未停止——壶嘴设计问题或液体粘度异常",

@@ -7,13 +7,13 @@
       "observation_method": {
         "type": "dual_channel",
         "digital": {
-          "qualities": [
+          "continuous_state_variables": [
             {
-              "quality_ref": "grip_force",
+              "variable_ref": "grip_force",
               "condition": { "operator": "gte", "threshold_ref": "min_grip_hold_force" }
             },
             {
-              "quality_ref": "contact_state",
+              "variable_ref": "contact_state",
               "condition": { "operator": "eq", "threshold_ref": "contact_confirmed" }
             }
           ],
@@ -21,9 +21,9 @@
           "channel_description": "夹爪力传感器+接触传感器确认夹爪已抓取物体"
         },
         "physical": {
-          "qualities": [
+          "continuous_state_variables": [
             {
-              "quality_ref": "cup_displacement",
+              "variable_ref": "cup_displacement",
               "condition": { "operator": "lte", "threshold_ref": "max_tracking_gap" },
               "accumulation_rule": "minimum_duration",
               "accumulation_param": { "window_ms": 100, "direction": "stable" }
@@ -37,7 +37,7 @@
           "on_conflict": "trust_physical",
           "max_disagreement_duration_ms": 200,
           "tolerance": {
-            "quality_refs": ["grip_force", "cup_displacement"],
+            "variable_refs": ["grip_force", "cup_displacement"],
             "allowed_difference": 0,
             "unit": "logical_and"
           }
@@ -46,22 +46,22 @@
       "falsified_by_failures": [
         {
           "process_ref": "grasp_cup",
-          "failure_degree_ref": "cup_slip_during_lift",
+          "failure_condition_ref": "cup_slip_during_lift",
           "reason": "提起时杯子滑脱意味着 cup_in_gripper 不再成立"
         },
         {
           "process_ref": "grasp_cup",
-          "failure_degree_ref": "cup_fell",
+          "failure_condition_ref": "cup_fell",
           "reason": "杯子完全脱离夹爪"
         },
         {
           "process_ref": "grasp_cup",
-          "failure_degree_ref": "cup_slip_during_close",
+          "failure_condition_ref": "cup_slip_during_close",
           "reason": "闭合时杯子滑移表示未达到稳定抓取"
         }
       ],
       "verified_by_completions": [
-        { "process_ref": "grasp_cup", "stage_ref": "lift", "degree_ref": "lifted_to_target_height" }
+        { "process_ref": "grasp_cup", "stage_ref": "lift", "transition_condition_ref": "lifted_to_target_height" }
       ]
     },
     "kettle_has_water": {
@@ -74,7 +74,7 @@
       "falsified_by_failures": [
         {
           "process_ref": "pour_water",
-          "failure_degree_ref": "no_flow_after_max_tilt",
+          "failure_condition_ref": "no_flow_after_max_tilt",
           "reason": "倾角超过安全上限仍未出水——壶内无水或水位过低"
         }
       ],
@@ -82,7 +82,7 @@
         {
           "process_ref": "pour_water",
           "stage_ref": "tilting",
-          "degree_ref": "flow_emerged",
+          "transition_condition_ref": "flow_emerged",
           "reason": "水流出现证实壶内有水"
         }
       ]
@@ -93,9 +93,9 @@
       "observation_method": {
         "type": "dual_channel",
         "digital": {
-          "qualities": [
+          "continuous_state_variables": [
             {
-              "quality_ref": "water_flow_rate",
+              "variable_ref": "water_flow_rate",
               "condition": { "operator": "gt", "threshold_ref": "zero_flow" },
               "accumulation_rule": "integral_over_time",
               "accumulation_param": { "window_ms": 500 }
@@ -105,9 +105,9 @@
           "channel_description": "水流传感器对时间的积分确认已注水量"
         },
         "physical": {
-          "qualities": [
+          "continuous_state_variables": [
             {
-              "quality_ref": "water_surface_gap",
+              "variable_ref": "water_surface_gap",
               "condition": { "operator": "lt", "threshold_ref": "cup_height" },
               "accumulation_rule": "instant"
             }
@@ -120,14 +120,14 @@
           "on_conflict": "trust_physical",
           "max_disagreement_duration_ms": 500,
           "tolerance": {
-            "quality_refs": ["water_flow_rate", "water_surface_gap"],
+            "variable_refs": ["water_flow_rate", "water_surface_gap"],
             "allowed_difference": 20,
             "unit": "percent"
           }
         }
       },
       "verified_by_completions": [
-        { "process_ref": "pour_water", "stage_ref": "recovering", "degree_ref": "flow_stopped_and_level" }
+        { "process_ref": "pour_water", "stage_ref": "recovering", "transition_condition_ref": "flow_stopped_and_level" }
       ]
     },
     "cup_at_human_location": {
@@ -136,9 +136,9 @@
       "observation_method": {
         "type": "dual_channel",
         "digital": {
-          "qualities": [
+          "continuous_state_variables": [
             {
-              "quality_ref": "distance_to_target",
+              "variable_ref": "distance_to_target",
               "condition": { "operator": "lte", "threshold_ref": "arrival_threshold" }
             }
           ],
@@ -146,13 +146,13 @@
           "channel_description": "末端执行器位置编码器确认到达目标坐标"
         },
         "physical": {
-          "qualities": [
+          "continuous_state_variables": [
             {
-              "quality_ref": "cup_contact_with_surface",
+              "variable_ref": "cup_contact_with_surface",
               "condition": { "operator": "eq", "threshold_ref": "contact_true" }
             },
             {
-              "quality_ref": "cup_stability",
+              "variable_ref": "cup_stability",
               "condition": { "operator": "eq", "threshold_ref": "stable_true" },
               "accumulation_rule": "minimum_duration",
               "accumulation_param": { "window_ms": 500, "direction": "stable" }
@@ -174,9 +174,9 @@
       "observation_method": {
         "type": "single_channel",
         "channel": {
-          "qualities": [
+          "continuous_state_variables": [
             {
-              "quality_ref": "cup_at_human_location",
+              "variable_ref": "cup_at_human_location",
               "condition": { "operator": "eq", "threshold_ref": "verified_true" }
             }
           ],
