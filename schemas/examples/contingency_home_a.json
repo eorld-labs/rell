@@ -1,5 +1,5 @@
 {
-  "$schema": "../contingency_binding.schema.json",
+  "$schema": "../occasional_binding.schema.json",
   "binding_id": "home_a_kitchen_daytime",
   "environment_ref": "robot_home_a",
   "description": "家庭A厨房——日间使用场景。马克杯+不锈钢壶。偏好：倒满。",

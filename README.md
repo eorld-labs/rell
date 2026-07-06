@@ -66,6 +66,8 @@ demo_runtime/
 
 `schemas/` 提供第一期核心对象格式，`demo_runtime/` 提供最小运行时闭环。运行时安全治理可通过 Sayfos SDK 等外部治理层适配，本仓库第一期只保留必要引用字段和接口位置。
 
+P016 相关正式入口包括 `process_template.schema.json`、`occasional_binding.schema.json`、`fact_observation.schema.json` 和 `engine_contract.schema.json`。旧命名文件作为兼容入口保留。
+
 ## 商业边界
 
 第一期开源用于验证方法、建立对象格式和吸引共创。以下内容不属于第一期开源范围：

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/process_template.schema.json",
+  "title": "ProcessTemplate",
+  "description": "正式公开入口：过程模板定义物理动作的不变过程结构，包括阶段序列、连续状态变量、阶段跃迁条件和参数槽。本文件保留为公开门面，当前兼容引用 process_necessity.schema.json。",
+  "allOf": [
+    {
+      "$ref": "process_necessity.schema.json"
+    }
+  ]
+}

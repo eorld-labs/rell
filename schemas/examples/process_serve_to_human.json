@@ -1,5 +1,5 @@
 {
-  "$schema": "../process_necessity.schema.json",
+  "$schema": "../process_template.schema.json",
   "process_id": "serve_to_human",
   "process_name": "端给人类",
   "physical_basis": "末端执行器保持水平运动——手爪维持抓取姿态，在空间中沿平滑轨迹将杯子从当前位置移动到人类面前的目标位置。全程杯中液体不应洒出（保持水平），移动不应与其他物体碰撞。",

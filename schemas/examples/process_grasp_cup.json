@@ -1,5 +1,5 @@
 {
-  "$schema": "../process_necessity.schema.json",
+  "$schema": "../process_template.schema.json",
   "process_id": "grasp_cup",
   "process_name": "拿杯子",
   "physical_basis": "摩擦力抓取——末端执行器施加的法向力在接触面产生摩擦力，当摩擦力超过杯子重力时，杯子可以被提起而不滑脱。抓取力必须同时满足：大于最小提起力、小于杯子破裂力、且杯子不发生滑移。这三个约束是物理必然，任何抓取过程都必须同时满足。",

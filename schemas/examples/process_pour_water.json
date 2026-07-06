@@ -1,5 +1,5 @@
 {
-  "$schema": "../process_necessity.schema.json",
+  "$schema": "../process_template.schema.json",
   "process_id": "pour_water",
   "process_name": "倒水",
   "physical_basis": "重力驱动流体转移——壶口倾斜使液面超过壶嘴下沿，水在重力作用下持续流出；壶身回正使液面低于壶嘴下沿，水流停止。这是流体静力学的必然结果，不依赖容器材质或大小。",

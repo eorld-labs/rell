@@ -1,5 +1,5 @@
 {
-  "$schema": "../contingency_binding.schema.json",
+  "$schema": "../occasional_binding.schema.json",
   "binding_id": "home_b_kitchen_evening",
   "environment_ref": "robot_home_b",
   "description": "家庭B厨房——晚间使用场景。高脚玻璃杯+玻璃水壶。偏好：倒八分满（温和偏好）。注意：玻璃杯抓取力上限更低，搬运时倾角容忍度更严格（细长杯重心高）。",
