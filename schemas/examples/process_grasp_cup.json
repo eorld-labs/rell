@@ -1,0 +1,210 @@
+{
+  "$schema": "../process_template.schema.json",
+  "process_id": "grasp_cup",
+  "process_name": "拿杯子",
+  "physical_basis": "摩擦力抓取——末端执行器施加的法向力在接触面产生摩擦力，当摩擦力超过杯子重力时，杯子可以被提起而不滑脱。抓取力必须同时满足：大于最小提起力、小于杯子破裂力、且杯子不发生滑移。这三个约束是物理必然，任何抓取过程都必须同时满足。",
+  "stages": [
+    {
+      "stage_id": "approach",
+      "stage_order": 1,
+      "display_name": "接近阶段",
+      "description": "末端执行器从当前位置移动到抓取目标附近。此阶段杯子不应发生位移——如果杯子在接近阶段就移动了，说明视觉定位有误或环境中存在不可见障碍。",
+      "continuous_state_variables": [
+        {
+          "variable_id": "gripper_to_cup_distance",
+          "display_name": "末端执行器到杯子的距离",
+          "physical_domain": "distance",
+          "unit": "mm",
+          "role": "observed"
+        },
+        {
+          "variable_id": "cup_position_stability",
+          "display_name": "杯子位置稳定性",
+          "physical_domain": "state",
+          "unit": "boolean",
+          "role": "observed"
+        }
+      ],
+      "entry_conditions": [
+        {
+          "description": "杯子位置已通过空间语义建立，且杯子在可达区域内"
+        }
+      ],
+      "transition_condition": {
+        "condition_id": "within_grasp_range",
+        "display_name": "末端执行器进入抓取范围",
+        "condition": {
+          "predicate": {
+            "variable_ref": "gripper_to_cup_distance",
+            "operator": "lte",
+            "threshold_ref": "grasp_approach_threshold"
+          }
+        },
+        "target_stage": "close"
+      },
+      "failure_conditions": [
+        {
+          "failure_id": "cup_not_found",
+          "description": "接近过程中杯子位置丢失——杯子被移动或视觉遮挡",
+          "failure_type": "object_absent",
+          "recovery_hint": "重新扫描空间定位杯子；如果确认杯子不存在，终止任务"
+        },
+        {
+          "failure_id": "cup_move_during_approach",
+          "description": "末端执行器还未接触杯子但杯子发生了位移——碰撞或环境扰动",
+          "failure_type": "unexpected_state",
+          "recovery_hint": "立即停止接近动作；检查是否末端执行器意外触碰其他物体"
+        }
+      ]
+    },
+    {
+      "stage_id": "close",
+      "stage_order": 2,
+      "display_name": "闭合阶段",
+      "description": "末端执行器从打开状态逐渐闭合，夹爪接触杯子表面。闭合过程中杯子位移应接近零——如果杯子在接触瞬间大幅移动，说明定位偏差或夹爪力方向不对。",
+      "continuous_state_variables": [
+        {
+          "variable_id": "grip_force",
+          "display_name": "抓取力",
+          "physical_domain": "force",
+          "unit": "N",
+          "role": "controlled"
+        },
+        {
+          "variable_id": "cup_displacement",
+          "display_name": "杯子位移",
+          "physical_domain": "translation",
+          "unit": "mm",
+          "role": "observed"
+        },
+        {
+          "variable_id": "contact_state",
+          "display_name": "接触状态",
+          "physical_domain": "contact",
+          "unit": "boolean",
+          "role": "observed"
+        }
+      ],
+      "entry_conditions": [
+        {
+          "description": "末端执行器处于目标杯子两侧的抓取位置"
+        }
+      ],
+      "transition_condition": {
+        "condition_id": "stable_grip_achieved",
+        "display_name": "达到稳定抓取状态",
+        "condition": {
+          "predicate": {
+            "all": [
+              {
+                "variable_ref": "grip_force",
+                "operator": "gte",
+                "threshold_ref": "min_grip_force"
+              },
+              {
+                "variable_ref": "cup_displacement",
+                "operator": "lte",
+                "threshold_ref": "max_close_displacement"
+              },
+              {
+                "variable_ref": "contact_state",
+                "operator": "eq",
+                "threshold_ref": "contact_confirmed"
+              }
+            ]
+          }
+        },
+        "target_stage": "lift"
+      },
+      "failure_conditions": [
+        {
+          "failure_id": "cup_slip_during_close",
+          "description": "闭合过程中杯子发生显著位移——抓取位置不对或杯子表面摩擦不足",
+          "failure_type": "object_slipped",
+          "recovery_hint": "松开夹爪；调整抓取位置；如果杯子材质为光滑表面（如玻璃），增加接触面积或更换接触面材料"
+        },
+        {
+          "failure_id": "no_contact",
+          "description": "夹爪闭合到极限仍未检测到接触——杯子不在预期位置",
+          "failure_type": "object_absent",
+          "recovery_hint": "在抓取极限位置停止增加力；重新定位杯子"
+        },
+        {
+          "failure_id": "crush_risk",
+          "description": "抓取力超过杯子承受上限——可能压碎杯子",
+          "failure_type": "boundary_exceeded",
+          "recovery_hint": "立即停止增加力并微调至安全范围；此阈值由偶然绑定数据中的对象映射 fragility 决定"
+        }
+      ]
+    },
+    {
+      "stage_id": "lift",
+      "stage_order": 3,
+      "display_name": "提起阶段",
+      "description": "将杯子从放置面提起到目标高度。此阶段的关键是杯子必须保持水平——倾角过大意味着抓取点不对或杯子重心偏移，可能导致滑脱。垂直上升过程中观测的是杯子是否在夹爪中保持稳定。",
+      "continuous_state_variables": [
+        {
+          "variable_id": "cup_vertical_position",
+          "display_name": "杯子垂直位置",
+          "physical_domain": "translation",
+          "unit": "cm",
+          "role": "observed"
+        },
+        {
+          "variable_id": "cup_tilt",
+          "display_name": "杯子倾角",
+          "physical_domain": "angle",
+          "unit": "degree",
+          "role": "observed"
+        },
+        {
+          "variable_id": "grip_force",
+          "display_name": "抓取力",
+          "physical_domain": "force",
+          "unit": "N",
+          "role": "controlled"
+        }
+      ],
+      "entry_conditions": [
+        {
+          "description": "闭合阶段成功退出（已达到稳定抓取状态）"
+        }
+      ],
+      "transition_condition": {
+        "condition_id": "lifted_to_target_height",
+        "display_name": "杯子到达目标高度且姿态稳定",
+        "condition": {
+          "predicate": {
+            "all": [
+              {
+                "variable_ref": "cup_vertical_position",
+                "operator": "gte",
+                "threshold_ref": "target_lift_height"
+              },
+              {
+                "variable_ref": "cup_tilt",
+                "operator": "lte",
+                "threshold_ref": "max_tilt_during_lift"
+              }
+            ]
+          }
+        },
+        "target_stage": "__terminal__"
+      },
+      "failure_conditions": [
+        {
+          "failure_id": "cup_slip_during_lift",
+          "description": "提起过程中杯子在夹爪内滑移——抓取力不足或杯子重心偏移",
+          "failure_type": "object_slipped",
+          "recovery_hint": "立即将杯子放回原处；增加抓取力后重试；检查杯子是否为空杯（重心在几何中心）还是有内容物（重心偏移）"
+        },
+        {
+          "failure_id": "cup_fell",
+          "description": "杯子完全脱离夹爪落到放置面或地面",
+          "failure_type": "object_slipped",
+          "recovery_hint": "停止当前任务；检查杯子是否破损；记录为重大失败经验"
+        }
+      ]
+    }
+  ]
+}

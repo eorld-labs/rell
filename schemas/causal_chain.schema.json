@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/causal_chain.schema.json",
+  "title": "CausalChain",
+  "description": "因果层——定义过程之间的因果依赖关系、资源声明、以及并行编排约束。编排引擎用因果匹配搜索过程链，链的断裂点即是补救入口。核心原则：编排结果是一个因果图，不是一个动作序列。并行分支由因果独立性（无因果依赖）和资源可用性（无资源冲突）共同决定。",
+  "definitions": {
+    "causal_fact": {
+      "type": "object",
+      "required": ["fact_id", "description"],
+      "properties": {
+        "fact_id": { "type": "string", "description": "因果事实标识" },
+        "description": { "type": "string" },
+        "fact_type": { "type": "string", "enum": ["spatial", "mechanical", "material", "thermal", "informational"] }
+      }
+    },
+    "resource": {
+      "type": "object",
+      "required": ["resource_id", "resource_type"],
+      "properties": {
+        "resource_id": { "type": "string", "description": "资源标识，如 right_arm、left_arm、front_camera" },
+        "resource_type": { "type": "string", "enum": ["actuator", "sensor", "computation", "workspace_region"] },
+        "description": { "type": "string" },
+        "shareable": { "type": "boolean", "default": false, "description": "是否可被多个过程同时使用" },
+        "exclusive_stages_only": { "type": "array", "items": { "type": "string" }, "description": "资源仅在特定阶段需要独占，其他阶段可共享。如 camera 在 scan 时独占，transport 时不需要。" }
+      }
+    },
+    "process_causal_signature": {
+      "type": "object",
+      "required": ["process_ref", "requires", "produces"],
+      "properties": {
+        "process_ref": { "type": "string" },
+        "requires": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["fact_ref"],
+            "properties": {
+              "fact_ref": { "type": "string" },
+              "binding_hint": { "type": "string" },
+              "optional": { "type": "boolean", "default": false }
+            }
+          }
+        },
+        "produces": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["fact_ref"],
+            "properties": {
+              "fact_ref": { "type": "string" },
+              "durability": { "type": "string", "enum": ["persistent", "fragile", "transient"], "default": "persistent" }
+            }
+          }
+        },
+        "destroys": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["fact_ref"],
+            "properties": {
+              "fact_ref": { "type": "string" },
+              "condition": { "type": "string" }
+            }
+          }
+        },
+        "resource_claims": {
+          "type": "array",
+          "description": "该过程执行期间占用的资源。如果两个过程声明的资源有交集且 shareable=false，它们不能并行执行。",
+          "items": {
+            "type": "object",
+            "required": ["resource_ref"],
+            "properties": {
+              "resource_ref": { "type": "string" },
+              "exclusive": { "type": "boolean", "default": true },
+              "required_for_stages": { "type": "array", "items": { "type": "string" }, "description": "该资源仅在以下阶段需要，其他阶段可释放" }
+            }
+          }
+        },
+        "estimated_duration_ms": {
+          "type": "number",
+          "description": "预估执行时长（毫秒）——用于编排引擎优化并行策略和预估总时间"
+        }
+      }
+    }
+  },
+  "type": "object",
+  "required": ["causal_facts", "resources", "process_signatures"],
+  "properties": {
+    "causal_facts": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/causal_fact" }
+    },
+    "resources": {
+      "type": "array",
+      "minItems": 1,
+      "description": "该因果域中所有可用的执行资源",
+      "items": { "$ref": "#/definitions/resource" }
+    },
+    "process_signatures": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/process_causal_signature" }
+    },
+    "chains": {
+      "type": "array",
+      "description": "具体任务中的因果编排图",
+      "items": {
+        "type": "object",
+        "required": ["chain_id", "goal_fact", "nodes", "edges"],
+        "properties": {
+          "chain_id": { "type": "string" },
+          "task_goal": { "type": "string" },
+          "goal_fact": { "type": "string" },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["process_ref", "instance_id"],
+              "properties": {
+                "process_ref": { "type": "string" },
+                "instance_id": { "type": "string" },
+                "resource_bindings": {
+                  "type": "array",
+                  "description": "该实例使用的具体资源绑定（将过程声明的 resource_claims 映射到具体物理资源）",
+                  "items": {
+                    "type": "object",
+                    "required": ["process_resource_ref", "physical_resource_ref"],
+                    "properties": {
+                      "process_resource_ref": { "type": "string", "description": "过程签名中声明的资源标识" },
+                      "physical_resource_ref": { "type": "string", "description": "物理资源池中的具体资源标识" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["from_instance", "produces_fact", "to_instance", "satisfies"],
+              "properties": {
+                "from_instance": { "type": "string" },
+                "produces_fact": { "type": "string" },
+                "to_instance": { "type": "string" },
+                "satisfies": { "type": "string" }
+              }
+            }
+          },
+          "parallel_groups": {
+            "type": "array",
+            "description": "并行执行组——组内所有过程可以同时执行。分组的条件：组内无因果依赖边+组内无资源冲突。",
+            "items": {
+              "type": "object",
+              "required": ["group_id", "instances"],
+              "properties": {
+                "group_id": { "type": "string" },
+                "instances": { "type": "array", "items": { "type": "string" } },
+                "critical_path_instance": {
+                  "type": "string",
+                  "description": "该并行组中执行时间最长的过程——决定组的总耗时"
+                }
+              }
+            }
+          },
+          "critical_path": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "考虑并行后的关键路径——从起始到目标的最长因果链，决定任务下限时间"
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,193 @@
+{
+  "$schema": "../process_template.schema.json",
+  "process_id": "pour_water",
+  "process_name": "倒水",
+  "physical_basis": "重力驱动流体转移——壶口倾斜使液面超过壶嘴下沿，水在重力作用下持续流出；壶身回正使液面低于壶嘴下沿，水流停止。这是流体静力学的必然结果，不依赖容器材质或大小。",
+  "stages": [
+    {
+      "stage_id": "tilting",
+      "stage_order": 1,
+      "display_name": "倾斜阶段",
+      "description": "从初始姿态逐渐倾斜壶身，直至壶口出现连续水流。注意：壶口必须有水才可能出水；如果壶内无水，此阶段的跃迁条件将无法满足，触发 mechanism_blocked 失败。",
+      "continuous_state_variables": [
+        {
+          "variable_id": "tilt_angle",
+          "display_name": "壶口倾角",
+          "physical_domain": "rotation",
+          "unit": "degree",
+          "role": "controlled"
+        },
+        {
+          "variable_id": "water_flow_rate",
+          "display_name": "壶口水流速度",
+          "physical_domain": "flow",
+          "unit": "ml_per_second",
+          "role": "observed"
+        }
+      ],
+      "entry_conditions": [
+        {
+          "description": "壶口位于目标容器正上方",
+          "required_condition_ref": null
+        }
+      ],
+      "transition_condition": {
+        "condition_id": "flow_emerged",
+        "display_name": "壶口出现连续水流",
+        "condition": {
+          "predicate": {
+            "variable_ref": "water_flow_rate",
+            "operator": "gte",
+            "threshold_ref": "min_continuous_flow"
+          }
+        },
+        "target_stage": "holding"
+      },
+      "failure_conditions": [
+        {
+          "failure_id": "no_flow_after_max_tilt",
+          "description": "倾角超过安全上限仍未检测到连续水流——壶内无水、壶口被堵、或倾角方向错误",
+          "failure_type": "mechanism_blocked",
+          "recovery": {
+            "strategy": "inject_recovery_process",
+            "recovery_process_ref": "check_kettle_water_or_unblock",
+            "recovery_injection_point": "retry",
+            "max_recovery_attempts": 1,
+            "on_recovery_exhausted": "request_human",
+            "recovery_hint": "检查壶内是否有水；检查壶口是否被异物堵塞；确认倾斜方向朝向杯口"
+          }
+        }
+      ]
+    },
+    {
+      "stage_id": "holding",
+      "stage_order": 2,
+      "display_name": "保持阶段",
+      "description": "保持壶口倾角不变，水流持续注入目标容器。此阶段主要观测水面升高。阶段跃迁条件中的阈值决定何时停止，该阈值可作为偏好附着点。",
+      "continuous_state_variables": [
+        {
+          "variable_id": "tilt_angle",
+          "display_name": "壶口倾角",
+          "physical_domain": "rotation",
+          "unit": "degree",
+          "role": "controlled"
+        },
+        {
+          "variable_id": "water_surface_gap",
+          "display_name": "水面距杯口距离",
+          "physical_domain": "distance",
+          "unit": "cm",
+          "role": "observed"
+        }
+      ],
+      "entry_conditions": [
+        {
+          "description": "倾斜阶段成功退出（水流已出现）"
+        }
+      ],
+      "transition_condition": {
+        "condition_id": "water_near_rim",
+        "display_name": "水面接近杯口",
+        "condition": {
+          "predicate": {
+            "variable_ref": "water_surface_gap",
+            "operator": "lte",
+            "threshold_ref": "stop_threshold"
+          }
+        },
+        "target_stage": "recovering"
+      },
+      "failure_conditions": [
+        {
+          "failure_id": "water_spilling",
+          "description": "水面距杯口距离小于0——水已溢出",
+          "failure_type": "boundary_exceeded",
+          "recovery": {
+            "strategy": "skip_to_recovery_stage",
+            "recovery_process_ref": "wipe_spill",
+            "recovery_injection_point": "retry",
+            "max_recovery_attempts": 1,
+            "on_recovery_exhausted": "request_human",
+            "recovery_hint": "立即进入回正阶段停止注水；检查是否 stop_threshold 设置过大或观测延迟过长"
+          }
+        },
+        {
+          "failure_id": "cup_displaced",
+          "description": "杯子位置发生显著变化——可能被碰倒或滑走",
+          "failure_type": "unexpected_state",
+          "recovery": {
+            "strategy": "retry_current_process",
+            "recovery_process_ref": "regrasp_object",
+            "recovery_injection_point": "restart",
+            "max_recovery_attempts": 1,
+            "on_recovery_exhausted": "request_human",
+            "recovery_hint": "立即停止注水；重新定位并抓取杯子"
+          }
+        }
+      ]
+    },
+    {
+      "stage_id": "recovering",
+      "stage_order": 3,
+      "display_name": "回正阶段",
+      "description": "回正壶身至初始姿态，水流逐渐减小直至停止。当倾角回到0°附近且水流完全停止时，过程结束。",
+      "continuous_state_variables": [
+        {
+          "variable_id": "tilt_angle",
+          "display_name": "壶口倾角",
+          "physical_domain": "rotation",
+          "unit": "degree",
+          "role": "controlled"
+        },
+        {
+          "variable_id": "water_flow_rate",
+          "display_name": "壶口水流速度",
+          "physical_domain": "flow",
+          "unit": "ml_per_second",
+          "role": "observed"
+        }
+      ],
+      "entry_conditions": [
+        {
+          "description": "保持阶段成功退出（水面已达到目标位置）"
+        }
+      ],
+      "transition_condition": {
+        "condition_id": "flow_stopped_and_level",
+        "display_name": "水流停止且壶身回正",
+        "condition": {
+          "predicate": {
+            "all": [
+              {
+                "variable_ref": "tilt_angle",
+                "operator": "lte",
+                "threshold_ref": "level_threshold"
+              },
+              {
+                "variable_ref": "water_flow_rate",
+                "operator": "eq",
+                "threshold_ref": "zero_flow"
+              }
+            ]
+          }
+        },
+        "target_stage": "__terminal__"
+      },
+      "failure_conditions": [
+        {
+          "failure_id": "flow_not_stopping",
+          "description": "壶身已回正但水流未停止——壶嘴设计问题或液体粘度异常",
+          "failure_type": "mechanism_blocked",
+          "recovery": {
+            "strategy": "inject_recovery_process",
+            "recovery_process_ref": "unblock_spout",
+            "recovery_injection_point": "retry",
+            "max_recovery_attempts": 2,
+            "on_recovery_exhausted": "request_human",
+            "recovery_hint": "检查壶嘴是否有残留液体挂壁；继续维持回正姿态并等待；若持续3秒仍不停止，触发人工介入"
+          }
+        }
+      ]
+    }
+  ]
+}

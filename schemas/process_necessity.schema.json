@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/process_necessity.schema.json",
+  "title": "ProcessTemplate",
+  "description": "过程模板定义物理动作的不变过程结构，包括阶段序列、连续状态变量、阶段跃迁条件和参数槽。支持两种定义方式：(1) 具体过程，如 pour_water 直接定义当前动作结构；(2) 参数化过程模板，如 grasp_object 定义可复用结构，并由偶然绑定数据填充为当前环境下的物理动作实例。",
+  "type": "object",
+  "required": ["process_id", "process_name", "physical_basis", "stages"],
+  "properties": {
+    "process_id": {
+      "type": "string",
+      "description": "过程唯一标识，如 pour_water、grasp_object"
+    },
+    "process_name": {
+      "type": "string",
+      "description": "过程的人类可读名称，如 倒水"
+    },
+    "physical_basis": {
+      "type": "string",
+      "description": "该过程所依赖的物理机制，用于说明阶段序列和阶段跃迁条件的物理依据"
+    },
+    "is_template": {
+      "type": "boolean",
+      "default": false,
+      "description": "是否为过程模板。过程模板定义物理动作的不变过程结构，由偶然绑定数据提供对象、传感器和阈值绑定后产生具体物理动作实例。如 grasp_object 是一个模板，grasp(mug_ceramic, right_hand) 是一个实例。"
+    },
+    "template_parameters": {
+      "type": "array",
+      "description": "模板参数槽列表，仅当 is_template=true 时有效。参数槽不包含当前环境下的具体对象标识、传感器标识或阈值，需由偶然绑定数据或执行计划填充。",
+      "items": {
+        "type": "object",
+        "required": ["param_name", "param_type"],
+        "properties": {
+          "param_name": { "type": "string", "description": "参数标识，如 object_ref、gripper_ref" },
+          "display_name": { "type": "string", "description": "人类可读名称，如 操作对象" },
+          "param_type": { "type": "string", "enum": ["object_id", "gripper_id", "force_threshold", "distance_threshold", "angle_threshold", "speed_limit", "spatial_ref", "region_ref"] },
+          "description": { "type": "string" },
+          "default_value": { "description": "若偶然绑定数据未提供绑定时的默认值" }
+        }
+      }
+    },
+    "stages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["stage_id", "stage_order", "display_name", "continuous_state_variables", "entry_conditions", "transition_condition"],
+        "properties": {
+          "stage_id": { "type": "string", "description": "阶段唯一标识" },
+          "stage_order": { "type": "integer", "minimum": 1 },
+          "display_name": { "type": "string", "description": "阶段的人类可读名称" },
+          "description": { "type": "string" },
+          "continuous_state_variables": {
+            "type": "array",
+            "minItems": 1,
+            "description": "该阶段需要观测或控制的连续状态变量",
+            "items": {
+              "type": "object",
+              "required": ["variable_id", "display_name", "physical_domain"],
+              "properties": {
+                "variable_id": { "type": "string" },
+                "display_name": { "type": "string" },
+                "physical_domain": {
+                  "type": "string",
+                  "enum": ["rotation", "translation", "force", "flow", "distance", "angle", "torque", "velocity", "pressure", "temperature", "contact", "state"]
+                },
+                "unit": { "type": "string" },
+                "role": { "type": "string", "enum": ["controlled", "observed", "both"] }
+              }
+            }
+          },
+          "entry_conditions": {
+            "type": "array",
+            "description": "进入该阶段必须满足的条件",
+            "items": {
+              "type": "object",
+              "required": ["description"],
+              "properties": {
+                "description": { "type": "string" },
+                "required_condition_ref": { "type": "string" }
+              }
+            }
+          },
+          "transition_condition": {
+            "type": "object",
+            "required": ["condition_id", "display_name", "condition", "target_stage"],
+            "description": "触发阶段跃迁的条件逻辑结构",
+            "properties": {
+              "condition_id": { "type": "string" },
+              "display_name": { "type": "string" },
+              "condition": {
+                "type": "object",
+                "required": ["predicate"],
+                "properties": {
+                  "predicate": {
+                    "type": "object",
+                    "oneOf": [
+                      {
+                        "required": ["variable_ref", "operator", "threshold_ref"],
+                        "properties": {
+                          "variable_ref": { "type": "string" },
+                          "operator": { "type": "string", "enum": ["eq", "neq", "lt", "lte", "gt", "gte", "within", "outside"] },
+                          "threshold_ref": { "type": "string", "description": "引用偶然绑定数据中的阈值参数名" }
+                        }
+                      },
+                      {
+                        "required": ["all"],
+                        "properties": {
+                          "all": { "type": "array", "items": { "$ref": "#/properties/stages/items/properties/transition_condition/properties/condition/properties/predicate" } }
+                        }
+                      },
+                      {
+                        "required": ["any"],
+                        "properties": {
+                          "any": { "type": "array", "items": { "$ref": "#/properties/stages/items/properties/transition_condition/properties/condition/properties/predicate" } }
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              "target_stage": { "type": "string", "description": "目标阶段 stage_id，__terminal__ 表示过程结束" }
+            }
+          },
+          "failure_conditions": {
+            "type": "array",
+            "description": "该阶段可能发生的失败模式",
+            "items": {
+              "type": "object",
+              "required": ["failure_id", "description", "failure_type"],
+              "properties": {
+                "failure_id": { "type": "string" },
+                "description": { "type": "string" },
+                "failure_type": {
+                  "type": "string",
+                  "enum": ["mechanism_blocked", "object_absent", "object_slipped", "excessive_resistance", "boundary_exceeded", "sensor_blind", "unexpected_state", "timeout"]
+                },
+                "recovery": {
+                  "type": "object",
+                  "description": "结构化的恢复方案。恢复物理动作可具有与过程模板相同的结构格式，包括阶段序列、连续状态变量、阶段跃迁条件和参数槽。",
+                  "required": ["strategy"],
+                  "properties": {
+                    "strategy": {
+                      "type": "string",
+                      "enum": [
+                        "retry_current_stage",
+                        "retry_current_process",
+                        "inject_recovery_process",
+                        "skip_to_recovery_stage",
+                        "request_human_intervention",
+                        "abort_and_notify"
+                      ],
+                      "description": "恢复策略"
+                    },
+                    "recovery_process_ref": {
+                      "type": "string",
+                      "description": "引用的恢复过程 process_id（如 clear_blocked_spout、regrasp_object、wipe_spill）。恢复过程可具有独立的阶段序列、连续状态变量和阶段跃迁条件。"
+                    },
+                    "recovery_injection_point": {
+                      "type": "string",
+                      "description": "恢复过程完成后从哪里继续：retry=重新执行被中断的同一阶段，next=跳过被中断的阶段进入下一个阶段，restart=重新执行整个过程"
+                    },
+                    "max_recovery_attempts": { "type": "integer", "default": 1 },
+                    "on_recovery_exhausted": {
+                      "type": "string",
+                      "enum": ["abort_process", "abort_chain", "request_human", "mark_as_permanent_failure"],
+                      "description": "所有恢复尝试均失败后的处置"
+                    },
+                    "recovery_hint": {
+                      "type": "string",
+                      "description": "给人类的辅助说明（保留原 recovery_hint 语义，用于审计日志和人工介入时的提示）"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

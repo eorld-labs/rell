@@ -1,0 +1,313 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/engine_contract.schema.json",
+  "title": "EngineContract",
+  "description": "编排引擎的执行契约——定义引擎的状态机、引擎的输入输出数据格式、执行计划的格式、监控循环的接口。引擎本身是运行时组件（不在此 Schema 中实现），此 Schema 定义引擎生产和消费的所有数据结构。这使得引擎实现可与 Schema 设计独立迭代。",
+  "definitions": {
+    "engine_state": {
+      "type": "string",
+      "enum": [
+        "IDLE", "ACCEPTING_INTENT", "PLANNING", "PLAN_READY",
+        "DISPATCHING", "MONITORING", "STAGE_TRANSITIONING",
+        "PROCESS_COMPLETING", "CHAIN_TRANSITIONING",
+        "RECOVERING", "RETRYING", "PAUSED",
+        "COMPLETED", "FAILED", "ABORTED"
+      ],
+      "description": "引擎状态枚举"
+    },
+    "engine_transition": {
+      "type": "object",
+      "required": ["from", "to", "trigger"],
+      "properties": {
+        "from": { "$ref": "#/definitions/engine_state" },
+        "to": { "$ref": "#/definitions/engine_state" },
+        "trigger": { "type": "string", "description": "触发此转换的事件" },
+        "guard": { "type": "string", "description": "转换的守卫条件" },
+        "action": { "type": "string", "description": "转换时执行的动作" }
+      }
+    }
+  },
+  "type": "object",
+  "required": ["engine_version", "state_machine", "execution_plan_schema"],
+  "properties": {
+    "engine_version": { "type": "string" },
+    "state_machine": {
+      "type": "object",
+      "required": ["initial_state", "states", "transitions"],
+      "properties": {
+        "initial_state": {
+          "$ref": "#/definitions/engine_state",
+          "default": "IDLE"
+        },
+        "states": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["state", "description"],
+            "properties": {
+              "state": { "$ref": "#/definitions/engine_state" },
+              "description": { "type": "string" },
+              "entry_action": { "type": "string" },
+              "exit_action": { "type": "string" },
+              "timeout_ms": { "type": "number" },
+              "on_timeout_transition": { "$ref": "#/definitions/engine_state" }
+            }
+          }
+        },
+        "transitions": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/engine_transition" }
+        }
+      }
+    },
+    "execution_plan_schema": {
+      "type": "object",
+      "description": "编排引擎规划阶段的产出格式——将因果链展开为可执行的阶段序列。这是 PLANNING → PLAN_READY 的输出。",
+      "required": ["plan_id", "intent_ref", "causal_chain_ref", "process_sequence", "resource_schedule"],
+      "properties": {
+        "plan_id": { "type": "string" },
+        "intent_ref": { "type": "string" },
+        "causal_chain_ref": { "type": "string" },
+        "contingency_binding_ref": { "type": "string" },
+        "goal_fact": { "type": "string" },
+        "process_sequence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["instance_id", "process_ref", "execution_mode", "causal_dependencies"],
+            "properties": {
+              "instance_id": { "type": "string" },
+              "process_ref": { "type": "string" },
+              "template_bindings": {
+                "type": "object",
+                "description": "如果是过程模板实例，此处的参数绑定",
+                "additionalProperties": {}
+              },
+              "execution_mode": {
+                "type": "string",
+                "enum": ["sequential", "parallel", "conditional"],
+                "description": "sequential=必须等前一个完成、parallel=可与其他并行、conditional=仅当某条件成立时执行"
+              },
+              "parallel_group": {
+                "type": "string",
+                "description": "同一 parallel_group 内的过程可以同时执行（如双手操作）"
+              },
+              "resource_claims": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "该过程执行期间独占的资源：right_arm、left_arm、front_camera、depth_sensor"
+              },
+              "causal_dependencies": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["requires_fact", "produced_by_instance"],
+                  "properties": {
+                    "requires_fact": { "type": "string" },
+                    "produced_by_instance": { "type": "string" }
+                  }
+                }
+              },
+              "recovery_plan": {
+                "type": "object",
+                "properties": {
+                  "max_retries": { "type": "integer", "default": 1 },
+                  "recovery_process_ref": { "type": "string" },
+                  "on_recovery_failure": {
+                    "type": "string",
+                    "enum": ["skip_process", "abort_chain", "request_human", "try_alternative_process"]
+                  },
+                  "alternative_process_ref": { "type": "string" }
+                }
+              },
+              "verification_checkpoints": {
+                "type": "array",
+                "description": "该过程执行完成后需要验证的因果事实列表",
+                "items": {
+                  "type": "object",
+                  "required": ["fact_ref"],
+                  "properties": {
+                    "fact_ref": { "type": "string" },
+                    "verification_strategy": {
+                      "type": "string",
+                      "enum": ["dual_channel", "completion_implies_true", "lazy_verify_on_demand"],
+                      "description": "dual_channel=双通道主动验证、completion_implies_true=过程成功完成即可认为该事实成立、lazy_verify_on_demand=仅在后续过程需要该事实时才验证"
+                    },
+                    "blocking": {
+                      "type": "boolean",
+                      "default": true,
+                      "description": "验证不通过是否阻塞后续过程"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "resource_schedule": {
+          "type": "object",
+          "description": "全程资源占用时间表——用于避免死锁和资源冲突",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "allocated_to_instance": { "type": "string" },
+              "from_stage": { "type": "string" },
+              "to_stage": { "type": "string" },
+              "released_after": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "monitoring_loop": {
+      "type": "object",
+      "description": "感知-动作闭环的运行时接口定义。这是引擎在 MONITORING 状态中持续运行的循环——每个阶段执行时自动启用，不是经验库的内容。",
+      "required": ["loop_frequency_hz", "sensor_sources", "control_law"],
+      "properties": {
+        "loop_frequency_hz": { "type": "number" },
+        "sensor_sources": {
+          "type": "object",
+          "description": "循环中读取的传感器数据来源",
+          "patternProperties": {
+            ".*": {
+              "type": "object",
+              "properties": {
+                "channel": { "type": "string", "enum": ["digital", "physical"] },
+                "source": { "type": "string" },
+                "update_rate_hz": { "type": "number" }
+              }
+            }
+          }
+        },
+        "control_law": {
+          "type": "object",
+          "description": "实时对齐策略：比较意图状态机（期望值）与实际状态机（观测值），有偏差就微调",
+          "required": ["alignment_strategy"],
+          "properties": {
+            "alignment_strategy": {
+              "type": "string",
+              "enum": ["pid_correction", "direct_servo", "impedance_control", "admittance_control"],
+              "description": "偏差纠正的控制策略"
+            },
+            "max_correction_per_cycle": { "type": "number" },
+            "deadband": {
+              "type": "object",
+              "description": "死区——偏差在这个范围内不纠正，避免过度抖动",
+              "properties": {
+                "variable_ref": { "type": "string" },
+                "range": { "type": "object", "properties": { "min": { "type": "number" }, "max": { "type": "number" } } }
+              }
+            }
+          }
+        },
+        "transition_condition_check": {
+          "type": "object",
+          "description": "每个循环周期检查阶段跃迁条件是否满足；满足确认窗口后，触发阶段跃迁",
+          "required": ["check_frequency", "confirmation_window"],
+          "properties": {
+            "check_frequency": {
+              "type": "string",
+              "enum": ["every_cycle", "every_n_cycles", "on_significant_change"],
+              "description": "every_n_cycles=每N个循环检查一次（用于变化缓慢的状态变量如水位上升）、on_significant_change=仅在连续状态变量发生显著变化时检查"
+            },
+            "confirmation_window": {
+              "type": "object",
+              "description": "阶段跃迁条件需要持续成立多久或连续确认多少次才算真正满足",
+              "properties": {
+                "duration_ms": { "type": "number" },
+                "consecutive_checks": { "type": "integer" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "interruption_resumption": {
+      "type": "object",
+      "description": "中断恢复协议——定义引擎在中断后如何通过双通道重建上下文。不做序列化、不做断点存档。只重新看世界。",
+      "required": ["resume_strategy"],
+      "properties": {
+        "resume_strategy": {
+          "type": "string",
+          "enum": ["reobserve_and_match", "restart_current_stage", "restart_current_process", "restart_chain"],
+          "description": "reobserve_and_match=重新观测双通道数据，与过程模板中的阶段跃迁条件匹配，找到当前所在阶段入口（默认策略）"
+        },
+        "reobservation_protocol": {
+          "type": "object",
+          "properties": {
+            "step_1": { "type": "string", "description": "读取数字通道全部连续状态变量的当前值" },
+            "step_2": { "type": "string", "description": "读取物理通道的视觉推断值" },
+            "step_3": { "type": "string", "description": "双通道交叉验证确认当前实际状态" },
+            "step_4": { "type": "string", "description": "将当前状态与各阶段的 entry_conditions 匹配，确定入口阶段" },
+            "step_5": { "type": "string", "description": "从该入口阶段开始执行" }
+          }
+        },
+        "max_resume_attempts": { "type": "integer", "default": 3 }
+      }
+    },
+    "engine_inputs": {
+      "type": "object",
+      "description": "引擎的外部输入通道",
+      "properties": {
+        "task_intent": {
+          "type": "object",
+          "description": "来自 LLM 翻译层的结构化任务意图",
+          "properties": { "schema_ref": { "type": "string", "const": "task_intent.schema.json" } }
+        },
+        "sensor_stream": {
+          "type": "object",
+          "description": "来自传感器的连续数据流",
+          "properties": {
+            "digital_sources": { "type": "array", "items": { "type": "string" } },
+            "physical_sources": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "human_feedback": {
+          "type": "object",
+          "description": "人类实时反馈——确认、拒绝、纠正、接管",
+          "properties": {
+            "feedback_types": {
+              "type": "array",
+              "items": { "type": "string", "enum": ["confirm", "reject", "correct", "override", "pause", "resume", "abort"] }
+            }
+          }
+        }
+      }
+    },
+    "engine_outputs": {
+      "type": "object",
+      "description": "引擎的外部输出通道",
+      "properties": {
+        "motor_commands": {
+          "type": "object",
+          "description": "驱动执行器的控制指令"
+        },
+        "execution_trace": {
+          "type": "object",
+          "description": "执行过程的完整轨迹，记录每个阶段的实际观测值（连续状态变量的时间序列）、每个阶段跃迁条件的触发时间和值、每次独立观测通道验证的结果以及最终成立状态",
+          "properties": {
+            "schema_ref": { "type": "string", "const": "experience_record.schema.json (待修订为过程轨迹格式)" }
+          }
+        },
+        "audit_record": {
+          "type": "object",
+          "description": "审计记录——串联任务意图、执行计划、每阶段的实际观测和裁决",
+          "properties": { "schema_ref": { "type": "string", "const": "skill_audit.schema.json (待修订)" } }
+        },
+        "status_updates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "engine_state": { "$ref": "#/definitions/engine_state" },
+              "current_process": { "type": "string" },
+              "current_stage": { "type": "string" },
+              "timestamp": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

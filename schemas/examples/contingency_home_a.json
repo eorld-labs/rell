@@ -1,0 +1,215 @@
+{
+  "$schema": "../occasional_binding.schema.json",
+  "binding_id": "home_a_kitchen_daytime",
+  "environment_ref": "robot_home_a",
+  "description": "家庭A厨房——日间使用场景。马克杯+不锈钢壶。偏好：倒满。",
+  "process_bindings": [
+    {
+      "process_ref": "pour_water",
+      "state_variable_bindings": {
+        "tilt_angle": {
+          "source": "imu_right_wrist",
+          "channel": "digital",
+          "transform": "calibrated",
+          "sample_rate_hz": 100,
+          "latency_ms": 2
+        },
+        "water_flow_rate": {
+          "source": "flow_sensor_spout",
+          "channel": "digital",
+          "transform": "raw",
+          "sample_rate_hz": 100,
+          "latency_ms": 5
+        },
+        "water_surface_gap": {
+          "source": "camera_depth_front",
+          "channel": "physical",
+          "transform": "vision_inference",
+          "sample_rate_hz": 30,
+          "latency_ms": 50
+        }
+      },
+      "cross_validation_pairs": [
+        {
+          "digital_variable": "tilt_angle",
+          "physical_variable": "water_flow_rate",
+          "description": "数字的倾角读数应与物理的水流出现状态一致——倾角超过阈值时必须观察到水流",
+          "consistency_rule": {
+            "strategy": "digital_primary",
+            "allowed_deviation": 0,
+            "deviation_unit": "logical_correlation",
+            "on_inconsistency": "flag_for_human",
+            "inconsistency_action": "倾角已达到但水流未出现——壶内无水或壶口堵塞"
+          }
+        }
+      ],
+      "threshold_overrides": {
+        "min_continuous_flow": 3,
+        "stop_threshold": 0.5,
+        "level_threshold": 1,
+        "zero_flow": 0
+      },
+      "object_mappings": {
+        "cup_ref": {
+          "object_id": "mug_ceramic_white",
+          "display_name": "白色陶瓷马克杯",
+          "material": "ceramic",
+          "geometry_hint": "圆柱形，直径8cm，高10cm",
+          "weight_kg": 0.35,
+          "fragility": "fragile"
+        },
+        "kettle_ref": {
+          "object_id": "kettle_stainless_1l",
+          "display_name": "不锈钢水壶1L",
+          "material": "stainless_steel",
+          "geometry_hint": "标准水壶，容量1L，壶嘴约15cm高",
+          "weight_kg": 0.8,
+          "fragility": "robust"
+        }
+      },
+      "spatial_bindings": {
+        "cup_start_position": {
+          "x": 0.5,
+          "y": 0.3,
+          "z": 0.85,
+          "frame_ref": "robot_base",
+          "tolerance_mm": 5
+        },
+        "cup_target_position": {
+          "x": 0.8,
+          "y": 0.1,
+          "z": 0.75,
+          "frame_ref": "robot_base",
+          "tolerance_mm": 10
+        }
+      },
+      "preference_attachments": [
+        {
+          "transition_condition_ref": "water_near_rim",
+          "threshold_name": "stop_threshold",
+          "default_value": 0.5,
+          "preference_type": "continuous",
+          "preference_label": "倒水满度"
+        }
+      ]
+    },
+    {
+      "process_ref": "grasp_cup",
+      "state_variable_bindings": {
+        "gripper_to_cup_distance": {
+          "source": "camera_depth_front",
+          "transform": "vision_inference",
+          "sample_rate_hz": 30
+        },
+        "cup_position_stability": {
+          "source": "camera_rgb_front",
+          "transform": "vision_inference",
+          "sample_rate_hz": 15
+        },
+        "grip_force": {
+          "source": "force_sensor_right_gripper",
+          "transform": "calibrated",
+          "sample_rate_hz": 100
+        },
+        "cup_displacement": {
+          "source": "camera_depth_front",
+          "transform": "vision_inference",
+          "sample_rate_hz": 30
+        },
+        "contact_state": {
+          "source": "tactile_sensor_right",
+          "transform": "raw",
+          "sample_rate_hz": 50
+        },
+        "cup_vertical_position": {
+          "source": "camera_depth_front",
+          "transform": "vision_inference",
+          "sample_rate_hz": 30
+        },
+        "cup_tilt": {
+          "source": "imu_right_wrist",
+          "transform": "calibrated",
+          "sample_rate_hz": 100
+        }
+      },
+      "threshold_overrides": {
+        "grasp_approach_threshold": 20,
+        "min_grip_force": 5,
+        "max_close_displacement": 3,
+        "contact_confirmed": true,
+        "target_lift_height": 15,
+        "max_tilt_during_lift": 5
+      },
+      "object_mappings": {
+        "cup_ref": {
+          "object_id": "mug_ceramic_white",
+          "display_name": "白色陶瓷马克杯",
+          "material": "ceramic",
+          "geometry_hint": "圆柱形，直径8cm，高10cm",
+          "weight_kg": 0.35,
+          "fragility": "fragile"
+        }
+      }
+    },
+    {
+      "process_ref": "serve_to_human",
+      "state_variable_bindings": {
+        "cup_tilt": {
+          "source": "imu_right_wrist",
+          "transform": "calibrated",
+          "sample_rate_hz": 100
+        },
+        "liquid_surface_stability": {
+          "source": "camera_rgb_front",
+          "transform": "vision_inference",
+          "sample_rate_hz": 30
+        },
+        "distance_to_target": {
+          "source": "camera_depth_front",
+          "transform": "vision_inference",
+          "sample_rate_hz": 30
+        },
+        "collision_risk": {
+          "source": "camera_depth_front",
+          "transform": "vision_inference",
+          "sample_rate_hz": 15
+        },
+        "cup_contact_with_surface": {
+          "source": "tactile_sensor_right",
+          "transform": "raw",
+          "sample_rate_hz": 50
+        },
+        "cup_stability": {
+          "source": "camera_rgb_front",
+          "transform": "vision_inference",
+          "sample_rate_hz": 15
+        }
+      },
+      "threshold_overrides": {
+        "max_serve_tilt": 3,
+        "stable_true": true,
+        "arrival_threshold": 5,
+        "contact_true": true
+      },
+      "object_mappings": {
+        "cup_ref": {
+          "object_id": "mug_ceramic_white",
+          "display_name": "白色陶瓷马克杯",
+          "material": "ceramic",
+          "geometry_hint": "圆柱形，直径8cm，高10cm",
+          "weight_kg": 0.35,
+          "fragility": "fragile"
+        }
+      },
+      "spatial_bindings": {
+        "human_location": {
+          "x": 1.5,
+          "y": 0.0,
+          "z": 0.75,
+          "frame_ref": "robot_base",
+          "tolerance_mm": 20
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/occasional_binding.schema.json",
+  "title": "OccasionalBindingData",
+  "description": "正式公开入口：偶然绑定数据将过程模板中的参数槽填充为当前环境下的具体对象、传感器和阈值。本文件保留为公开门面，当前兼容引用 contingency_binding.schema.json。",
+  "allOf": [
+    {
+      "$ref": "contingency_binding.schema.json"
+    }
+  ]
+}

@@ -1,0 +1,190 @@
+{
+  "$schema": "../fact_observation.schema.json",
+  "facts": {
+    "cup_in_gripper": {
+      "fact_id": "cup_in_gripper",
+      "description": "杯子在末端执行器内且被稳定抓取。双通道验证：数字通道查抓取力和夹爪位置，物理通道查杯子视觉追踪。两通道必须一致——力的读数和视觉的位移必须同时确认杯子被抓住。",
+      "observation_method": {
+        "type": "dual_channel",
+        "digital": {
+          "continuous_state_variables": [
+            {
+              "variable_ref": "grip_force",
+              "condition": { "operator": "gte", "threshold_ref": "min_grip_hold_force" }
+            },
+            {
+              "variable_ref": "contact_state",
+              "condition": { "operator": "eq", "threshold_ref": "contact_confirmed" }
+            }
+          ],
+          "combine": "all",
+          "channel_description": "夹爪力传感器+接触传感器确认夹爪已抓取物体"
+        },
+        "physical": {
+          "continuous_state_variables": [
+            {
+              "variable_ref": "cup_displacement",
+              "condition": { "operator": "lte", "threshold_ref": "max_tracking_gap" },
+              "accumulation_rule": "minimum_duration",
+              "accumulation_param": { "window_ms": 100, "direction": "stable" }
+            }
+          ],
+          "combine": "all",
+          "channel_description": "视觉追踪确认杯子随夹爪运动且不发生独立位移"
+        },
+        "cross_validation": {
+          "strategy": "both_must_agree",
+          "on_conflict": "trust_physical",
+          "max_disagreement_duration_ms": 200,
+          "tolerance": {
+            "variable_refs": ["grip_force", "cup_displacement"],
+            "allowed_difference": 0,
+            "unit": "logical_and"
+          }
+        }
+      },
+      "falsified_by_failures": [
+        {
+          "process_ref": "grasp_cup",
+          "failure_condition_ref": "cup_slip_during_lift",
+          "reason": "提起时杯子滑脱意味着 cup_in_gripper 不再成立"
+        },
+        {
+          "process_ref": "grasp_cup",
+          "failure_condition_ref": "cup_fell",
+          "reason": "杯子完全脱离夹爪"
+        },
+        {
+          "process_ref": "grasp_cup",
+          "failure_condition_ref": "cup_slip_during_close",
+          "reason": "闭合时杯子滑移表示未达到稳定抓取"
+        }
+      ],
+      "verified_by_completions": [
+        { "process_ref": "grasp_cup", "stage_ref": "lift", "transition_condition_ref": "lifted_to_target_height" }
+      ]
+    },
+    "kettle_has_water": {
+      "fact_id": "kettle_has_water",
+      "description": "壶内含有足够倒出一杯的水。不透明壶体无法直接观测内部水量——该事实在执行前假定为真，由倒水过程的第一阶段验真或证伪。",
+      "observation_method": {
+        "type": "execution_verified",
+        "note": "无法在倒水前直接验证。如果倾斜阶段的水流从未出现，则该事实被证伪。如果水流出现，则该事实同时被证实。"
+      },
+      "falsified_by_failures": [
+        {
+          "process_ref": "pour_water",
+          "failure_condition_ref": "no_flow_after_max_tilt",
+          "reason": "倾角超过安全上限仍未出水——壶内无水或水位过低"
+        }
+      ],
+      "verified_by_completions": [
+        {
+          "process_ref": "pour_water",
+          "stage_ref": "tilting",
+          "transition_condition_ref": "flow_emerged",
+          "reason": "水流出现证实壶内有水"
+        }
+      ]
+    },
+    "cup_has_water": {
+      "fact_id": "cup_has_water",
+      "description": "杯内含水。双通道验证：数字通道累积倒水过程中的流量积分，物理通道用视觉确认水面在杯内且距杯口在预期范围内。中断恢复时用此事实重建‘水倒到哪了’的上下文。",
+      "observation_method": {
+        "type": "dual_channel",
+        "digital": {
+          "continuous_state_variables": [
+            {
+              "variable_ref": "water_flow_rate",
+              "condition": { "operator": "gt", "threshold_ref": "zero_flow" },
+              "accumulation_rule": "integral_over_time",
+              "accumulation_param": { "window_ms": 500 }
+            }
+          ],
+          "combine": "all",
+          "channel_description": "水流传感器对时间的积分确认已注水量"
+        },
+        "physical": {
+          "continuous_state_variables": [
+            {
+              "variable_ref": "water_surface_gap",
+              "condition": { "operator": "lt", "threshold_ref": "cup_height" },
+              "accumulation_rule": "instant"
+            }
+          ],
+          "combine": "all",
+          "channel_description": "视觉深度确认杯内存在水面且水面在杯口以下"
+        },
+        "cross_validation": {
+          "strategy": "digital_primary_physical_confirm",
+          "on_conflict": "trust_physical",
+          "max_disagreement_duration_ms": 500,
+          "tolerance": {
+            "variable_refs": ["water_flow_rate", "water_surface_gap"],
+            "allowed_difference": 20,
+            "unit": "percent"
+          }
+        }
+      },
+      "verified_by_completions": [
+        { "process_ref": "pour_water", "stage_ref": "recovering", "transition_condition_ref": "flow_stopped_and_level" }
+      ]
+    },
+    "cup_at_human_location": {
+      "fact_id": "cup_at_human_location",
+      "description": "杯子位于人类面前的放置面上。物理通道验证（视觉定位），数字通道辅助（末端执行器位置确认到达目标区域）。",
+      "observation_method": {
+        "type": "dual_channel",
+        "digital": {
+          "continuous_state_variables": [
+            {
+              "variable_ref": "distance_to_target",
+              "condition": { "operator": "lte", "threshold_ref": "arrival_threshold" }
+            }
+          ],
+          "combine": "all",
+          "channel_description": "末端执行器位置编码器确认到达目标坐标"
+        },
+        "physical": {
+          "continuous_state_variables": [
+            {
+              "variable_ref": "cup_contact_with_surface",
+              "condition": { "operator": "eq", "threshold_ref": "contact_true" }
+            },
+            {
+              "variable_ref": "cup_stability",
+              "condition": { "operator": "eq", "threshold_ref": "stable_true" },
+              "accumulation_rule": "minimum_duration",
+              "accumulation_param": { "window_ms": 500, "direction": "stable" }
+            }
+          ],
+          "combine": "all",
+          "channel_description": "视觉确认杯子已接触桌面且姿态稳定"
+        },
+        "cross_validation": {
+          "strategy": "both_must_agree",
+          "on_conflict": "retry_observation",
+          "max_disagreement_duration_ms": 300
+        }
+      }
+    },
+    "task_completed": {
+      "fact_id": "task_completed",
+      "description": "任务目标达成。这是编排链中所有因果事实的终极验证——当 goal_fact 被确认成立时，整个任务完成。",
+      "observation_method": {
+        "type": "single_channel",
+        "channel": {
+          "continuous_state_variables": [
+            {
+              "variable_ref": "cup_at_human_location",
+              "condition": { "operator": "eq", "threshold_ref": "verified_true" }
+            }
+          ],
+          "combine": "all",
+          "channel_description": "任务完成由 cup_at_human_location 的验证结果推导——杯子已端到人类面前 = 任务完成"
+        },
+        "fallback_note": "当 cup_at_human_location 的 both_must_agree 策略确认两通道一致时，task_completed 自动成立"
+      }
+    }
+  }
+}
