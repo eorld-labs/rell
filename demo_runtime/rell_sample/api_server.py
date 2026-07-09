@@ -151,6 +151,7 @@ INDEX_HTML = """<!doctype html>
     }
     .metric span { display: block; color: var(--muted); font-size: 12px; }
     .metric strong { display: block; margin-top: 5px; font-size: 16px; overflow-wrap: anywhere; }
+    #taskMetric { font-size: 14px; line-height: 1.25; }
     .runtime {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -172,6 +173,114 @@ INDEX_HTML = """<!doctype html>
       color: var(--ink);
       font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
     }
+    .sim {
+      border: 1px solid var(--line);
+      margin-bottom: 14px;
+      display: grid;
+      grid-template-columns: minmax(260px, 1.1fr) minmax(220px, .9fr);
+      min-height: 230px;
+      background: #fbfcfd;
+    }
+    .scene {
+      position: relative;
+      overflow: hidden;
+      min-height: 230px;
+      border-right: 1px solid var(--line);
+      background: linear-gradient(#f8fafb 0 72%, #eef3f1 72% 100%);
+    }
+    .counter {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 34px;
+      height: 8px;
+      background: #9aa5aa;
+    }
+    .kettle {
+      position: absolute;
+      width: 82px;
+      height: 92px;
+      left: 58px;
+      bottom: 46px;
+      transform-origin: 74px 82px;
+      transform: translateX(var(--kettle-x, 0px)) rotate(var(--kettle-tilt, 0deg));
+      transition: transform .18s linear;
+    }
+    .kettle-body {
+      position: absolute;
+      left: 8px;
+      top: 22px;
+      width: 58px;
+      height: 58px;
+      border: 3px solid #263238;
+      background: #dfe8e7;
+    }
+    .kettle-spout {
+      position: absolute;
+      right: -4px;
+      top: 36px;
+      width: 28px;
+      height: 10px;
+      border-top: 3px solid #263238;
+      transform: rotate(-8deg);
+    }
+    .kettle-handle {
+      position: absolute;
+      left: -2px;
+      top: 36px;
+      width: 18px;
+      height: 30px;
+      border: 3px solid #263238;
+      border-right: 0;
+    }
+    .cup {
+      position: absolute;
+      left: 278px;
+      bottom: 47px;
+      width: 78px;
+      height: 78px;
+      border: 3px solid #263238;
+      border-top: 0;
+      background: #ffffff;
+      overflow: hidden;
+    }
+    .cup-water {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: var(--water-level, 0%);
+      background: #55a7b5;
+      transition: height .18s linear;
+    }
+    .stream {
+      position: absolute;
+      left: var(--stream-x, 212px);
+      top: 98px;
+      width: 8px;
+      height: var(--stream-height, 0px);
+      background: #55a7b5;
+      opacity: var(--stream-opacity, 0);
+      transform: rotate(16deg);
+      transform-origin: top center;
+      transition: height .18s linear, opacity .12s linear;
+    }
+    .state-panel {
+      padding: 12px;
+      display: grid;
+      gap: 8px;
+      align-content: start;
+    }
+    .state-item {
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 14px;
+    }
+    .state-item span { color: var(--muted); }
+    .state-item strong { text-align: right; overflow-wrap: anywhere; }
     .stage-row {
       border-bottom: 1px solid var(--line);
       padding: 10px 0;
@@ -185,7 +294,8 @@ INDEX_HTML = """<!doctype html>
     .warn { color: var(--warn); }
     .bad { color: var(--bad); }
     @media (max-width: 860px) {
-      .grid, .runtime { grid-template-columns: 1fr; }
+      .grid, .runtime, .sim { grid-template-columns: 1fr; }
+      .scene { border-right: 0; border-bottom: 1px solid var(--line); }
       .summary { grid-template-columns: 1fr 1fr; }
       header { align-items: start; flex-direction: column; }
     }
@@ -222,6 +332,25 @@ INDEX_HTML = """<!doctype html>
           <div class="metric"><span>运行结果</span><strong id="outcomeMetric">-</strong></div>
           <div class="metric"><span>任务</span><strong id="taskMetric">-</strong></div>
         </div>
+        <div class="sim">
+          <div id="scene" class="scene">
+            <div class="counter"></div>
+            <div id="kettle" class="kettle">
+              <div class="kettle-body"></div>
+              <div class="kettle-spout"></div>
+              <div class="kettle-handle"></div>
+            </div>
+            <div id="stream" class="stream"></div>
+            <div class="cup"><div id="cupWater" class="cup-water"></div></div>
+          </div>
+          <div class="state-panel">
+            <div class="state-item"><span>壶嘴距离</span><strong id="distanceValue">-</strong></div>
+            <div class="state-item"><span>倾角</span><strong id="tiltValue">-</strong></div>
+            <div class="state-item"><span>水流速度</span><strong id="flowValue">-</strong></div>
+            <div class="state-item"><span>杯中液位</span><strong id="levelValue">-</strong></div>
+            <div class="state-item"><span>验真状态</span><strong id="factValue">-</strong></div>
+          </div>
+        </div>
         <div class="runtime">
           <div id="log" class="log"></div>
           <div id="facts" class="facts"></div>
@@ -239,6 +368,12 @@ INDEX_HTML = """<!doctype html>
     const stateMetric = document.getElementById("stateMetric");
     const outcomeMetric = document.getElementById("outcomeMetric");
     const taskMetric = document.getElementById("taskMetric");
+    const scene = document.getElementById("scene");
+    const distanceValue = document.getElementById("distanceValue");
+    const tiltValue = document.getElementById("tiltValue");
+    const flowValue = document.getElementById("flowValue");
+    const levelValue = document.getElementById("levelValue");
+    const factValue = document.getElementById("factValue");
 
     const eventLabel = {
       stage_started: "阶段启动",
@@ -265,7 +400,58 @@ INDEX_HTML = """<!doctype html>
       setText(stateMetric, "-");
       setText(outcomeMetric, "-");
       setText(taskMetric, "-");
+      resetScene();
       serviceState.textContent = "待运行";
+    }
+
+    function resetScene() {
+      scene.style.setProperty("--kettle-x", "0px");
+      scene.style.setProperty("--kettle-tilt", "0deg");
+      scene.style.setProperty("--water-level", "0%");
+      scene.style.setProperty("--stream-height", "0px");
+      scene.style.setProperty("--stream-opacity", "0");
+      scene.style.setProperty("--stream-x", "212px");
+      setText(distanceValue, "-");
+      setText(tiltValue, "-");
+      setText(flowValue, "-");
+      setText(levelValue, "-");
+      setText(factValue, "-");
+    }
+
+    function readPayloadValue(summary, name) {
+      const match = summary.match(new RegExp(name + "=([0-9.\\-]+)"));
+      return match ? Number(match[1]) : null;
+    }
+
+    function updateSceneFromEvent(event) {
+      const summary = event.payload_summary || "";
+      const distance = readPayloadValue(summary, "spout_to_cup_distance");
+      if (distance !== null) {
+        const x = Math.max(0, Math.min(145, (8 - distance) * 19));
+        scene.style.setProperty("--kettle-x", `${x}px`);
+        setText(distanceValue, `${distance.toFixed(1)} cm`);
+      }
+      const tilt = readPayloadValue(summary, "tilt_angle");
+      if (tilt !== null) {
+        scene.style.setProperty("--kettle-tilt", `${tilt.toFixed(1)}deg`);
+        setText(tiltValue, `${tilt.toFixed(1)}°`);
+      }
+      const flow = readPayloadValue(summary, "water_flow_rate");
+      if (flow !== null) {
+        scene.style.setProperty("--stream-height", flow > 0 ? "84px" : "0px");
+        scene.style.setProperty("--stream-opacity", flow > 0 ? "1" : "0");
+        setText(flowValue, `${flow.toFixed(1)} ml/s`);
+      }
+      const gap = readPayloadValue(summary, "water_surface_gap");
+      if (gap !== null) {
+        const level = Math.max(0, Math.min(86, (3 - gap) / 2.65 * 86));
+        scene.style.setProperty("--water-level", `${level.toFixed(0)}%`);
+        setText(levelValue, `gap ${gap.toFixed(2)} cm`);
+      }
+      if (summary.includes("cup_has_water")) {
+        const value = summary.split("cup_has_water:")[1] || summary;
+        setText(factValue, value.replace(" adapter=simulated_pouring_robot", ""));
+      }
     }
 
     function describeTrace(event) {
@@ -327,6 +513,7 @@ INDEX_HTML = """<!doctype html>
         for (const event of events) {
           await new Promise(resolve => setTimeout(resolve, 180));
           appendLog(describeTrace(event));
+          updateSceneFromEvent(event);
         }
         renderFacts(result);
         serviceState.textContent = result.audit_summary.outcome === "completed" ? "完成" : "等待人工确认";
