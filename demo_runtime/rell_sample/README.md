@@ -9,6 +9,9 @@
 - 异步 Robot Adapter 合约，不接真实机器人。
 - Mock 时间轴可作为固定剧本对照。
 - SimulatedRobotAdapter 可根据阶段动作生成连续状态变量和事实观测结果。
+- 规则式翻译层可将自然语言任务转换为结构化任务意图。
+- 空间准入会检查数字厨房认知模型中的绑定候选、对象索引和区域可用性。
+- 未进入第一阶段技能库的任务会返回 `cannot_do`，不进入 Runtime 执行。
 - 双通道验真：物理液位观测与数字流速积分估计。
 - 冲突时降级到人工确认，不做自动传感器融合。
 
@@ -101,9 +104,11 @@ http://127.0.0.1:8876/
 
 外部 API：
 
+- `POST /intent/translate`
 - `POST /process/admit`
 - `POST /process/run`
 - `GET /audit/{task_id}`
+- `GET /skills`
 
 空间调试接口：
 

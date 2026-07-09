@@ -11,8 +11,20 @@ def main() -> None:
     success = run_process("success")
     if success["audit_summary"]["outcome"] != "completed":
         raise AssertionError("success API run must complete")
+    if success["intent_translation"]["task_type"] != "pour_water":
+        raise AssertionError(f"success API run must expose intent translation: {success.get('intent_translation')}")
+    if success["space_admission"]["decision"] != "allowed":
+        raise AssertionError(f"success API run must pass space admission: {success.get('space_admission')}")
     if success["space_context"]["space_id"] != "home_a_kitchen":
         raise AssertionError(f"success API run must expose digital space context: {success.get('space_context')}")
+
+    auto = run_process("auto", "给客人倒一杯水")
+    if auto["scenario"] != "simulated_success" or auto["audit_summary"]["outcome"] != "completed":
+        raise AssertionError(f"auto API run must translate and choose simulated_success: {auto}")
+
+    unsupported = run_process("auto", "去楼下拿个快递")
+    if unsupported["audit_summary"]["outcome"] != "cannot_do":
+        raise AssertionError(f"unsupported task must return cannot_do: {unsupported}")
 
     conflict = run_process("channel_conflict")
     if conflict["audit_summary"]["outcome"] != "requires_human_confirmation":

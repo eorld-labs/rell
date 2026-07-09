@@ -32,6 +32,15 @@ TIMELINE_SCENARIOS = {
 SIMULATED_SCENARIOS = {"simulated_success", "simulated_no_water", "simulated_channel_conflict"}
 SCENARIOS = {**TIMELINE_SCENARIOS, **{name: name for name in SIMULATED_SCENARIOS}}
 
+TASK_LIBRARY = {
+    "pour_water": {
+        "display_name": "倒水",
+        "process_template": "pour_water",
+        "default_scenario": "simulated_success",
+        "required_bindings": ["CUP_OBJECT", "KETTLE_OBJECT", "CAMERA_SENSOR", "POUR_OPERATION_REGION", "WALKABLE_REGION"],
+    }
+}
+
 AUDIT_STORE: dict[str, dict[str, Any]] = {}
 STATE_STORE: dict[str, dict[str, Any]] = {}
 TRACE_STORE: dict[str, dict[str, Any]] = {}
@@ -284,6 +293,61 @@ INDEX_HTML = """<!doctype html>
     }
     .state-item span { color: var(--muted); }
     .state-item strong { text-align: right; overflow-wrap: anywhere; }
+    .space-map {
+      position: relative;
+      border: 1px solid var(--line);
+      margin-bottom: 14px;
+      min-height: 260px;
+      background: #f9fbfa;
+      overflow: hidden;
+    }
+    .map-region {
+      position: absolute;
+      border: 1px solid #7d8c88;
+      background: rgba(255,255,255,.75);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 6px;
+      font-size: 12px;
+      color: var(--ink);
+    }
+    .map-walkway { left: 10%; top: 45%; width: 76%; height: 33%; background: #eaf4ef; }
+    .map-counter { left: 56%; top: 14%; width: 28%; height: 16%; background: #eef1f5; }
+    .map-water { left: 18%; top: 14%; width: 20%; height: 16%; background: #e4f3f7; }
+    .map-cup { left: 59%; top: 17%; width: 8%; height: 9%; background: #fff; border-width: 2px; }
+    .map-service { left: 72%; top: 58%; width: 15%; height: 16%; border-radius: 999px; background: #fff8e8; }
+    .map-door { left: 5%; top: 55%; width: 9%; height: 18%; background: #f4efe6; }
+    .map-risk { left: 84%; top: 13%; width: 12%; height: 18%; background: #f9e7e5; border-color: #b66a61; color: #7e2e27; }
+    .map-object {
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border: 2px solid #263238;
+      background: #fff;
+    }
+    .map-kettle { left: 28%; top: 19%; }
+    .map-sensor { left: 43%; top: 62%; border-radius: 999px; background: #172026; }
+    .map-robot {
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      border: 2px solid #172026;
+      background: var(--accent);
+      left: var(--robot-x, 28%);
+      top: var(--robot-y, 60%);
+      transform: translate(-50%, -50%);
+      transition: left .24s linear, top .24s linear;
+    }
+    .map-path {
+      position: absolute;
+      left: 30%;
+      top: 60%;
+      width: 36%;
+      height: 2px;
+      border-top: 2px dashed #7c918a;
+    }
     .stage-row {
       border-bottom: 1px solid var(--line);
       padding: 10px 0;
@@ -316,6 +380,7 @@ INDEX_HTML = """<!doctype html>
         <textarea id="utterance">给客人倒一杯水</textarea>
         <label for="scenario">运行场景</label>
         <select id="scenario">
+          <option value="auto">自动：翻译层选择</option>
           <option value="simulated_success">模拟执行体：成功倒水</option>
           <option value="simulated_no_water">模拟执行体：壶内无水</option>
           <option value="simulated_channel_conflict">模拟执行体：双通道冲突</option>
@@ -354,6 +419,19 @@ INDEX_HTML = """<!doctype html>
             <div class="state-item"><span>验真状态</span><strong id="factValue">-</strong></div>
           </div>
         </div>
+        <div id="spaceMap" class="space-map">
+          <div class="map-region map-water">水源区</div>
+          <div class="map-region map-counter">操作台</div>
+          <div class="map-region map-walkway">可行动区</div>
+          <div class="map-region map-cup">杯</div>
+          <div class="map-region map-service">服务位</div>
+          <div class="map-region map-door">门</div>
+          <div class="map-region map-risk">风险区</div>
+          <div class="map-path"></div>
+          <div class="map-object map-kettle" title="object_kettle_steel_1l"></div>
+          <div class="map-object map-sensor" title="sensor_depth_front"></div>
+          <div id="mapRobot" class="map-robot" title="simulated_pouring_robot"></div>
+        </div>
         <div class="runtime">
           <div id="log" class="log"></div>
           <div id="facts" class="facts"></div>
@@ -377,6 +455,7 @@ INDEX_HTML = """<!doctype html>
     const flowValue = document.getElementById("flowValue");
     const levelValue = document.getElementById("levelValue");
     const factValue = document.getElementById("factValue");
+    const mapRobot = document.getElementById("mapRobot");
 
     const eventLabel = {
       stage_started: "阶段启动",
@@ -414,6 +493,8 @@ INDEX_HTML = """<!doctype html>
       scene.style.setProperty("--stream-height", "0px");
       scene.style.setProperty("--stream-opacity", "0");
       scene.style.setProperty("--stream-x", "212px");
+      mapRobot.style.setProperty("--robot-x", "28%");
+      mapRobot.style.setProperty("--robot-y", "60%");
       setText(distanceValue, "-");
       setText(tiltValue, "-");
       setText(flowValue, "-");
@@ -432,6 +513,9 @@ INDEX_HTML = """<!doctype html>
       if (distance !== null) {
         const x = Math.max(0, Math.min(145, (8 - distance) * 19));
         scene.style.setProperty("--kettle-x", `${x}px`);
+        const robotX = Math.max(30, Math.min(63, 30 + (8 - distance) * 4.2));
+        mapRobot.style.setProperty("--robot-x", `${robotX}%`);
+        mapRobot.style.setProperty("--robot-y", "60%");
         setText(distanceValue, `${distance.toFixed(1)} cm`);
       }
       const tilt = readPayloadValue(summary, "tilt_angle");
@@ -443,6 +527,10 @@ INDEX_HTML = """<!doctype html>
       if (flow !== null) {
         scene.style.setProperty("--stream-height", flow > 0 ? "84px" : "0px");
         scene.style.setProperty("--stream-opacity", flow > 0 ? "1" : "0");
+        if (flow > 0) {
+          mapRobot.style.setProperty("--robot-x", "64%");
+          mapRobot.style.setProperty("--robot-y", "36%");
+        }
         setText(flowValue, `${flow.toFixed(1)} ml/s`);
       }
       const gap = readPayloadValue(summary, "water_surface_gap");
@@ -469,6 +557,12 @@ INDEX_HTML = """<!doctype html>
       const facts = audit.fact_summary || [];
       const rows = [];
       rows.push(`<div class="stage-row"><strong>阶段结果</strong><span>${stages.length ? "" : "暂无阶段摘要"}</span></div>`);
+      if (result.intent_translation) {
+        rows.push(`<div class="stage-row"><strong>翻译层</strong><span>${result.intent_translation.task_type}: ${result.intent_translation.reason}</span></div>`);
+      }
+      if (result.space_admission) {
+        rows.push(`<div class="stage-row"><strong>空间准入</strong><span>${result.space_admission.decision}: ${result.space_admission.reason}</span></div>`);
+      }
       for (const stage of stages) {
         rows.push(`<div class="stage-row"><strong>${stage.stage_id}: ${stage.result}</strong><span>${stage.notes || ""}</span></div>`);
       }
@@ -497,29 +591,39 @@ INDEX_HTML = """<!doctype html>
       runButton.disabled = true;
       serviceState.textContent = "运行中";
       appendLog("接收任务：" + document.getElementById("utterance").value.trim());
-      appendLog("执行准入检查...");
+      const utterance = document.getElementById("utterance").value.trim();
+      appendLog("执行翻译层解析...");
       try {
-        const admit = await fetch("/process/admit", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).then(r => r.json());
+        const translated = await fetch("/intent/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ utterance })
+        }).then(r => r.json());
+        appendLog("翻译结果：" + JSON.stringify(translated, null, 2));
+        appendLog("执行准入检查...");
+        const admit = await fetch("/process/admit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ utterance })
+        }).then(r => r.json());
         setText(admitMetric, admit.decision || "unknown", admit.allowed ? "ok" : "bad");
         appendLog("准入结果：" + JSON.stringify(admit, null, 2));
-        if (!admit.allowed) {
-          serviceState.textContent = "未准入";
-          return;
-        }
 
         const scenario = document.getElementById("scenario").value;
-        appendLog("加载过程模板：pour_water");
-        appendLog("绑定当前环境：home_a_kitchen_daytime");
+        if (admit.allowed) {
+          appendLog("加载过程模板：pour_water");
+          appendLog("绑定当前环境：home_a_kitchen_daytime");
+        }
         appendLog("启动场景：" + scenario);
         const result = await fetch("/process/run", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ scenario, utterance: document.getElementById("utterance").value.trim() })
+          body: JSON.stringify({ scenario, utterance })
         }).then(r => r.json());
 
         setText(taskMetric, result.task_id || "-");
         setText(stateMetric, result.stage_runtime_state.runtime_state);
-        const outcomeClass = result.audit_summary.outcome === "completed" ? "ok" : "warn";
+        const outcomeClass = result.audit_summary.outcome === "completed" ? "ok" : (result.audit_summary.outcome === "cannot_do" ? "bad" : "warn");
         setText(outcomeMetric, result.audit_summary.outcome, outcomeClass);
 
         const events = result.execution_trace.events || [];
@@ -529,7 +633,7 @@ INDEX_HTML = """<!doctype html>
           updateSceneFromEvent(event);
         }
         renderFacts(result);
-        serviceState.textContent = result.audit_summary.outcome === "completed" ? "完成" : "等待人工确认";
+        serviceState.textContent = result.audit_summary.outcome === "completed" ? "完成" : (result.audit_summary.outcome === "cannot_do" ? "不会做" : "等待人工确认");
       } catch (error) {
         serviceState.textContent = "异常";
         appendLog("运行异常：" + error.message);
@@ -547,17 +651,180 @@ INDEX_HTML = """<!doctype html>
 """
 
 
-def admit_process() -> dict[str, Any]:
+def translate_intent(utterance: str) -> dict[str, Any]:
+    text = (utterance or "").strip()
+    if not text:
+        return {
+            "schema_version": "1.0.0",
+            "utterance": text,
+            "task_type": "unknown",
+            "decision": "unsupported",
+            "reason": "空任务输入",
+            "candidate_process": None,
+        }
+    if any(keyword in text for keyword in ["快递", "下楼", "电梯", "楼下"]):
+        return {
+            "schema_version": "1.0.0",
+            "utterance": text,
+            "task_type": "long_chain_delivery",
+            "decision": "unsupported",
+            "reason": "长程多过程任务尚未进入第一阶段技能库",
+            "candidate_process": None,
+        }
+    if any(keyword in text for keyword in ["炉灶", "火", "热源"]):
+        return {
+            "schema_version": "1.0.0",
+            "utterance": text,
+            "task_type": "risk_area_action",
+            "decision": "blocked",
+            "reason": "任务涉及数字空间中的风险区域，第一阶段阻断执行",
+            "candidate_process": None,
+        }
+    if any(keyword in text for keyword in ["倒水", "倒一杯水", "给客人倒水", "杯水"]):
+        scenario = "simulated_success"
+        if any(keyword in text for keyword in ["没水", "无水", "空壶"]):
+            scenario = "simulated_no_water"
+        if any(keyword in text for keyword in ["冲突", "看不清", "遮挡"]):
+            scenario = "simulated_channel_conflict"
+        return {
+            "schema_version": "1.0.0",
+            "utterance": text,
+            "task_type": "pour_water",
+            "decision": "executable",
+            "reason": "命中第一阶段倒水技能",
+            "candidate_process": "pour_water",
+            "recommended_scenario": scenario,
+            "goal_fact": "cup_has_water",
+        }
+    return {
+        "schema_version": "1.0.0",
+        "utterance": text,
+        "task_type": "unknown",
+        "decision": "unsupported",
+        "reason": "技能库未匹配到可执行过程模板",
+        "candidate_process": None,
+    }
+
+
+def evaluate_space_admission(intent: dict[str, Any], cognitive_model: dict[str, Any]) -> dict[str, Any]:
+    if intent["decision"] != "executable":
+        return {
+            "allowed": False,
+            "decision": intent["decision"],
+            "reason": intent["reason"],
+            "checks": [{"check_id": "intent_executable", "passed": False, "notes": intent["reason"]}],
+        }
+    task = TASK_LIBRARY[intent["task_type"]]
+    bindings = cognitive_model.get("binding_candidates", {})
+    object_index = cognitive_model.get("object_region_index", {})
+    regions = {item["region_id"]: item for item in cognitive_model.get("space_region_table", [])}
+    missing_bindings = [name for name in task["required_bindings"] if name not in bindings]
+    required_objects = [bindings.get("CUP_OBJECT"), bindings.get("KETTLE_OBJECT"), bindings.get("CAMERA_SENSOR")]
+    missing_objects = [item for item in required_objects if item and item not in object_index]
+    required_regions = [bindings.get("POUR_OPERATION_REGION"), bindings.get("WALKABLE_REGION")]
+    missing_regions = [item for item in required_regions if item and item not in regions]
+    risk_regions = cognitive_model.get("risk_region_table", [])
+    checks = [
+        {"check_id": "intent_executable", "passed": True, "notes": intent["reason"]},
+        {"check_id": "space_bindings_complete", "passed": not missing_bindings, "notes": ",".join(missing_bindings)},
+        {"check_id": "objects_indexed", "passed": not missing_objects, "notes": ",".join(missing_objects)},
+        {"check_id": "required_regions_available", "passed": not missing_regions, "notes": ",".join(missing_regions)},
+        {"check_id": "risk_regions_known", "passed": True, "notes": f"{len(risk_regions)} risk region(s) guarded"},
+    ]
+    allowed = all(item["passed"] for item in checks)
+    return {
+        "allowed": allowed,
+        "decision": "allowed" if allowed else "blocked",
+        "reason": "空间上下文满足倒水过程准入" if allowed else "空间上下文缺失必要绑定",
+        "checks": checks,
+    }
+
+
+def build_cannot_do_result(utterance: str, intent: dict[str, Any], space_admission: dict[str, Any]) -> dict[str, Any]:
+    cognitive_model = get_cognitive_model()
+    task_id = "task_unexecutable"
+    return {
+        "task_id": task_id,
+        "scenario": "not_executed",
+        "intent_translation": intent,
+        "space_admission": space_admission,
+        "admission_decision": {
+            "schema_version": "1.0.0",
+            "task_id": task_id,
+            "allowed": False,
+            "decision": "blocked" if intent["decision"] == "blocked" else "unsupported",
+            "checks": space_admission["checks"],
+            "missing_items": [intent["reason"]],
+        },
+        "audit_summary": {
+            "schema_version": "1.0.0",
+            "task_id": task_id,
+            "process_instance_id": "not_created",
+            "outcome": "cannot_do",
+            "stage_summary": [],
+            "fact_summary": [],
+            "stop_reason": intent["reason"],
+        },
+        "stage_runtime_state": {
+            "schema_version": "1.0.0",
+            "task_id": task_id,
+            "process_instance_id": "not_created",
+            "current_stage_id": None,
+            "runtime_state": "cannot_do",
+            "utterance": utterance,
+        },
+        "execution_trace": {
+            "schema_version": "1.0.0",
+            "task_id": task_id,
+            "process_instance_id": "not_created",
+            "events": [],
+        },
+        "space_context": build_space_context(cognitive_model),
+    }
+
+
+def admit_process(utterance: str = "给客人倒一杯水") -> dict[str, Any]:
     queue = SerialEventQueue()
     process_instance = read_json(DATA / "pour_water_process_instance.json")
     initial_state = read_json(DATA / "stage_runtime_state_initial.json")
     timeline = read_json(DATA / "mock_timeline_success.json")
     adapter = MockRobotAdapter(timeline, queue)
     runtime = P016Runtime(process_instance, initial_state, adapter)
-    return runtime.admit()
+    intent = translate_intent(utterance)
+    cognitive_model = get_cognitive_model()
+    space_admission = evaluate_space_admission(intent, cognitive_model)
+    admission = runtime.admit()
+    admission["intent_translation"] = intent
+    admission["space_admission"] = space_admission
+    if not space_admission["allowed"]:
+        admission["allowed"] = False
+        admission["decision"] = space_admission["decision"]
+        admission["checks"].extend(space_admission["checks"])
+        admission["missing_items"].append(space_admission["reason"])
+    else:
+        admission["checks"].extend(space_admission["checks"])
+    return admission
 
 
-def run_process(scenario: str = "success") -> dict[str, Any]:
+def build_space_context(cognitive_model: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "space_id": cognitive_model["local_environment_summary"]["space_id"],
+        "cognitive_model_id": cognitive_model["cognitive_model_id"],
+        "region_count": cognitive_model["local_environment_summary"]["region_count"],
+        "relation_count": cognitive_model["local_environment_summary"]["relation_count"],
+        "object_count": cognitive_model["local_environment_summary"]["object_count"],
+        "binding_candidates": cognitive_model["binding_candidates"],
+    }
+
+
+def run_process(scenario: str = "success", utterance: str = "给客人倒一杯水") -> dict[str, Any]:
+    intent = translate_intent(utterance)
+    cognitive_model = get_cognitive_model()
+    space_admission = evaluate_space_admission(intent, cognitive_model)
+    if not space_admission["allowed"]:
+        return build_cannot_do_result(utterance, intent, space_admission)
+    if scenario == "auto":
+        scenario = intent.get("recommended_scenario", "simulated_success")
     if scenario not in SCENARIOS:
         return {
             "error": "unknown_scenario",
@@ -571,22 +838,16 @@ def run_process(scenario: str = "success") -> dict[str, Any]:
     AUDIT_STORE[task_id] = result["audit_summary"]
     STATE_STORE[task_id] = result["stage_runtime_state"]
     TRACE_STORE[task_id] = result["execution_trace"]
-    cognitive_model = read_json(COGNITIVE_MODEL_FILE)
     return {
         "task_id": task_id,
         "scenario": scenario,
+        "intent_translation": intent,
+        "space_admission": space_admission,
         "admission_decision": result["admission_decision"],
         "audit_summary": result["audit_summary"],
         "stage_runtime_state": result["stage_runtime_state"],
         "execution_trace": result["execution_trace"],
-        "space_context": {
-            "space_id": cognitive_model["local_environment_summary"]["space_id"],
-            "cognitive_model_id": cognitive_model["cognitive_model_id"],
-            "region_count": cognitive_model["local_environment_summary"]["region_count"],
-            "relation_count": cognitive_model["local_environment_summary"]["relation_count"],
-            "object_count": cognitive_model["local_environment_summary"]["object_count"],
-            "binding_candidates": cognitive_model["binding_candidates"],
-        },
+        "space_context": build_space_context(cognitive_model),
     }
 
 
@@ -628,6 +889,9 @@ class RellSampleHandler(BaseHTTPRequestHandler):
         if path == "/space/cognitive-model":
             self._send_json(get_cognitive_model())
             return
+        if path == "/skills":
+            self._send_json({"schema_version": "1.0.0", "skills": TASK_LIBRARY})
+            return
         if path.startswith("/audit/"):
             task_id = path.removeprefix("/audit/")
             self._send_json(get_audit(task_id), status=200 if task_id in AUDIT_STORE else 404)
@@ -642,11 +906,16 @@ class RellSampleHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
         body = self._read_json_body()
+        if path == "/intent/translate":
+            intent = translate_intent(body.get("utterance", ""))
+            cognitive_model = get_cognitive_model()
+            self._send_json({"intent_translation": intent, "space_admission": evaluate_space_admission(intent, cognitive_model)})
+            return
         if path == "/process/admit":
-            self._send_json(admit_process())
+            self._send_json(admit_process(body.get("utterance", "给客人倒一杯水")))
             return
         if path == "/process/run":
-            result = run_process(body.get("scenario", "success"))
+            result = run_process(body.get("scenario", "success"), body.get("utterance", "给客人倒一杯水"))
             self._send_json(result, status=400 if "error" in result else 200)
             return
         self._send_json({"error": "not_found"}, status=404)
