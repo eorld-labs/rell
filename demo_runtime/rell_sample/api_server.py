@@ -458,8 +458,13 @@ INDEX_HTML = """<!doctype html>
 到水源处
 接一杯水
 倒水</textarea>
+        <label for="dialogueTeaching" style="margin-top:12px;">对话教学</label>
+        <textarea id="dialogueTeaching">教你：走向操作台，然后拿起杯子，到水源处接一杯水，然后倒水</textarea>
         <div class="actions" style="margin-top:8px;">
           <button id="teachButton" class="secondary" title="将步骤转为候选经验">教学入库</button>
+          <button id="dialogueTeachButton" class="secondary" title="从对话中形成候选经验">对话教学</button>
+        </div>
+        <div class="actions" style="margin-top:8px;">
           <button id="libraryButton" class="secondary" title="查看当前经验库">经验库</button>
         </div>
       </section>
@@ -487,6 +492,8 @@ INDEX_HTML = """<!doctype html>
             <div class="state-item"><span>水流速度</span><strong id="flowValue">-</strong></div>
             <div class="state-item"><span>杯中液位</span><strong id="levelValue">-</strong></div>
             <div class="state-item"><span>验真状态</span><strong id="factValue">-</strong></div>
+            <div class="state-item"><span>当前经验步骤</span><strong id="learnedStepValue">-</strong></div>
+            <div class="state-item"><span>空间目标</span><strong id="targetValue">-</strong></div>
           </div>
         </div>
         <div id="spaceMap" class="space-map">
@@ -513,6 +520,7 @@ INDEX_HTML = """<!doctype html>
   <script>
     const runButton = document.getElementById("runButton");
     const teachButton = document.getElementById("teachButton");
+    const dialogueTeachButton = document.getElementById("dialogueTeachButton");
     const libraryButton = document.getElementById("libraryButton");
     const clearButton = document.getElementById("clearButton");
     const logEl = document.getElementById("log");
@@ -528,6 +536,8 @@ INDEX_HTML = """<!doctype html>
     const flowValue = document.getElementById("flowValue");
     const levelValue = document.getElementById("levelValue");
     const factValue = document.getElementById("factValue");
+    const learnedStepValue = document.getElementById("learnedStepValue");
+    const targetValue = document.getElementById("targetValue");
     const mapRobot = document.getElementById("mapRobot");
     const mapCupItem = document.getElementById("mapCupItem");
 
@@ -579,6 +589,8 @@ INDEX_HTML = """<!doctype html>
       setText(flowValue, "-");
       setText(levelValue, "-");
       setText(factValue, "-");
+      setText(learnedStepValue, "-");
+      setText(targetValue, "-");
     }
 
     function readPayloadValue(summary, name) {
@@ -604,6 +616,10 @@ INDEX_HTML = """<!doctype html>
       const summary = event.payload_summary || "";
       const step = readPayloadToken(summary, "step");
       if (!step) return false;
+      const display = readPayloadToken(summary, "display");
+      const target = readPayloadToken(summary, "target");
+      setText(learnedStepValue, display || step);
+      setText(targetValue, target || "-");
       scene.style.setProperty("--stream-height", "0px");
       scene.style.setProperty("--stream-opacity", "0");
       if (step === "move_to_counter") {
@@ -769,7 +785,8 @@ INDEX_HTML = """<!doctype html>
 
         const events = result.execution_trace.events || [];
         for (const event of events) {
-          await new Promise(resolve => setTimeout(resolve, 180));
+          const delayMs = event.trigger_reason === "learned_step_executed" ? 760 : 180;
+          await new Promise(resolve => setTimeout(resolve, delayMs));
           appendLog(describeTrace(event));
           updateSceneFromEvent(event);
         }
@@ -819,6 +836,42 @@ INDEX_HTML = """<!doctype html>
       }
     }
 
+    async function teachByDialogue() {
+      dialogueTeachButton.disabled = true;
+      serviceState.textContent = "对话教学中";
+      const utterance = document.getElementById("utterance").value.trim();
+      const message = document.getElementById("dialogueTeaching").value.trim();
+      appendLog("提交对话教学：" + message);
+      try {
+        const result = await fetch("/experience/dialogue-teach", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ utterance, message })
+        }).then(r => r.json());
+        appendLog("对话教学结果：" + JSON.stringify(result, null, 2));
+        if (result.decision === "experience_created") {
+          setText(admitMetric, "learned", "ok");
+          setText(stateMetric, "candidate_created", "ok");
+          setText(outcomeMetric, "可回放", "ok");
+          setText(taskMetric, result.experience.experience_id);
+          factsEl.innerHTML = [
+            `<div class="stage-row"><strong>经验形成</strong><span>${result.message}</span></div>`,
+            `<div class="stage-row"><strong>过程链</strong><span>${result.experience.process_chain.join(" -> ")}</span></div>`,
+            `<div class="stage-row"><strong>来源</strong><span>dialogue_teaching</span></div>`
+          ].join("");
+          serviceState.textContent = "已学习";
+        } else {
+          setText(outcomeMetric, "教学失败", "bad");
+          serviceState.textContent = "教学失败";
+        }
+      } catch (error) {
+        serviceState.textContent = "异常";
+        appendLog("对话教学异常：" + error.message);
+      } finally {
+        dialogueTeachButton.disabled = false;
+      }
+    }
+
     async function showExperienceLibrary() {
       const result = await fetch("/experience/library").then(r => r.json());
       appendLog("经验库：" + JSON.stringify(result, null, 2));
@@ -830,6 +883,7 @@ INDEX_HTML = """<!doctype html>
 
     runButton.addEventListener("click", runProcess);
     teachButton.addEventListener("click", teachExperience);
+    dialogueTeachButton.addEventListener("click", teachByDialogue);
     libraryButton.addEventListener("click", showExperienceLibrary);
     clearButton.addEventListener("click", clearView);
     clearView();
@@ -1028,6 +1082,28 @@ def teach_experience(utterance: str, steps: Any) -> dict[str, Any]:
         "experience": experience,
         "message": "已形成候选经验，后续相同任务将优先命中该经验链",
     }
+
+
+def teach_experience_from_dialogue(utterance: str, message: str) -> dict[str, Any]:
+    text = (message or "").strip()
+    if not text:
+        return {"error": "missing_dialogue", "message": "对话教学内容不能为空"}
+    source_utterance = (utterance or "").strip()
+    cleaned = re.sub(r"^(教你|我教你|现在教你|对话教学)[：:，,\s]*", "", text).strip()
+    if not source_utterance:
+        source_utterance = cleaned
+    result = teach_experience(source_utterance, text)
+    if "experience" in result:
+        result["experience"]["context"]["human_intent_ref"] = "dialogue_teaching"
+        result["experience"]["action"]["parameters"]["source"] = "dialogue_teaching"
+        library = load_experience_library()
+        library["experiences"] = [
+            result["experience"] if item.get("experience_id") == result["experience"]["experience_id"] else item
+            for item in library.get("experiences", [])
+        ]
+        save_experience_library(library)
+        result["message"] = "已从对话教学形成候选经验，后续相同任务将优先命中该经验链"
+    return result
 
 
 def evaluate_space_admission(intent: dict[str, Any], cognitive_model: dict[str, Any]) -> dict[str, Any]:
@@ -1359,6 +1435,10 @@ class RellSampleHandler(BaseHTTPRequestHandler):
             return
         if path == "/experience/teach":
             result = teach_experience(body.get("utterance", ""), body.get("steps", ""))
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/experience/dialogue-teach":
+            result = teach_experience_from_dialogue(body.get("utterance", ""), body.get("message", ""))
             self._send_json(result, status=400 if "error" in result else 200)
             return
         self._send_json({"error": "not_found"}, status=404)

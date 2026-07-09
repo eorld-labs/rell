@@ -12,6 +12,7 @@ from api_server import (
     load_experience_library,
     run_process,
     teach_experience,
+    teach_experience_from_dialogue,
 )
 
 
@@ -65,6 +66,15 @@ def main() -> None:
     if learned_run.get("experience_ref") != taught["experience"]["experience_id"]:
         raise AssertionError(f"learned run must reference taught experience: {learned_run}")
 
+    dialogue_taught = teach_experience_from_dialogue(
+        "走向操作台，然后拿起杯子，到水源处接一杯水，然后倒水",
+        "教你：走向操作台，然后拿起杯子，到水源处接一杯水，然后倒水",
+    )
+    if dialogue_taught.get("decision") != "experience_created":
+        raise AssertionError(f"dialogue teaching must create an experience: {dialogue_taught}")
+    if dialogue_taught["experience"]["context"]["human_intent_ref"] != "dialogue_teaching":
+        raise AssertionError(f"dialogue teaching must mark source: {dialogue_taught}")
+
     conflict = run_process("channel_conflict")
     if conflict["audit_summary"]["outcome"] != "requires_human_confirmation":
         raise AssertionError("conflict API run must require human confirmation")
@@ -97,7 +107,7 @@ def main() -> None:
         EXPERIENCE_LIBRARY_FILE.write_text(original_library, encoding="utf-8")
 
     print("API sample validation passed.")
-    print("Validated: admit, run success, teach experience, run learned chain, run channel_conflict, run simulated_success, get audit, get space.")
+    print("Validated: admit, run success, teach experience, dialogue teaching, run learned chain, run channel_conflict, run simulated_success, get audit, get space.")
 
 
 if __name__ == "__main__":

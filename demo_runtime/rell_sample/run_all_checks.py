@@ -73,6 +73,8 @@ def run_http_smoke() -> None:
             raise AssertionError("demo page did not render")
         if "mapCupItem" not in page or "updateLearnedStepScene" not in page:
             raise AssertionError("demo page did not include learned experience animation mapping")
+        if "dialogueTeachButton" not in page:
+            raise AssertionError("demo page did not include dialogue teaching entry")
         if health.get("status") != "ok":
             raise AssertionError(f"health failed: {health}")
         if cognitive_model.get("prior_ref") != "semantic_prior_home_a_kitchen_v1":
