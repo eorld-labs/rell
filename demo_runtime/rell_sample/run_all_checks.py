@@ -71,6 +71,8 @@ def run_http_smoke() -> None:
         audit = get_json(f"/audit/{run_result['task_id']}")
         if "RELL 真实世界经验引擎样品" not in page:
             raise AssertionError("demo page did not render")
+        if "mapCupItem" not in page or "updateLearnedStepScene" not in page:
+            raise AssertionError("demo page did not include learned experience animation mapping")
         if health.get("status") != "ok":
             raise AssertionError(f"health failed: {health}")
         if cognitive_model.get("prior_ref") != "semantic_prior_home_a_kitchen_v1":

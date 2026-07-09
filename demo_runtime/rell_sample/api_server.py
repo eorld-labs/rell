@@ -301,6 +301,8 @@ INDEX_HTML = """<!doctype html>
       border-top: 0;
       background: #ffffff;
       overflow: hidden;
+      transform: translateX(var(--cup-x, 0px));
+      transition: transform .24s linear;
     }
     .cup-water {
       position: absolute;
@@ -386,6 +388,18 @@ INDEX_HTML = """<!doctype html>
       transform: translate(-50%, -50%);
       transition: left .24s linear, top .24s linear;
     }
+    .map-cup-item {
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      left: var(--cup-map-x, 63%);
+      top: var(--cup-map-y, 22%);
+      border: 2px solid #263238;
+      background: linear-gradient(#fff 0 var(--cup-empty, 100%), #55a7b5 var(--cup-empty, 100%) 100%);
+      transform: translate(-50%, -50%);
+      transition: left .24s linear, top .24s linear, background .18s linear;
+      z-index: 4;
+    }
     .map-path {
       position: absolute;
       left: 30%;
@@ -465,7 +479,7 @@ INDEX_HTML = """<!doctype html>
               <div class="kettle-handle"></div>
             </div>
             <div id="stream" class="stream"></div>
-            <div class="cup"><div id="cupWater" class="cup-water"></div></div>
+            <div id="sceneCup" class="cup"><div id="cupWater" class="cup-water"></div></div>
           </div>
           <div class="state-panel">
             <div class="state-item"><span>壶嘴距离</span><strong id="distanceValue">-</strong></div>
@@ -486,6 +500,7 @@ INDEX_HTML = """<!doctype html>
           <div class="map-path"></div>
           <div class="map-object map-kettle" title="object_kettle_steel_1l"></div>
           <div class="map-object map-sensor" title="sensor_depth_front"></div>
+          <div id="mapCupItem" class="map-cup-item" title="object_cup_white_mug"></div>
           <div id="mapRobot" class="map-robot" title="simulated_pouring_robot"></div>
         </div>
         <div class="runtime">
@@ -514,6 +529,7 @@ INDEX_HTML = """<!doctype html>
     const levelValue = document.getElementById("levelValue");
     const factValue = document.getElementById("factValue");
     const mapRobot = document.getElementById("mapRobot");
+    const mapCupItem = document.getElementById("mapCupItem");
 
     const eventLabel = {
       stage_started: "阶段启动",
@@ -552,8 +568,12 @@ INDEX_HTML = """<!doctype html>
       scene.style.setProperty("--stream-height", "0px");
       scene.style.setProperty("--stream-opacity", "0");
       scene.style.setProperty("--stream-x", "212px");
+      scene.style.setProperty("--cup-x", "0px");
       mapRobot.style.setProperty("--robot-x", "28%");
       mapRobot.style.setProperty("--robot-y", "60%");
+      mapCupItem.style.setProperty("--cup-map-x", "63%");
+      mapCupItem.style.setProperty("--cup-map-y", "22%");
+      mapCupItem.style.setProperty("--cup-empty", "100%");
       setText(distanceValue, "-");
       setText(tiltValue, "-");
       setText(flowValue, "-");
@@ -566,8 +586,61 @@ INDEX_HTML = """<!doctype html>
       return match ? Number(match[1]) : null;
     }
 
+    function readPayloadToken(summary, name) {
+      const match = summary.match(new RegExp(name + "=([^\\\\s]+)"));
+      return match ? match[1] : "";
+    }
+
+    function moveDigitalActors(robotX, robotY, cupX = null, cupY = null) {
+      mapRobot.style.setProperty("--robot-x", robotX);
+      mapRobot.style.setProperty("--robot-y", robotY);
+      if (cupX && cupY) {
+        mapCupItem.style.setProperty("--cup-map-x", cupX);
+        mapCupItem.style.setProperty("--cup-map-y", cupY);
+      }
+    }
+
+    function updateLearnedStepScene(event) {
+      const summary = event.payload_summary || "";
+      const step = readPayloadToken(summary, "step");
+      if (!step) return false;
+      scene.style.setProperty("--stream-height", "0px");
+      scene.style.setProperty("--stream-opacity", "0");
+      if (step === "move_to_counter") {
+        moveDigitalActors("63%", "58%");
+        scene.style.setProperty("--cup-x", "0px");
+        setText(factValue, "executor_at_counter");
+      } else if (step === "pick_up_cup") {
+        moveDigitalActors("63%", "58%", "63%", "55%");
+        scene.style.setProperty("--cup-x", "-18px");
+        setText(factValue, "cup_in_gripper");
+      } else if (step === "move_to_water_source") {
+        moveDigitalActors("28%", "58%", "29%", "55%");
+        scene.style.setProperty("--cup-x", "-150px");
+        setText(factValue, "executor_at_water_source");
+      } else if (step === "fill_cup_at_water_source") {
+        moveDigitalActors("28%", "58%", "29%", "55%");
+        mapCupItem.style.setProperty("--cup-empty", "35%");
+        scene.style.setProperty("--water-level", "62%");
+        setText(levelValue, "digital fill");
+        setText(factValue, "cup_contains_water");
+      } else if (step === "pour_water") {
+        moveDigitalActors("63%", "58%", "63%", "55%");
+        mapCupItem.style.setProperty("--cup-empty", "35%");
+        scene.style.setProperty("--cup-x", "0px");
+        scene.style.setProperty("--stream-height", "70px");
+        scene.style.setProperty("--stream-opacity", "1");
+        setText(flowValue, "digital pour");
+        setText(factValue, "water_poured");
+      }
+      return true;
+    }
+
     function updateSceneFromEvent(event) {
       const summary = event.payload_summary || "";
+      if (event.trigger_reason === "learned_step_executed" && updateLearnedStepScene(event)) {
+        return;
+      }
       const distance = readPayloadValue(summary, "spout_to_cup_distance");
       if (distance !== null) {
         const x = Math.max(0, Math.min(145, (8 - distance) * 19));
