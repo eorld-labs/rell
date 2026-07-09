@@ -1,0 +1,20 @@
+{
+  "$schema": "../../../schemas/mock_timeline.schema.json",
+  "schema_version": "1.0.0",
+  "timeline_id": "mock_pour_water_no_flow",
+  "process_instance_id": "proc_pour_water_home_a_001",
+  "time_base": "stage_started",
+  "description": "倾斜到位但无水流，用于触发恢复或人工确认。",
+  "stages": {
+    "align": [
+      { "time_ms": 0, "event": "stage_started" },
+      { "time_ms": 300, "event": "state_update", "variable": "spout_to_cup_distance", "value": 0.4, "unit": "cm", "source": "mock_depth_camera" }
+    ],
+    "tilting": [
+      { "time_ms": 0, "event": "stage_started" },
+      { "time_ms": 400, "event": "state_update", "variable": "tilt_angle", "value": 22, "unit": "degree", "source": "mock_imu" },
+      { "time_ms": 1200, "event": "state_update", "variable": "water_flow_rate", "value": 0, "unit": "ml_per_second", "source": "mock_flow_estimator" },
+      { "time_ms": 1300, "event": "failure_event", "failure_id": "no_flow_after_max_tilt", "failure_label": "no_flow" }
+    ]
+  }
+}

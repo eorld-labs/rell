@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/mock_timeline.schema.json",
+  "title": "MockTimeline",
+  "description": "MockRobotAdapter 使用的时间轴事件脚本。该结构是测试剧本 DSL，不是 RuntimeEvent；MockAdapter 按阶段启动时间将其展开为 RuntimeEvent 后推入 Runtime 事件队列。",
+  "type": "object",
+  "required": ["schema_version", "timeline_id", "process_instance_id", "time_base", "stages"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema_version": { "type": "string", "pattern": "^1\\.\\d+\\.\\d+$" },
+    "timeline_id": { "type": "string" },
+    "process_instance_id": { "type": "string" },
+    "time_base": {
+      "type": "string",
+      "enum": ["stage_started"],
+      "description": "time_ms 以当前阶段 stage_started 为相对零点，不以系统启动时间为零点。"
+    },
+    "description": { "type": "string" },
+    "stages": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": ["time_ms", "event"],
+          "properties": {
+            "time_ms": { "type": "integer", "minimum": 0 },
+            "event": {
+              "type": "string",
+              "enum": ["stage_started", "state_update", "observation_update", "failure_event"]
+            },
+            "variable": { "type": "string" },
+            "value": {},
+            "unit": { "type": "string" },
+            "source": { "type": "string" },
+            "fact_id": { "type": "string" },
+            "channel_id": { "type": "string" },
+            "state": {
+              "type": "string",
+              "enum": ["established", "not_established", "conflicted", "unknown"]
+            },
+            "inputs": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "failure_id": { "type": "string" },
+            "failure_label": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

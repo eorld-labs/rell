@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/admission_decision.schema.json",
+  "title": "AdmissionDecision",
+  "description": "进入 RELL Runtime 前的能力准入判断。",
+  "type": "object",
+  "required": ["schema_version", "task_id", "allowed", "decision", "checks"],
+  "properties": {
+    "schema_version": { "type": "string", "pattern": "^1\\.\\d+\\.\\d+$" },
+    "task_id": { "type": "string" },
+    "allowed": { "type": "boolean" },
+    "decision": { "type": "string", "enum": ["allowed", "blocked", "requires_human_confirmation"] },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["check_id", "passed"],
+        "properties": {
+          "check_id": { "type": "string" },
+          "passed": { "type": "boolean" },
+          "details": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "missing_items": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}

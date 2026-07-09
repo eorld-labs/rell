@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/execution_trace.schema.json",
+  "title": "ExecutionTrace",
+  "description": "RELL Runtime 追加写事件日志，用于审计和经验回写。",
+  "type": "object",
+  "required": ["schema_version", "task_id", "process_instance_id", "events"],
+  "properties": {
+    "schema_version": { "type": "string", "pattern": "^1\\.\\d+\\.\\d+$" },
+    "task_id": { "type": "string" },
+    "process_instance_id": { "type": "string" },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["event_ref", "consumed_sequence", "before_state", "after_state"],
+        "properties": {
+          "event_ref": { "type": "string" },
+          "consumed_sequence": { "type": "integer", "minimum": 0 },
+          "before_state": { "type": "string" },
+          "after_state": { "type": "string" },
+          "trigger_reason": { "type": "string" },
+          "recorded_at": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,49 @@
+{
+  "$schema": "../../../schemas/process_instance.schema.json",
+  "schema_version": "1.0.0",
+  "process_instance_id": "proc_pour_water_home_a_001",
+  "process_template_ref": "pour_water",
+  "binding_ref": "home_a_kitchen_daytime",
+  "task_id": "task_pour_water_001",
+  "stages": [
+    {
+      "stage_id": "align",
+      "required_capability": "align_container",
+      "transition_condition_ref": "spout_aligned",
+      "target_fact_ref": "cup_kettle_aligned"
+    },
+    {
+      "stage_id": "tilting",
+      "required_capability": "tilt_container",
+      "transition_condition_ref": "flow_emerged",
+      "target_fact_ref": "water_flow_started"
+    },
+    {
+      "stage_id": "maintain_flow",
+      "required_capability": "hold_pose",
+      "transition_condition_ref": "target_level_reached",
+      "target_fact_ref": "cup_has_water"
+    },
+    {
+      "stage_id": "return",
+      "required_capability": "return_to_level",
+      "transition_condition_ref": "flow_stopped_and_level",
+      "target_fact_ref": "pouring_completed"
+    }
+  ],
+  "bound_parameters": {
+    "CUP_OBJECT": "mug_ceramic_white",
+    "KETTLE_OBJECT": "kettle_stainless_1l",
+    "CAMERA_SENSOR": "camera_depth_front",
+    "FLOW_MIN": 3.0,
+    "TARGET_LEVEL_GAP": 0.5,
+    "LEVEL_THRESHOLD": 1.0,
+    "ZERO_FLOW": 0.0,
+    "confirmation_window_ms": 300,
+    "verification_timeout_ms": 1500
+  },
+  "recovery_policy": {
+    "max_recovery_attempts": 1,
+    "recovery_escalation": "request_human_confirmation"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "../../../schemas/mock_timeline.schema.json",
+  "schema_version": "1.0.0",
+  "timeline_id": "mock_pour_water_success",
+  "process_instance_id": "proc_pour_water_home_a_001",
+  "time_base": "stage_started",
+  "description": "成功倒水路径。time_ms 以当前 stage_started 为相对零点。",
+  "stages": {
+    "align": [
+      { "time_ms": 0, "event": "stage_started" },
+      { "time_ms": 300, "event": "state_update", "variable": "spout_to_cup_distance", "value": 0.4, "unit": "cm", "source": "mock_depth_camera" }
+    ],
+    "tilting": [
+      { "time_ms": 0, "event": "stage_started" },
+      { "time_ms": 400, "event": "state_update", "variable": "tilt_angle", "value": 18, "unit": "degree", "source": "mock_imu" },
+      { "time_ms": 900, "event": "state_update", "variable": "water_flow_rate", "value": 3.4, "unit": "ml_per_second", "source": "mock_flow_estimator" }
+    ],
+    "maintain_flow": [
+      { "time_ms": 0, "event": "stage_started" },
+      { "time_ms": 600, "event": "state_update", "variable": "water_surface_gap", "value": 0.45, "unit": "cm", "source": "mock_depth_camera" },
+      { "time_ms": 650, "event": "observation_update", "fact_id": "cup_has_water", "channel_id": "physical_liquid_level", "state": "established", "inputs": { "water_surface_gap": 0.45 } },
+      { "time_ms": 700, "event": "observation_update", "fact_id": "cup_has_water", "channel_id": "digital_flow_integral", "state": "established", "inputs": { "flow_integral_ml": 120, "tilt_angle": 18 } }
+    ],
+    "return": [
+      { "time_ms": 0, "event": "stage_started" },
+      { "time_ms": 500, "event": "state_update", "variable": "tilt_angle", "value": 0.5, "unit": "degree", "source": "mock_imu" },
+      { "time_ms": 550, "event": "state_update", "variable": "water_flow_rate", "value": 0, "unit": "ml_per_second", "source": "mock_flow_estimator" }
+    ]
+  }
+}

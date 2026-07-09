@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/audit_summary.schema.json",
+  "title": "AuditSummary",
+  "description": "样品阶段审计摘要，面向演示和经验回写。",
+  "type": "object",
+  "required": ["schema_version", "task_id", "process_instance_id", "outcome", "stage_summary", "fact_summary"],
+  "properties": {
+    "schema_version": { "type": "string", "pattern": "^1\\.\\d+\\.\\d+$" },
+    "task_id": { "type": "string" },
+    "process_instance_id": { "type": "string" },
+    "outcome": { "type": "string", "enum": ["completed", "blocked", "requires_human_confirmation", "failed", "stopped"] },
+    "stage_summary": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["stage_id", "result"],
+        "properties": {
+          "stage_id": { "type": "string" },
+          "result": { "type": "string" },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "fact_summary": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["fact_id", "state"],
+        "properties": {
+          "fact_id": { "type": "string" },
+          "state": { "type": "string" },
+          "channel_notes": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "skill_package_draft_ref": { "type": "string" }
+  },
+  "additionalProperties": false
+}

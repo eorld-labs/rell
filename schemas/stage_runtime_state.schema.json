@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/stage_runtime_state.schema.json",
+  "title": "StageRuntimeState",
+  "description": "RELL Runtime 当前状态快照。该结构只表示当前状态，不保存历史日志。",
+  "type": "object",
+  "required": ["schema_version", "task_id", "process_instance_id", "runtime_state", "current_stage_id", "variables", "retry_count", "updated_at"],
+  "properties": {
+    "schema_version": { "type": "string", "pattern": "^1\\.\\d+\\.\\d+$" },
+    "task_id": { "type": "string" },
+    "process_instance_id": { "type": "string" },
+    "runtime_state": {
+      "type": "string",
+      "enum": [
+        "idle",
+        "admitted",
+        "running",
+        "awaiting_fact_verification",
+        "awaiting_human_confirmation",
+        "recovering",
+        "completed",
+        "stopped",
+        "failed"
+      ]
+    },
+    "current_stage_id": { "type": "string" },
+    "variables": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["value"],
+        "properties": {
+          "value": {},
+          "unit": { "type": "string" },
+          "source": { "type": "string" },
+          "updated_at": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "latest_fact_state": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "enum": ["established", "not_established", "conflicted", "unknown"]
+      }
+    },
+    "retry_count": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "pending_human_confirmation": {
+      "type": "object",
+      "properties": {
+        "confirmation_id": { "type": "string" },
+        "prompt": { "type": "string" },
+        "requested_at": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "updated_at": { "type": "string" }
+  },
+  "additionalProperties": false
+}

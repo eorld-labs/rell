@@ -1,0 +1,30 @@
+{
+  "$schema": "../../../schemas/admission_decision.schema.json",
+  "schema_version": "1.0.0",
+  "task_id": "task_pour_water_001",
+  "allowed": true,
+  "decision": "allowed",
+  "checks": [
+    {
+      "check_id": "rule_mapping_found",
+      "passed": true,
+      "details": "倒水类输入映射到 process_template: pour_water。"
+    },
+    {
+      "check_id": "template_exists",
+      "passed": true,
+      "details": "倒水过程模板已预置。"
+    },
+    {
+      "check_id": "binding_complete",
+      "passed": true,
+      "details": "家庭A偶然绑定包含对象、传感器和阈值。"
+    },
+    {
+      "check_id": "adapter_capabilities",
+      "passed": true,
+      "details": "MockRobotAdapter 报告 align_container、tilt_container、hold_pose、return_to_level 和观测能力。"
+    }
+  ],
+  "missing_items": []
+}

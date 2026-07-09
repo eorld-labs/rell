@@ -1,0 +1,17 @@
+{
+  "$schema": "../../../schemas/stage_runtime_state.schema.json",
+  "schema_version": "1.0.0",
+  "task_id": "task_pour_water_001",
+  "process_instance_id": "proc_pour_water_home_a_001",
+  "runtime_state": "admitted",
+  "current_stage_id": "align",
+  "variables": {},
+  "latest_fact_state": {},
+  "retry_count": {
+    "align": 0,
+    "tilting": 0,
+    "maintain_flow": 0,
+    "return": 0
+  },
+  "updated_at": "2026-07-09T00:00:00Z"
+}

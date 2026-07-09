@@ -1,0 +1,33 @@
+{
+  "$schema": "../../../schemas/task_intent.schema.json",
+  "intent_id": "intent_pour_water_001",
+  "human_utterance": "给客人倒一杯水",
+  "translated_at": "2026-07-09T00:00:00Z",
+  "goal_fact": "cup_has_water",
+  "goal_hint": "完成倒水，使杯中有水。",
+  "constraints": ["no_spill", "requires_fact_verification"],
+  "constraint_details": [
+    {
+      "constraint_type": "safety",
+      "description": "仅在倒水模板、家庭A绑定和双通道验真均可用时执行。",
+      "hard_constraint": true,
+      "causal_fact_ref": "cup_has_water"
+    }
+  ],
+  "context": {
+    "space_ref": "home_a_kitchen",
+    "available_objects": ["mug_ceramic_white", "kettle_stainless_1l"],
+    "current_robot_state": {
+      "grippers_free": ["right_gripper"],
+      "grippers_occupied": {},
+      "current_pose_ref": "kitchen_counter_pose"
+    }
+  },
+  "preferences_ref": "pref_full_cup",
+  "priority": "normal",
+  "llm_audit": {
+    "model": "rule_mapping_v1",
+    "ambiguities_flagged": [],
+    "unknowns_declared": []
+  }
+}

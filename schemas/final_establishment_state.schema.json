@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/final_establishment_state.schema.json",
+  "title": "FinalEstablishmentState",
+  "description": "目标因果事实的最终成立状态及其回流动作。",
+  "type": "object",
+  "required": ["schema_version", "fact_id", "state", "reflow_action"],
+  "properties": {
+    "schema_version": { "type": "string", "pattern": "^1\\.\\d+\\.\\d+$" },
+    "fact_id": { "type": "string" },
+    "state": {
+      "type": "string",
+      "enum": ["established", "not_established", "conflicted", "unknown"]
+    },
+    "judgment_refs": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "reflow_action": {
+      "type": "string",
+      "enum": [
+        "advance_stage",
+        "trigger_recovery",
+        "request_human_confirmation",
+        "stop",
+        "write_experience_record"
+      ]
+    },
+    "reason": { "type": "string" }
+  },
+  "additionalProperties": false
+}
