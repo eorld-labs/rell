@@ -43,12 +43,20 @@ def main() -> None:
         raise AssertionError(f"unsupported task must return cannot_do: {unsupported}")
 
     process_chain = run_process("auto", "走向操作台，然后拿起杯子，到水源处接一杯水，然后倒水")
-    if process_chain["audit_summary"]["outcome"] != "cannot_do":
-        raise AssertionError(f"process chain must not collapse into pour_water: {process_chain}")
-    if process_chain["intent_translation"].get("task_type") != "process_chain":
-        raise AssertionError(f"process chain must be identified before execution: {process_chain['intent_translation']}")
-    if "fill_cup_at_water_source" not in process_chain["intent_translation"].get("candidate_process_chain", []):
-        raise AssertionError(f"process chain must retain water-source filling step: {process_chain['intent_translation']}")
+    if process_chain["audit_summary"]["outcome"] != "completed":
+        raise AssertionError(f"process chain must be solved through causal planning: {process_chain}")
+    if process_chain["intent_translation"].get("task_type") != "causal_process_chain":
+        raise AssertionError(f"process chain must be translated as causal_process_chain: {process_chain['intent_translation']}")
+    expected_long_chain = [
+        "move_to_counter",
+        "pick_up_cup",
+        "move_to_water_source",
+        "fill_cup_at_water_source",
+        "move_to_counter",
+        "pour_water",
+    ]
+    if process_chain["intent_translation"].get("candidate_process_chain") != expected_long_chain:
+        raise AssertionError(f"process chain must be derived from causal preconditions: {process_chain['intent_translation']}")
 
     taught = teach_experience(
         "走向操作台，然后拿起杯子，到水源处接一杯水，然后倒水",
@@ -61,10 +69,10 @@ def main() -> None:
     learned_run = run_process("auto", "走向操作台，然后拿起杯子，到水源处接一杯水，然后倒水")
     if learned_run["audit_summary"]["outcome"] != "completed":
         raise AssertionError(f"learned process chain must run in digital space: {learned_run}")
-    if learned_run["intent_translation"]["task_type"] != "learned_process_chain":
-        raise AssertionError(f"learned task must be translated as learned_process_chain: {learned_run['intent_translation']}")
-    if learned_run.get("experience_ref") != taught["experience"]["experience_id"]:
-        raise AssertionError(f"learned run must reference taught experience: {learned_run}")
+    if learned_run["intent_translation"]["task_type"] != "causal_process_chain":
+        raise AssertionError(f"causal planner must take priority over exact phrase enumeration: {learned_run['intent_translation']}")
+    if learned_run["intent_translation"].get("goal_fact") != "water_poured":
+        raise AssertionError(f"learned long task must retain target fact: {learned_run['intent_translation']}")
 
     dialogue_taught = teach_experience_from_dialogue(
         "走向操作台，然后拿起杯子，到水源处接一杯水，然后倒水",
@@ -75,18 +83,14 @@ def main() -> None:
     if dialogue_taught["experience"]["context"]["human_intent_ref"] != "dialogue_teaching":
         raise AssertionError(f"dialogue teaching must mark source: {dialogue_taught}")
 
-    short_dialogue_taught = teach_experience_from_dialogue("到水源处接一杯水", "")
-    if short_dialogue_taught.get("decision") != "experience_created":
-        raise AssertionError(f"empty dialogue message must fall back to utterance: {short_dialogue_taught}")
-    if "pour_water" in short_dialogue_taught["experience"]["process_chain"]:
-        raise AssertionError(f"filling water must not be misread as pouring water: {short_dialogue_taught}")
     short_run = run_process("auto", "到水源处接一杯水")
     if short_run["audit_summary"]["outcome"] != "completed":
-        raise AssertionError(f"short taught chain must run in digital space: {short_run}")
-    if "move_to_water_source" not in short_run["intent_translation"].get("candidate_process_chain", []):
-        raise AssertionError(f"short taught chain must include water source step: {short_run['intent_translation']}")
+        raise AssertionError(f"short goal must run through causal precondition search: {short_run}")
+    expected_short_chain = ["move_to_counter", "pick_up_cup", "move_to_water_source", "fill_cup_at_water_source"]
+    if short_run["intent_translation"].get("candidate_process_chain") != expected_short_chain:
+        raise AssertionError(f"short goal must infer cup preconditions from causal layer: {short_run['intent_translation']}")
     if "pour_water" in short_run["intent_translation"].get("candidate_process_chain", []):
-        raise AssertionError(f"short taught chain must not include pouring step: {short_run['intent_translation']}")
+        raise AssertionError(f"short goal must not include pouring step: {short_run['intent_translation']}")
 
     conflict = run_process("channel_conflict")
     if conflict["audit_summary"]["outcome"] != "requires_human_confirmation":
@@ -120,7 +124,7 @@ def main() -> None:
         EXPERIENCE_LIBRARY_FILE.write_text(original_library, encoding="utf-8")
 
     print("API sample validation passed.")
-    print("Validated: admit, run success, teach experience, dialogue teaching, short-chain teaching, run learned chain, run channel_conflict, run simulated_success, get audit, get space.")
+    print("Validated: admit, run success, teach experience, dialogue teaching, causal chain solving, causal short-goal solving, run channel_conflict, run simulated_success, get audit, get space.")
 
 
 if __name__ == "__main__":

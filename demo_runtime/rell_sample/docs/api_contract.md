@@ -1,6 +1,6 @@
 # RELL Sample API Contract
 
-第一阶段对外仍以运行、准入和审计为主；经验教学接口作为样品学习闭环的最小入口，暂不扩展为通用规划或模板学习 API。
+第一阶段对外仍以运行、准入和审计为主；经验教学接口作为样品学习闭环的最小入口，暂不扩展为通用规划或模板学习 API。自因果链最小实现起，`/process/run` 在检测到目标因果事实时，会优先通过因果层反向搜索形成过程链，而不是要求每一种自然语言任务都枚举为独立经验。
 
 ## POST /process/admit
 
@@ -42,6 +42,20 @@
 
 `simulated_*` 场景由 SimulatedRobotAdapter 根据阶段动作生成连续状态变量；其余场景为固定 Mock 时间轴，用于回归对照。
 
+当输入为 `到水源处接一杯水` 时，翻译层输出目标因果事实 `cup_contains_water`。编排层基于当前空间事实和过程事实注册表反向补齐前提事实，生成：
+
+```text
+move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_source
+```
+
+当输入为 `走向操作台，然后拿起杯子，到水源处接一杯水，然后倒水` 时，目标因果事实为 `water_poured`，系统生成：
+
+```text
+move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_source -> move_to_counter -> pour_water
+```
+
+响应中的 `intent_translation.causal_plan` 会给出初始事实、最终事实、推导过程和生成的过程链。
+
 ## GET /audit/{task_id}
 
 用途：查询最近一次运行写入内存的审计摘要。
@@ -61,7 +75,7 @@
 }
 ```
 
-第一阶段采用轻量规则映射表解析教学步骤，不调用通用规划器，不自动生成新的 P016 过程模板。生成的经验链先标记为数字空间可回放经验，后续再进入人工审核、真机验证或模板化沉淀。
+第一阶段采用轻量规则映射表解析教学步骤，不调用通用规划器，不自动生成新的 P016 过程模板。生成的经验链先标记为数字空间可回放经验，后续再进入人工审核、真机验证或模板化沉淀。若同一输入已经能被目标因果事实和因果层求解，则运行时优先采用因果求解结果，教学经验作为候选经验和审计依据保留。
 
 ## POST /experience/dialogue-teach
 
