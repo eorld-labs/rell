@@ -41,6 +41,14 @@ TASK_LIBRARY = {
     }
 }
 
+PROCESS_CHAIN_KEYWORDS = [
+    ("move_to_counter", ["走向操作台", "走到操作台", "到操作台", "去操作台"]),
+    ("pick_up_cup", ["拿起杯子", "拿杯子", "取杯子", "抓取杯子"]),
+    ("move_to_water_source", ["到水源", "去水源", "走到水源", "水源处"]),
+    ("fill_cup_at_water_source", ["接一杯水", "接水", "装水", "取水"]),
+    ("pour_water", ["倒水", "倒一杯水", "给客人倒水", "杯水"]),
+]
+
 AUDIT_STORE: dict[str, dict[str, Any]] = {}
 STATE_STORE: dict[str, dict[str, Any]] = {}
 TRACE_STORE: dict[str, dict[str, Any]] = {}
@@ -662,6 +670,19 @@ def translate_intent(utterance: str) -> dict[str, Any]:
             "reason": "空任务输入",
             "candidate_process": None,
         }
+    detected_steps = detect_process_chain(text)
+    has_sequence_marker = any(marker in text for marker in ["然后", "再", "接着", "之后", "，", ","])
+    if len(detected_steps) > 1 or (has_sequence_marker and detected_steps and detected_steps != ["pour_water"]):
+        return {
+            "schema_version": "1.0.0",
+            "utterance": text,
+            "task_type": "process_chain",
+            "decision": "unsupported",
+            "reason": "检测到多过程任务链，第一阶段仅支持单过程倒水，未执行以避免跳过前置动作",
+            "candidate_process": None,
+            "candidate_process_chain": detected_steps,
+            "unsupported_steps": [step for step in detected_steps if step != "pour_water"],
+        }
     if any(keyword in text for keyword in ["快递", "下楼", "电梯", "楼下"]):
         return {
             "schema_version": "1.0.0",
@@ -704,6 +725,15 @@ def translate_intent(utterance: str) -> dict[str, Any]:
         "reason": "技能库未匹配到可执行过程模板",
         "candidate_process": None,
     }
+
+
+def detect_process_chain(text: str) -> list[str]:
+    steps: list[tuple[int, str]] = []
+    for step_id, keywords in PROCESS_CHAIN_KEYWORDS:
+        positions = [text.find(keyword) for keyword in keywords if keyword in text]
+        if positions:
+            steps.append((min(positions), step_id))
+    return [step_id for _, step_id in sorted(steps, key=lambda item: item[0])]
 
 
 def evaluate_space_admission(intent: dict[str, Any], cognitive_model: dict[str, Any]) -> dict[str, Any]:

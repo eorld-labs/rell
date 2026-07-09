@@ -26,6 +26,14 @@ def main() -> None:
     if unsupported["audit_summary"]["outcome"] != "cannot_do":
         raise AssertionError(f"unsupported task must return cannot_do: {unsupported}")
 
+    process_chain = run_process("auto", "走向操作台，然后拿起杯子，到水源处接一杯水，然后倒水")
+    if process_chain["audit_summary"]["outcome"] != "cannot_do":
+        raise AssertionError(f"process chain must not collapse into pour_water: {process_chain}")
+    if process_chain["intent_translation"].get("task_type") != "process_chain":
+        raise AssertionError(f"process chain must be identified before execution: {process_chain['intent_translation']}")
+    if "fill_cup_at_water_source" not in process_chain["intent_translation"].get("candidate_process_chain", []):
+        raise AssertionError(f"process chain must retain water-source filling step: {process_chain['intent_translation']}")
+
     conflict = run_process("channel_conflict")
     if conflict["audit_summary"]["outcome"] != "requires_human_confirmation":
         raise AssertionError("conflict API run must require human confirmation")
