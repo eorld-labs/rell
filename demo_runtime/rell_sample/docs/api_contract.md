@@ -27,15 +27,20 @@
 
 ```json
 {
-  "scenario": "success"
+  "scenario": "simulated_success"
 }
 ```
 
 可选场景：
 
+- `simulated_success`
+- `simulated_no_water`
+- `simulated_channel_conflict`
 - `success`
 - `no_flow`
 - `channel_conflict`
+
+`simulated_*` 场景由 SimulatedRobotAdapter 根据阶段动作生成连续状态变量；其余场景为固定 Mock 时间轴，用于回归对照。
 
 ## GET /audit/{task_id}
 

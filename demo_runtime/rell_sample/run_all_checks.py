@@ -53,7 +53,7 @@ def run_http_smoke() -> None:
         page = get_text("/")
         health = get_json("/health")
         admit = post_json("/process/admit", {})
-        run_result = post_json("/process/run", {"scenario": "channel_conflict"})
+        run_result = post_json("/process/run", {"scenario": "simulated_channel_conflict"})
         audit = get_json(f"/audit/{run_result['task_id']}")
         if "RELL 真实世界经验引擎样品" not in page:
             raise AssertionError("demo page did not render")
@@ -63,6 +63,11 @@ def run_http_smoke() -> None:
             raise AssertionError(f"admit failed: {admit}")
         if run_result["audit_summary"]["outcome"] != "requires_human_confirmation":
             raise AssertionError(f"run failed: {run_result}")
+        if not any(
+            "adapter=simulated_pouring_robot" in event.get("payload_summary", "")
+            for event in run_result["execution_trace"]["events"]
+        ):
+            raise AssertionError("HTTP smoke did not use simulated adapter")
         if audit.get("outcome") != "requires_human_confirmation":
             raise AssertionError(f"audit failed: {audit}")
     finally:
@@ -77,6 +82,7 @@ def run_http_smoke() -> None:
 def main() -> None:
     run_python("validate_stage_zero.py")
     run_python("validate_runtime_sample.py")
+    run_python("validate_simulated_robot_sample.py")
     run_python("validate_api_sample.py")
     run_http_smoke()
     print("All RELL sample checks passed.")

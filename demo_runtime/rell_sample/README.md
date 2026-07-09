@@ -1,13 +1,14 @@
-# RELL Sample Stage Zero
+# RELL Sample
 
-本目录是 RELL 样品从 0 到 1 的阶段零交付物。阶段零只冻结数据结构、接口边界和 Mock 剧本，不实现完整 Runtime。
+本目录是 RELL 样品从 0 到 1 的纯软件样品。当前已包含阶段零数据契约、Mock 剧本、P016 Runtime Core、SimulatedRobotAdapter、最小 API 和交互演示页面。
 
 ## 当前范围
 
 - 单过程倒水样品：`align -> tilting -> maintain_flow -> return`。
 - 规则映射式意图输入，不做通用语义检索。
 - 异步 Robot Adapter 合约，不接真实机器人。
-- Mock 时间轴驱动连续状态变量和事实观测结果。
+- Mock 时间轴可作为固定剧本对照。
+- SimulatedRobotAdapter 可根据阶段动作生成连续状态变量和事实观测结果。
 - 双通道验真：物理液位观测与数字流速积分估计。
 - 冲突时降级到人工确认，不做自动传感器融合。
 
@@ -17,6 +18,7 @@
 - `data/mock_timeline_success.json`：成功闭环剧本。
 - `data/mock_timeline_no_flow.json`：无水流失败剧本。
 - `data/mock_timeline_channel_conflict.json`：双通道冲突剧本。
+- `runtime_core.py`：P016 Runtime Core、MockRobotAdapter 和 SimulatedRobotAdapter。
 - `docs/adapter_contract.md`：Runtime 与 Robot Adapter 的异步边界。
 - `docs/admission_rules.md`：第一阶段“会不会做”的最小准入规则。
 - `docs/schema_change_protocol.md`：Schema 受控变更协议。
@@ -53,6 +55,9 @@ python .\demo_runtime\rell_sample\run_runtime_sample.py
 - `success`：两个观测通道均确认 `cup_has_water` 成立，四阶段完成。
 - `no_flow`：倾斜到位但无水流，触发失败标签并进入人工确认。
 - `channel_conflict`：物理液位通道成立、数字流速积分通道不成立，进入人工确认。
+- `simulated_success`：模拟执行体根据阶段动作生成状态并完成倒水。
+- `simulated_no_water`：模拟执行体壶内无水，进入人工确认。
+- `simulated_channel_conflict`：模拟执行体物理液位通道成立、数字估计通道不成立，进入人工确认。
 
 输出写入：
 
@@ -64,6 +69,7 @@ demo_runtime/output/rell_sample
 
 ```powershell
 python .\demo_runtime\rell_sample\validate_runtime_sample.py
+python .\demo_runtime\rell_sample\validate_simulated_robot_sample.py
 ```
 
 ## 运行最小 API

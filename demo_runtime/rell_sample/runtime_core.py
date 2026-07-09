@@ -130,12 +130,215 @@ class MockRobotAdapter:
         self.queue.enqueue(event)
 
 
+class SimulatedPouringRobotAdapter:
+    """Low-dimensional robot adapter that derives sensor events from action state."""
+
+    def __init__(self, scenario: str, queue: SerialEventQueue) -> None:
+        self.scenario = scenario
+        self.queue = queue
+        self.sequence = 0
+        self.paused = False
+        self.confirmation_requests: list[dict[str, Any]] = []
+        self.latest_snapshot: dict[str, Any] = {}
+        self.robot_state = {
+            "spout_to_cup_distance": 8.0,
+            "tilt_angle": 0.0,
+            "water_flow_rate": 0.0,
+            "liquid_level_ml": 0.0,
+            "water_surface_gap": 3.0,
+            "water_available_ml": 180.0 if scenario != "simulated_no_water" else 0.0,
+            "flow_integral_ml": 0.0,
+        }
+
+    def report_capabilities(self) -> list[str]:
+        return sorted(REQUIRED_CAPABILITIES)
+
+    def execute_stage_action(self, stage: dict[str, Any], context: dict[str, Any], callback=None) -> None:
+        if self.paused:
+            return
+        stage_id = stage["stage_id"]
+        process_instance_id = context["process_instance_id"]
+        self._emit(stage_id, "stage_started", process_instance_id, {}, 0)
+        if stage_id == "align":
+            self._simulate_align(stage_id, process_instance_id)
+        elif stage_id == "tilting":
+            self._simulate_tilting(stage_id, process_instance_id)
+        elif stage_id == "maintain_flow":
+            self._simulate_maintain_flow(stage_id, process_instance_id)
+        elif stage_id == "return":
+            self._simulate_return(stage_id, process_instance_id)
+        if callback:
+            callback({"stage_id": stage_id, "adapter": "simulated_pouring_robot"})
+
+    def pause_streams(self, process_instance_id: str) -> None:
+        self.paused = True
+
+    def resume_streams(self, process_instance_id: str) -> None:
+        self.paused = False
+
+    def get_latest_snapshot(self, process_instance_id: str) -> dict[str, Any]:
+        return deepcopy(self.latest_snapshot)
+
+    def stop(self, reason: str, callback=None) -> None:
+        result = {"stopped": True, "reason": reason}
+        if callback:
+            callback(result)
+
+    def request_human_confirmation(self, prompt: str, callback=None) -> None:
+        request = {
+            "confirmation_id": f"confirm_{len(self.confirmation_requests) + 1}",
+            "prompt": prompt,
+            "requested_at": now_iso(),
+        }
+        self.confirmation_requests.append(request)
+        if callback:
+            callback({"status": "requested", **request})
+
+    def _simulate_align(self, stage_id: str, process_instance_id: str) -> None:
+        for time_ms, distance in [(250, 5.2), (500, 2.1), (750, 0.4)]:
+            self.robot_state["spout_to_cup_distance"] = distance
+            self._emit_state(stage_id, process_instance_id, time_ms, "spout_to_cup_distance", distance, "cm", "sim_depth_camera")
+
+    def _simulate_tilting(self, stage_id: str, process_instance_id: str) -> None:
+        for time_ms, angle in [(250, 7.0), (500, 14.0), (750, 22.0)]:
+            self.robot_state["tilt_angle"] = angle
+            self._emit_state(stage_id, process_instance_id, time_ms, "tilt_angle", angle, "degree", "sim_joint_encoder")
+        if self.robot_state["water_available_ml"] <= 0:
+            self.robot_state["water_flow_rate"] = 0.0
+            self._emit_state(stage_id, process_instance_id, 1000, "water_flow_rate", 0.0, "ml_per_second", "sim_flow_model")
+            self._emit(
+                stage_id,
+                "failure_event",
+                process_instance_id,
+                {"failure_id": "simulated_no_water", "failure_label": "no_flow"},
+                1100,
+            )
+            return
+        self.robot_state["water_flow_rate"] = 3.6
+        self._emit_state(stage_id, process_instance_id, 1000, "water_flow_rate", 3.6, "ml_per_second", "sim_flow_model")
+
+    def _simulate_maintain_flow(self, stage_id: str, process_instance_id: str) -> None:
+        for time_ms, added_ml in [(300, 34.0), (600, 38.0), (900, 42.0)]:
+            self.robot_state["liquid_level_ml"] += added_ml
+            self.robot_state["flow_integral_ml"] += added_ml
+            self.robot_state["water_available_ml"] = max(0.0, self.robot_state["water_available_ml"] - added_ml)
+            gap = max(0.35, 3.0 - self.robot_state["liquid_level_ml"] / 42.0)
+            self.robot_state["water_surface_gap"] = round(gap, 2)
+            self._emit_state(
+                stage_id,
+                process_instance_id,
+                time_ms,
+                "water_surface_gap",
+                self.robot_state["water_surface_gap"],
+                "cm",
+                "sim_depth_camera",
+            )
+        physical_state = "established" if self.robot_state["water_surface_gap"] <= 0.5 else "not_established"
+        digital_state = "established" if self.robot_state["flow_integral_ml"] >= 80.0 else "not_established"
+        if self.scenario == "simulated_channel_conflict":
+            digital_state = "not_established"
+        self._emit_observation(
+            stage_id,
+            process_instance_id,
+            1000,
+            "cup_has_water",
+            "physical_liquid_level",
+            physical_state,
+            {"water_surface_gap": self.robot_state["water_surface_gap"]},
+        )
+        self._emit_observation(
+            stage_id,
+            process_instance_id,
+            1100,
+            "cup_has_water",
+            "digital_flow_integral",
+            digital_state,
+            {"flow_integral_ml": round(self.robot_state["flow_integral_ml"], 2), "tilt_angle": self.robot_state["tilt_angle"]},
+        )
+
+    def _simulate_return(self, stage_id: str, process_instance_id: str) -> None:
+        for time_ms, angle in [(250, 12.0), (500, 5.0), (750, 0.5)]:
+            self.robot_state["tilt_angle"] = angle
+            self._emit_state(stage_id, process_instance_id, time_ms, "tilt_angle", angle, "degree", "sim_joint_encoder")
+        self.robot_state["water_flow_rate"] = 0.0
+        self._emit_state(stage_id, process_instance_id, 900, "water_flow_rate", 0.0, "ml_per_second", "sim_flow_model")
+
+    def _emit_state(
+        self,
+        stage_id: str,
+        process_instance_id: str,
+        time_ms: int,
+        variable: str,
+        value: Any,
+        unit: str,
+        source: str,
+    ) -> None:
+        self._emit(
+            stage_id,
+            "state_update",
+            process_instance_id,
+            {"variable": variable, "value": value, "unit": unit, "source": source},
+            time_ms,
+        )
+
+    def _emit_observation(
+        self,
+        stage_id: str,
+        process_instance_id: str,
+        time_ms: int,
+        fact_id: str,
+        channel_id: str,
+        state: str,
+        inputs: dict[str, Any],
+    ) -> None:
+        self._emit(
+            stage_id,
+            "observation_update",
+            process_instance_id,
+            {"fact_id": fact_id, "channel_id": channel_id, "state": state, "inputs": inputs},
+            time_ms,
+        )
+
+    def _emit(
+        self,
+        stage_id: str,
+        event_type: str,
+        process_instance_id: str,
+        payload: dict[str, Any],
+        relative_time_ms: int,
+    ) -> None:
+        self.sequence += 1
+        event = {
+            "schema_version": "1.0.0",
+            "event_id": f"sim_evt_{self.sequence:04d}",
+            "sequence": self.sequence,
+            "timestamp": now_iso(),
+            "process_instance_id": process_instance_id,
+            "stage_id": stage_id,
+            "event_type": event_type,
+            "payload": {
+                **payload,
+                "relative_time_ms": relative_time_ms,
+                "adapter": "simulated_pouring_robot",
+                "scenario": self.scenario,
+            },
+        }
+        if event_type == "state_update":
+            self.latest_snapshot[payload["variable"]] = {
+                "value": payload["value"],
+                "unit": payload.get("unit"),
+                "source": payload.get("source"),
+                "updated_at": event["timestamp"],
+            }
+        self.queue.enqueue(event)
+
+
 class P016Runtime:
     def __init__(
         self,
         process_instance: dict[str, Any],
         initial_state: dict[str, Any],
-        adapter: MockRobotAdapter,
+        adapter: Any,
     ) -> None:
         self.process_instance = process_instance
         self.state = deepcopy(initial_state)
@@ -352,6 +555,7 @@ class P016Runtime:
         self.state["updated_at"] = now_iso()
 
     def _record_trace(self, event: dict[str, Any], before_state: str, after_state: str) -> None:
+        payload = event.get("payload", {})
         self.trace.append(
             {
                 "event_ref": event["event_id"],
@@ -359,6 +563,7 @@ class P016Runtime:
                 "before_state": before_state,
                 "after_state": after_state,
                 "trigger_reason": event["event_type"],
+                "payload_summary": summarize_payload(payload),
                 "recorded_at": now_iso(),
             }
         )
@@ -403,3 +608,24 @@ def run_runtime_sample(data_dir: Path, timeline_name: str) -> dict[str, Any]:
     adapter = MockRobotAdapter(timeline, queue)
     runtime = P016Runtime(process_instance, initial_state, adapter)
     return runtime.run()
+
+
+def run_simulated_runtime_sample(data_dir: Path, scenario: str) -> dict[str, Any]:
+    queue = SerialEventQueue()
+    process_instance = read_json(data_dir / "pour_water_process_instance.json")
+    initial_state = read_json(data_dir / "stage_runtime_state_initial.json")
+    adapter = SimulatedPouringRobotAdapter(scenario, queue)
+    runtime = P016Runtime(process_instance, initial_state, adapter)
+    return runtime.run()
+
+
+def summarize_payload(payload: dict[str, Any]) -> str:
+    adapter = payload.get("adapter", "")
+    suffix = f" adapter={adapter}" if adapter else ""
+    if "variable" in payload:
+        return f"{payload['variable']}={payload.get('value')} {payload.get('unit', '')} source={payload.get('source', '')}{suffix}".strip()
+    if "fact_id" in payload:
+        return f"{payload['fact_id']}:{payload.get('channel_id')}={payload.get('state')}{suffix}"
+    if "failure_id" in payload:
+        return f"{payload['failure_id']}:{payload.get('failure_label')}{suffix}"
+    return suffix.strip()

@@ -16,6 +16,15 @@ def main() -> None:
     if conflict["audit_summary"]["outcome"] != "requires_human_confirmation":
         raise AssertionError("conflict API run must require human confirmation")
 
+    simulated = run_process("simulated_success")
+    if simulated["audit_summary"]["outcome"] != "completed":
+        raise AssertionError("simulated success API run must complete")
+    if not any(
+        "adapter=simulated_pouring_robot" in event.get("payload_summary", "")
+        for event in simulated["execution_trace"]["events"]
+    ):
+        raise AssertionError("simulated API run must expose simulated adapter trace payloads")
+
     task_id = success["task_id"]
     audit = get_audit(task_id)
     if audit.get("task_id") != task_id:
@@ -25,7 +34,7 @@ def main() -> None:
         raise AssertionError("audit store must contain latest task_id")
 
     print("API sample validation passed.")
-    print("Validated: admit, run success, run channel_conflict, get audit.")
+    print("Validated: admit, run success, run channel_conflict, run simulated_success, get audit.")
 
 
 if __name__ == "__main__":

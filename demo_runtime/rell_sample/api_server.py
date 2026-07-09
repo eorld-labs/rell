@@ -6,7 +6,14 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from runtime_core import MockRobotAdapter, P016Runtime, SerialEventQueue, read_json, run_runtime_sample
+from runtime_core import (
+    MockRobotAdapter,
+    P016Runtime,
+    SerialEventQueue,
+    read_json,
+    run_runtime_sample,
+    run_simulated_runtime_sample,
+)
 
 
 ROOT = Path(__file__).resolve().parent
@@ -14,11 +21,13 @@ DATA = ROOT / "data"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8876
 
-SCENARIOS = {
+TIMELINE_SCENARIOS = {
     "success": "mock_timeline_success.json",
     "no_flow": "mock_timeline_no_flow.json",
     "channel_conflict": "mock_timeline_channel_conflict.json",
 }
+SIMULATED_SCENARIOS = {"simulated_success", "simulated_no_water", "simulated_channel_conflict"}
+SCENARIOS = {**TIMELINE_SCENARIOS, **{name: name for name in SIMULATED_SCENARIOS}}
 
 AUDIT_STORE: dict[str, dict[str, Any]] = {}
 STATE_STORE: dict[str, dict[str, Any]] = {}
@@ -194,9 +203,12 @@ INDEX_HTML = """<!doctype html>
         <textarea id="utterance">给客人倒一杯水</textarea>
         <label for="scenario">运行场景</label>
         <select id="scenario">
-          <option value="success">成功倒水</option>
-          <option value="no_flow">无水流失败</option>
-          <option value="channel_conflict">双通道冲突</option>
+          <option value="simulated_success">模拟执行体：成功倒水</option>
+          <option value="simulated_no_water">模拟执行体：壶内无水</option>
+          <option value="simulated_channel_conflict">模拟执行体：双通道冲突</option>
+          <option value="success">Mock剧本：成功倒水</option>
+          <option value="no_flow">Mock剧本：无水流失败</option>
+          <option value="channel_conflict">Mock剧本：双通道冲突</option>
         </select>
         <div class="actions">
           <button id="runButton" title="运行过程实例">▶ 运行</button>
@@ -258,7 +270,8 @@ INDEX_HTML = """<!doctype html>
 
     function describeTrace(event) {
       const label = eventLabel[event.trigger_reason] || event.trigger_reason;
-      return `[${String(event.consumed_sequence).padStart(2, "0")}] ${label} | ${event.before_state} -> ${event.after_state}`;
+      const payload = event.payload_summary ? " | " + event.payload_summary : "";
+      return `[${String(event.consumed_sequence).padStart(2, "0")}] ${label} | ${event.before_state} -> ${event.after_state}${payload}`;
     }
 
     function renderFacts(result) {
@@ -350,7 +363,10 @@ def run_process(scenario: str = "success") -> dict[str, Any]:
             "error": "unknown_scenario",
             "allowed_scenarios": sorted(SCENARIOS),
         }
-    result = run_runtime_sample(DATA, SCENARIOS[scenario])
+    if scenario in SIMULATED_SCENARIOS:
+        result = run_simulated_runtime_sample(DATA, scenario)
+    else:
+        result = run_runtime_sample(DATA, TIMELINE_SCENARIOS[scenario])
     task_id = result["audit_summary"]["task_id"]
     AUDIT_STORE[task_id] = result["audit_summary"]
     STATE_STORE[task_id] = result["stage_runtime_state"]

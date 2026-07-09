@@ -20,6 +20,7 @@
           "before_state": { "type": "string" },
           "after_state": { "type": "string" },
           "trigger_reason": { "type": "string" },
+          "payload_summary": { "type": "string" },
           "recorded_at": { "type": "string" }
         },
         "additionalProperties": false
