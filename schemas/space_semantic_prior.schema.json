@@ -1,0 +1,238 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/space_semantic_prior.schema.json",
+  "title": "SpaceSemanticPrior",
+  "description": "P010-style semantic prior generated from external visual or digital-space inputs and loadable by endpoint subjects.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "prior_id",
+    "target_space",
+    "source_inputs",
+    "semantic_regions",
+    "spatial_relations",
+    "edge_conversion_info"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string"
+    },
+    "prior_id": {
+      "type": "string"
+    },
+    "target_space": {
+      "type": "object",
+      "required": ["space_id", "space_type", "coordinate_frame"],
+      "properties": {
+        "space_id": {
+          "type": "string"
+        },
+        "space_type": {
+          "type": "string"
+        },
+        "display_name": {
+          "type": "string"
+        },
+        "coordinate_frame": {
+          "type": "object",
+          "required": ["frame_id", "unit", "origin"],
+          "properties": {
+            "frame_id": {
+              "type": "string"
+            },
+            "unit": {
+              "type": "string"
+            },
+            "origin": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "source_inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["source_id", "source_type", "capture_role"],
+        "properties": {
+          "source_id": {
+            "type": "string"
+          },
+          "source_type": {
+            "type": "string"
+          },
+          "capture_role": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "semantic_regions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["region_id", "region_type", "function_attributes", "geometry_ref", "confidence"],
+        "properties": {
+          "region_id": {
+            "type": "string"
+          },
+          "region_type": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "function_attributes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "geometry_ref": {
+            "type": "object",
+            "required": ["shape", "frame_id"],
+            "properties": {
+              "shape": {
+                "type": "string"
+              },
+              "frame_id": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true
+          },
+          "permission": {
+            "type": "string"
+          },
+          "adapted_subject_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "space_objects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["object_id", "object_type", "region_ref", "affordances"],
+        "properties": {
+          "object_id": {
+            "type": "string"
+          },
+          "object_type": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "region_ref": {
+            "type": "string"
+          },
+          "affordances": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "state_facts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "spatial_relations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["relation_id", "source_ref", "target_ref", "relation_type", "confidence"],
+        "properties": {
+          "relation_id": {
+            "type": "string"
+          },
+          "source_ref": {
+            "type": "string"
+          },
+          "target_ref": {
+            "type": "string"
+          },
+          "relation_type": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "weight": {
+            "type": "number"
+          },
+          "constraint": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "binding_candidates": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "edge_conversion_info": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["subject_type", "output_models", "region_mapping_rule", "relation_mapping_rule", "validation_rule"],
+        "properties": {
+          "subject_type": {
+            "type": "string"
+          },
+          "output_models": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "region_mapping_rule": {
+            "type": "string"
+          },
+          "relation_mapping_rule": {
+            "type": "string"
+          },
+          "validation_rule": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

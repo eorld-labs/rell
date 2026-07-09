@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
@@ -19,7 +20,9 @@ from runtime_core import (
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
 DEFAULT_HOST = "127.0.0.1"
-DEFAULT_PORT = 8876
+DEFAULT_PORT = int(os.environ.get("RELL_SAMPLE_PORT", "8876"))
+SPACE_PRIOR_FILE = DATA / "digital_kitchen_semantic_prior.json"
+COGNITIVE_MODEL_FILE = DATA / "digital_kitchen_cognitive_model.json"
 
 TIMELINE_SCENARIOS = {
     "success": "mock_timeline_success.json",
@@ -481,6 +484,11 @@ INDEX_HTML = """<!doctype html>
         rows.push(`<div class="stage-row"><strong>执行体画像</strong><span>${profile.executor_type} / ${profile.body_profile} / ${profile.end_effector_type}</span></div>`);
         rows.push(`<div class="stage-row"><strong>空间约束预留</strong><span>${profile.spatial_entry_constraints?.body_envelope?.shape || "reserved"} envelope, P008 entry constraints reserved</span></div>`);
       }
+      const space = result.space_context;
+      if (space) {
+        rows.push(`<div class="stage-row"><strong>数字空间</strong><span>${space.space_id} / ${space.cognitive_model_id}</span></div>`);
+        rows.push(`<div class="stage-row"><strong>空间节点</strong><span>${space.region_count} regions, ${space.relation_count} relations, ${space.object_count} objects</span></div>`);
+      }
       factsEl.innerHTML = rows.join("");
     }
 
@@ -563,6 +571,7 @@ def run_process(scenario: str = "success") -> dict[str, Any]:
     AUDIT_STORE[task_id] = result["audit_summary"]
     STATE_STORE[task_id] = result["stage_runtime_state"]
     TRACE_STORE[task_id] = result["execution_trace"]
+    cognitive_model = read_json(COGNITIVE_MODEL_FILE)
     return {
         "task_id": task_id,
         "scenario": scenario,
@@ -570,7 +579,23 @@ def run_process(scenario: str = "success") -> dict[str, Any]:
         "audit_summary": result["audit_summary"],
         "stage_runtime_state": result["stage_runtime_state"],
         "execution_trace": result["execution_trace"],
+        "space_context": {
+            "space_id": cognitive_model["local_environment_summary"]["space_id"],
+            "cognitive_model_id": cognitive_model["cognitive_model_id"],
+            "region_count": cognitive_model["local_environment_summary"]["region_count"],
+            "relation_count": cognitive_model["local_environment_summary"]["relation_count"],
+            "object_count": cognitive_model["local_environment_summary"]["object_count"],
+            "binding_candidates": cognitive_model["binding_candidates"],
+        },
     }
+
+
+def get_space_prior() -> dict[str, Any]:
+    return read_json(SPACE_PRIOR_FILE)
+
+
+def get_cognitive_model() -> dict[str, Any]:
+    return read_json(COGNITIVE_MODEL_FILE)
 
 
 def get_audit(task_id: str) -> dict[str, Any]:
@@ -596,6 +621,12 @@ class RellSampleHandler(BaseHTTPRequestHandler):
             return
         if path == "/health":
             self._send_json({"status": "ok", "service": "rell_sample"})
+            return
+        if path == "/space/prior":
+            self._send_json(get_space_prior())
+            return
+        if path == "/space/cognitive-model":
+            self._send_json(get_cognitive_model())
             return
         if path.startswith("/audit/"):
             task_id = path.removeprefix("/audit/")

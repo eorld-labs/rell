@@ -1,0 +1,582 @@
+{
+  "schema_version": "1.0.0",
+  "cognitive_model_id": "home_a_kitchen_simulated_robot_cognitive_model_v1",
+  "prior_ref": "semantic_prior_home_a_kitchen_v1",
+  "subject_type": "simulated_robot",
+  "space_region_table": [
+    {
+      "region_id": "region_floor_walkway",
+      "region_type": "walkable_area",
+      "function_attributes": [
+        "traversable",
+        "staying",
+        "human_activity_high_frequency"
+      ],
+      "permission": "public_runtime",
+      "confidence": 0.91,
+      "geometry_ref": {
+        "shape": "polygon2d",
+        "frame_id": "home_a_kitchen_world",
+        "points": [
+          [
+            0.4,
+            0.4
+          ],
+          [
+            3.8,
+            0.4
+          ],
+          [
+            3.8,
+            1.7
+          ],
+          [
+            0.4,
+            1.7
+          ]
+        ],
+        "height_range_m": [
+          0.0,
+          2.3
+        ]
+      }
+    },
+    {
+      "region_id": "region_counter_operation",
+      "region_type": "operation_surface",
+      "function_attributes": [
+        "interactive",
+        "object_target",
+        "task_execution",
+        "mountable"
+      ],
+      "permission": "task_allowed",
+      "confidence": 0.94,
+      "geometry_ref": {
+        "shape": "box",
+        "frame_id": "home_a_kitchen_world",
+        "center_m": [
+          2.8,
+          2.55,
+          0.92
+        ],
+        "size_m": [
+          1.2,
+          0.55,
+          0.08
+        ]
+      }
+    },
+    {
+      "region_id": "region_water_source",
+      "region_type": "resource_zone",
+      "function_attributes": [
+        "interactive",
+        "target_object_location",
+        "water_resource"
+      ],
+      "permission": "task_allowed",
+      "confidence": 0.9,
+      "geometry_ref": {
+        "shape": "box",
+        "frame_id": "home_a_kitchen_world",
+        "center_m": [
+          1.15,
+          2.55,
+          0.95
+        ],
+        "size_m": [
+          0.7,
+          0.55,
+          0.15
+        ]
+      }
+    },
+    {
+      "region_id": "region_cup_station",
+      "region_type": "object_station",
+      "function_attributes": [
+        "interactive",
+        "target_object_location",
+        "staying"
+      ],
+      "permission": "task_allowed",
+      "confidence": 0.93,
+      "geometry_ref": {
+        "shape": "box",
+        "frame_id": "home_a_kitchen_world",
+        "center_m": [
+          2.65,
+          2.48,
+          0.96
+        ],
+        "size_m": [
+          0.35,
+          0.35,
+          0.18
+        ]
+      }
+    },
+    {
+      "region_id": "region_service_position",
+      "region_type": "human_service_zone",
+      "function_attributes": [
+        "staying",
+        "task_target",
+        "interaction_reachable"
+      ],
+      "permission": "public_runtime",
+      "confidence": 0.86,
+      "geometry_ref": {
+        "shape": "circle",
+        "frame_id": "home_a_kitchen_world",
+        "center_m": [
+          3.25,
+          0.9,
+          0.0
+        ],
+        "radius_m": 0.45,
+        "height_range_m": [
+          0.0,
+          2.0
+        ]
+      }
+    },
+    {
+      "region_id": "region_doorway",
+      "region_type": "transition_area",
+      "function_attributes": [
+        "traversable",
+        "channel",
+        "crossing"
+      ],
+      "permission": "public_runtime",
+      "confidence": 0.89,
+      "geometry_ref": {
+        "shape": "box",
+        "frame_id": "home_a_kitchen_world",
+        "center_m": [
+          0.45,
+          0.95,
+          1.0
+        ],
+        "size_m": [
+          0.25,
+          0.9,
+          2.0
+        ]
+      }
+    },
+    {
+      "region_id": "region_stove_risk",
+      "region_type": "risk_zone",
+      "function_attributes": [
+        "risk",
+        "non_traversable",
+        "no_entry",
+        "heat_source"
+      ],
+      "permission": "restricted_runtime",
+      "confidence": 0.95,
+      "geometry_ref": {
+        "shape": "box",
+        "frame_id": "home_a_kitchen_world",
+        "center_m": [
+          3.55,
+          2.55,
+          0.95
+        ],
+        "size_m": [
+          0.55,
+          0.55,
+          0.22
+        ]
+      }
+    }
+  ],
+  "space_action_graph": {
+    "nodes": [
+      {
+        "node_id": "region_floor_walkway",
+        "node_type": "walkable_area",
+        "attributes": [
+          "traversable",
+          "staying",
+          "human_activity_high_frequency"
+        ],
+        "confidence": 0.91
+      },
+      {
+        "node_id": "region_counter_operation",
+        "node_type": "operation_surface",
+        "attributes": [
+          "interactive",
+          "object_target",
+          "task_execution",
+          "mountable"
+        ],
+        "confidence": 0.94
+      },
+      {
+        "node_id": "region_water_source",
+        "node_type": "resource_zone",
+        "attributes": [
+          "interactive",
+          "target_object_location",
+          "water_resource"
+        ],
+        "confidence": 0.9
+      },
+      {
+        "node_id": "region_cup_station",
+        "node_type": "object_station",
+        "attributes": [
+          "interactive",
+          "target_object_location",
+          "staying"
+        ],
+        "confidence": 0.93
+      },
+      {
+        "node_id": "region_service_position",
+        "node_type": "human_service_zone",
+        "attributes": [
+          "staying",
+          "task_target",
+          "interaction_reachable"
+        ],
+        "confidence": 0.86
+      },
+      {
+        "node_id": "region_doorway",
+        "node_type": "transition_area",
+        "attributes": [
+          "traversable",
+          "channel",
+          "crossing"
+        ],
+        "confidence": 0.89
+      }
+    ],
+    "edges": [
+      {
+        "edge_id": "rel_doorway_to_walkway",
+        "source": "region_doorway",
+        "target": "region_floor_walkway",
+        "relation_type": "connected",
+        "weight": 1.0,
+        "constraint": "minimum_width_m>=0.75",
+        "confidence": 0.9
+      },
+      {
+        "edge_id": "rel_walkway_to_counter",
+        "source": "region_floor_walkway",
+        "target": "region_counter_operation",
+        "relation_type": "interaction_reachable",
+        "weight": 0.85,
+        "constraint": "manipulator_or_mock_reach_required",
+        "confidence": 0.88
+      },
+      {
+        "edge_id": "rel_water_source_near_cup",
+        "source": "region_water_source",
+        "target": "region_cup_station",
+        "relation_type": "near",
+        "weight": 0.72,
+        "constraint": "pouring_requires_alignment",
+        "confidence": 0.87
+      },
+      {
+        "edge_id": "rel_cup_observed_by_depth_sensor",
+        "source": "sensor_depth_front",
+        "target": "object_cup_white_mug",
+        "relation_type": "observation_reachable",
+        "weight": 0.9,
+        "constraint": "line_of_sight_clear",
+        "confidence": 0.86
+      }
+    ],
+    "blocked_edges": [
+      {
+        "edge_id": "rel_stove_blocks_direct_path",
+        "source": "region_stove_risk",
+        "target": "region_counter_operation",
+        "relation_type": "no_entry",
+        "weight": 1.0,
+        "constraint": "avoid_heat_source",
+        "confidence": 0.95
+      }
+    ]
+  },
+  "semantic_topology_graph": {
+    "nodes": [
+      {
+        "node_id": "region_floor_walkway",
+        "node_type": "walkable_area"
+      },
+      {
+        "node_id": "region_counter_operation",
+        "node_type": "operation_surface"
+      },
+      {
+        "node_id": "region_water_source",
+        "node_type": "resource_zone"
+      },
+      {
+        "node_id": "region_cup_station",
+        "node_type": "object_station"
+      },
+      {
+        "node_id": "region_service_position",
+        "node_type": "human_service_zone"
+      },
+      {
+        "node_id": "region_doorway",
+        "node_type": "transition_area"
+      },
+      {
+        "node_id": "region_stove_risk",
+        "node_type": "risk_zone"
+      }
+    ],
+    "edges": [
+      {
+        "edge_id": "rel_doorway_to_walkway",
+        "source": "region_doorway",
+        "target": "region_floor_walkway",
+        "relation_type": "connected",
+        "weight": 1.0,
+        "constraint": "minimum_width_m>=0.75",
+        "confidence": 0.9
+      },
+      {
+        "edge_id": "rel_walkway_to_counter",
+        "source": "region_floor_walkway",
+        "target": "region_counter_operation",
+        "relation_type": "interaction_reachable",
+        "weight": 0.85,
+        "constraint": "manipulator_or_mock_reach_required",
+        "confidence": 0.88
+      },
+      {
+        "edge_id": "rel_counter_contains_cup_station",
+        "source": "region_counter_operation",
+        "target": "region_cup_station",
+        "relation_type": "contains",
+        "weight": 1.0,
+        "constraint": "cup_station_on_counter",
+        "confidence": 0.94
+      },
+      {
+        "edge_id": "rel_water_source_near_cup",
+        "source": "region_water_source",
+        "target": "region_cup_station",
+        "relation_type": "near",
+        "weight": 0.72,
+        "constraint": "pouring_requires_alignment",
+        "confidence": 0.87
+      },
+      {
+        "edge_id": "rel_stove_blocks_direct_path",
+        "source": "region_stove_risk",
+        "target": "region_counter_operation",
+        "relation_type": "no_entry",
+        "weight": 1.0,
+        "constraint": "avoid_heat_source",
+        "confidence": 0.95
+      },
+      {
+        "edge_id": "rel_service_visible_from_walkway",
+        "source": "region_floor_walkway",
+        "target": "region_service_position",
+        "relation_type": "line_of_sight_reachable",
+        "weight": 0.62,
+        "constraint": "not_required_for_pour_water_stage_one",
+        "confidence": 0.8
+      },
+      {
+        "edge_id": "rel_cup_observed_by_depth_sensor",
+        "source": "sensor_depth_front",
+        "target": "object_cup_white_mug",
+        "relation_type": "observation_reachable",
+        "weight": 0.9,
+        "constraint": "line_of_sight_clear",
+        "confidence": 0.86
+      }
+    ]
+  },
+  "task_reachable_graph": {
+    "task_type": "pour_water",
+    "start_region": "region_floor_walkway",
+    "required_regions": [
+      "region_counter_operation",
+      "region_water_source",
+      "region_cup_station"
+    ],
+    "required_objects": [
+      "object_cup_white_mug",
+      "object_kettle_steel_1l"
+    ]
+  },
+  "risk_region_table": [
+    {
+      "region_id": "region_stove_risk",
+      "risk_attributes": [
+        "heat_source",
+        "no_entry",
+        "risk"
+      ],
+      "confidence": 0.95,
+      "runtime_policy": "avoid_or_request_confirmation"
+    }
+  ],
+  "interaction_region_table": [
+    {
+      "region_id": "region_counter_operation",
+      "region_type": "operation_surface",
+      "function_attributes": [
+        "interactive",
+        "object_target",
+        "task_execution",
+        "mountable"
+      ],
+      "permission": "task_allowed",
+      "confidence": 0.94,
+      "geometry_ref": {
+        "shape": "box",
+        "frame_id": "home_a_kitchen_world",
+        "center_m": [
+          2.8,
+          2.55,
+          0.92
+        ],
+        "size_m": [
+          1.2,
+          0.55,
+          0.08
+        ]
+      }
+    },
+    {
+      "region_id": "region_water_source",
+      "region_type": "resource_zone",
+      "function_attributes": [
+        "interactive",
+        "target_object_location",
+        "water_resource"
+      ],
+      "permission": "task_allowed",
+      "confidence": 0.9,
+      "geometry_ref": {
+        "shape": "box",
+        "frame_id": "home_a_kitchen_world",
+        "center_m": [
+          1.15,
+          2.55,
+          0.95
+        ],
+        "size_m": [
+          0.7,
+          0.55,
+          0.15
+        ]
+      }
+    },
+    {
+      "region_id": "region_cup_station",
+      "region_type": "object_station",
+      "function_attributes": [
+        "interactive",
+        "target_object_location",
+        "staying"
+      ],
+      "permission": "task_allowed",
+      "confidence": 0.93,
+      "geometry_ref": {
+        "shape": "box",
+        "frame_id": "home_a_kitchen_world",
+        "center_m": [
+          2.65,
+          2.48,
+          0.96
+        ],
+        "size_m": [
+          0.35,
+          0.35,
+          0.18
+        ]
+      }
+    }
+  ],
+  "object_region_index": {
+    "object_cup_white_mug": {
+      "object_type": "cup",
+      "region_ref": "region_cup_station",
+      "affordances": [
+        "receive_liquid",
+        "graspable",
+        "placeable"
+      ],
+      "state_facts": [
+        "cup_empty",
+        "cup_has_water"
+      ]
+    },
+    "object_kettle_steel_1l": {
+      "object_type": "kettle",
+      "region_ref": "region_water_source",
+      "affordances": [
+        "contains_liquid",
+        "pourable",
+        "graspable"
+      ],
+      "state_facts": [
+        "kettle_has_water",
+        "kettle_liquid_decreases"
+      ]
+    },
+    "sensor_depth_front": {
+      "object_type": "depth_sensor",
+      "region_ref": "region_floor_walkway",
+      "affordances": [
+        "observe_liquid_level",
+        "observe_spatial_relation"
+      ],
+      "state_facts": [
+        "liquid_level_observable"
+      ]
+    }
+  },
+  "binding_candidates": {
+    "CUP_OBJECT": "object_cup_white_mug",
+    "KETTLE_OBJECT": "object_kettle_steel_1l",
+    "CAMERA_SENSOR": "sensor_depth_front",
+    "POUR_OPERATION_REGION": "region_counter_operation",
+    "WALKABLE_REGION": "region_floor_walkway"
+  },
+  "local_environment_summary": {
+    "space_id": "home_a_kitchen",
+    "region_count": 7,
+    "relation_count": 7,
+    "object_count": 3,
+    "conversion_rule": "map traversable regions to action graph nodes; map interactive and target_object_location regions to task nodes; map risk and no_entry regions to risk table",
+    "runtime_use": "provide spatial context for simulated execution, verification, recovery and future learning traces"
+  },
+  "validation_targets": [
+    {
+      "target_ref": "region_water_source",
+      "reason": "low_confidence_or_runtime_sensitive",
+      "confidence": 0.9
+    },
+    {
+      "target_ref": "region_cup_station",
+      "reason": "low_confidence_or_runtime_sensitive",
+      "confidence": 0.93
+    },
+    {
+      "target_ref": "region_stove_risk",
+      "reason": "low_confidence_or_runtime_sensitive",
+      "confidence": 0.95
+    }
+  ]
+}

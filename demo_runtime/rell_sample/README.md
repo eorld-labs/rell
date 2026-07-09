@@ -18,6 +18,9 @@
 - `data/mock_timeline_success.json`：成功闭环剧本。
 - `data/mock_timeline_no_flow.json`：无水流失败剧本。
 - `data/mock_timeline_channel_conflict.json`：双通道冲突剧本。
+- `data/digital_kitchen_semantic_prior.json`：P010 口径的数字厨房空间语义先验。
+- `data/digital_kitchen_cognitive_model.json`：模拟执行体加载语义先验后形成的主体侧空间认知模型。
+- `digital_space.py`：空间语义先验到主体侧空间认知模型的端侧内化逻辑。
 - `runtime_core.py`：P016 Runtime Core、MockRobotAdapter 和 SimulatedRobotAdapter。
 - `adapters/adapter_contract.py`：Robot Adapter 统一接口和能力词汇表。
 - `adapters/vendor_robot_adapter_stub.py`：真机 SDK 接入占位 Adapter。
@@ -75,6 +78,7 @@ demo_runtime/output/rell_sample
 python .\demo_runtime\rell_sample\validate_runtime_sample.py
 python .\demo_runtime\rell_sample\validate_simulated_robot_sample.py
 python .\demo_runtime\rell_sample\validate_adapter_contract.py
+python .\demo_runtime\rell_sample\validate_digital_space.py
 ```
 
 ## 运行最小 API
@@ -100,6 +104,11 @@ http://127.0.0.1:8876/
 - `POST /process/admit`
 - `POST /process/run`
 - `GET /audit/{task_id}`
+
+空间调试接口：
+
+- `GET /space/prior`
+- `GET /space/cognitive-model`
 
 API 逻辑校验：
 

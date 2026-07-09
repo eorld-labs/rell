@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import socket
 import subprocess
 import sys
 import time
@@ -11,6 +13,12 @@ from urllib.request import Request, urlopen
 ROOT = Path(__file__).resolve().parent
 REPO = ROOT.parents[1]
 API_URL = "http://127.0.0.1:8876"
+
+
+def find_free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
 
 
 def run_python(script: str) -> None:
@@ -41,10 +49,15 @@ def get_text(path: str) -> str:
 
 
 def run_http_smoke() -> None:
+    global API_URL
     print("[check] api_server HTTP smoke")
+    port = find_free_port()
+    API_URL = f"http://127.0.0.1:{port}"
+    env = {**os.environ, "RELL_SAMPLE_PORT": str(port)}
     process = subprocess.Popen(
         [sys.executable, str(ROOT / "api_server.py")],
         cwd=REPO,
+        env=env,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
@@ -52,6 +65,7 @@ def run_http_smoke() -> None:
         time.sleep(0.8)
         page = get_text("/")
         health = get_json("/health")
+        cognitive_model = get_json("/space/cognitive-model")
         admit = post_json("/process/admit", {})
         run_result = post_json("/process/run", {"scenario": "simulated_channel_conflict"})
         audit = get_json(f"/audit/{run_result['task_id']}")
@@ -59,6 +73,8 @@ def run_http_smoke() -> None:
             raise AssertionError("demo page did not render")
         if health.get("status") != "ok":
             raise AssertionError(f"health failed: {health}")
+        if cognitive_model.get("prior_ref") != "semantic_prior_home_a_kitchen_v1":
+            raise AssertionError(f"space cognitive model failed: {cognitive_model}")
         if admit.get("decision") != "allowed":
             raise AssertionError(f"admit failed: {admit}")
         if run_result["audit_summary"]["outcome"] != "requires_human_confirmation":
@@ -81,6 +97,7 @@ def run_http_smoke() -> None:
 
 def main() -> None:
     run_python("validate_stage_zero.py")
+    run_python("validate_digital_space.py")
     run_python("validate_adapter_contract.py")
     run_python("validate_runtime_sample.py")
     run_python("validate_simulated_robot_sample.py")

@@ -6,6 +6,7 @@
 
 | 正式入口 | 作用 |
 | --- | --- |
+| `space_semantic_prior.schema.json` | 定义 P010 空间语义先验，包括语义区域、空间关系和端侧转换信息。 |
 | `process_template.schema.json` | 定义过程模板、连续状态变量、阶段跃迁条件和参数槽。 |
 | `occasional_binding.schema.json` | 将过程模板参数槽绑定到当前环境中的对象、传感器和阈值。 |
 | `causal_chain.schema.json` | 声明因果前提、产出事实、销毁事实和过程链编排关系。 |
