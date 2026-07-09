@@ -65,3 +65,27 @@ demo_runtime/output/rell_sample
 ```powershell
 python .\demo_runtime\rell_sample\validate_runtime_sample.py
 ```
+
+## 运行最小 API
+
+```powershell
+python .\demo_runtime\rell_sample\api_server.py
+```
+
+默认地址：
+
+```text
+http://127.0.0.1:8876
+```
+
+外部 API：
+
+- `POST /process/admit`
+- `POST /process/run`
+- `GET /audit/{task_id}`
+
+API 逻辑校验：
+
+```powershell
+python .\demo_runtime\rell_sample\validate_api_sample.py
+```
