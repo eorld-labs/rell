@@ -35,6 +35,11 @@ def get_json(path: str) -> dict:
         return json.loads(response.read().decode("utf-8"))
 
 
+def get_text(path: str) -> str:
+    with urlopen(f"{API_URL}{path}", timeout=5) as response:
+        return response.read().decode("utf-8")
+
+
 def run_http_smoke() -> None:
     print("[check] api_server HTTP smoke")
     process = subprocess.Popen(
@@ -45,10 +50,13 @@ def run_http_smoke() -> None:
     )
     try:
         time.sleep(0.8)
+        page = get_text("/")
         health = get_json("/health")
         admit = post_json("/process/admit", {})
         run_result = post_json("/process/run", {"scenario": "channel_conflict"})
         audit = get_json(f"/audit/{run_result['task_id']}")
+        if "RELL 真实世界经验引擎样品" not in page:
+            raise AssertionError("demo page did not render")
         if health.get("status") != "ok":
             raise AssertionError(f"health failed: {health}")
         if admit.get("decision") != "allowed":

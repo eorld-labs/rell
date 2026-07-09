@@ -78,6 +78,12 @@ python .\demo_runtime\rell_sample\api_server.py
 http://127.0.0.1:8876
 ```
 
+演示页面：
+
+```text
+http://127.0.0.1:8876/
+```
+
 外部 API：
 
 - `POST /process/admit`
