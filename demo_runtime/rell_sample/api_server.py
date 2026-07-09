@@ -123,9 +123,11 @@ def build_world_state_facts(cognitive_model: dict[str, Any]) -> set[str]:
     cup = objects.get("object_cup_white_mug", {})
     if cup.get("region_ref") in {"region_cup_station", "region_counter_operation"}:
         facts.add("cup_at_counter")
-    facts.update(cup.get("state_facts", []))
+    if "cup_empty" in cup.get("state_facts", []):
+        facts.add("cup_empty")
     kettle = objects.get("object_kettle_steel_1l", {})
-    facts.update(kettle.get("state_facts", []))
+    if "kettle_has_water" in kettle.get("state_facts", []):
+        facts.add("kettle_has_water")
     return facts
 
 
