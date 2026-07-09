@@ -46,3 +46,9 @@
 ## 调试接口
 
 `GET /process/status/{task_id}` 为调试接口，不作为对外承诺接口。
+
+## 验收命令
+
+```powershell
+python .\demo_runtime\rell_sample\run_all_checks.py
+```

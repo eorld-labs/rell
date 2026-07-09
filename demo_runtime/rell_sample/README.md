@@ -89,3 +89,11 @@ API 逻辑校验：
 ```powershell
 python .\demo_runtime\rell_sample\validate_api_sample.py
 ```
+
+## 一键验收
+
+```powershell
+python .\demo_runtime\rell_sample\run_all_checks.py
+```
+
+该脚本会依次运行阶段零校验、Runtime 样品校验、API 函数校验和本地 HTTP 冒烟测试。
