@@ -66,6 +66,12 @@ def main() -> None:
         raise AssertionError(f"teaching must create an experience: {taught}")
     if not load_experience_library().get("experiences"):
         raise AssertionError("experience library must persist taught experience")
+    taught_contract = taught["experience"].get("invariant_contract", {})
+    if taught_contract.get("storage_policy") != "store_invariants_not_concrete_parameters":
+        raise AssertionError(f"experience must store invariant contract, not concrete parameters: {taught_contract}")
+    for forbidden in ["absolute_coordinates", "robot_specific_joint_angles", "fixed_execution_duration"]:
+        if forbidden not in taught_contract.get("forbidden_storage", []):
+            raise AssertionError(f"invariant contract must forbid {forbidden}: {taught_contract}")
     learned_run = run_process("auto", "走向操作台，然后拿起杯子，到水源处接一杯水，然后倒水")
     if learned_run["audit_summary"]["outcome"] != "completed":
         raise AssertionError(f"learned process chain must run in digital space: {learned_run}")
@@ -129,6 +135,11 @@ def main() -> None:
     ]
     if routed_teaching.get("experience", {}).get("process_chain") != expected_routed_chain:
         raise AssertionError(f"routed teaching must preserve explicit semantic waypoints: {routed_teaching}")
+    routed_contract = routed_teaching.get("experience", {}).get("invariant_contract", {})
+    if len(routed_contract.get("topology_invariants", [])) != len(expected_routed_chain):
+        raise AssertionError(f"routed teaching must produce topology invariants for each step: {routed_contract}")
+    if not all(item.get("terminate_when", "").endswith("== established") for item in routed_contract.get("termination_conditions", [])):
+        raise AssertionError(f"all invariant termination conditions must be fact-based: {routed_contract}")
     routed_run = run_process("auto", "走到门旁边，再走到服务为，再去操作台拿杯子，去水源处倒杯水")
     if routed_run["intent_translation"].get("candidate_process_chain") != expected_routed_chain:
         raise AssertionError(f"explicit route must survive causal planning: {routed_run['intent_translation']}")

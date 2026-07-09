@@ -136,6 +136,17 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 
 系统会将“需要先”之后的内容解析为前置过程，将“接完以后杯子里有水”解析为目标因果事实说明，并把该经验作为可被因果编排器读取的过程能力。后续用户说 `帮我接水` 时，系统可以从 `cup_contains_water` 反向搜索并调用该教学经验签名，而不是匹配原始教学语句。
 
+自经验不变量契约实现起，经验记录还会同步生成 `invariant_contract`。该结构用于明确经验库保存的是跨空间、跨本体可迁移的不变量，而不是某次执行的具体坐标、关节角或执行时长。
+
+`invariant_contract` 至少包括：
+
+- `topology_invariants`：拓扑关系，例如执行体到达语义区域、末端执行器到达可抓取对象、容器开口与水源资源区对齐。
+- `action_constraints`：试探方向与物理约束，例如朝绑定区域导航、接近对象直到可抓取、保持容器稳定并避免过量。
+- `termination_conditions`：事实终止条件，例如 `cup_contains_water == established`。
+- `forbidden_storage`：禁止沉淀 `absolute_coordinates`、`robot_specific_joint_angles` 和 `fixed_execution_duration`。
+
+具体机器人如何满足拓扑关系、如何规划轨迹、如何求解关节角，由当前 Robot Adapter、厂商 SDK 或运动控制器在执行时完成，不进入经验库长期保存。
+
 ## GET /experience/library
 
 用途：查询当前样品经验库。

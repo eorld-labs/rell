@@ -215,7 +215,39 @@
 - `execution_trace` 是追加日志。
 - 审计摘要展示双通道输入、判断、冲突和最终状态。
 
-#### 3.1.8 Minimal API
+#### 3.1.8 RuntimeWorldState 与经验不变量契约
+
+建议文件：
+
+- `demo_runtime/rell_sample/runtime/world_state.py`
+- `demo_runtime/rell_sample/runtime/invariant_contract.py`
+
+职责：
+
+- 在任务启动时，基于 P010 主体侧空间认知模型生成端侧运行时世界状态快照。
+- 在每个过程步骤完成时，依据 P016 的 `requires_facts`、`produces_fact` 和 `destroys_facts` 更新执行体位置、持有物、对象位置和已成立事实。
+- 运行时世界状态只作为当前任务工作记忆，生命周期为 `ephemeral_task_memory`，任务结束后不作为长期世界数据库保存。
+- 经验库沉淀时，不存绝对坐标、固定关节角或固定执行时长，而存拓扑关系、试探方向与物理约束、事实终止条件。
+- 具体机器人如何到达拓扑关系，由 Robot Adapter、机器人 SDK、运动学求解器或厂商控制器在当前本体上实现。
+
+验收：
+
+- `runtime_world_state` 能展示执行体从初始区域到目标区域的变化。
+- `pick_up_cup` 后，杯子位置从空间对象位置更新为 `executor_gripper`。
+- `fill_cup_at_water_source` 后，`cup_contains_water` 成为已成立事实。
+- `experience_library` 中每条经验包含 `invariant_contract`。
+- `invariant_contract.forbidden_storage` 明确禁止 `absolute_coordinates`、`robot_specific_joint_angles` 和 `fixed_execution_duration`。
+- 所有阶段终止条件以事实成立为边界，例如 `cup_contains_water == established`，而不是固定时长。
+
+架构核实结论：
+
+- P010 负责相对稳定的空间语义底图。
+- RuntimeWorldState 负责当前任务期间的状态对齐和工作记忆。
+- P012 负责把多条交互经验归纳为可迁移概念和典型经验模式。
+- P016 负责阶段跃迁、事实验真和最终成立状态回流。
+- 经验库保存可迁移不变量和因果签名，技能包在此基础上加入模板、绑定、验收和审计材料，形成可交付能力。
+
+#### 3.1.9 Minimal API
 
 建议文件：
 
@@ -348,6 +380,7 @@
 6. 不允许让 `execution_trace` 和 `stage_runtime_state` 互相混用。
 7. 不允许在双通道冲突时自动采信单一通道继续执行。
 8. 不允许 Schema 偷偷改，必须更新版本号和 Mock JSON。
+9. 不允许把经验库存成绝对坐标、固定关节角或固定执行时长；经验库只保存可迁移不变量、因果签名和可审核记录。
 
 ## 七、完成标准
 

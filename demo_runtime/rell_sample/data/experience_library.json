@@ -149,7 +149,160 @@
       "governance_ref": {
         "audit_ref": "teaching_session"
       },
-      "created_at": "2026-07-09T00:00:00+08:00"
+      "created_at": "2026-07-09T00:00:00+08:00",
+      "invariant_contract": {
+        "schema_version": "1.0.0",
+        "storage_policy": "store_invariants_not_concrete_parameters",
+        "invariant_dimensions": [
+          "topology_relation",
+          "exploratory_direction_and_physical_constraint",
+          "fact_based_termination_condition"
+        ],
+        "forbidden_storage": [
+          "absolute_coordinates",
+          "robot_specific_joint_angles",
+          "fixed_execution_duration",
+          "single_body_trajectory_without_binding_slots"
+        ],
+        "topology_invariants": [
+          {
+            "step": "move_to_counter",
+            "relation": "executor_reaches_semantic_region",
+            "target_ref": "region_counter_operation",
+            "stored_as": "semantic_region_relation_not_absolute_coordinates"
+          },
+          {
+            "step": "pick_up_cup",
+            "relation": "end_effector_reaches_graspable_object",
+            "target_ref": "object_cup_white_mug",
+            "stored_as": "object_affordance_and_relative_reach_relation"
+          },
+          {
+            "step": "move_to_water_source",
+            "relation": "executor_reaches_semantic_region",
+            "target_ref": "region_water_source",
+            "stored_as": "semantic_region_relation_not_absolute_coordinates"
+          },
+          {
+            "step": "fill_cup_at_water_source",
+            "relation": "container_opening_aligned_with_water_resource",
+            "target_ref": "region_water_source",
+            "stored_as": "resource_zone_and_container_topology_not_absolute_pose"
+          },
+          {
+            "step": "pour_water",
+            "relation": "container_spout_or_opening_aligned_with_target_container",
+            "target_ref": "region_counter_operation",
+            "stored_as": "liquid_transfer_topology_not_robot_specific_pose"
+          }
+        ],
+        "action_constraints": [
+          {
+            "step": "move_to_counter",
+            "direction_policy": "navigate_toward_bound_region",
+            "physical_limits": [
+              "respect_walkable_area",
+              "avoid_restricted_region"
+            ],
+            "not_stored": [
+              "fixed_path_points",
+              "absolute_pose_sequence"
+            ]
+          },
+          {
+            "step": "pick_up_cup",
+            "direction_policy": "approach_object_until_graspable",
+            "physical_limits": [
+              "respect_gripper_force_limit",
+              "keep_object_stable"
+            ],
+            "not_stored": [
+              "fixed_joint_angles",
+              "fixed_gripper_duration"
+            ]
+          },
+          {
+            "step": "move_to_water_source",
+            "direction_policy": "navigate_toward_bound_region",
+            "physical_limits": [
+              "respect_walkable_area",
+              "avoid_restricted_region"
+            ],
+            "not_stored": [
+              "fixed_path_points",
+              "absolute_pose_sequence"
+            ]
+          },
+          {
+            "step": "fill_cup_at_water_source",
+            "direction_policy": "move_container_into_resource_flow_until_liquid_enters",
+            "physical_limits": [
+              "avoid_overfill",
+              "keep_container_upright_enough_for_stability"
+            ],
+            "not_stored": [
+              "fixed_fill_time",
+              "fixed_sensor_value_sequence"
+            ]
+          },
+          {
+            "step": "pour_water",
+            "direction_policy": "tilt_container_toward_target_until_flow_or_level_condition",
+            "physical_limits": [
+              "max_safe_tilt",
+              "avoid_spill",
+              "maintain_target_alignment"
+            ],
+            "not_stored": [
+              "fixed_joint_angle",
+              "fixed_execution_seconds"
+            ]
+          }
+        ],
+        "termination_conditions": [
+          {
+            "step": "move_to_counter",
+            "terminate_when": "executor_at_counter == established",
+            "verification_basis": "runtime_world_state_and_observation_channels",
+            "not_stored": "fixed_duration"
+          },
+          {
+            "step": "pick_up_cup",
+            "terminate_when": "cup_in_gripper == established",
+            "verification_basis": "runtime_world_state_and_observation_channels",
+            "not_stored": "fixed_duration"
+          },
+          {
+            "step": "move_to_water_source",
+            "terminate_when": "executor_at_water_source == established",
+            "verification_basis": "runtime_world_state_and_observation_channels",
+            "not_stored": "fixed_duration"
+          },
+          {
+            "step": "fill_cup_at_water_source",
+            "terminate_when": "cup_contains_water == established",
+            "verification_basis": "runtime_world_state_and_observation_channels",
+            "not_stored": "fixed_duration"
+          },
+          {
+            "step": "pour_water",
+            "terminate_when": "water_poured == established",
+            "verification_basis": "runtime_world_state_and_observation_channels",
+            "not_stored": "fixed_duration"
+          }
+        ],
+        "binding_slots": [
+          "region_counter_operation",
+          "object_cup_white_mug",
+          "region_water_source"
+        ],
+        "runtime_binding": {
+          "space_source": "P010 subject cognitive model",
+          "concept_source": "P012 concept match",
+          "execution_source": "P016 runtime transition and verification",
+          "body_specific_solution": "provided_by_robot_adapter_or_vendor_controller"
+        }
+      }
     },
     {
       "experience_id": "exp_5ca6871e34",
@@ -266,7 +419,110 @@
       "governance_ref": {
         "audit_ref": "teaching_session"
       },
-      "created_at": "2026-07-09T00:00:00+08:00"
+      "created_at": "2026-07-09T00:00:00+08:00",
+      "invariant_contract": {
+        "schema_version": "1.0.0",
+        "storage_policy": "store_invariants_not_concrete_parameters",
+        "invariant_dimensions": [
+          "topology_relation",
+          "exploratory_direction_and_physical_constraint",
+          "fact_based_termination_condition"
+        ],
+        "forbidden_storage": [
+          "absolute_coordinates",
+          "robot_specific_joint_angles",
+          "fixed_execution_duration",
+          "single_body_trajectory_without_binding_slots"
+        ],
+        "topology_invariants": [
+          {
+            "step": "pick_up_cup",
+            "relation": "end_effector_reaches_graspable_object",
+            "target_ref": "object_cup_white_mug",
+            "stored_as": "object_affordance_and_relative_reach_relation"
+          },
+          {
+            "step": "move_to_water_source",
+            "relation": "executor_reaches_semantic_region",
+            "target_ref": "region_water_source",
+            "stored_as": "semantic_region_relation_not_absolute_coordinates"
+          },
+          {
+            "step": "fill_cup_at_water_source",
+            "relation": "container_opening_aligned_with_water_resource",
+            "target_ref": "region_water_source",
+            "stored_as": "resource_zone_and_container_topology_not_absolute_pose"
+          }
+        ],
+        "action_constraints": [
+          {
+            "step": "pick_up_cup",
+            "direction_policy": "approach_object_until_graspable",
+            "physical_limits": [
+              "respect_gripper_force_limit",
+              "keep_object_stable"
+            ],
+            "not_stored": [
+              "fixed_joint_angles",
+              "fixed_gripper_duration"
+            ]
+          },
+          {
+            "step": "move_to_water_source",
+            "direction_policy": "navigate_toward_bound_region",
+            "physical_limits": [
+              "respect_walkable_area",
+              "avoid_restricted_region"
+            ],
+            "not_stored": [
+              "fixed_path_points",
+              "absolute_pose_sequence"
+            ]
+          },
+          {
+            "step": "fill_cup_at_water_source",
+            "direction_policy": "move_container_into_resource_flow_until_liquid_enters",
+            "physical_limits": [
+              "avoid_overfill",
+              "keep_container_upright_enough_for_stability"
+            ],
+            "not_stored": [
+              "fixed_fill_time",
+              "fixed_sensor_value_sequence"
+            ]
+          }
+        ],
+        "termination_conditions": [
+          {
+            "step": "pick_up_cup",
+            "terminate_when": "cup_in_gripper == established",
+            "verification_basis": "runtime_world_state_and_observation_channels",
+            "not_stored": "fixed_duration"
+          },
+          {
+            "step": "move_to_water_source",
+            "terminate_when": "executor_at_water_source == established",
+            "verification_basis": "runtime_world_state_and_observation_channels",
+            "not_stored": "fixed_duration"
+          },
+          {
+            "step": "fill_cup_at_water_source",
+            "terminate_when": "cup_contains_water == established",
+            "verification_basis": "runtime_world_state_and_observation_channels",
+            "not_stored": "fixed_duration"
+          }
+        ],
+        "binding_slots": [
+          "object_cup_white_mug",
+          "region_water_source"
+        ],
+        "runtime_binding": {
+          "space_source": "P010 subject cognitive model",
+          "concept_source": "P012 concept match",
+          "execution_source": "P016 runtime transition and verification",
+          "body_specific_solution": "provided_by_robot_adapter_or_vendor_controller"
+        }
+      }
     },
     {
       "experience_id": "exp_c6b24cecff",
@@ -431,7 +687,185 @@
       "governance_ref": {
         "audit_ref": "teaching_session"
       },
-      "created_at": "2026-07-09T00:00:00+08:00"
+      "created_at": "2026-07-09T00:00:00+08:00",
+      "invariant_contract": {
+        "schema_version": "1.0.0",
+        "storage_policy": "store_invariants_not_concrete_parameters",
+        "invariant_dimensions": [
+          "topology_relation",
+          "exploratory_direction_and_physical_constraint",
+          "fact_based_termination_condition"
+        ],
+        "forbidden_storage": [
+          "absolute_coordinates",
+          "robot_specific_joint_angles",
+          "fixed_execution_duration",
+          "single_body_trajectory_without_binding_slots"
+        ],
+        "topology_invariants": [
+          {
+            "step": "move_to_doorway",
+            "relation": "executor_reaches_semantic_region",
+            "target_ref": "region_doorway",
+            "stored_as": "semantic_region_relation_not_absolute_coordinates"
+          },
+          {
+            "step": "move_to_service_position",
+            "relation": "executor_reaches_semantic_region",
+            "target_ref": "region_service_position",
+            "stored_as": "semantic_region_relation_not_absolute_coordinates"
+          },
+          {
+            "step": "move_to_counter",
+            "relation": "executor_reaches_semantic_region",
+            "target_ref": "region_counter_operation",
+            "stored_as": "semantic_region_relation_not_absolute_coordinates"
+          },
+          {
+            "step": "pick_up_cup",
+            "relation": "end_effector_reaches_graspable_object",
+            "target_ref": "object_cup_white_mug",
+            "stored_as": "object_affordance_and_relative_reach_relation"
+          },
+          {
+            "step": "move_to_water_source",
+            "relation": "executor_reaches_semantic_region",
+            "target_ref": "region_water_source",
+            "stored_as": "semantic_region_relation_not_absolute_coordinates"
+          },
+          {
+            "step": "fill_cup_at_water_source",
+            "relation": "container_opening_aligned_with_water_resource",
+            "target_ref": "region_water_source",
+            "stored_as": "resource_zone_and_container_topology_not_absolute_pose"
+          }
+        ],
+        "action_constraints": [
+          {
+            "step": "move_to_doorway",
+            "direction_policy": "navigate_toward_bound_region",
+            "physical_limits": [
+              "respect_walkable_area",
+              "avoid_restricted_region"
+            ],
+            "not_stored": [
+              "fixed_path_points",
+              "absolute_pose_sequence"
+            ]
+          },
+          {
+            "step": "move_to_service_position",
+            "direction_policy": "navigate_toward_bound_region",
+            "physical_limits": [
+              "respect_walkable_area",
+              "avoid_restricted_region"
+            ],
+            "not_stored": [
+              "fixed_path_points",
+              "absolute_pose_sequence"
+            ]
+          },
+          {
+            "step": "move_to_counter",
+            "direction_policy": "navigate_toward_bound_region",
+            "physical_limits": [
+              "respect_walkable_area",
+              "avoid_restricted_region"
+            ],
+            "not_stored": [
+              "fixed_path_points",
+              "absolute_pose_sequence"
+            ]
+          },
+          {
+            "step": "pick_up_cup",
+            "direction_policy": "approach_object_until_graspable",
+            "physical_limits": [
+              "respect_gripper_force_limit",
+              "keep_object_stable"
+            ],
+            "not_stored": [
+              "fixed_joint_angles",
+              "fixed_gripper_duration"
+            ]
+          },
+          {
+            "step": "move_to_water_source",
+            "direction_policy": "navigate_toward_bound_region",
+            "physical_limits": [
+              "respect_walkable_area",
+              "avoid_restricted_region"
+            ],
+            "not_stored": [
+              "fixed_path_points",
+              "absolute_pose_sequence"
+            ]
+          },
+          {
+            "step": "fill_cup_at_water_source",
+            "direction_policy": "move_container_into_resource_flow_until_liquid_enters",
+            "physical_limits": [
+              "avoid_overfill",
+              "keep_container_upright_enough_for_stability"
+            ],
+            "not_stored": [
+              "fixed_fill_time",
+              "fixed_sensor_value_sequence"
+            ]
+          }
+        ],
+        "termination_conditions": [
+          {
+            "step": "move_to_doorway",
+            "terminate_when": "executor_at_doorway == established",
+            "verification_basis": "runtime_world_state_and_observation_channels",
+            "not_stored": "fixed_duration"
+          },
+          {
+            "step": "move_to_service_position",
+            "terminate_when": "executor_at_service_position == established",
+            "verification_basis": "runtime_world_state_and_observation_channels",
+            "not_stored": "fixed_duration"
+          },
+          {
+            "step": "move_to_counter",
+            "terminate_when": "executor_at_counter == established",
+            "verification_basis": "runtime_world_state_and_observation_channels",
+            "not_stored": "fixed_duration"
+          },
+          {
+            "step": "pick_up_cup",
+            "terminate_when": "cup_in_gripper == established",
+            "verification_basis": "runtime_world_state_and_observation_channels",
+            "not_stored": "fixed_duration"
+          },
+          {
+            "step": "move_to_water_source",
+            "terminate_when": "executor_at_water_source == established",
+            "verification_basis": "runtime_world_state_and_observation_channels",
+            "not_stored": "fixed_duration"
+          },
+          {
+            "step": "fill_cup_at_water_source",
+            "terminate_when": "cup_contains_water == established",
+            "verification_basis": "runtime_world_state_and_observation_channels",
+            "not_stored": "fixed_duration"
+          }
+        ],
+        "binding_slots": [
+          "region_doorway",
+          "region_service_position",
+          "region_counter_operation",
+          "object_cup_white_mug",
+          "region_water_source"
+        ],
+        "runtime_binding": {
+          "space_source": "P010 subject cognitive model",
+          "concept_source": "P012 concept match",
+          "execution_source": "P016 runtime transition and verification",
+          "body_specific_solution": "provided_by_robot_adapter_or_vendor_controller"
+        }
+      }
     }
   ]
 }

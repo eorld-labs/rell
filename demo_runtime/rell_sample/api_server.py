@@ -1397,6 +1397,7 @@ INDEX_HTML = """<!doctype html>
             `<div class="stage-row"><strong>经验形成</strong><span>${result.message}</span></div>`,
             `<div class="stage-row"><strong>过程链</strong><span>${result.experience.process_chain.join(" -> ")}</span></div>`,
             `<div class="stage-row"><strong>因果签名</strong><span>requires: ${(signature.requires_facts || []).join(", ") || "none"} / produces: ${signature.produces_fact || "-"}</span></div>`,
+            `<div class="stage-row"><strong>不变量契约</strong><span>${result.experience.invariant_contract?.storage_policy || "-"}</span></div>`,
             `<div class="stage-row"><strong>下一步</strong><span>再次点击运行，将由数字执行体按经验链回放。</span></div>`
           ].join("");
           serviceState.textContent = "已学习";
@@ -1435,6 +1436,7 @@ INDEX_HTML = """<!doctype html>
             `<div class="stage-row"><strong>经验形成</strong><span>${result.message}</span></div>`,
             `<div class="stage-row"><strong>过程链</strong><span>${result.experience.process_chain.join(" -> ")}</span></div>`,
             `<div class="stage-row"><strong>因果签名</strong><span>requires: ${(signature.requires_facts || []).join(", ") || "none"} / produces: ${signature.produces_fact || "-"}</span></div>`,
+            `<div class="stage-row"><strong>不变量契约</strong><span>${result.experience.invariant_contract?.storage_policy || "-"}</span></div>`,
             `<div class="stage-row"><strong>来源</strong><span>dialogue_teaching</span></div>`
           ].join("");
           serviceState.textContent = "已学习";
@@ -1457,7 +1459,8 @@ INDEX_HTML = """<!doctype html>
       factsEl.innerHTML = experiences.length
         ? experiences.map(item => {
             const signature = item.causal_signature || {};
-            return `<div class="stage-row"><strong>${item.experience_id}</strong><span>${item.source_utterance} / ${item.process_chain.join(" -> ")} / produces: ${signature.produces_fact || item.goal_fact}</span></div>`;
+            const invariant = item.invariant_contract || {};
+            return `<div class="stage-row"><strong>${item.experience_id}</strong><span>${item.source_utterance} / ${item.process_chain.join(" -> ")} / produces: ${signature.produces_fact || item.goal_fact} / invariants: ${invariant.storage_policy || "-"}</span></div>`;
           }).join("")
         : `<div class="stage-row"><strong>经验库</strong><span>暂无经验</span></div>`;
     }
@@ -1702,6 +1705,123 @@ def build_causal_signature(process_chain: list[str]) -> dict[str, Any]:
     }
 
 
+def build_invariant_contract(process_chain: list[str]) -> dict[str, Any]:
+    topology_invariants: list[dict[str, Any]] = []
+    action_constraints: list[dict[str, Any]] = []
+    termination_conditions: list[dict[str, Any]] = []
+    binding_slots: list[str] = []
+
+    for step in process_chain:
+        meta = STEP_LIBRARY[step]
+        target = meta.get("target_region") or meta.get("target_object")
+        if target and target not in binding_slots:
+            binding_slots.append(target)
+
+        if meta["capability"] == "navigate_to_region":
+            topology_invariants.append(
+                {
+                    "step": step,
+                    "relation": "executor_reaches_semantic_region",
+                    "target_ref": target,
+                    "stored_as": "semantic_region_relation_not_absolute_coordinates",
+                }
+            )
+            action_constraints.append(
+                {
+                    "step": step,
+                    "direction_policy": "navigate_toward_bound_region",
+                    "physical_limits": ["respect_walkable_area", "avoid_restricted_region"],
+                    "not_stored": ["fixed_path_points", "absolute_pose_sequence"],
+                }
+            )
+        elif step == "pick_up_cup":
+            topology_invariants.append(
+                {
+                    "step": step,
+                    "relation": "end_effector_reaches_graspable_object",
+                    "target_ref": target,
+                    "stored_as": "object_affordance_and_relative_reach_relation",
+                }
+            )
+            action_constraints.append(
+                {
+                    "step": step,
+                    "direction_policy": "approach_object_until_graspable",
+                    "physical_limits": ["respect_gripper_force_limit", "keep_object_stable"],
+                    "not_stored": ["fixed_joint_angles", "fixed_gripper_duration"],
+                }
+            )
+        elif step == "fill_cup_at_water_source":
+            topology_invariants.append(
+                {
+                    "step": step,
+                    "relation": "container_opening_aligned_with_water_resource",
+                    "target_ref": target,
+                    "stored_as": "resource_zone_and_container_topology_not_absolute_pose",
+                }
+            )
+            action_constraints.append(
+                {
+                    "step": step,
+                    "direction_policy": "move_container_into_resource_flow_until_liquid_enters",
+                    "physical_limits": ["avoid_overfill", "keep_container_upright_enough_for_stability"],
+                    "not_stored": ["fixed_fill_time", "fixed_sensor_value_sequence"],
+                }
+            )
+        elif step == "pour_water":
+            topology_invariants.append(
+                {
+                    "step": step,
+                    "relation": "container_spout_or_opening_aligned_with_target_container",
+                    "target_ref": target,
+                    "stored_as": "liquid_transfer_topology_not_robot_specific_pose",
+                }
+            )
+            action_constraints.append(
+                {
+                    "step": step,
+                    "direction_policy": "tilt_container_toward_target_until_flow_or_level_condition",
+                    "physical_limits": ["max_safe_tilt", "avoid_spill", "maintain_target_alignment"],
+                    "not_stored": ["fixed_joint_angle", "fixed_execution_seconds"],
+                }
+            )
+
+        termination_conditions.append(
+            {
+                "step": step,
+                "terminate_when": f"{meta['produces_fact']} == established",
+                "verification_basis": "runtime_world_state_and_observation_channels",
+                "not_stored": "fixed_duration",
+            }
+        )
+
+    return {
+        "schema_version": "1.0.0",
+        "storage_policy": "store_invariants_not_concrete_parameters",
+        "invariant_dimensions": [
+            "topology_relation",
+            "exploratory_direction_and_physical_constraint",
+            "fact_based_termination_condition",
+        ],
+        "forbidden_storage": [
+            "absolute_coordinates",
+            "robot_specific_joint_angles",
+            "fixed_execution_duration",
+            "single_body_trajectory_without_binding_slots",
+        ],
+        "topology_invariants": topology_invariants,
+        "action_constraints": action_constraints,
+        "termination_conditions": termination_conditions,
+        "binding_slots": binding_slots,
+        "runtime_binding": {
+            "space_source": "P010 subject cognitive model",
+            "concept_source": "P012 concept match",
+            "execution_source": "P016 runtime transition and verification",
+            "body_specific_solution": "provided_by_robot_adapter_or_vendor_controller",
+        },
+    }
+
+
 def teach_experience(utterance: str, steps: Any) -> dict[str, Any]:
     source_utterance = (utterance or "").strip()
     process_chain = parse_teaching_steps(steps)
@@ -1716,6 +1836,7 @@ def teach_experience(utterance: str, steps: Any) -> dict[str, Any]:
     experience_id = "exp_" + digest[:10]
     created_at = "2026-07-09T00:00:00+08:00"
     causal_signature = build_causal_signature(process_chain)
+    invariant_contract = build_invariant_contract(process_chain)
     experience = {
         "experience_id": experience_id,
         "status": "validated_in_digital_space",
@@ -1726,6 +1847,7 @@ def teach_experience(utterance: str, steps: Any) -> dict[str, Any]:
         "teaching_steps": [STEP_LIBRARY[step]["display_name"] for step in process_chain],
         "goal_fact": causal_signature["produces_fact"],
         "causal_signature": causal_signature,
+        "invariant_contract": invariant_contract,
         "context": {
             "task_ref": source_utterance,
             "space_refs": ["home_a_kitchen", "semantic_prior_home_a_kitchen_v1"],
