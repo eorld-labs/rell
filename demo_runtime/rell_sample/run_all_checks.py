@@ -81,6 +81,7 @@ def run_http_smoke() -> None:
 
 def main() -> None:
     run_python("validate_stage_zero.py")
+    run_python("validate_adapter_contract.py")
     run_python("validate_runtime_sample.py")
     run_python("validate_simulated_robot_sample.py")
     run_python("validate_api_sample.py")

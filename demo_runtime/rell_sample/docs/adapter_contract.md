@@ -23,6 +23,18 @@ stop(reason: str, callback=None) -> None
 request_human_confirmation(prompt: str, callback) -> None
 ```
 
+代码合约入口：
+
+```text
+demo_runtime/rell_sample/adapters/adapter_contract.py
+```
+
+真机接入占位：
+
+```text
+demo_runtime/rell_sample/adapters/vendor_robot_adapter_stub.py
+```
+
 ## 最小能力词汇表
 
 - `align_container`

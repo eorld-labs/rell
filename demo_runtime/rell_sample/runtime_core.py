@@ -7,17 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-
-REQUIRED_CAPABILITIES = {
-    "align_container",
-    "tilt_container",
-    "hold_pose",
-    "return_to_level",
-    "observe_tilt_angle",
-    "observe_flow_rate",
-    "observe_liquid_level",
-    "request_human_confirmation",
-}
+from adapters.adapter_contract import REQUIRED_CAPABILITIES, RellRobotAdapter
 
 
 def now_iso() -> str:
@@ -338,7 +328,7 @@ class P016Runtime:
         self,
         process_instance: dict[str, Any],
         initial_state: dict[str, Any],
-        adapter: Any,
+        adapter: RellRobotAdapter,
     ) -> None:
         self.process_instance = process_instance
         self.state = deepcopy(initial_state)

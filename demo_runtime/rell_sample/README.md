@@ -19,7 +19,11 @@
 - `data/mock_timeline_no_flow.json`：无水流失败剧本。
 - `data/mock_timeline_channel_conflict.json`：双通道冲突剧本。
 - `runtime_core.py`：P016 Runtime Core、MockRobotAdapter 和 SimulatedRobotAdapter。
+- `adapters/adapter_contract.py`：Robot Adapter 统一接口和能力词汇表。
+- `adapters/vendor_robot_adapter_stub.py`：真机 SDK 接入占位 Adapter。
 - `docs/adapter_contract.md`：Runtime 与 Robot Adapter 的异步边界。
+- `docs/robot_adapter_integration_guide.md`：机器人厂商或仿真平台接入指南。
+- `docs/vendor_joint_debug_checklist.md`：第一次联调清单。
 - `docs/admission_rules.md`：第一阶段“会不会做”的最小准入规则。
 - `docs/schema_change_protocol.md`：Schema 受控变更协议。
 
@@ -70,6 +74,7 @@ demo_runtime/output/rell_sample
 ```powershell
 python .\demo_runtime\rell_sample\validate_runtime_sample.py
 python .\demo_runtime\rell_sample\validate_simulated_robot_sample.py
+python .\demo_runtime\rell_sample\validate_adapter_contract.py
 ```
 
 ## 运行最小 API
