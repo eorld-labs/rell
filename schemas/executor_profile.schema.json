@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/executor_profile.schema.json",
+  "title": "ExecutorProfile",
+  "description": "Minimal executor body and capability profile reserved for P008-style subject constraints.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "executor_id",
+    "executor_type",
+    "body_profile",
+    "supported_actions",
+    "reachable_workspace",
+    "sensor_frames",
+    "end_effector_type",
+    "payload_limit",
+    "precision_level",
+    "mobility_constraints",
+    "spatial_entry_constraints"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string"
+    },
+    "executor_id": {
+      "type": "string"
+    },
+    "executor_type": {
+      "type": "string",
+      "enum": ["digital_agent", "simulated_robot", "real_robot"]
+    },
+    "body_profile": {
+      "type": "string"
+    },
+    "supported_actions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "reachable_workspace": {
+      "type": "object",
+      "required": ["frame_id"],
+      "properties": {
+        "frame_id": {
+          "type": "string"
+        },
+        "shape": {
+          "type": "string"
+        },
+        "bounds": {
+          "type": "object"
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "sensor_frames": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["sensor_id", "frame_id"],
+        "properties": {
+          "sensor_id": {
+            "type": "string"
+          },
+          "frame_id": {
+            "type": "string"
+          },
+          "sensor_type": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "end_effector_type": {
+      "type": "string"
+    },
+    "payload_limit": {
+      "type": "object",
+      "required": ["value", "unit"],
+      "properties": {
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "precision_level": {
+      "type": "string"
+    },
+    "mobility_constraints": {
+      "type": "object",
+      "properties": {
+        "turning_radius": {
+          "type": "object"
+        },
+        "step_over_height": {
+          "type": "object"
+        },
+        "base_type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "spatial_entry_constraints": {
+      "type": "object",
+      "properties": {
+        "body_envelope": {
+          "type": "object"
+        },
+        "clearance_required_m": {
+          "type": "number"
+        },
+        "minimum_entry_width_m": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

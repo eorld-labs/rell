@@ -51,6 +51,7 @@
 12. `demo_runtime/rell_sample/data/mock_timeline_channel_conflict.json`
 13. `demo_runtime/rell_sample/docs/adapter_contract.md`
 14. `demo_runtime/rell_sample/docs/admission_rules.md`
+15. `schemas/executor_profile.schema.json`
 
 ### 2.2 阶段零硬门槛
 
@@ -60,8 +61,9 @@
 2. 双通道 Mock 信号定义完成，并至少包含一个冲突配置。
 3. 所有 JSON 示例通过 Schema 校验。
 4. Robot Adapter 最小能力词汇表完成。
-5. Runtime Event 结构包含 `event_id`、`sequence`、`timestamp`、`process_instance_id`、`stage_id`。
-6. Schema 版本号采用 major/minor 规则。
+5. Robot Adapter 能上报最小执行体能力画像，用于承接 P008 主体物理约束和后续空间可进入性准入。
+6. Runtime Event 结构包含 `event_id`、`sequence`、`timestamp`、`process_instance_id`、`stage_id`。
+7. Schema 版本号采用 major/minor 规则。
 
 ## 三、阶段一：纯软件 Runtime 样品
 

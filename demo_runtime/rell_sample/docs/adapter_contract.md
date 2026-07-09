@@ -13,6 +13,7 @@
 
 ```python
 report_capabilities() -> list[str]
+report_executor_profile() -> dict
 execute_stage_action(stage: dict, context: dict, callback) -> None
 subscribe_state_variables(process_instance_id: str, handler) -> None
 subscribe_observation_channel(fact_id: str, handler) -> None
@@ -45,6 +46,24 @@ demo_runtime/rell_sample/adapters/vendor_robot_adapter_stub.py
 - `observe_flow_rate`
 - `observe_liquid_level`
 - `request_human_confirmation`
+
+## 执行体能力画像
+
+`report_executor_profile()` 用于预留 P008 主体物理约束和空间可进入性判断的工程入口。第一阶段仅要求返回固定画像，不做复杂 IK、全身规划或跨机器人本体动作迁移。
+
+最小字段：
+
+- `executor_id`
+- `executor_type`
+- `body_profile`
+- `supported_actions`
+- `reachable_workspace`
+- `sensor_frames`
+- `end_effector_type`
+- `payload_limit`
+- `precision_level`
+- `mobility_constraints`
+- `spatial_entry_constraints`
 
 ## 事件要求
 

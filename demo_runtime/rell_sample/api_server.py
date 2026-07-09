@@ -476,6 +476,11 @@ INDEX_HTML = """<!doctype html>
       if (audit.stop_reason) {
         rows.push(`<div class="stage-row"><strong>停止原因</strong><span>${audit.stop_reason}</span></div>`);
       }
+      const profile = result.admission_decision?.executor_profile;
+      if (profile) {
+        rows.push(`<div class="stage-row"><strong>执行体画像</strong><span>${profile.executor_type} / ${profile.body_profile} / ${profile.end_effector_type}</span></div>`);
+        rows.push(`<div class="stage-row"><strong>空间约束预留</strong><span>${profile.spatial_entry_constraints?.body_envelope?.shape || "reserved"} envelope, P008 entry constraints reserved</span></div>`);
+      }
       factsEl.innerHTML = rows.join("");
     }
 
@@ -561,6 +566,7 @@ def run_process(scenario: str = "success") -> dict[str, Any]:
     return {
         "task_id": task_id,
         "scenario": scenario,
+        "admission_decision": result["admission_decision"],
         "audit_summary": result["audit_summary"],
         "stage_runtime_state": result["stage_runtime_state"],
         "execution_trace": result["execution_trace"],

@@ -7,7 +7,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from adapters.adapter_contract import REQUIRED_CAPABILITIES, RellRobotAdapter
+from adapters.adapter_contract import (
+    REQUIRED_CAPABILITIES,
+    RellRobotAdapter,
+    build_executor_profile,
+    clone_executor_profile,
+)
 
 
 def now_iso() -> str:
@@ -54,9 +59,17 @@ class MockRobotAdapter:
         self.paused = False
         self.latest_snapshot: dict[str, Any] = {}
         self.confirmation_requests: list[dict[str, Any]] = []
+        self.executor_profile = build_executor_profile(
+            "mock_pouring_executor",
+            "simulated_robot",
+            "fixed_mock",
+        )
 
     def report_capabilities(self) -> list[str]:
         return sorted(REQUIRED_CAPABILITIES)
+
+    def report_executor_profile(self) -> dict[str, Any]:
+        return clone_executor_profile(self.executor_profile)
 
     def execute_stage_action(self, stage: dict[str, Any], context: dict[str, Any], callback=None) -> None:
         if self.paused:
@@ -139,9 +152,17 @@ class SimulatedPouringRobotAdapter:
             "water_available_ml": 180.0 if scenario != "simulated_no_water" else 0.0,
             "flow_integral_ml": 0.0,
         }
+        self.executor_profile = build_executor_profile(
+            "simulated_pouring_robot",
+            "simulated_robot",
+            "wheeled_arm",
+        )
 
     def report_capabilities(self) -> list[str]:
         return sorted(REQUIRED_CAPABILITIES)
+
+    def report_executor_profile(self) -> dict[str, Any]:
+        return clone_executor_profile(self.executor_profile)
 
     def execute_stage_action(self, stage: dict[str, Any], context: dict[str, Any], callback=None) -> None:
         if self.paused:
@@ -344,11 +365,13 @@ class P016Runtime:
     def admit(self) -> dict[str, Any]:
         checks = []
         capabilities = set(self.adapter.report_capabilities())
+        executor_profile = self.adapter.report_executor_profile()
         required_by_instance = {stage["required_capability"] for stage in self.process_instance["stages"]}
         check_items = {
             "template_exists": self.process_instance.get("process_template_ref") == "pour_water",
             "binding_complete": bool(self.process_instance.get("bound_parameters")),
             "adapter_capabilities": required_by_instance.issubset(capabilities),
+            "executor_profile_available": bool(executor_profile.get("executor_id")),
             "observation_channels": True,
         }
         for check_id, passed in check_items.items():
@@ -361,6 +384,7 @@ class P016Runtime:
             "decision": "allowed" if allowed else "blocked",
             "checks": checks,
             "missing_items": sorted(required_by_instance - capabilities),
+            "executor_profile": executor_profile,
         }
 
     def run(self) -> dict[str, Any]:

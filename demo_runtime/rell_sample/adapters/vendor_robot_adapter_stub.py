@@ -3,7 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
-from .adapter_contract import REQUIRED_CAPABILITIES
+from .adapter_contract import REQUIRED_CAPABILITIES, build_executor_profile, clone_executor_profile
 
 
 class VendorRobotAdapterStub:
@@ -16,6 +16,11 @@ class VendorRobotAdapterStub:
         self.paused = False
         self.latest_snapshot: dict[str, Any] = {}
         self.confirmation_requests: list[dict[str, Any]] = []
+        self.executor_profile = build_executor_profile(
+            f"{vendor_name}_executor",
+            "real_robot",
+            "vendor_defined",
+        )
 
     def connect(self, config: dict[str, Any]) -> None:
         """Connect to a vendor SDK or middleware in future integration work."""
@@ -28,6 +33,9 @@ class VendorRobotAdapterStub:
 
     def report_capabilities(self) -> list[str]:
         return sorted(REQUIRED_CAPABILITIES)
+
+    def report_executor_profile(self) -> dict[str, Any]:
+        return clone_executor_profile(self.executor_profile)
 
     def execute_stage_action(self, stage: dict[str, Any], context: dict[str, Any], callback=None) -> None:
         raise NotImplementedError(
