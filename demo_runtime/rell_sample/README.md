@@ -41,3 +41,27 @@ python .\demo_runtime\rell_sample\validate_stage_zero.py
 Mock 时间轴是剧本 DSL，不是 Runtime 队列中的正式事件。MockRobotAdapter 读取时间轴后，应按 Runtime 当前阶段启动时间展开为带 `event_id`、`sequence`、`timestamp`、`process_instance_id`、`stage_id` 和 `event_type` 的 `RuntimeEvent`。
 
 第一阶段不实现多动作过程链、不实现根因诊断、不实现自动模板学习、不实现真实视觉识别或流体仿真。
+
+## 运行 Runtime 样品
+
+```powershell
+python .\demo_runtime\rell_sample\run_runtime_sample.py
+```
+
+该脚本运行三条纯软件路径：
+
+- `success`：两个观测通道均确认 `cup_has_water` 成立，四阶段完成。
+- `no_flow`：倾斜到位但无水流，触发失败标签并进入人工确认。
+- `channel_conflict`：物理液位通道成立、数字流速积分通道不成立，进入人工确认。
+
+输出写入：
+
+```text
+demo_runtime/output/rell_sample
+```
+
+运行结果校验：
+
+```powershell
+python .\demo_runtime\rell_sample\validate_runtime_sample.py
+```

@@ -36,7 +36,8 @@
         "additionalProperties": false
       }
     },
-    "skill_package_draft_ref": { "type": "string" }
+    "skill_package_draft_ref": { "type": "string" },
+    "stop_reason": { "type": "string" }
   },
   "additionalProperties": false
 }
