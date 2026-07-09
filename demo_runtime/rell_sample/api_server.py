@@ -45,10 +45,12 @@ TASK_LIBRARY = {
 }
 
 PROCESS_CHAIN_KEYWORDS = [
+    ("move_to_doorway", ["走到门旁边", "到门旁边", "门旁边", "走到门口", "到门口", "门口"]),
+    ("move_to_service_position", ["走到服务位", "到服务位", "服务位", "走到服务为", "到服务为", "服务为"]),
     ("move_to_counter", ["走向操作台", "走到操作台", "到操作台", "去操作台"]),
     ("pick_up_cup", ["拿起杯子", "拿杯子", "取杯子", "抓取杯子"]),
     ("move_to_water_source", ["到水源", "去水源", "走到水源", "水源处"]),
-    ("fill_cup_at_water_source", ["接一杯水", "接水", "装水", "取水"]),
+    ("fill_cup_at_water_source", ["接一杯水", "接水", "装水", "取水", "倒杯水"]),
     ("pour_water", ["倒水", "倒一杯水", "给客人倒水"]),
 ]
 
@@ -58,13 +60,29 @@ TRACE_STORE: dict[str, dict[str, Any]] = {}
 
 
 STEP_LIBRARY = {
+    "move_to_doorway": {
+        "display_name": "走到门旁边",
+        "capability": "navigate_to_region",
+        "target_region": "region_doorway",
+        "requires_facts": [],
+        "produces_fact": "executor_at_doorway",
+        "destroys_facts": ["executor_at_counter", "executor_at_water_source", "executor_at_service_position"],
+    },
+    "move_to_service_position": {
+        "display_name": "走到服务位",
+        "capability": "navigate_to_region",
+        "target_region": "region_service_position",
+        "requires_facts": [],
+        "produces_fact": "executor_at_service_position",
+        "destroys_facts": ["executor_at_counter", "executor_at_water_source", "executor_at_doorway"],
+    },
     "move_to_counter": {
         "display_name": "走向操作台",
         "capability": "navigate_to_region",
         "target_region": "region_counter_operation",
         "requires_facts": [],
         "produces_fact": "executor_at_counter",
-        "destroys_facts": ["executor_at_water_source"],
+        "destroys_facts": ["executor_at_water_source", "executor_at_doorway", "executor_at_service_position"],
     },
     "pick_up_cup": {
         "display_name": "拿起杯子",
@@ -80,7 +98,7 @@ STEP_LIBRARY = {
         "target_region": "region_water_source",
         "requires_facts": [],
         "produces_fact": "executor_at_water_source",
-        "destroys_facts": ["executor_at_counter"],
+        "destroys_facts": ["executor_at_counter", "executor_at_doorway", "executor_at_service_position"],
     },
     "fill_cup_at_water_source": {
         "display_name": "接一杯水",
@@ -103,7 +121,7 @@ STEP_LIBRARY = {
 
 GOAL_FACT_KEYWORDS = [
     ("water_poured", ["倒水", "倒一杯水", "给客人倒水"]),
-    ("cup_contains_water", ["接一杯水", "接水", "装水", "取水", "杯子里有水", "杯中有水", "弄杯水"]),
+    ("cup_contains_water", ["接一杯水", "接水", "装水", "取水", "杯子里有水", "杯中有水", "弄杯水", "倒杯水"]),
 ]
 
 
@@ -217,6 +235,60 @@ def solve_causal_process_chain(goal_fact: str, cognitive_model: dict[str, Any]) 
         "process_chain": plan if solved else [],
         "reasoning": reasoning,
         "failures": failures,
+    }
+
+
+def chain_covers_goal(explicit_chain: list[str], causal_chain: list[str]) -> bool:
+    if not explicit_chain or not causal_chain:
+        return False
+    explicit_set = set(explicit_chain)
+    return all(step in explicit_set for step in causal_chain)
+
+
+def chain_is_causally_supported(explicit_chain: list[str], base_plan: dict[str, Any]) -> bool:
+    facts = set(base_plan.get("initial_facts", []))
+    for step in explicit_chain:
+        meta = STEP_LIBRARY[step]
+        missing = [fact for fact in meta.get("requires_facts", []) if fact not in facts]
+        if missing:
+            return False
+        for destroyed in meta.get("destroys_facts", []):
+            facts.discard(destroyed)
+        facts.add(meta["produces_fact"])
+    return True
+
+
+def build_explicit_causal_plan(goal_fact: str, explicit_chain: list[str], base_plan: dict[str, Any]) -> dict[str, Any]:
+    facts = set(base_plan.get("initial_facts", []))
+    reasoning: list[dict[str, Any]] = []
+    for step in explicit_chain:
+        meta = STEP_LIBRARY[step]
+        missing = [fact for fact in meta.get("requires_facts", []) if fact not in facts]
+        reasoning.append(
+            {
+                "fact": meta["produces_fact"],
+                "status": "explicit_step",
+                "process": step,
+                "requires_facts": meta.get("requires_facts", []),
+                "missing_before_step": missing,
+                "produces_fact": meta["produces_fact"],
+                "destroys_facts": meta.get("destroys_facts", []),
+                "expanded_process_chain": [step],
+                "source": "explicit_user_teaching",
+            }
+        )
+        for destroyed in meta.get("destroys_facts", []):
+            facts.discard(destroyed)
+        facts.add(meta["produces_fact"])
+    return {
+        "solved": True,
+        "goal_fact": goal_fact,
+        "initial_facts": base_plan.get("initial_facts", []),
+        "final_facts": sorted(facts),
+        "process_chain": explicit_chain,
+        "reasoning": reasoning,
+        "failures": [],
+        "plan_source": "explicit_user_teaching",
     }
 
 
@@ -752,7 +824,13 @@ INDEX_HTML = """<!doctype html>
       setText(targetValue, target || "-");
       scene.style.setProperty("--stream-height", "0px");
       scene.style.setProperty("--stream-opacity", "0");
-      if (step === "move_to_counter") {
+      if (step === "move_to_doorway") {
+        moveDigitalActors("10%", "64%");
+        setText(factValue, "executor_at_doorway");
+      } else if (step === "move_to_service_position") {
+        moveDigitalActors("78%", "66%");
+        setText(factValue, "executor_at_service_position");
+      } else if (step === "move_to_counter") {
         moveDigitalActors("63%", "58%");
         scene.style.setProperty("--cup-x", "0px");
         setText(factValue, "executor_at_counter");
@@ -904,6 +982,8 @@ INDEX_HTML = """<!doctype html>
     function hydrateTeachingFields(result) {
       const chain = result.teaching_hint?.candidate_process_chain || result.intent_translation?.candidate_process_chain || [];
       const stepNames = {
+        move_to_doorway: "走到门旁边",
+        move_to_service_position: "走到服务位",
         move_to_counter: "走向操作台",
         pick_up_cup: "拿起杯子",
         move_to_water_source: "到水源处",
@@ -1123,13 +1203,15 @@ def translate_intent(utterance: str) -> dict[str, Any]:
     if should_use_causal_solver:
         causal_plan = solve_causal_process_chain(goal_fact, get_cognitive_model())
         if causal_plan["solved"]:
+            if chain_covers_goal(detected_steps, causal_plan["process_chain"]) and chain_is_causally_supported(detected_steps, causal_plan):
+                causal_plan = build_explicit_causal_plan(goal_fact, detected_steps, causal_plan)
             plan_digest = hashlib.sha1((goal_fact + "|" + "|".join(causal_plan["process_chain"])).encode("utf-8")).hexdigest()
             return {
                 "schema_version": "1.0.0",
                 "utterance": text,
                 "task_type": "causal_process_chain",
                 "decision": "executable",
-                "reason": "目标因果事实经因果层反向搜索形成过程链",
+                "reason": "保留显式教学路线并完成目标因果事实校验" if causal_plan.get("plan_source") == "explicit_user_teaching" else "目标因果事实经因果层反向搜索形成过程链",
                 "candidate_process": "causal_plan_" + plan_digest[:10],
                 "candidate_process_chain": causal_plan["process_chain"],
                 "experience_id": "causal_plan_" + plan_digest[:10],

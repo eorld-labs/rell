@@ -115,6 +115,26 @@ def main() -> None:
     if "pour_water" in short_run["intent_translation"].get("candidate_process_chain", []):
         raise AssertionError(f"short goal must not include pouring step: {short_run['intent_translation']}")
 
+    routed_teaching = teach_experience_from_dialogue(
+        "走到门旁边，再走到服务为，再去操作台拿杯子，去水源处倒杯水",
+        "教你：走到门旁边，再走到服务为，再去操作台拿杯子，去水源处倒杯水",
+    )
+    expected_routed_chain = [
+        "move_to_doorway",
+        "move_to_service_position",
+        "move_to_counter",
+        "pick_up_cup",
+        "move_to_water_source",
+        "fill_cup_at_water_source",
+    ]
+    if routed_teaching.get("experience", {}).get("process_chain") != expected_routed_chain:
+        raise AssertionError(f"routed teaching must preserve explicit semantic waypoints: {routed_teaching}")
+    routed_run = run_process("auto", "走到门旁边，再走到服务为，再去操作台拿杯子，去水源处倒杯水")
+    if routed_run["intent_translation"].get("candidate_process_chain") != expected_routed_chain:
+        raise AssertionError(f"explicit route must survive causal planning: {routed_run['intent_translation']}")
+    if routed_run["intent_translation"].get("goal_fact") != "cup_contains_water":
+        raise AssertionError(f"water-source pouring phrase must mean filling cup, not final pour_water: {routed_run['intent_translation']}")
+
     conflict = run_process("channel_conflict")
     if conflict["audit_summary"]["outcome"] != "requires_human_confirmation":
         raise AssertionError("conflict API run must require human confirmation")
@@ -147,7 +167,7 @@ def main() -> None:
         EXPERIENCE_LIBRARY_FILE.write_text(original_library, encoding="utf-8")
 
     print("API sample validation passed.")
-    print("Validated: admit, run success, teach experience, dialogue teaching, natural-language causal teaching, causal chain solving, causal short-goal solving, run channel_conflict, run simulated_success, get audit, get space.")
+    print("Validated: admit, run success, teach experience, dialogue teaching, natural-language causal teaching, explicit route teaching, causal chain solving, causal short-goal solving, run channel_conflict, run simulated_success, get audit, get space.")
 
 
 if __name__ == "__main__":

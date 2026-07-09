@@ -267,6 +267,171 @@
         "audit_ref": "teaching_session"
       },
       "created_at": "2026-07-09T00:00:00+08:00"
+    },
+    {
+      "experience_id": "exp_c6b24cecff",
+      "status": "validated_in_digital_space",
+      "source_utterance": "走到门旁边，再走到服务位，再去操作台拿杯子，去水源处倒杯水",
+      "aliases": [
+        "走到门旁边，再走到服务位，再去操作台拿杯子，去水源处倒杯水"
+      ],
+      "task_type": "learned_process_chain",
+      "process_chain": [
+        "move_to_doorway",
+        "move_to_service_position",
+        "move_to_counter",
+        "pick_up_cup",
+        "move_to_water_source",
+        "fill_cup_at_water_source"
+      ],
+      "teaching_steps": [
+        "走到门旁边",
+        "走到服务位",
+        "走向操作台",
+        "拿起杯子",
+        "到水源处",
+        "接一杯水"
+      ],
+      "goal_fact": "cup_contains_water",
+      "causal_signature": {
+        "schema_version": "1.0.0",
+        "requires_facts": [
+          "cup_at_counter",
+          "gripper_empty",
+          "water_source_available"
+        ],
+        "produces_fact": "cup_contains_water",
+        "destroys_facts": [
+          "executor_at_counter",
+          "executor_at_water_source",
+          "executor_at_service_position",
+          "executor_at_doorway",
+          "cup_at_counter",
+          "gripper_empty",
+          "cup_empty"
+        ],
+        "expands_to": [
+          "move_to_doorway",
+          "move_to_service_position",
+          "move_to_counter",
+          "pick_up_cup",
+          "move_to_water_source",
+          "fill_cup_at_water_source"
+        ],
+        "reasoning": [
+          {
+            "step": "move_to_doorway",
+            "requires_facts": [],
+            "external_requirements_added": [],
+            "produces_fact": "executor_at_doorway",
+            "destroys_facts": [
+              "executor_at_counter",
+              "executor_at_water_source",
+              "executor_at_service_position"
+            ]
+          },
+          {
+            "step": "move_to_service_position",
+            "requires_facts": [],
+            "external_requirements_added": [],
+            "produces_fact": "executor_at_service_position",
+            "destroys_facts": [
+              "executor_at_counter",
+              "executor_at_water_source",
+              "executor_at_doorway"
+            ]
+          },
+          {
+            "step": "move_to_counter",
+            "requires_facts": [],
+            "external_requirements_added": [],
+            "produces_fact": "executor_at_counter",
+            "destroys_facts": [
+              "executor_at_water_source",
+              "executor_at_doorway",
+              "executor_at_service_position"
+            ]
+          },
+          {
+            "step": "pick_up_cup",
+            "requires_facts": [
+              "executor_at_counter",
+              "cup_at_counter",
+              "gripper_empty"
+            ],
+            "external_requirements_added": [
+              "cup_at_counter",
+              "gripper_empty"
+            ],
+            "produces_fact": "cup_in_gripper",
+            "destroys_facts": [
+              "cup_at_counter",
+              "gripper_empty"
+            ]
+          },
+          {
+            "step": "move_to_water_source",
+            "requires_facts": [],
+            "external_requirements_added": [],
+            "produces_fact": "executor_at_water_source",
+            "destroys_facts": [
+              "executor_at_counter",
+              "executor_at_doorway",
+              "executor_at_service_position"
+            ]
+          },
+          {
+            "step": "fill_cup_at_water_source",
+            "requires_facts": [
+              "cup_in_gripper",
+              "executor_at_water_source",
+              "water_source_available"
+            ],
+            "external_requirements_added": [
+              "water_source_available"
+            ],
+            "produces_fact": "cup_contains_water",
+            "destroys_facts": [
+              "cup_empty"
+            ]
+          }
+        ],
+        "solver_enabled": true
+      },
+      "context": {
+        "task_ref": "走到门旁边，再走到服务位，再去操作台拿杯子，去水源处倒杯水",
+        "space_refs": [
+          "home_a_kitchen",
+          "semantic_prior_home_a_kitchen_v1"
+        ],
+        "human_intent_ref": "dialogue_teaching"
+      },
+      "action": {
+        "action_type": "process_chain",
+        "target_refs": [
+          "region_doorway",
+          "region_service_position",
+          "region_counter_operation",
+          "object_cup_white_mug",
+          "region_water_source",
+          "region_water_source"
+        ],
+        "parameters": {
+          "source": "dialogue_teaching"
+        }
+      },
+      "outcome": {
+        "outcome_type": "candidate_created",
+        "state_delta": "manual steps translated into a digital process-chain experience",
+        "evidence_refs": [
+          "POST /experience/teach",
+          "GET /experience/library"
+        ]
+      },
+      "governance_ref": {
+        "audit_ref": "teaching_session"
+      },
+      "created_at": "2026-07-09T00:00:00+08:00"
     }
   ]
 }
