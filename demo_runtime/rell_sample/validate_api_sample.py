@@ -83,6 +83,29 @@ def main() -> None:
     if dialogue_taught["experience"]["context"]["human_intent_ref"] != "dialogue_teaching":
         raise AssertionError(f"dialogue teaching must mark source: {dialogue_taught}")
 
+    causal_taught = teach_experience_from_dialogue(
+        "",
+        "教你一个技能：接一杯水需要先拿杯子，再去水源处接水。接完以后杯子里有水。",
+    )
+    if causal_taught.get("decision") != "experience_created":
+        raise AssertionError(f"natural language causal teaching must create an experience: {causal_taught}")
+    signature = causal_taught["experience"].get("causal_signature", {})
+    if signature.get("produces_fact") != "cup_contains_water":
+        raise AssertionError(f"causal teaching must produce cup_contains_water: {causal_taught}")
+    if not signature.get("solver_enabled"):
+        raise AssertionError(f"causal teaching must be available to the causal solver: {causal_taught}")
+    if "executor_at_counter" not in signature.get("requires_facts", []):
+        raise AssertionError(f"causal signature must expose external preconditions: {signature}")
+    causal_taught_run = run_process("auto", "帮我接水")
+    if causal_taught_run["audit_summary"]["outcome"] != "completed":
+        raise AssertionError(f"taught causal process must run from a different utterance: {causal_taught_run}")
+    reasoning_sources = [
+        item.get("source")
+        for item in causal_taught_run["intent_translation"].get("causal_plan", {}).get("reasoning", [])
+    ]
+    if "experience_library" not in reasoning_sources:
+        raise AssertionError(f"causal solver must use taught experience signature: {causal_taught_run['intent_translation']}")
+
     short_run = run_process("auto", "到水源处接一杯水")
     if short_run["audit_summary"]["outcome"] != "completed":
         raise AssertionError(f"short goal must run through causal precondition search: {short_run}")
@@ -124,7 +147,7 @@ def main() -> None:
         EXPERIENCE_LIBRARY_FILE.write_text(original_library, encoding="utf-8")
 
     print("API sample validation passed.")
-    print("Validated: admit, run success, teach experience, dialogue teaching, causal chain solving, causal short-goal solving, run channel_conflict, run simulated_success, get audit, get space.")
+    print("Validated: admit, run success, teach experience, dialogue teaching, natural-language causal teaching, causal chain solving, causal short-goal solving, run channel_conflict, run simulated_success, get audit, get space.")
 
 
 if __name__ == "__main__":

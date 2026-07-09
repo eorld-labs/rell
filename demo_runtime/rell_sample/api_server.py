@@ -103,7 +103,7 @@ STEP_LIBRARY = {
 
 GOAL_FACT_KEYWORDS = [
     ("water_poured", ["倒水", "倒一杯水", "给客人倒水"]),
-    ("cup_contains_water", ["接一杯水", "接水", "装水", "取水"]),
+    ("cup_contains_water", ["接一杯水", "接水", "装水", "取水", "杯子里有水", "杯中有水", "弄杯水"]),
 ]
 
 
@@ -131,16 +131,37 @@ def build_world_state_facts(cognitive_model: dict[str, Any]) -> set[str]:
     return facts
 
 
+def build_process_registry() -> dict[str, dict[str, Any]]:
+    registry = {step_id: dict(meta) for step_id, meta in STEP_LIBRARY.items()}
+    for item in load_experience_library().get("experiences", []):
+        signature = item.get("causal_signature")
+        if not signature or not signature.get("solver_enabled"):
+            continue
+        registry[item["experience_id"]] = {
+            "display_name": item.get("source_utterance", item["experience_id"]),
+            "capability": "taught_causal_process",
+            "requires_facts": signature.get("requires_facts", []),
+            "produces_fact": signature["produces_fact"],
+            "destroys_facts": signature.get("destroys_facts", []),
+            "expands_to": signature.get("expands_to", item.get("process_chain", [])),
+            "source": "experience_library",
+        }
+    return registry
+
+
 def solve_causal_process_chain(goal_fact: str, cognitive_model: dict[str, Any]) -> dict[str, Any]:
     initial_facts = build_world_state_facts(cognitive_model)
     state_facts = set(initial_facts)
     plan: list[str] = []
     reasoning: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
+    registry = build_process_registry()
 
     producers: dict[str, list[str]] = {}
-    for step_id, meta in STEP_LIBRARY.items():
+    for step_id, meta in registry.items():
         producers.setdefault(meta["produces_fact"], []).append(step_id)
+    for fact, step_ids in producers.items():
+        step_ids.sort(key=lambda step_id: 0 if registry[step_id].get("source") == "experience_library" else 1)
 
     def ensure_fact(fact: str, stack: list[str]) -> bool:
         if fact in state_facts:
@@ -154,14 +175,15 @@ def solve_causal_process_chain(goal_fact: str, cognitive_model: dict[str, Any]) 
             failures.append({"fact": fact, "reason": "no_process_produces_fact"})
             return False
         for step_id in candidate_steps:
-            meta = STEP_LIBRARY[step_id]
+            meta = registry[step_id]
             local_state = set(state_facts)
             local_plan_len = len(plan)
             local_reasoning_len = len(reasoning)
             local_failures_len = len(failures)
             requirements = meta.get("requires_facts", [])
             if all(ensure_fact(required, stack + [fact]) for required in requirements):
-                plan.append(step_id)
+                expanded_steps = meta.get("expands_to") or [step_id]
+                plan.extend(expanded_steps)
                 for destroyed in meta.get("destroys_facts", []):
                     state_facts.discard(destroyed)
                 state_facts.add(meta["produces_fact"])
@@ -173,6 +195,8 @@ def solve_causal_process_chain(goal_fact: str, cognitive_model: dict[str, Any]) 
                         "requires_facts": requirements,
                         "produces_fact": meta["produces_fact"],
                         "destroys_facts": meta.get("destroys_facts", []),
+                        "expanded_process_chain": expanded_steps,
+                        "source": meta.get("source", "step_library"),
                     }
                 )
                 return True
@@ -805,6 +829,25 @@ INDEX_HTML = """<!doctype html>
       return `[${String(event.consumed_sequence).padStart(2, "0")}] ${label} | ${event.before_state} -> ${event.after_state}${payload}`;
     }
 
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function describeCausalReasoning(reasoning) {
+      return (reasoning || []).map(item => {
+        if (item.status === "already_established") {
+          return `事实 ${item.fact} 已由当前世界状态确认`;
+        }
+        const reqs = (item.requires_facts || []).length ? item.requires_facts.join(", ") : "无外部前提";
+        const expanded = (item.expanded_process_chain || []).join(" -> ");
+        return `为达成 ${item.fact}，调用 ${item.process}；需要 ${reqs}；产出 ${item.produces_fact}` + (expanded ? `；展开为 ${expanded}` : "");
+      });
+    }
+
     function renderFacts(result) {
       const audit = result.audit_summary;
       const stages = audit.stage_summary || [];
@@ -817,6 +860,12 @@ INDEX_HTML = """<!doctype html>
       if (result.intent_translation?.causal_plan) {
         rows.push(`<div class="stage-row"><strong>目标事实</strong><span>${result.intent_translation.goal_fact}</span></div>`);
         rows.push(`<div class="stage-row"><strong>因果链</strong><span>${(result.intent_translation.causal_plan.process_chain || []).join(" -> ")}</span></div>`);
+        rows.push(`<div class="stage-row"><strong>初始事实</strong><span>${(result.intent_translation.causal_plan.initial_facts || []).join(", ")}</span></div>`);
+        const reasoningRows = describeCausalReasoning(result.intent_translation.causal_plan.reasoning);
+        rows.push(`<div class="stage-row"><strong>因果推理展开</strong><span>${reasoningRows.length ? "" : "暂无推理记录"}</span></div>`);
+        for (const line of reasoningRows) {
+          rows.push(`<div class="stage-row"><strong>推理</strong><span>${escapeHtml(line)}</span></div>`);
+        }
       }
       if (result.space_admission) {
         rows.push(`<div class="stage-row"><strong>空间准入</strong><span>${result.space_admission.decision}: ${result.space_admission.reason}</span></div>`);
@@ -954,9 +1003,11 @@ INDEX_HTML = """<!doctype html>
           setText(stateMetric, "candidate_created", "ok");
           setText(outcomeMetric, "可回放", "ok");
           setText(taskMetric, result.experience.experience_id);
+          const signature = result.experience.causal_signature || {};
           factsEl.innerHTML = [
             `<div class="stage-row"><strong>经验形成</strong><span>${result.message}</span></div>`,
             `<div class="stage-row"><strong>过程链</strong><span>${result.experience.process_chain.join(" -> ")}</span></div>`,
+            `<div class="stage-row"><strong>因果签名</strong><span>requires: ${(signature.requires_facts || []).join(", ") || "none"} / produces: ${signature.produces_fact || "-"}</span></div>`,
             `<div class="stage-row"><strong>下一步</strong><span>再次点击运行，将由数字执行体按经验链回放。</span></div>`
           ].join("");
           serviceState.textContent = "已学习";
@@ -990,9 +1041,11 @@ INDEX_HTML = """<!doctype html>
           setText(stateMetric, "candidate_created", "ok");
           setText(outcomeMetric, "可回放", "ok");
           setText(taskMetric, result.experience.experience_id);
+          const signature = result.experience.causal_signature || {};
           factsEl.innerHTML = [
             `<div class="stage-row"><strong>经验形成</strong><span>${result.message}</span></div>`,
             `<div class="stage-row"><strong>过程链</strong><span>${result.experience.process_chain.join(" -> ")}</span></div>`,
+            `<div class="stage-row"><strong>因果签名</strong><span>requires: ${(signature.requires_facts || []).join(", ") || "none"} / produces: ${signature.produces_fact || "-"}</span></div>`,
             `<div class="stage-row"><strong>来源</strong><span>dialogue_teaching</span></div>`
           ].join("");
           serviceState.textContent = "已学习";
@@ -1013,7 +1066,10 @@ INDEX_HTML = """<!doctype html>
       appendLog("经验库：" + JSON.stringify(result, null, 2));
       const experiences = result.experiences || [];
       factsEl.innerHTML = experiences.length
-        ? experiences.map(item => `<div class="stage-row"><strong>${item.experience_id}</strong><span>${item.source_utterance} / ${item.process_chain.join(" -> ")}</span></div>`).join("")
+        ? experiences.map(item => {
+            const signature = item.causal_signature || {};
+            return `<div class="stage-row"><strong>${item.experience_id}</strong><span>${item.source_utterance} / ${item.process_chain.join(" -> ")} / produces: ${signature.produces_fact || item.goal_fact}</span></div>`;
+          }).join("")
         : `<div class="stage-row"><strong>经验库</strong><span>暂无经验</span></div>`;
     }
 
@@ -1178,6 +1234,17 @@ def find_learned_experience(utterance: str) -> dict[str, Any] | None:
 
 
 def parse_teaching_steps(steps: Any) -> list[str]:
+    if isinstance(steps, str) and "需要先" in steps:
+        prefix, suffix = steps.split("需要先", 1)
+        suffix = re.split(r"(接完|完成|以后|之后|。|\.)", suffix, maxsplit=1)[0]
+        prerequisite_steps = detect_process_chain(suffix)
+        goal_steps = detect_process_chain(prefix)
+        parsed_from_causal_sentence: list[str] = []
+        for step in prerequisite_steps + goal_steps:
+            if step not in parsed_from_causal_sentence:
+                parsed_from_causal_sentence.append(step)
+        if parsed_from_causal_sentence:
+            return parsed_from_causal_sentence
     if isinstance(steps, list):
         raw_steps = [str(item).strip() for item in steps if str(item).strip()]
     else:
@@ -1195,6 +1262,44 @@ def parse_teaching_steps(steps: Any) -> list[str]:
     return parsed
 
 
+def build_causal_signature(process_chain: list[str]) -> dict[str, Any]:
+    known_facts: set[str] = set()
+    requires_facts: list[str] = []
+    destroys_facts: list[str] = []
+    reasoning: list[dict[str, Any]] = []
+    for step in process_chain:
+        meta = STEP_LIBRARY[step]
+        missing_before_step = []
+        for fact in meta.get("requires_facts", []):
+            if fact not in known_facts and fact not in requires_facts:
+                requires_facts.append(fact)
+                missing_before_step.append(fact)
+        for destroyed in meta.get("destroys_facts", []):
+            known_facts.discard(destroyed)
+            if destroyed not in destroys_facts:
+                destroys_facts.append(destroyed)
+        known_facts.add(meta["produces_fact"])
+        reasoning.append(
+            {
+                "step": step,
+                "requires_facts": meta.get("requires_facts", []),
+                "external_requirements_added": missing_before_step,
+                "produces_fact": meta["produces_fact"],
+                "destroys_facts": meta.get("destroys_facts", []),
+            }
+        )
+    goal_fact = STEP_LIBRARY[process_chain[-1]]["produces_fact"]
+    return {
+        "schema_version": "1.0.0",
+        "requires_facts": requires_facts,
+        "produces_fact": goal_fact,
+        "destroys_facts": destroys_facts,
+        "expands_to": process_chain,
+        "reasoning": reasoning,
+        "solver_enabled": goal_fact == "cup_contains_water",
+    }
+
+
 def teach_experience(utterance: str, steps: Any) -> dict[str, Any]:
     source_utterance = (utterance or "").strip()
     process_chain = parse_teaching_steps(steps)
@@ -1208,6 +1313,7 @@ def teach_experience(utterance: str, steps: Any) -> dict[str, Any]:
     digest = hashlib.sha1((normalize_text(source_utterance) + "|" + "|".join(process_chain)).encode("utf-8")).hexdigest()
     experience_id = "exp_" + digest[:10]
     created_at = "2026-07-09T00:00:00+08:00"
+    causal_signature = build_causal_signature(process_chain)
     experience = {
         "experience_id": experience_id,
         "status": "validated_in_digital_space",
@@ -1216,7 +1322,8 @@ def teach_experience(utterance: str, steps: Any) -> dict[str, Any]:
         "task_type": "learned_process_chain",
         "process_chain": process_chain,
         "teaching_steps": [STEP_LIBRARY[step]["display_name"] for step in process_chain],
-        "goal_fact": STEP_LIBRARY[process_chain[-1]]["produces_fact"],
+        "goal_fact": causal_signature["produces_fact"],
+        "causal_signature": causal_signature,
         "context": {
             "task_ref": source_utterance,
             "space_refs": ["home_a_kitchen", "semantic_prior_home_a_kitchen_v1"],

@@ -24,6 +24,99 @@
         "倒水"
       ],
       "goal_fact": "water_poured",
+      "causal_signature": {
+        "schema_version": "1.0.0",
+        "requires_facts": [
+          "cup_at_counter",
+          "gripper_empty",
+          "water_source_available",
+          "executor_at_counter"
+        ],
+        "produces_fact": "water_poured",
+        "destroys_facts": [
+          "executor_at_water_source",
+          "cup_at_counter",
+          "gripper_empty",
+          "executor_at_counter",
+          "cup_empty",
+          "cup_contains_water"
+        ],
+        "expands_to": [
+          "move_to_counter",
+          "pick_up_cup",
+          "move_to_water_source",
+          "fill_cup_at_water_source",
+          "pour_water"
+        ],
+        "reasoning": [
+          {
+            "step": "move_to_counter",
+            "requires_facts": [],
+            "external_requirements_added": [],
+            "produces_fact": "executor_at_counter",
+            "destroys_facts": [
+              "executor_at_water_source"
+            ]
+          },
+          {
+            "step": "pick_up_cup",
+            "requires_facts": [
+              "executor_at_counter",
+              "cup_at_counter",
+              "gripper_empty"
+            ],
+            "external_requirements_added": [
+              "cup_at_counter",
+              "gripper_empty"
+            ],
+            "produces_fact": "cup_in_gripper",
+            "destroys_facts": [
+              "cup_at_counter",
+              "gripper_empty"
+            ]
+          },
+          {
+            "step": "move_to_water_source",
+            "requires_facts": [],
+            "external_requirements_added": [],
+            "produces_fact": "executor_at_water_source",
+            "destroys_facts": [
+              "executor_at_counter"
+            ]
+          },
+          {
+            "step": "fill_cup_at_water_source",
+            "requires_facts": [
+              "cup_in_gripper",
+              "executor_at_water_source",
+              "water_source_available"
+            ],
+            "external_requirements_added": [
+              "water_source_available"
+            ],
+            "produces_fact": "cup_contains_water",
+            "destroys_facts": [
+              "cup_empty"
+            ]
+          },
+          {
+            "step": "pour_water",
+            "requires_facts": [
+              "cup_in_gripper",
+              "cup_contains_water",
+              "executor_at_counter"
+            ],
+            "external_requirements_added": [
+              "executor_at_counter"
+            ],
+            "produces_fact": "water_poured",
+            "destroys_facts": [
+              "cup_contains_water"
+            ]
+          }
+        ],
+        "solver_enabled": false
+      },
       "context": {
         "task_ref": "走向操作台，然后拿起杯子，到水源处接一杯水，然后倒水",
         "space_refs": [
@@ -43,6 +136,123 @@
         ],
         "parameters": {
           "source": "manual_teaching"
+        }
+      },
+      "outcome": {
+        "outcome_type": "candidate_created",
+        "state_delta": "manual steps translated into a digital process-chain experience",
+        "evidence_refs": [
+          "POST /experience/teach",
+          "GET /experience/library"
+        ]
+      },
+      "governance_ref": {
+        "audit_ref": "teaching_session"
+      },
+      "created_at": "2026-07-09T00:00:00+08:00"
+    },
+    {
+      "experience_id": "exp_5ca6871e34",
+      "status": "validated_in_digital_space",
+      "source_utterance": "一个技能：接一杯水需要先拿杯子，再去水源处接水。接完以后杯子里有水。",
+      "aliases": [
+        "一个技能：接一杯水需要先拿杯子，再去水源处接水。接完以后杯子里有水。"
+      ],
+      "task_type": "learned_process_chain",
+      "process_chain": [
+        "pick_up_cup",
+        "move_to_water_source",
+        "fill_cup_at_water_source"
+      ],
+      "teaching_steps": [
+        "拿起杯子",
+        "到水源处",
+        "接一杯水"
+      ],
+      "goal_fact": "cup_contains_water",
+      "causal_signature": {
+        "schema_version": "1.0.0",
+        "requires_facts": [
+          "executor_at_counter",
+          "cup_at_counter",
+          "gripper_empty",
+          "water_source_available"
+        ],
+        "produces_fact": "cup_contains_water",
+        "destroys_facts": [
+          "cup_at_counter",
+          "gripper_empty",
+          "executor_at_counter",
+          "cup_empty"
+        ],
+        "expands_to": [
+          "pick_up_cup",
+          "move_to_water_source",
+          "fill_cup_at_water_source"
+        ],
+        "reasoning": [
+          {
+            "step": "pick_up_cup",
+            "requires_facts": [
+              "executor_at_counter",
+              "cup_at_counter",
+              "gripper_empty"
+            ],
+            "external_requirements_added": [
+              "executor_at_counter",
+              "cup_at_counter",
+              "gripper_empty"
+            ],
+            "produces_fact": "cup_in_gripper",
+            "destroys_facts": [
+              "cup_at_counter",
+              "gripper_empty"
+            ]
+          },
+          {
+            "step": "move_to_water_source",
+            "requires_facts": [],
+            "external_requirements_added": [],
+            "produces_fact": "executor_at_water_source",
+            "destroys_facts": [
+              "executor_at_counter"
+            ]
+          },
+          {
+            "step": "fill_cup_at_water_source",
+            "requires_facts": [
+              "cup_in_gripper",
+              "executor_at_water_source",
+              "water_source_available"
+            ],
+            "external_requirements_added": [
+              "water_source_available"
+            ],
+            "produces_fact": "cup_contains_water",
+            "destroys_facts": [
+              "cup_empty"
+            ]
+          }
+        ],
+        "solver_enabled": true
+      },
+      "context": {
+        "task_ref": "一个技能：接一杯水需要先拿杯子，再去水源处接水。接完以后杯子里有水。",
+        "space_refs": [
+          "home_a_kitchen",
+          "semantic_prior_home_a_kitchen_v1"
+        ],
+        "human_intent_ref": "dialogue_teaching"
+      },
+      "action": {
+        "action_type": "process_chain",
+        "target_refs": [
+          "object_cup_white_mug",
+          "region_water_source",
+          "region_water_source"
+        ],
+        "parameters": {
+          "source": "dialogue_teaching"
         }
       },
       "outcome": {

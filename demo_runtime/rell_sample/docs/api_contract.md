@@ -92,6 +92,25 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 
 该接口仍采用轻量规则映射表，不引入大模型推理；其意义在于证明用户可通过对话式输入触发经验形成，而不是必须编辑结构化 JSON。
 
+自因果签名实现起，对话教学会在经验记录中同步生成 `causal_signature`：
+
+```json
+{
+  "requires_facts": ["executor_at_counter", "cup_at_counter", "gripper_empty"],
+  "produces_fact": "cup_contains_water",
+  "destroys_facts": ["cup_empty"],
+  "expands_to": ["pick_up_cup", "move_to_water_source", "fill_cup_at_water_source"]
+}
+```
+
+例如输入：
+
+```text
+教你一个技能：接一杯水需要先拿杯子，再去水源处接水。接完以后杯子里有水。
+```
+
+系统会将“需要先”之后的内容解析为前置过程，将“接完以后杯子里有水”解析为目标因果事实说明，并把该经验作为可被因果编排器读取的过程能力。后续用户说 `帮我接水` 时，系统可以从 `cup_contains_water` 反向搜索并调用该教学经验签名，而不是匹配原始教学语句。
+
 ## GET /experience/library
 
 用途：查询当前样品经验库。
