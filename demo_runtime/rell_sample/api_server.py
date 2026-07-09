@@ -355,6 +355,91 @@ def build_world_state_facts(cognitive_model: dict[str, Any]) -> set[str]:
     return facts
 
 
+def build_initial_runtime_world_state(cognitive_model: dict[str, Any], intent: dict[str, Any]) -> dict[str, Any]:
+    object_index = cognitive_model.get("object_region_index", {})
+    fact_set = sorted(build_world_state_facts(cognitive_model))
+    object_locations = {
+        object_id: {
+            "location_type": "region",
+            "location_ref": obj.get("region_ref"),
+            "state_facts": obj.get("state_facts", []),
+        }
+        for object_id, obj in object_index.items()
+    }
+    return {
+        "schema_version": "1.0.0",
+        "lifecycle": "ephemeral_task_memory",
+        "persistence_policy": "任务执行期间端侧生成和更新；任务结束后仅关键事件进入 trace 和经验记录，不作为长期世界数据库保存",
+        "source_layers": ["p010_subject_cognitive_model", "adapter_observation_stream", "p016_fact_transition"],
+        "task_ref": intent.get("experience_id") or intent.get("candidate_process"),
+        "executor": {
+            "location_type": "region",
+            "location_ref": "region_floor_walkway",
+            "holding": [],
+        },
+        "object_locations": object_locations,
+        "established_facts": fact_set,
+        "current_stage": None,
+        "completed_stages": [],
+    }
+
+
+def clone_runtime_world_state(state: dict[str, Any]) -> dict[str, Any]:
+    return json.loads(json.dumps(state, ensure_ascii=False))
+
+
+def apply_step_to_runtime_world_state(state: dict[str, Any], step: str, meta: dict[str, Any], sequence: int) -> dict[str, Any]:
+    before = clone_runtime_world_state(state)
+    facts = set(state.get("established_facts", []))
+    missing_before = [fact for fact in meta.get("requires_facts", []) if fact not in facts]
+
+    for fact in meta.get("destroys_facts", []):
+        facts.discard(fact)
+    facts.add(meta["produces_fact"])
+
+    if meta.get("capability") == "navigate_to_region" and meta.get("target_region"):
+        state["executor"]["location_type"] = "region"
+        state["executor"]["location_ref"] = meta["target_region"]
+    elif step == "pick_up_cup":
+        object_id = meta.get("target_object", "object_cup_white_mug")
+        if object_id not in state["executor"]["holding"]:
+            state["executor"]["holding"].append(object_id)
+        state["object_locations"].setdefault(object_id, {})
+        state["object_locations"][object_id].update({"location_type": "executor_gripper", "location_ref": "gripper"})
+    elif step == "fill_cup_at_water_source":
+        object_id = "object_cup_white_mug"
+        state["object_locations"].setdefault(object_id, {})
+        object_facts = set(state["object_locations"][object_id].get("state_facts", []))
+        object_facts.discard("cup_empty")
+        object_facts.add("cup_contains_water")
+        state["object_locations"][object_id]["state_facts"] = sorted(object_facts)
+    elif step == "pour_water":
+        object_id = "object_cup_white_mug"
+        state["object_locations"].setdefault(object_id, {})
+        object_facts = set(state["object_locations"][object_id].get("state_facts", []))
+        object_facts.discard("cup_contains_water")
+        object_facts.add("cup_empty")
+        state["object_locations"][object_id]["state_facts"] = sorted(object_facts)
+
+    state["established_facts"] = sorted(facts)
+    state["current_stage"] = step
+    state.setdefault("completed_stages", []).append(step)
+    after = clone_runtime_world_state(state)
+    return {
+        "sequence": sequence,
+        "step": step,
+        "requires_facts": meta.get("requires_facts", []),
+        "missing_before_step": missing_before,
+        "destroys_facts": meta.get("destroys_facts", []),
+        "produces_fact": meta["produces_fact"],
+        "before_facts": before.get("established_facts", []),
+        "after_facts": after.get("established_facts", []),
+        "before_executor_location": before.get("executor", {}).get("location_ref"),
+        "after_executor_location": after.get("executor", {}).get("location_ref"),
+        "snapshot_after": after,
+    }
+
+
 def build_process_registry() -> dict[str, dict[str, Any]]:
     registry = {step_id: dict(meta) for step_id, meta in STEP_LIBRARY.items()}
     for item in load_experience_library().get("experiences", []):
@@ -1164,6 +1249,14 @@ INDEX_HTML = """<!doctype html>
       if (result.space_admission) {
         rows.push(`<div class="stage-row"><strong>空间准入</strong><span>${result.space_admission.decision}: ${result.space_admission.reason}</span></div>`);
       }
+      const runtimeWorld = result.runtime_world_state || result.stage_runtime_state?.runtime_world_state || result.execution_trace?.runtime_world_state_final;
+      if (runtimeWorld) {
+        const executor = runtimeWorld.executor || {};
+        const holding = (executor.holding || []).join(", ") || "none";
+        const facts = (runtimeWorld.established_facts || []).join(", ");
+        rows.push(`<div class="stage-row"><strong>运行时世界状态</strong><span>${runtimeWorld.lifecycle || "ephemeral"} / ${executor.location_ref || "-"}</span></div>`);
+        rows.push(`<div class="stage-row"><strong>端侧工作记忆</strong><span>holding=${escapeHtml(holding)}；facts=${escapeHtml(facts)}</span></div>`);
+      }
       if (result.teaching_hint?.teachable) {
         rows.push(`<div class="stage-row"><strong>可教学</strong><span>${result.teaching_hint.reason}</span></div>`);
         rows.push(`<div class="stage-row"><strong>候选链路</strong><span>${(result.teaching_hint.candidate_process_chain || []).join(" -> ")}</span></div>`);
@@ -1809,12 +1902,17 @@ def run_process_chain_experience(intent: dict[str, Any], utterance: str, space_a
     events = []
     stage_summary = []
     fact_summary = []
+    runtime_world_state = build_initial_runtime_world_state(cognitive_model, intent)
+    runtime_world_state_initial = clone_runtime_world_state(runtime_world_state)
+    world_state_transitions = []
     before_state = "ready"
     for index, step in enumerate(intent.get("candidate_process_chain", []), start=1):
         meta = STEP_LIBRARY[step]
         after_state = f"{step}_completed"
         target = meta.get("target_region") or meta.get("target_object", "unknown_target")
         fact = meta["produces_fact"]
+        transition = apply_step_to_runtime_world_state(runtime_world_state, step, meta, index)
+        world_state_transitions.append(transition)
         events.append(
             {
                 "event_id": f"evt_{index:02d}_{step}",
@@ -1824,11 +1922,28 @@ def run_process_chain_experience(intent: dict[str, Any], utterance: str, space_a
                 "after_state": after_state,
                 "payload_summary": (
                     f"step={step} display={meta['display_name']} capability={meta['capability']} "
-                    f"target={target} produced_fact={fact} planner={intent['task_type']} adapter=digital_executor"
+                    f"target={target} produced_fact={fact} planner={intent['task_type']} adapter=digital_executor "
+                    f"runtime_world={transition['before_executor_location']}->{transition['after_executor_location']}"
                 ),
+                "runtime_world_transition": {
+                    "requires_facts": transition["requires_facts"],
+                    "missing_before_step": transition["missing_before_step"],
+                    "destroys_facts": transition["destroys_facts"],
+                    "produces_fact": transition["produces_fact"],
+                    "before_facts": transition["before_facts"],
+                    "after_facts": transition["after_facts"],
+                    "before_executor_location": transition["before_executor_location"],
+                    "after_executor_location": transition["after_executor_location"],
+                },
             }
         )
-        stage_summary.append({"stage_id": step, "result": "completed", "notes": meta["display_name"]})
+        stage_summary.append(
+            {
+                "stage_id": step,
+                "result": "completed",
+                "notes": f"{meta['display_name']}；运行时世界状态 {transition['before_executor_location']} -> {transition['after_executor_location']}",
+            }
+        )
         fact_summary.append({"fact_id": fact, "state": "established", "channel_notes": "digital_space_trace"})
         before_state = after_state
     audit_summary = {
@@ -1840,6 +1955,7 @@ def run_process_chain_experience(intent: dict[str, Any], utterance: str, space_a
         "fact_summary": fact_summary,
         "stop_reason": None,
         "causal_plan": intent.get("causal_plan"),
+        "runtime_world_state_final": runtime_world_state,
     }
     stage_runtime_state = {
         "schema_version": "1.0.0",
@@ -1848,6 +1964,7 @@ def run_process_chain_experience(intent: dict[str, Any], utterance: str, space_a
         "current_stage_id": intent.get("candidate_process_chain", [None])[-1],
         "runtime_state": "completed",
         "utterance": utterance,
+        "runtime_world_state": runtime_world_state,
     }
     execution_trace = {
         "schema_version": "1.0.0",
@@ -1855,6 +1972,9 @@ def run_process_chain_experience(intent: dict[str, Any], utterance: str, space_a
         "process_instance_id": intent["experience_id"],
         "events": events,
         "causal_plan": intent.get("causal_plan"),
+        "runtime_world_state_initial": runtime_world_state_initial,
+        "runtime_world_state_final": runtime_world_state,
+        "runtime_world_state_policy": runtime_world_state["persistence_policy"],
     }
     AUDIT_STORE[task_id] = audit_summary
     STATE_STORE[task_id] = stage_runtime_state
@@ -1875,6 +1995,7 @@ def run_process_chain_experience(intent: dict[str, Any], utterance: str, space_a
         "audit_summary": audit_summary,
         "stage_runtime_state": stage_runtime_state,
         "execution_trace": execution_trace,
+        "runtime_world_state": runtime_world_state,
         "experience_ref": intent["experience_id"],
         "space_context": build_space_context(cognitive_model),
     }

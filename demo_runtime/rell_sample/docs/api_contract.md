@@ -56,6 +56,12 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 
 响应中的 `intent_translation.causal_plan` 会给出初始事实、最终事实、推导过程和生成的过程链。
 
+过程链执行时，响应会返回 `runtime_world_state`。该结构表示端侧运行时世界状态快照，生命周期限定为当前任务执行期间，不作为长期世界数据库保存。它由 P010 主体侧空间认知模型初始化，并在每个过程步骤完成时依据 `requires_facts`、`produces_fact` 和 `destroys_facts` 更新，用于对齐“计划阶段”与“实际执行后的世界事实”。
+
+例如执行 `move_to_water_source` 后，快照中的执行体位置会从上一空间区域更新为 `region_water_source`；执行 `pick_up_cup` 后，杯子的 `location_type` 会更新为 `executor_gripper`；执行 `fill_cup_at_water_source` 后，`established_facts` 中会出现 `cup_contains_water`。
+
+`execution_trace.runtime_world_state_policy` 记录该状态的非持久化策略。实际产品中可以按需将关键阶段、事实成立、失败恢复和人工确认写入审计或经验记录，但不需要将每一帧物理状态写入长期数据库。
+
 自 P012 概念桥接实现起，`intent_translation` 中同步返回 `intent_frame`。该结构用于承接后续 LLM 或轻量 NLU 输出，但不允许语言模型直接绕过空间语义、概念层和因果层生成最终动作链。
 
 `intent_frame` 至少包括：

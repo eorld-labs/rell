@@ -145,6 +145,17 @@ def main() -> None:
             raise AssertionError(f"P012 intent frame must expose concept bridge {expected_concept}: {routed_frame}")
     if routed_frame.get("planning_policy", {}).get("llm_role") is None:
         raise AssertionError(f"intent frame must constrain LLM to semantic translation instead of direct action planning: {routed_frame}")
+    runtime_world = routed_run.get("runtime_world_state", {})
+    if runtime_world.get("lifecycle") != "ephemeral_task_memory":
+        raise AssertionError(f"runtime world state must be ephemeral task memory: {runtime_world}")
+    if runtime_world.get("executor", {}).get("location_ref") != "region_water_source":
+        raise AssertionError(f"runtime world state must track final executor location: {runtime_world}")
+    if "object_cup_white_mug" not in runtime_world.get("executor", {}).get("holding", []):
+        raise AssertionError(f"runtime world state must track held cup after pickup: {runtime_world}")
+    if "cup_contains_water" not in runtime_world.get("established_facts", []):
+        raise AssertionError(f"runtime world state must establish target fact after fill step: {runtime_world}")
+    if "长期世界数据库" not in routed_run.get("execution_trace", {}).get("runtime_world_state_policy", ""):
+        raise AssertionError(f"execution trace must document non-persistent runtime world policy: {routed_run.get('execution_trace')}")
 
     conflict = run_process("channel_conflict")
     if conflict["audit_summary"]["outcome"] != "requires_human_confirmation":
