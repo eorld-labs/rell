@@ -75,6 +75,19 @@ def main() -> None:
     if dialogue_taught["experience"]["context"]["human_intent_ref"] != "dialogue_teaching":
         raise AssertionError(f"dialogue teaching must mark source: {dialogue_taught}")
 
+    short_dialogue_taught = teach_experience_from_dialogue("到水源处接一杯水", "")
+    if short_dialogue_taught.get("decision") != "experience_created":
+        raise AssertionError(f"empty dialogue message must fall back to utterance: {short_dialogue_taught}")
+    if "pour_water" in short_dialogue_taught["experience"]["process_chain"]:
+        raise AssertionError(f"filling water must not be misread as pouring water: {short_dialogue_taught}")
+    short_run = run_process("auto", "到水源处接一杯水")
+    if short_run["audit_summary"]["outcome"] != "completed":
+        raise AssertionError(f"short taught chain must run in digital space: {short_run}")
+    if "move_to_water_source" not in short_run["intent_translation"].get("candidate_process_chain", []):
+        raise AssertionError(f"short taught chain must include water source step: {short_run['intent_translation']}")
+    if "pour_water" in short_run["intent_translation"].get("candidate_process_chain", []):
+        raise AssertionError(f"short taught chain must not include pouring step: {short_run['intent_translation']}")
+
     conflict = run_process("channel_conflict")
     if conflict["audit_summary"]["outcome"] != "requires_human_confirmation":
         raise AssertionError("conflict API run must require human confirmation")
@@ -107,7 +120,7 @@ def main() -> None:
         EXPERIENCE_LIBRARY_FILE.write_text(original_library, encoding="utf-8")
 
     print("API sample validation passed.")
-    print("Validated: admit, run success, teach experience, dialogue teaching, run learned chain, run channel_conflict, run simulated_success, get audit, get space.")
+    print("Validated: admit, run success, teach experience, dialogue teaching, short-chain teaching, run learned chain, run channel_conflict, run simulated_success, get audit, get space.")
 
 
 if __name__ == "__main__":

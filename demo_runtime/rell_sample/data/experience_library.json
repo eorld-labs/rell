@@ -57,6 +57,54 @@
         "audit_ref": "teaching_session"
       },
       "created_at": "2026-07-09T00:00:00+08:00"
+    },
+    {
+      "experience_id": "exp_2fe2211f9d",
+      "status": "validated_in_digital_space",
+      "source_utterance": "到水源处接一杯水",
+      "aliases": [
+        "到水源处接一杯水"
+      ],
+      "task_type": "learned_process_chain",
+      "process_chain": [
+        "move_to_water_source",
+        "fill_cup_at_water_source"
+      ],
+      "teaching_steps": [
+        "到水源处",
+        "接一杯水"
+      ],
+      "goal_fact": "cup_contains_water",
+      "context": {
+        "task_ref": "到水源处接一杯水",
+        "space_refs": [
+          "home_a_kitchen",
+          "semantic_prior_home_a_kitchen_v1"
+        ],
+        "human_intent_ref": "dialogue_teaching"
+      },
+      "action": {
+        "action_type": "process_chain",
+        "target_refs": [
+          "region_water_source",
+          "region_water_source"
+        ],
+        "parameters": {
+          "source": "dialogue_teaching"
+        }
+      },
+      "outcome": {
+        "outcome_type": "candidate_created",
+        "state_delta": "manual steps translated into a digital process-chain experience",
+        "evidence_refs": [
+          "POST /experience/teach",
+          "GET /experience/library"
+        ]
+      },
+      "governance_ref": {
+        "audit_ref": "teaching_session"
+      },
+      "created_at": "2026-07-09T00:00:00+08:00"
     }
   ]
 }

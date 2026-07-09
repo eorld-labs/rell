@@ -49,7 +49,7 @@ PROCESS_CHAIN_KEYWORDS = [
     ("pick_up_cup", ["拿起杯子", "拿杯子", "取杯子", "抓取杯子"]),
     ("move_to_water_source", ["到水源", "去水源", "走到水源", "水源处"]),
     ("fill_cup_at_water_source", ["接一杯水", "接水", "装水", "取水"]),
-    ("pour_water", ["倒水", "倒一杯水", "给客人倒水", "杯水"]),
+    ("pour_water", ["倒水", "倒一杯水", "给客人倒水"]),
 ]
 
 AUDIT_STORE: dict[str, dict[str, Any]] = {}
@@ -714,6 +714,7 @@ INDEX_HTML = """<!doctype html>
       if (result.teaching_hint?.teachable) {
         rows.push(`<div class="stage-row"><strong>可教学</strong><span>${result.teaching_hint.reason}</span></div>`);
         rows.push(`<div class="stage-row"><strong>候选链路</strong><span>${(result.teaching_hint.candidate_process_chain || []).join(" -> ")}</span></div>`);
+        rows.push(`<div class="stage-row"><strong>下一步</strong><span>当前任务尚未入库，点击“对话教学”或“教学入库”形成经验后再运行。</span></div>`);
       }
       if (result.experience_ref) {
         rows.push(`<div class="stage-row"><strong>经验命中</strong><span>${result.experience_ref}</span></div>`);
@@ -739,6 +740,27 @@ INDEX_HTML = """<!doctype html>
         rows.push(`<div class="stage-row"><strong>空间节点</strong><span>${space.region_count} regions, ${space.relation_count} relations, ${space.object_count} objects</span></div>`);
       }
       factsEl.innerHTML = rows.join("");
+    }
+
+    function hydrateTeachingFields(result) {
+      const chain = result.teaching_hint?.candidate_process_chain || result.intent_translation?.candidate_process_chain || [];
+      const stepNames = {
+        move_to_counter: "走向操作台",
+        pick_up_cup: "拿起杯子",
+        move_to_water_source: "到水源处",
+        fill_cup_at_water_source: "接一杯水",
+        pour_water: "倒水"
+      };
+      if (!chain.length) return;
+      const readableSteps = chain.map(step => stepNames[step] || step).join("\\n");
+      const utterance = document.getElementById("utterance").value.trim();
+      if (result.teaching_hint?.teachable || !document.getElementById("teachingSteps").value.trim()) {
+        document.getElementById("teachingSteps").value = readableSteps;
+      }
+      if (result.teaching_hint?.teachable || !document.getElementById("dialogueTeaching").value.trim()) {
+        document.getElementById("dialogueTeaching").value = "教你：" + (utterance || chain.map(step => stepNames[step] || step).join("，然后"));
+      }
+      appendLog("已根据候选链路填充教学区，需教学入库后再执行。");
     }
 
     async function runProcess() {
@@ -791,6 +813,7 @@ INDEX_HTML = """<!doctype html>
           updateSceneFromEvent(event);
         }
         renderFacts(result);
+        hydrateTeachingFields(result);
         serviceState.textContent = result.audit_summary.outcome === "completed" ? "完成" : (result.audit_summary.outcome === "cannot_do" ? "不会做" : "等待人工确认");
       } catch (error) {
         serviceState.textContent = "异常";
@@ -840,7 +863,7 @@ INDEX_HTML = """<!doctype html>
       dialogueTeachButton.disabled = true;
       serviceState.textContent = "对话教学中";
       const utterance = document.getElementById("utterance").value.trim();
-      const message = document.getElementById("dialogueTeaching").value.trim();
+      const message = document.getElementById("dialogueTeaching").value.trim() || utterance;
       appendLog("提交对话教学：" + message);
       try {
         const result = await fetch("/experience/dialogue-teach", {
@@ -948,7 +971,7 @@ def translate_intent(utterance: str) -> dict[str, Any]:
             "reason": "任务涉及数字空间中的风险区域，第一阶段阻断执行",
             "candidate_process": None,
         }
-    if any(keyword in text for keyword in ["倒水", "倒一杯水", "给客人倒水", "杯水"]):
+    if any(keyword in text for keyword in ["倒水", "倒一杯水", "给客人倒水"]):
         scenario = "simulated_success"
         if any(keyword in text for keyword in ["没水", "无水", "空壶"]):
             scenario = "simulated_no_water"
@@ -1085,10 +1108,10 @@ def teach_experience(utterance: str, steps: Any) -> dict[str, Any]:
 
 
 def teach_experience_from_dialogue(utterance: str, message: str) -> dict[str, Any]:
-    text = (message or "").strip()
+    source_utterance = (utterance or "").strip()
+    text = (message or "").strip() or source_utterance
     if not text:
         return {"error": "missing_dialogue", "message": "对话教学内容不能为空"}
-    source_utterance = (utterance or "").strip()
     cleaned = re.sub(r"^(教你|我教你|现在教你|对话教学)[：:，,\s]*", "", text).strip()
     if not source_utterance:
         source_utterance = cleaned
