@@ -1,0 +1,62 @@
+{
+  "schema_version": "1.0.0",
+  "experiences": [
+    {
+      "experience_id": "exp_94611898c5",
+      "status": "validated_in_digital_space",
+      "source_utterance": "走向操作台，然后拿起杯子，到水源处接一杯水，然后倒水",
+      "aliases": [
+        "走向操作台，然后拿起杯子，到水源处接一杯水，然后倒水"
+      ],
+      "task_type": "learned_process_chain",
+      "process_chain": [
+        "move_to_counter",
+        "pick_up_cup",
+        "move_to_water_source",
+        "fill_cup_at_water_source",
+        "pour_water"
+      ],
+      "teaching_steps": [
+        "走向操作台",
+        "拿起杯子",
+        "到水源处",
+        "接一杯水",
+        "倒水"
+      ],
+      "goal_fact": "water_poured",
+      "context": {
+        "task_ref": "走向操作台，然后拿起杯子，到水源处接一杯水，然后倒水",
+        "space_refs": [
+          "home_a_kitchen",
+          "semantic_prior_home_a_kitchen_v1"
+        ],
+        "human_intent_ref": "manual_teaching"
+      },
+      "action": {
+        "action_type": "process_chain",
+        "target_refs": [
+          "region_counter_operation",
+          "object_cup_white_mug",
+          "region_water_source",
+          "region_water_source",
+          "region_counter_operation"
+        ],
+        "parameters": {
+          "source": "manual_teaching"
+        }
+      },
+      "outcome": {
+        "outcome_type": "candidate_created",
+        "state_delta": "manual steps translated into a digital process-chain experience",
+        "evidence_refs": [
+          "POST /experience/teach",
+          "GET /experience/library"
+        ]
+      },
+      "governance_ref": {
+        "audit_ref": "teaching_session"
+      },
+      "created_at": "2026-07-09T00:00:00+08:00"
+    }
+  ]
+}

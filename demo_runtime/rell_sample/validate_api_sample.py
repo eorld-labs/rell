@@ -1,9 +1,24 @@
 from __future__ import annotations
 
-from api_server import AUDIT_STORE, admit_process, get_audit, get_cognitive_model, get_space_prior, run_process
+import json
+
+from api_server import (
+    EXPERIENCE_LIBRARY_FILE,
+    AUDIT_STORE,
+    admit_process,
+    get_audit,
+    get_cognitive_model,
+    get_space_prior,
+    load_experience_library,
+    run_process,
+    teach_experience,
+)
 
 
 def main() -> None:
+    original_library = EXPERIENCE_LIBRARY_FILE.read_text(encoding="utf-8") if EXPERIENCE_LIBRARY_FILE.exists() else None
+    EXPERIENCE_LIBRARY_FILE.write_text(json.dumps({"schema_version": "1.0.0", "experiences": []}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
     admission = admit_process()
     if not admission["allowed"]:
         raise AssertionError(f"admission expected allowed, got {admission}")
@@ -34,6 +49,22 @@ def main() -> None:
     if "fill_cup_at_water_source" not in process_chain["intent_translation"].get("candidate_process_chain", []):
         raise AssertionError(f"process chain must retain water-source filling step: {process_chain['intent_translation']}")
 
+    taught = teach_experience(
+        "走向操作台，然后拿起杯子，到水源处接一杯水，然后倒水",
+        "走向操作台\n拿起杯子\n到水源处\n接一杯水\n倒水",
+    )
+    if taught.get("decision") != "experience_created":
+        raise AssertionError(f"teaching must create an experience: {taught}")
+    if not load_experience_library().get("experiences"):
+        raise AssertionError("experience library must persist taught experience")
+    learned_run = run_process("auto", "走向操作台，然后拿起杯子，到水源处接一杯水，然后倒水")
+    if learned_run["audit_summary"]["outcome"] != "completed":
+        raise AssertionError(f"learned process chain must run in digital space: {learned_run}")
+    if learned_run["intent_translation"]["task_type"] != "learned_process_chain":
+        raise AssertionError(f"learned task must be translated as learned_process_chain: {learned_run['intent_translation']}")
+    if learned_run.get("experience_ref") != taught["experience"]["experience_id"]:
+        raise AssertionError(f"learned run must reference taught experience: {learned_run}")
+
     conflict = run_process("channel_conflict")
     if conflict["audit_summary"]["outcome"] != "requires_human_confirmation":
         raise AssertionError("conflict API run must require human confirmation")
@@ -60,8 +91,13 @@ def main() -> None:
     if prior["prior_id"] != model["prior_ref"]:
         raise AssertionError("space cognitive model must reference semantic prior")
 
+    if original_library is None:
+        EXPERIENCE_LIBRARY_FILE.unlink(missing_ok=True)
+    else:
+        EXPERIENCE_LIBRARY_FILE.write_text(original_library, encoding="utf-8")
+
     print("API sample validation passed.")
-    print("Validated: admit, run success, run channel_conflict, run simulated_success, get audit, get space.")
+    print("Validated: admit, run success, teach experience, run learned chain, run channel_conflict, run simulated_success, get audit, get space.")
 
 
 if __name__ == "__main__":

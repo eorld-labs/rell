@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import hashlib
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
@@ -23,6 +25,7 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = int(os.environ.get("RELL_SAMPLE_PORT", "8876"))
 SPACE_PRIOR_FILE = DATA / "digital_kitchen_semantic_prior.json"
 COGNITIVE_MODEL_FILE = DATA / "digital_kitchen_cognitive_model.json"
+EXPERIENCE_LIBRARY_FILE = DATA / "experience_library.json"
 
 TIMELINE_SCENARIOS = {
     "success": "mock_timeline_success.json",
@@ -52,6 +55,41 @@ PROCESS_CHAIN_KEYWORDS = [
 AUDIT_STORE: dict[str, dict[str, Any]] = {}
 STATE_STORE: dict[str, dict[str, Any]] = {}
 TRACE_STORE: dict[str, dict[str, Any]] = {}
+
+
+STEP_LIBRARY = {
+    "move_to_counter": {
+        "display_name": "走向操作台",
+        "capability": "navigate_to_region",
+        "target_region": "region_counter_operation",
+        "produces_fact": "executor_at_counter",
+    },
+    "pick_up_cup": {
+        "display_name": "拿起杯子",
+        "capability": "grasp_object",
+        "target_object": "object_cup_white_mug",
+        "produces_fact": "cup_in_gripper",
+    },
+    "move_to_water_source": {
+        "display_name": "到水源处",
+        "capability": "navigate_to_region",
+        "target_region": "region_water_source",
+        "produces_fact": "executor_at_water_source",
+    },
+    "fill_cup_at_water_source": {
+        "display_name": "接一杯水",
+        "capability": "fill_container",
+        "target_region": "region_water_source",
+        "produces_fact": "cup_contains_water",
+    },
+    "pour_water": {
+        "display_name": "倒水",
+        "capability": "pour_container",
+        "target_region": "region_counter_operation",
+        "produces_fact": "water_poured",
+    },
+}
+
 
 
 INDEX_HTML = """<!doctype html>
@@ -400,6 +438,16 @@ INDEX_HTML = """<!doctype html>
           <button id="runButton" title="运行过程实例">▶ 运行</button>
           <button id="clearButton" class="secondary" title="清空当前日志">清空</button>
         </div>
+        <label for="teachingSteps" style="margin-top:12px;">人工教学步骤</label>
+        <textarea id="teachingSteps">走向操作台
+拿起杯子
+到水源处
+接一杯水
+倒水</textarea>
+        <div class="actions" style="margin-top:8px;">
+          <button id="teachButton" class="secondary" title="将步骤转为候选经验">教学入库</button>
+          <button id="libraryButton" class="secondary" title="查看当前经验库">经验库</button>
+        </div>
       </section>
       <section>
         <div class="summary">
@@ -449,6 +497,8 @@ INDEX_HTML = """<!doctype html>
   </main>
   <script>
     const runButton = document.getElementById("runButton");
+    const teachButton = document.getElementById("teachButton");
+    const libraryButton = document.getElementById("libraryButton");
     const clearButton = document.getElementById("clearButton");
     const logEl = document.getElementById("log");
     const factsEl = document.getElementById("facts");
@@ -470,7 +520,8 @@ INDEX_HTML = """<!doctype html>
       state_update: "连续状态变量更新",
       observation_update: "目标因果事实观测",
       failure_event: "失败事件",
-      runtime_failure: "Runtime 失败"
+      runtime_failure: "Runtime 失败",
+      learned_step_executed: "教学经验步骤"
     };
 
     function setText(node, value, className = "") {
@@ -571,6 +622,13 @@ INDEX_HTML = """<!doctype html>
       if (result.space_admission) {
         rows.push(`<div class="stage-row"><strong>空间准入</strong><span>${result.space_admission.decision}: ${result.space_admission.reason}</span></div>`);
       }
+      if (result.teaching_hint?.teachable) {
+        rows.push(`<div class="stage-row"><strong>可教学</strong><span>${result.teaching_hint.reason}</span></div>`);
+        rows.push(`<div class="stage-row"><strong>候选链路</strong><span>${(result.teaching_hint.candidate_process_chain || []).join(" -> ")}</span></div>`);
+      }
+      if (result.experience_ref) {
+        rows.push(`<div class="stage-row"><strong>经验命中</strong><span>${result.experience_ref}</span></div>`);
+      }
       for (const stage of stages) {
         rows.push(`<div class="stage-row"><strong>${stage.stage_id}: ${stage.result}</strong><span>${stage.notes || ""}</span></div>`);
       }
@@ -618,9 +676,11 @@ INDEX_HTML = """<!doctype html>
         appendLog("准入结果：" + JSON.stringify(admit, null, 2));
 
         const scenario = document.getElementById("scenario").value;
-        if (admit.allowed) {
+        if (admit.allowed && translated.task_type === "pour_water") {
           appendLog("加载过程模板：pour_water");
           appendLog("绑定当前环境：home_a_kitchen_daytime");
+        } else if (admit.allowed && translated.task_type === "learned_process_chain") {
+          appendLog("加载教学经验链：" + translated.experience_id);
         }
         appendLog("启动场景：" + scenario);
         const result = await fetch("/process/run", {
@@ -650,7 +710,54 @@ INDEX_HTML = """<!doctype html>
       }
     }
 
+    async function teachExperience() {
+      teachButton.disabled = true;
+      serviceState.textContent = "教学中";
+      const utterance = document.getElementById("utterance").value.trim();
+      const steps = document.getElementById("teachingSteps").value.trim();
+      appendLog("提交人工教学：" + utterance);
+      try {
+        const result = await fetch("/experience/teach", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ utterance, steps })
+        }).then(r => r.json());
+        appendLog("教学结果：" + JSON.stringify(result, null, 2));
+        if (result.decision === "experience_created") {
+          setText(admitMetric, "learned", "ok");
+          setText(stateMetric, "candidate_created", "ok");
+          setText(outcomeMetric, "可回放", "ok");
+          setText(taskMetric, result.experience.experience_id);
+          factsEl.innerHTML = [
+            `<div class="stage-row"><strong>经验形成</strong><span>${result.message}</span></div>`,
+            `<div class="stage-row"><strong>过程链</strong><span>${result.experience.process_chain.join(" -> ")}</span></div>`,
+            `<div class="stage-row"><strong>下一步</strong><span>再次点击运行，将由数字执行体按经验链回放。</span></div>`
+          ].join("");
+          serviceState.textContent = "已学习";
+        } else {
+          setText(outcomeMetric, "教学失败", "bad");
+          serviceState.textContent = "教学失败";
+        }
+      } catch (error) {
+        serviceState.textContent = "异常";
+        appendLog("教学异常：" + error.message);
+      } finally {
+        teachButton.disabled = false;
+      }
+    }
+
+    async function showExperienceLibrary() {
+      const result = await fetch("/experience/library").then(r => r.json());
+      appendLog("经验库：" + JSON.stringify(result, null, 2));
+      const experiences = result.experiences || [];
+      factsEl.innerHTML = experiences.length
+        ? experiences.map(item => `<div class="stage-row"><strong>${item.experience_id}</strong><span>${item.source_utterance} / ${item.process_chain.join(" -> ")}</span></div>`).join("")
+        : `<div class="stage-row"><strong>经验库</strong><span>暂无经验</span></div>`;
+    }
+
     runButton.addEventListener("click", runProcess);
+    teachButton.addEventListener("click", teachExperience);
+    libraryButton.addEventListener("click", showExperienceLibrary);
     clearButton.addEventListener("click", clearView);
     clearView();
   </script>
@@ -669,6 +776,19 @@ def translate_intent(utterance: str) -> dict[str, Any]:
             "decision": "unsupported",
             "reason": "空任务输入",
             "candidate_process": None,
+        }
+    learned = find_learned_experience(text)
+    if learned:
+        return {
+            "schema_version": "1.0.0",
+            "utterance": text,
+            "task_type": "learned_process_chain",
+            "decision": "executable",
+            "reason": "命中人工教学形成的数字经验链",
+            "candidate_process": learned["experience_id"],
+            "candidate_process_chain": learned["process_chain"],
+            "experience_id": learned["experience_id"],
+            "goal_fact": learned.get("goal_fact", "water_poured"),
         }
     detected_steps = detect_process_chain(text)
     has_sequence_marker = any(marker in text for marker in ["然后", "再", "接着", "之后", "，", ","])
@@ -736,6 +856,107 @@ def detect_process_chain(text: str) -> list[str]:
     return [step_id for _, step_id in sorted(steps, key=lambda item: item[0])]
 
 
+def normalize_text(text: str) -> str:
+    return re.sub(r"[\s，,。；;、：:]+", "", (text or "").lower())
+
+
+def load_experience_library() -> dict[str, Any]:
+    if not EXPERIENCE_LIBRARY_FILE.exists():
+        return {"schema_version": "1.0.0", "experiences": []}
+    return read_json(EXPERIENCE_LIBRARY_FILE)
+
+
+def save_experience_library(library: dict[str, Any]) -> None:
+    EXPERIENCE_LIBRARY_FILE.write_text(json.dumps(library, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def find_learned_experience(utterance: str) -> dict[str, Any] | None:
+    normalized = normalize_text(utterance)
+    for item in load_experience_library().get("experiences", []):
+        if item.get("status") not in {"candidate_created", "validated_in_digital_space"}:
+            continue
+        keys = {normalize_text(item.get("source_utterance", ""))}
+        keys.update(normalize_text(alias) for alias in item.get("aliases", []))
+        if normalized in keys:
+            return item
+    return None
+
+
+def parse_teaching_steps(steps: Any) -> list[str]:
+    if isinstance(steps, list):
+        raw_steps = [str(item).strip() for item in steps if str(item).strip()]
+    else:
+        raw_steps = [item.strip() for item in re.split(r"[\n；;]+", str(steps or "")) if item.strip()]
+    parsed: list[str] = []
+    for raw in raw_steps:
+        detected = detect_process_chain(raw)
+        if detected:
+            parsed.extend(step for step in detected if step not in parsed)
+            continue
+        normalized = normalize_text(raw)
+        for step_id, meta in STEP_LIBRARY.items():
+            if normalize_text(meta["display_name"]) in normalized and step_id not in parsed:
+                parsed.append(step_id)
+    return parsed
+
+
+def teach_experience(utterance: str, steps: Any) -> dict[str, Any]:
+    source_utterance = (utterance or "").strip()
+    process_chain = parse_teaching_steps(steps)
+    if not source_utterance:
+        return {"error": "missing_utterance", "message": "教学样本必须包含原始任务输入"}
+    if not process_chain:
+        return {"error": "missing_steps", "message": "未能从教学步骤中解析出可用过程链"}
+    unknown_steps = [step for step in process_chain if step not in STEP_LIBRARY]
+    if unknown_steps:
+        return {"error": "unknown_steps", "unknown_steps": unknown_steps}
+    digest = hashlib.sha1((normalize_text(source_utterance) + "|" + "|".join(process_chain)).encode("utf-8")).hexdigest()
+    experience_id = "exp_" + digest[:10]
+    created_at = "2026-07-09T00:00:00+08:00"
+    experience = {
+        "experience_id": experience_id,
+        "status": "validated_in_digital_space",
+        "source_utterance": source_utterance,
+        "aliases": [source_utterance],
+        "task_type": "learned_process_chain",
+        "process_chain": process_chain,
+        "teaching_steps": [STEP_LIBRARY[step]["display_name"] for step in process_chain],
+        "goal_fact": STEP_LIBRARY[process_chain[-1]]["produces_fact"],
+        "context": {
+            "task_ref": source_utterance,
+            "space_refs": ["home_a_kitchen", "semantic_prior_home_a_kitchen_v1"],
+            "human_intent_ref": "manual_teaching",
+        },
+        "action": {
+            "action_type": "process_chain",
+            "target_refs": [
+                STEP_LIBRARY[step].get("target_region") or STEP_LIBRARY[step].get("target_object", "")
+                for step in process_chain
+            ],
+            "parameters": {"source": "manual_teaching"},
+        },
+        "outcome": {
+            "outcome_type": "candidate_created",
+            "state_delta": "manual steps translated into a digital process-chain experience",
+            "evidence_refs": ["POST /experience/teach", "GET /experience/library"],
+        },
+        "governance_ref": {"audit_ref": "teaching_session"},
+        "created_at": created_at,
+    }
+    library = load_experience_library()
+    library["experiences"] = [
+        item for item in library.get("experiences", []) if item.get("experience_id") != experience_id
+    ]
+    library["experiences"].append(experience)
+    save_experience_library(library)
+    return {
+        "schema_version": "1.0.0",
+        "decision": "experience_created",
+        "experience": experience,
+        "message": "已形成候选经验，后续相同任务将优先命中该经验链",
+    }
+
+
 def evaluate_space_admission(intent: dict[str, Any], cognitive_model: dict[str, Any]) -> dict[str, Any]:
     if intent["decision"] != "executable":
         return {
@@ -743,6 +964,32 @@ def evaluate_space_admission(intent: dict[str, Any], cognitive_model: dict[str, 
             "decision": intent["decision"],
             "reason": intent["reason"],
             "checks": [{"check_id": "intent_executable", "passed": False, "notes": intent["reason"]}],
+        }
+    if intent["task_type"] == "learned_process_chain":
+        regions = {item["region_id"]: item for item in cognitive_model.get("space_region_table", [])}
+        objects = cognitive_model.get("object_region_index", {})
+        chain = intent.get("candidate_process_chain", [])
+        missing_targets: list[str] = []
+        for step in chain:
+            meta = STEP_LIBRARY.get(step, {})
+            target_region = meta.get("target_region")
+            target_object = meta.get("target_object")
+            if target_region and target_region not in regions:
+                missing_targets.append(target_region)
+            if target_object and target_object not in objects:
+                missing_targets.append(target_object)
+        checks = [
+            {"check_id": "intent_executable", "passed": True, "notes": intent["reason"]},
+            {"check_id": "experience_chain_loaded", "passed": bool(chain), "notes": " -> ".join(chain)},
+            {"check_id": "digital_space_targets_available", "passed": not missing_targets, "notes": ",".join(missing_targets)},
+            {"check_id": "runtime_scope", "passed": True, "notes": "第一阶段以数字执行体回放经验链，不进入真实机器人控制"},
+        ]
+        allowed = all(item["passed"] for item in checks)
+        return {
+            "allowed": allowed,
+            "decision": "allowed" if allowed else "blocked",
+            "reason": "教学经验链已通过数字空间准入" if allowed else "教学经验链缺少空间目标",
+            "checks": checks,
         }
     task = TASK_LIBRARY[intent["task_type"]]
     bindings = cognitive_model.get("binding_candidates", {})
@@ -773,6 +1020,14 @@ def evaluate_space_admission(intent: dict[str, Any], cognitive_model: dict[str, 
 def build_cannot_do_result(utterance: str, intent: dict[str, Any], space_admission: dict[str, Any]) -> dict[str, Any]:
     cognitive_model = get_cognitive_model()
     task_id = "task_unexecutable"
+    teaching_hint = None
+    if intent.get("task_type") == "process_chain":
+        teaching_hint = {
+            "teachable": True,
+            "reason": "可通过人工步骤教学形成候选经验链",
+            "candidate_process_chain": intent.get("candidate_process_chain", []),
+            "endpoint": "POST /experience/teach",
+        }
     return {
         "task_id": task_id,
         "scenario": "not_executed",
@@ -809,6 +1064,82 @@ def build_cannot_do_result(utterance: str, intent: dict[str, Any], space_admissi
             "process_instance_id": "not_created",
             "events": [],
         },
+        "teaching_hint": teaching_hint,
+        "space_context": build_space_context(cognitive_model),
+    }
+
+
+def run_learned_experience(intent: dict[str, Any], utterance: str, space_admission: dict[str, Any]) -> dict[str, Any]:
+    cognitive_model = get_cognitive_model()
+    task_id = "task_" + intent["experience_id"]
+    events = []
+    stage_summary = []
+    fact_summary = []
+    before_state = "ready"
+    for index, step in enumerate(intent.get("candidate_process_chain", []), start=1):
+        meta = STEP_LIBRARY[step]
+        after_state = f"{step}_completed"
+        target = meta.get("target_region") or meta.get("target_object", "unknown_target")
+        fact = meta["produces_fact"]
+        events.append(
+            {
+                "event_id": f"evt_{index:02d}_{step}",
+                "consumed_sequence": index,
+                "trigger_reason": "learned_step_executed",
+                "before_state": before_state,
+                "after_state": after_state,
+                "payload_summary": (
+                    f"step={step} display={meta['display_name']} capability={meta['capability']} "
+                    f"target={target} produced_fact={fact} adapter=digital_executor"
+                ),
+            }
+        )
+        stage_summary.append({"stage_id": step, "result": "completed", "notes": meta["display_name"]})
+        fact_summary.append({"fact_id": fact, "state": "established", "channel_notes": "digital_space_trace"})
+        before_state = after_state
+    audit_summary = {
+        "schema_version": "1.0.0",
+        "task_id": task_id,
+        "process_instance_id": intent["experience_id"],
+        "outcome": "completed",
+        "stage_summary": stage_summary,
+        "fact_summary": fact_summary,
+        "stop_reason": None,
+    }
+    stage_runtime_state = {
+        "schema_version": "1.0.0",
+        "task_id": task_id,
+        "process_instance_id": intent["experience_id"],
+        "current_stage_id": intent.get("candidate_process_chain", [None])[-1],
+        "runtime_state": "completed",
+        "utterance": utterance,
+    }
+    execution_trace = {
+        "schema_version": "1.0.0",
+        "task_id": task_id,
+        "process_instance_id": intent["experience_id"],
+        "events": events,
+    }
+    AUDIT_STORE[task_id] = audit_summary
+    STATE_STORE[task_id] = stage_runtime_state
+    TRACE_STORE[task_id] = execution_trace
+    return {
+        "task_id": task_id,
+        "scenario": "learned_digital_experience",
+        "intent_translation": intent,
+        "space_admission": space_admission,
+        "admission_decision": {
+            "schema_version": "1.0.0",
+            "task_id": task_id,
+            "allowed": True,
+            "decision": "allowed",
+            "checks": space_admission["checks"],
+            "missing_items": [],
+        },
+        "audit_summary": audit_summary,
+        "stage_runtime_state": stage_runtime_state,
+        "execution_trace": execution_trace,
+        "experience_ref": intent["experience_id"],
         "space_context": build_space_context(cognitive_model),
     }
 
@@ -853,6 +1184,8 @@ def run_process(scenario: str = "success", utterance: str = "给客人倒一杯�
     space_admission = evaluate_space_admission(intent, cognitive_model)
     if not space_admission["allowed"]:
         return build_cannot_do_result(utterance, intent, space_admission)
+    if intent["task_type"] == "learned_process_chain":
+        return run_learned_experience(intent, utterance, space_admission)
     if scenario == "auto":
         scenario = intent.get("recommended_scenario", "simulated_success")
     if scenario not in SCENARIOS:
@@ -922,6 +1255,9 @@ class RellSampleHandler(BaseHTTPRequestHandler):
         if path == "/skills":
             self._send_json({"schema_version": "1.0.0", "skills": TASK_LIBRARY})
             return
+        if path == "/experience/library":
+            self._send_json(load_experience_library())
+            return
         if path.startswith("/audit/"):
             task_id = path.removeprefix("/audit/")
             self._send_json(get_audit(task_id), status=200 if task_id in AUDIT_STORE else 404)
@@ -946,6 +1282,10 @@ class RellSampleHandler(BaseHTTPRequestHandler):
             return
         if path == "/process/run":
             result = run_process(body.get("scenario", "success"), body.get("utterance", "给客人倒一杯水"))
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/experience/teach":
+            result = teach_experience(body.get("utterance", ""), body.get("steps", ""))
             self._send_json(result, status=400 if "error" in result else 200)
             return
         self._send_json({"error": "not_found"}, status=404)

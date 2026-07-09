@@ -109,6 +109,8 @@ http://127.0.0.1:8876/
 - `POST /process/run`
 - `GET /audit/{task_id}`
 - `GET /skills`
+- `POST /experience/teach`
+- `GET /experience/library`
 
 空间调试接口：
 
