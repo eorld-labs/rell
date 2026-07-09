@@ -134,6 +134,17 @@ def main() -> None:
         raise AssertionError(f"explicit route must survive causal planning: {routed_run['intent_translation']}")
     if routed_run["intent_translation"].get("goal_fact") != "cup_contains_water":
         raise AssertionError(f"water-source pouring phrase must mean filling cup, not final pour_water: {routed_run['intent_translation']}")
+    routed_frame = routed_run["intent_translation"].get("intent_frame", {})
+    routed_regions = [item.get("region_ref") for item in routed_frame.get("spatial_constraints", [])]
+    for expected_region in ["region_doorway", "region_service_position", "region_counter_operation", "region_water_source"]:
+        if expected_region not in routed_regions:
+            raise AssertionError(f"P012 intent frame must preserve spatial semantic target {expected_region}: {routed_frame}")
+    routed_concepts = [item.get("concept_id") for item in routed_frame.get("concept_matches", [])]
+    for expected_concept in ["concept_spatial_region_navigation", "concept_fillable_container", "concept_water_resource_zone"]:
+        if expected_concept not in routed_concepts:
+            raise AssertionError(f"P012 intent frame must expose concept bridge {expected_concept}: {routed_frame}")
+    if routed_frame.get("planning_policy", {}).get("llm_role") is None:
+        raise AssertionError(f"intent frame must constrain LLM to semantic translation instead of direct action planning: {routed_frame}")
 
     conflict = run_process("channel_conflict")
     if conflict["audit_summary"]["outcome"] != "requires_human_confirmation":

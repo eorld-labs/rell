@@ -54,6 +54,56 @@ PROCESS_CHAIN_KEYWORDS = [
     ("pour_water", ["倒水", "倒一杯水", "给客人倒水"]),
 ]
 
+REGION_SEMANTIC_ALIASES = {
+    "region_doorway": ["门旁边", "门口", "入口", "出入口"],
+    "region_service_position": ["服务位", "服务为", "客人旁边", "客人位置", "服务位置"],
+    "region_counter_operation": ["操作台", "台面", "工作台", "杯子处"],
+    "region_water_source": ["水源处", "水源", "接水处", "水龙头"],
+}
+
+OBJECT_SEMANTIC_ALIASES = {
+    "object_cup_white_mug": ["杯子", "杯", "水杯"],
+    "object_kettle_steel_1l": ["水壶", "壶"],
+}
+
+P012_CONCEPT_LIBRARY = {
+    "concept_spatial_region_navigation": {
+        "display_name": "空间目标导航概念",
+        "concept_level": "action_way",
+        "typical_action": "navigate_to_region",
+        "typical_consequence": "executor_at_target_region",
+        "usage": "公共空间能力，不作为具体任务经验入库",
+    },
+    "concept_interactive_object_acquisition": {
+        "display_name": "可交互对象获取概念",
+        "concept_level": "task_processing",
+        "typical_action": "grasp_object",
+        "typical_consequence": "object_in_gripper",
+        "usage": "用于从当前空间中定位并获取任务对象",
+    },
+    "concept_fillable_container": {
+        "display_name": "可盛装容器概念",
+        "concept_level": "object",
+        "typical_action": "fill_container",
+        "typical_consequence": "container_contains_liquid",
+        "usage": "用于把不同杯子、容器映射到接水经验",
+    },
+    "concept_water_resource_zone": {
+        "display_name": "水源资源区概念",
+        "concept_level": "context",
+        "typical_action": "use_resource_zone",
+        "typical_consequence": "water_resource_available",
+        "usage": "用于把不同空间中的水龙头、饮水机或水源点映射为资源区",
+    },
+    "concept_liquid_transfer_task": {
+        "display_name": "液体转移任务概念",
+        "concept_level": "task_processing",
+        "typical_action": "pour_container",
+        "typical_consequence": "liquid_transferred",
+        "usage": "具体倒水类任务经验，由经验库或 P016 过程模板承载",
+    },
+}
+
 AUDIT_STORE: dict[str, dict[str, Any]] = {}
 STATE_STORE: dict[str, dict[str, Any]] = {}
 TRACE_STORE: dict[str, dict[str, Any]] = {}
@@ -130,6 +180,162 @@ def infer_goal_fact(text: str) -> str | None:
         if any(keyword in text for keyword in keywords):
             return goal_fact
     return None
+
+
+def _find_alias_mentions(text: str, aliases: list[str]) -> list[dict[str, Any]]:
+    mentions: list[dict[str, Any]] = []
+    occupied: list[range] = []
+    for alias in sorted(aliases, key=len, reverse=True):
+        start = text.find(alias)
+        while start >= 0:
+            end = start + len(alias)
+            if not any(start < span.stop and end > span.start for span in occupied):
+                mentions.append({"text": alias, "start": start, "end": end})
+                occupied.append(range(start, end))
+            start = text.find(alias, end)
+    return sorted(mentions, key=lambda item: item["start"])
+
+
+def extract_spatial_constraints(text: str, cognitive_model: dict[str, Any]) -> list[dict[str, Any]]:
+    region_index = {item["region_id"]: item for item in cognitive_model.get("space_region_table", [])}
+    constraints: list[dict[str, Any]] = []
+    for region_id, aliases in REGION_SEMANTIC_ALIASES.items():
+        region = region_index.get(region_id)
+        if not region:
+            continue
+        for mention in _find_alias_mentions(text, aliases):
+            constraints.append(
+                {
+                    "constraint_type": "spatial_target",
+                    "region_ref": region_id,
+                    "region_type": region.get("region_type"),
+                    "function_attributes": region.get("function_attributes", []),
+                    "permission": region.get("permission"),
+                    "source_text": mention["text"],
+                    "text_span": [mention["start"], mention["end"]],
+                    "concept_tag": "concept_spatial_region_navigation",
+                    "required_capability": "navigate_to_region",
+                    "binding_source": "p010_subject_cognitive_model",
+                }
+            )
+    constraints.sort(key=lambda item: item["text_span"][0])
+    return constraints
+
+
+def extract_object_constraints(text: str, cognitive_model: dict[str, Any]) -> list[dict[str, Any]]:
+    object_index = cognitive_model.get("object_region_index", {})
+    constraints: list[dict[str, Any]] = []
+    for object_id, aliases in OBJECT_SEMANTIC_ALIASES.items():
+        obj = object_index.get(object_id, {})
+        for mention in _find_alias_mentions(text, aliases):
+            concept_tag = "concept_fillable_container" if "receive_liquid" in obj.get("affordances", []) else "concept_interactive_object_acquisition"
+            constraints.append(
+                {
+                    "constraint_type": "object_target",
+                    "object_ref": object_id,
+                    "object_type": obj.get("object_type"),
+                    "region_ref": obj.get("region_ref"),
+                    "affordances": obj.get("affordances", []),
+                    "state_facts": obj.get("state_facts", []),
+                    "source_text": mention["text"],
+                    "text_span": [mention["start"], mention["end"]],
+                    "concept_tag": concept_tag,
+                    "binding_source": "p010_subject_cognitive_model",
+                }
+            )
+    constraints.sort(key=lambda item: item["text_span"][0])
+    merged: dict[str, dict[str, Any]] = {}
+    for item in constraints:
+        object_ref = item["object_ref"]
+        if object_ref not in merged:
+            merged[object_ref] = dict(item)
+            merged[object_ref]["source_mentions"] = [item["source_text"]]
+            continue
+        merged[object_ref]["source_mentions"].append(item["source_text"])
+        merged[object_ref]["source_text"] = "/".join(dict.fromkeys(merged[object_ref]["source_mentions"]))
+    return list(merged.values())
+
+
+def build_concept_matches(
+    text: str,
+    goal_fact: str | None,
+    spatial_constraints: list[dict[str, Any]],
+    object_constraints: list[dict[str, Any]],
+    detected_steps: list[str],
+) -> list[dict[str, Any]]:
+    concept_ids: list[str] = []
+    if spatial_constraints:
+        concept_ids.append("concept_spatial_region_navigation")
+    if any(item.get("object_ref") == "object_cup_white_mug" for item in object_constraints):
+        concept_ids.extend(["concept_interactive_object_acquisition", "concept_fillable_container"])
+    if any(item.get("region_ref") == "region_water_source" for item in spatial_constraints) or goal_fact == "cup_contains_water":
+        concept_ids.append("concept_water_resource_zone")
+    if goal_fact == "water_poured" or "pour_water" in detected_steps:
+        concept_ids.append("concept_liquid_transfer_task")
+
+    matches: list[dict[str, Any]] = []
+    for concept_id in dict.fromkeys(concept_ids):
+        concept = P012_CONCEPT_LIBRARY[concept_id]
+        matches.append(
+            {
+                "concept_id": concept_id,
+                "display_name": concept["display_name"],
+                "concept_level": concept["concept_level"],
+                "typical_action": concept["typical_action"],
+                "typical_consequence": concept["typical_consequence"],
+                "usage": concept["usage"],
+                "formation_basis": "情境描述信息、动作信息和后果信息共同约束；当前样品先以轻量规则抽取候选概念，后续由交互经验记录持续更新",
+            }
+        )
+    return matches
+
+
+def build_sequence_constraints(spatial_constraints: list[dict[str, Any]], detected_steps: list[str]) -> list[dict[str, Any]]:
+    constraints: list[dict[str, Any]] = []
+    for index, item in enumerate(spatial_constraints, start=1):
+        constraints.append(
+            {
+                "order": index,
+                "constraint_type": "explicit_spatial_waypoint",
+                "target_ref": item["region_ref"],
+                "source_text": item["source_text"],
+                "required_capability": item["required_capability"],
+            }
+        )
+    if detected_steps:
+        constraints.append(
+            {
+                "order": len(constraints) + 1,
+                "constraint_type": "detected_process_order",
+                "process_chain": detected_steps,
+            }
+        )
+    return constraints
+
+
+def build_intent_frame(text: str, cognitive_model: dict[str, Any]) -> dict[str, Any]:
+    detected_steps = detect_process_chain(text)
+    goal_fact = infer_goal_fact(text)
+    spatial_constraints = extract_spatial_constraints(text, cognitive_model)
+    object_constraints = extract_object_constraints(text, cognitive_model)
+    concept_matches = build_concept_matches(text, goal_fact, spatial_constraints, object_constraints, detected_steps)
+    return {
+        "schema_version": "1.0.0",
+        "translation_mode": "p012_concept_bridge_v1",
+        "utterance": text,
+        "goal_fact": goal_fact,
+        "explicit_process_chain": detected_steps,
+        "spatial_constraints": spatial_constraints,
+        "object_constraints": object_constraints,
+        "concept_matches": concept_matches,
+        "sequence_constraints": build_sequence_constraints(spatial_constraints, detected_steps),
+        "world_state_facts": sorted(build_world_state_facts(cognitive_model)),
+        "planning_policy": {
+            "llm_role": "仅生成结构化候选语义，不直接绕过空间语义、概念层和因果层生成最终动作链",
+            "space_binding": "空间目标必须回到 P010 主体侧空间认知模型进行绑定",
+            "concept_transfer": "公共空间能力由概念层复用，具体任务经验由经验库或 P016 过程模板承载",
+        },
+    }
 
 
 def build_world_state_facts(cognitive_model: dict[str, Any]) -> set[str]:
@@ -935,6 +1141,16 @@ INDEX_HTML = """<!doctype html>
       if (result.intent_translation) {
         rows.push(`<div class="stage-row"><strong>翻译层</strong><span>${result.intent_translation.task_type}: ${result.intent_translation.reason}</span></div>`);
       }
+      const frame = result.intent_translation?.intent_frame;
+      if (frame) {
+        const spatial = (frame.spatial_constraints || []).map(item => `${item.source_text}->${item.region_ref}`).join(" / ");
+        const objects = (frame.object_constraints || []).map(item => `${item.source_text}->${item.object_ref}`).join(" / ");
+        const concepts = (frame.concept_matches || []).map(item => `${item.display_name}(${item.concept_level})`).join(" / ");
+        rows.push(`<div class="stage-row"><strong>P012 意图帧</strong><span>${frame.translation_mode} / 目标事实：${frame.goal_fact || "-"}</span></div>`);
+        rows.push(`<div class="stage-row"><strong>空间约束</strong><span>${escapeHtml(spatial || "未抽取到显式空间目标")}</span></div>`);
+        rows.push(`<div class="stage-row"><strong>对象约束</strong><span>${escapeHtml(objects || "未抽取到显式对象目标")}</span></div>`);
+        rows.push(`<div class="stage-row"><strong>概念匹配</strong><span>${escapeHtml(concepts || "暂无概念候选")}</span></div>`);
+      }
       if (result.intent_translation?.causal_plan) {
         rows.push(`<div class="stage-row"><strong>目标事实</strong><span>${result.intent_translation.goal_fact}</span></div>`);
         rows.push(`<div class="stage-row"><strong>因果链</strong><span>${(result.intent_translation.causal_plan.process_chain || []).join(" -> ")}</span></div>`);
@@ -1167,6 +1383,8 @@ INDEX_HTML = """<!doctype html>
 
 def translate_intent(utterance: str) -> dict[str, Any]:
     text = (utterance or "").strip()
+    cognitive_model = get_cognitive_model()
+    intent_frame = build_intent_frame(text, cognitive_model) if text else None
     if not text:
         return {
             "schema_version": "1.0.0",
@@ -1175,8 +1393,9 @@ def translate_intent(utterance: str) -> dict[str, Any]:
             "decision": "unsupported",
             "reason": "空任务输入",
             "candidate_process": None,
+            "intent_frame": intent_frame,
         }
-    detected_steps = detect_process_chain(text)
+    detected_steps = intent_frame["explicit_process_chain"]
     has_sequence_marker = any(marker in text for marker in ["然后", "再", "接着", "之后", "，", ","])
     if any(keyword in text for keyword in ["快递", "下楼", "电梯", "楼下"]):
         return {
@@ -1186,6 +1405,7 @@ def translate_intent(utterance: str) -> dict[str, Any]:
             "decision": "unsupported",
             "reason": "长程多过程任务尚未进入第一阶段技能库",
             "candidate_process": None,
+            "intent_frame": intent_frame,
         }
     if any(keyword in text for keyword in ["炉灶", "火", "热源"]):
         return {
@@ -1195,13 +1415,14 @@ def translate_intent(utterance: str) -> dict[str, Any]:
             "decision": "blocked",
             "reason": "任务涉及数字空间中的风险区域，第一阶段阻断执行",
             "candidate_process": None,
+            "intent_frame": intent_frame,
         }
-    goal_fact = infer_goal_fact(text)
+    goal_fact = intent_frame["goal_fact"]
     should_use_causal_solver = goal_fact == "cup_contains_water" or (
         goal_fact is not None and (len(detected_steps) > 1 or (has_sequence_marker and detected_steps))
     )
     if should_use_causal_solver:
-        causal_plan = solve_causal_process_chain(goal_fact, get_cognitive_model())
+        causal_plan = solve_causal_process_chain(goal_fact, cognitive_model)
         if causal_plan["solved"]:
             if chain_covers_goal(detected_steps, causal_plan["process_chain"]) and chain_is_causally_supported(detected_steps, causal_plan):
                 causal_plan = build_explicit_causal_plan(goal_fact, detected_steps, causal_plan)
@@ -1218,6 +1439,7 @@ def translate_intent(utterance: str) -> dict[str, Any]:
                 "goal_fact": goal_fact,
                 "causal_plan": causal_plan,
                 "detected_steps": detected_steps,
+                "intent_frame": intent_frame,
             }
         return {
             "schema_version": "1.0.0",
@@ -1229,6 +1451,7 @@ def translate_intent(utterance: str) -> dict[str, Any]:
             "candidate_process_chain": [],
             "goal_fact": goal_fact,
             "causal_plan": causal_plan,
+            "intent_frame": intent_frame,
         }
     learned = find_learned_experience(text)
     if learned:
@@ -1242,6 +1465,7 @@ def translate_intent(utterance: str) -> dict[str, Any]:
             "candidate_process_chain": learned["process_chain"],
             "experience_id": learned["experience_id"],
             "goal_fact": learned.get("goal_fact", "water_poured"),
+            "intent_frame": intent_frame,
         }
     if len(detected_steps) > 1 or (has_sequence_marker and detected_steps and detected_steps != ["pour_water"]):
         return {
@@ -1253,6 +1477,7 @@ def translate_intent(utterance: str) -> dict[str, Any]:
             "candidate_process": None,
             "candidate_process_chain": detected_steps,
             "unsupported_steps": [step for step in detected_steps if step != "pour_water"],
+            "intent_frame": intent_frame,
         }
     if any(keyword in text for keyword in ["倒水", "倒一杯水", "给客人倒水"]):
         scenario = "simulated_success"
@@ -1269,6 +1494,7 @@ def translate_intent(utterance: str) -> dict[str, Any]:
             "candidate_process": "pour_water",
             "recommended_scenario": scenario,
             "goal_fact": "cup_has_water",
+            "intent_frame": intent_frame,
         }
     return {
         "schema_version": "1.0.0",
@@ -1277,6 +1503,7 @@ def translate_intent(utterance: str) -> dict[str, Any]:
         "decision": "unsupported",
         "reason": "技能库未匹配到可执行过程模板",
         "candidate_process": None,
+        "intent_frame": intent_frame,
     }
 
 

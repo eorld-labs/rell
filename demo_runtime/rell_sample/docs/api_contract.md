@@ -56,6 +56,25 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 
 响应中的 `intent_translation.causal_plan` 会给出初始事实、最终事实、推导过程和生成的过程链。
 
+自 P012 概念桥接实现起，`intent_translation` 中同步返回 `intent_frame`。该结构用于承接后续 LLM 或轻量 NLU 输出，但不允许语言模型直接绕过空间语义、概念层和因果层生成最终动作链。
+
+`intent_frame` 至少包括：
+
+- `goal_fact`：由人类输入翻译得到的目标因果事实。
+- `spatial_constraints`：从输入中抽取并绑定到 P010 主体侧空间认知模型的空间目标，例如 `门旁边 -> region_doorway`。
+- `object_constraints`：从输入中抽取并绑定到当前空间对象的对象目标，例如 `杯子 -> object_cup_white_mug`。
+- `concept_matches`：P012 概念层候选，例如空间目标导航概念、可盛装容器概念、水源资源区概念。
+- `sequence_constraints`：用户显式给出的路标顺序或过程顺序。
+- `planning_policy`：限定 LLM 只生成结构化候选语义，最终仍由空间语义、概念层、因果层和经验库共同决定。
+
+例如输入：
+
+```text
+走到门旁边，再走到服务位，再去操作台拿杯子，去水源处倒杯水
+```
+
+翻译层会保留门旁边、服务位、操作台和水源处四个空间约束，概念层匹配“空间目标导航概念”“可盛装容器概念”和“水源资源区概念”，再由因果层确认该显式路线能达成 `cup_contains_water`。
+
 ## GET /audit/{task_id}
 
 用途：查询最近一次运行写入内存的审计摘要。
