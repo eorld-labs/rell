@@ -112,6 +112,7 @@ RUNTIME_WORLD_STATE_STORE: dict[str, dict[str, Any]] = {}
 EXPERIENCE_GAP_STORE: dict[str, dict[str, Any]] = {}
 READAPTATION_STORE: dict[str, dict[str, Any]] = {}
 EXECUTION_DISPATCH_STORE: dict[str, dict[str, Any]] = {}
+TEACHING_SESSION_STORE: dict[str, dict[str, Any]] = {}
 
 
 STEP_LIBRARY = {
@@ -995,6 +996,13 @@ INDEX_HTML = """<!doctype html>
           <button id="libraryButton" class="secondary" title="查看当前经验库">经验库</button>
           <button id="p017Button" class="secondary" title="查看 P017 六段最小闭环证据">P017 最小闭环</button>
         </div>
+        <label for="stepwiseTeaching" style="margin-top:12px;">边教边动</label>
+        <textarea id="stepwiseTeaching">走向操作台</textarea>
+        <div class="actions" style="margin-top:8px;">
+          <button id="startTeachingSessionButton" class="secondary" title="启动数字执行主体教学会话">开始会话</button>
+          <button id="stepTeachingSessionButton" class="secondary" title="执行本次教学步骤并返回事实反馈">教一步并执行</button>
+          <button id="finishTeachingSessionButton" class="secondary" title="确认成功并固化经验">成功入库</button>
+        </div>
       </section>
       <section>
         <div class="summary">
@@ -1051,6 +1059,9 @@ INDEX_HTML = """<!doctype html>
     const dialogueTeachButton = document.getElementById("dialogueTeachButton");
     const libraryButton = document.getElementById("libraryButton");
     const p017Button = document.getElementById("p017Button");
+    const startTeachingSessionButton = document.getElementById("startTeachingSessionButton");
+    const stepTeachingSessionButton = document.getElementById("stepTeachingSessionButton");
+    const finishTeachingSessionButton = document.getElementById("finishTeachingSessionButton");
     const clearButton = document.getElementById("clearButton");
     const logEl = document.getElementById("log");
     const factsEl = document.getElementById("facts");
@@ -1069,6 +1080,7 @@ INDEX_HTML = """<!doctype html>
     const targetValue = document.getElementById("targetValue");
     const mapRobot = document.getElementById("mapRobot");
     const mapCupItem = document.getElementById("mapCupItem");
+    let currentTeachingSessionId = "";
 
     const eventLabel = {
       stage_started: "阶段启动",
@@ -1099,6 +1111,7 @@ INDEX_HTML = """<!doctype html>
       setText(taskMetric, "-");
       resetScene();
       serviceState.textContent = "待运行";
+      currentTeachingSessionId = "";
     }
 
     function resetScene() {
@@ -1348,6 +1361,55 @@ INDEX_HTML = """<!doctype html>
       appendLog("已根据候选链路填充教学区，需教学入库后再执行。");
     }
 
+    function buildStepEventFromFeedback(feedback) {
+      const targets = {
+        move_to_doorway: "region_doorway",
+        move_to_service_position: "region_service_position",
+        move_to_counter: "region_counter_operation",
+        pick_up_cup: "object_cup_white_mug",
+        move_to_water_source: "region_water_source",
+        fill_cup_at_water_source: "region_water_source",
+        pour_water: "region_counter_operation"
+      };
+      return {
+        trigger_reason: "learned_step_executed",
+        payload_summary: `step=${feedback.step} display=${feedback.display_name || feedback.step} target=${targets[feedback.step] || "-"}`
+      };
+    }
+
+    function renderStepwiseTeaching(result) {
+      setText(taskMetric, result.session_id || currentTeachingSessionId || "-");
+      setText(stateMetric, result.status || "-");
+      const status = result.status || "";
+      const ok = status.includes("goal_achieved") || status === "experience_saved";
+      const warn = status.includes("awaiting") || status.includes("teaching_in_progress");
+      setText(outcomeMetric, ok ? "目标可固化" : status || "-", ok ? "ok" : (warn ? "warn" : ""));
+      setText(admitMetric, "digital_executor", "ok");
+      const state = result.runtime_world_state_snapshot || {};
+      const executor = state.executor || {};
+      const feedback = result.step_feedback || [];
+      for (const item of feedback) {
+        if (item.executed) {
+          updateLearnedStepScene(buildStepEventFromFeedback(item));
+        }
+      }
+      const rows = [
+        `<div class="stage-row"><strong>边教边动会话</strong><span>${escapeHtml(result.session_id || currentTeachingSessionId || "-")} / ${escapeHtml(status || "-")}</span></div>`,
+        `<div class="stage-row"><strong>目标事实</strong><span>${escapeHtml(result.goal_fact || "-")}</span></div>`,
+        `<div class="stage-row"><strong>数字执行主体</strong><span>${escapeHtml(executor.location_ref || "-")} / holding=${escapeHtml((executor.holding || []).join(", ") || "none")}</span></div>`,
+        `<div class="stage-row"><strong>已教链路</strong><span>${escapeHtml((result.process_chain || []).join(" -> ") || "暂无")}</span></div>`
+      ];
+      for (const item of feedback) {
+        const produced = (item.causal_produced_facts || []).join(", ") || "-";
+        const missing = (item.missing_before_step || []).join(", ") || "-";
+        const hints = (item.prerequisite_hints || []).map(h => h.suggested_display_name || h.missing_fact).join(" / ");
+        rows.push(`<div class="stage-row"><strong>${escapeHtml(item.display_name || item.step)}</strong><span>${item.executed ? "已执行" : "未执行"}；产出=${escapeHtml(produced)}；缺口=${escapeHtml(missing)}${hints ? "；建议先教：" + escapeHtml(hints) : ""}</span></div>`);
+      }
+      const facts = (state.established_facts || []).join(", ");
+      rows.push(`<div class="stage-row"><strong>当前事实</strong><span>${escapeHtml(facts || "-")}</span></div>`);
+      factsEl.innerHTML = rows.join("");
+    }
+
     async function runProcess() {
       clearView();
       runButton.disabled = true;
@@ -1555,11 +1617,126 @@ INDEX_HTML = """<!doctype html>
       }
     }
 
+    async function startStepwiseTeaching() {
+      startTeachingSessionButton.disabled = true;
+      serviceState.textContent = "启动教学会话";
+      const utterance = document.getElementById("utterance").value.trim();
+      appendLog("启动边教边动会话：" + utterance);
+      try {
+        const result = await fetch("/teaching/session/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ utterance })
+        }).then(r => r.json());
+        appendLog("边教边动会话：" + JSON.stringify(result, null, 2));
+        if (result.error) {
+          serviceState.textContent = "会话失败";
+          setText(outcomeMetric, "会话失败", "bad");
+          return;
+        }
+        currentTeachingSessionId = result.session_id;
+        renderStepwiseTeaching(result);
+        serviceState.textContent = "教学会话中";
+      } catch (error) {
+        serviceState.textContent = "异常";
+        appendLog("边教边动启动异常：" + error.message);
+      } finally {
+        startTeachingSessionButton.disabled = false;
+      }
+    }
+
+    async function executeStepwiseTeaching() {
+      stepTeachingSessionButton.disabled = true;
+      serviceState.textContent = "执行教学步骤";
+      const teachingInput = document.getElementById("stepwiseTeaching").value.trim();
+      appendLog("本次教学步骤：" + teachingInput);
+      try {
+        if (!currentTeachingSessionId) {
+          const startResult = await fetch("/teaching/session/start", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ utterance: document.getElementById("utterance").value.trim() })
+          }).then(r => r.json());
+          if (startResult.error) {
+            appendLog("自动启动教学会话失败：" + JSON.stringify(startResult, null, 2));
+            return;
+          }
+          currentTeachingSessionId = startResult.session_id;
+          appendLog("自动启动教学会话：" + currentTeachingSessionId);
+        }
+        const result = await fetch("/teaching/session/step", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: currentTeachingSessionId, teaching_input: teachingInput })
+        }).then(r => r.json());
+        appendLog("教学执行反馈：" + JSON.stringify(result, null, 2));
+        if (result.error) {
+          serviceState.textContent = "步骤失败";
+          setText(outcomeMetric, "步骤失败", "bad");
+          return;
+        }
+        renderStepwiseTeaching(result);
+        serviceState.textContent = result.status === "goal_achieved_pending_confirmation" ? "目标已达成" : "等待下一步";
+      } catch (error) {
+        serviceState.textContent = "异常";
+        appendLog("教学步骤异常：" + error.message);
+      } finally {
+        stepTeachingSessionButton.disabled = false;
+      }
+    }
+
+    async function finishStepwiseTeaching() {
+      finishTeachingSessionButton.disabled = true;
+      serviceState.textContent = "固化经验";
+      try {
+        if (!currentTeachingSessionId) {
+          serviceState.textContent = "无会话";
+          appendLog("尚未启动边教边动会话。");
+          return;
+        }
+        const result = await fetch("/teaching/session/finish", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: currentTeachingSessionId, success_confirmed: true })
+        }).then(r => r.json());
+        appendLog("边教边动入库结果：" + JSON.stringify(result, null, 2));
+        if (result.error) {
+          serviceState.textContent = "入库失败";
+          setText(outcomeMetric, "入库失败", "bad");
+          return;
+        }
+        const experience = result.experience_result?.experience;
+        setText(stateMetric, result.status || "-");
+        setText(outcomeMetric, result.status === "experience_saved" ? "经验已入库" : "未入库", result.status === "experience_saved" ? "ok" : "warn");
+        setText(taskMetric, experience?.experience_id || currentTeachingSessionId);
+        renderStepwiseTeaching({
+          session_id: currentTeachingSessionId,
+          status: result.status,
+          goal_fact: result.goal_fact,
+          process_chain: experience?.process_chain || [],
+          runtime_world_state_snapshot: result.runtime_world_state_snapshot,
+          step_feedback: []
+        });
+        if (experience) {
+          appendLog("已固化经验：" + experience.experience_id + " / " + experience.process_chain.join(" -> "));
+        }
+        serviceState.textContent = result.status === "experience_saved" ? "已学习" : "已结束";
+      } catch (error) {
+        serviceState.textContent = "异常";
+        appendLog("边教边动入库异常：" + error.message);
+      } finally {
+        finishTeachingSessionButton.disabled = false;
+      }
+    }
+
     runButton.addEventListener("click", runProcess);
     teachButton.addEventListener("click", teachExperience);
     dialogueTeachButton.addEventListener("click", teachByDialogue);
     libraryButton.addEventListener("click", showExperienceLibrary);
     p017Button.addEventListener("click", showP017MinimalLoop);
+    startTeachingSessionButton.addEventListener("click", startStepwiseTeaching);
+    stepTeachingSessionButton.addEventListener("click", executeStepwiseTeaching);
+    finishTeachingSessionButton.addEventListener("click", finishStepwiseTeaching);
     clearButton.addEventListener("click", clearView);
     clearView();
   </script>
@@ -1747,6 +1924,9 @@ def parse_teaching_steps(steps: Any) -> list[str]:
         raw_steps = [item.strip() for item in re.split(r"[\n；;]+", str(steps or "")) if item.strip()]
     parsed: list[str] = []
     for raw in raw_steps:
+        if raw in STEP_LIBRARY and raw not in parsed:
+            parsed.append(raw)
+            continue
         detected = detect_process_chain(raw)
         if detected:
             parsed.extend(step for step in detected if step not in parsed)
@@ -1994,6 +2174,206 @@ def teach_experience_from_dialogue(utterance: str, message: str) -> dict[str, An
         save_experience_library(library)
         result["message"] = "已从对话教学形成候选经验，后续相同任务将优先命中该经验链"
     return result
+
+
+def build_teaching_session_id(utterance: str) -> str:
+    seed = "|".join([normalize_text(utterance), str(len(TEACHING_SESSION_STORE) + 1)])
+    return "teach_session_" + hashlib.sha1(seed.encode("utf-8")).hexdigest()[:12]
+
+
+def start_teaching_session(utterance: str, goal_fact: str | None = None) -> dict[str, Any]:
+    source_utterance = (utterance or "").strip()
+    if not source_utterance:
+        return {"error": "missing_utterance", "message": "边教边动会话必须包含任务输入"}
+    intent = translate_intent(source_utterance)
+    cognitive_model = get_cognitive_model()
+    session_id = build_teaching_session_id(source_utterance)
+    target_goal_fact = goal_fact or intent.get("goal_fact") or "cup_contains_water"
+    runtime_world_state = build_initial_runtime_world_state(cognitive_model, {**intent, "experience_id": session_id})
+    runtime_world_state["teaching_session_id"] = session_id
+    runtime_world_state["runtime_world_state_snapshot_id"] = session_id + "_snapshot"
+    runtime_world_state["audit_record_id"] = "audit_" + session_id.removeprefix("teach_session_")
+    session = {
+        "schema_version": "1.0.0",
+        "session_id": session_id,
+        "mode": "stepwise_teaching_with_digital_executor",
+        "source_utterance": source_utterance,
+        "intent_translation": intent,
+        "goal_fact": target_goal_fact,
+        "status": "teaching_in_progress",
+        "process_chain": [],
+        "step_feedback": [],
+        "runtime_world_state_snapshot": runtime_world_state,
+        "created_at": "2026-07-10T00:00:00+08:00",
+    }
+    TEACHING_SESSION_STORE[session_id] = session
+    RUNTIME_WORLD_STATE_STORE[session_id] = runtime_world_state
+    STATE_STORE[session_id] = {
+        "schema_version": "1.0.0",
+        "task_id": session_id,
+        "current_stage_id": None,
+        "runtime_state": "stepwise_teaching_started",
+        "runtime_world_state": runtime_world_state,
+        "goal_fact": target_goal_fact,
+    }
+    AUDIT_STORE[runtime_world_state["audit_record_id"]] = {
+        "schema_version": "1.0.0",
+        "audit_record_id": runtime_world_state["audit_record_id"],
+        "teaching_session_id": session_id,
+        "outcome": "teaching_in_progress",
+        "runtime_world_state_snapshot_id": runtime_world_state["runtime_world_state_snapshot_id"],
+    }
+    return session
+
+
+def build_prerequisite_hint(missing_facts: list[str]) -> list[dict[str, Any]]:
+    hints: list[dict[str, Any]] = []
+    for fact in missing_facts:
+        producer = next((step_id for step_id, meta in STEP_LIBRARY.items() if meta.get("produces_fact") == fact), None)
+        hints.append(
+            {
+                "missing_fact": fact,
+                "suggested_teaching_step": producer,
+                "suggested_display_name": STEP_LIBRARY.get(producer, {}).get("display_name") if producer else None,
+            }
+        )
+    return hints
+
+
+def execute_teaching_session_step(session_id: str, teaching_input: Any) -> dict[str, Any]:
+    session = TEACHING_SESSION_STORE.get(session_id)
+    if not session:
+        return {"error": "teaching_session_not_found", "session_id": session_id}
+    if session.get("status") in {"experience_saved", "closed_without_save"}:
+        return {"error": "teaching_session_closed", "session_id": session_id, "status": session.get("status")}
+    parsed_steps = parse_teaching_steps(teaching_input)
+    if not parsed_steps:
+        return {"error": "missing_teaching_step", "message": "未能从本次教学中解析出可执行步骤", "session_id": session_id}
+    state = session["runtime_world_state_snapshot"]
+    feedback_items: list[dict[str, Any]] = []
+    for step in parsed_steps:
+        meta = STEP_LIBRARY.get(step)
+        if not meta:
+            feedback_items.append({"step": step, "status": "unknown_step", "message": "当前步骤不在样品步骤库中"})
+            continue
+        facts = set(state.get("established_facts", []))
+        missing_before = [fact for fact in meta.get("requires_facts", []) if fact not in facts]
+        if missing_before:
+            feedback = {
+                "sequence": len(session["step_feedback"]) + len(feedback_items) + 1,
+                "step": step,
+                "display_name": meta["display_name"],
+                "status": "needs_more_teaching",
+                "executed": False,
+                "missing_before_step": missing_before,
+                "prerequisite_hints": build_prerequisite_hint(missing_before),
+                "message": "当前前提事实未成立，数字执行主体先反馈缺口，不猜测执行",
+                "runtime_world_state_snapshot": clone_runtime_world_state(state),
+            }
+            feedback_items.append(feedback)
+            session["status"] = "awaiting_teaching_or_confirmation"
+            continue
+        transition = apply_step_to_runtime_world_state(state, step, meta, len(session["process_chain"]) + 1)
+        session["process_chain"].append(step)
+        goal_achieved = session["goal_fact"] in set(state.get("established_facts", []))
+        feedback = {
+            "sequence": len(session["step_feedback"]) + len(feedback_items) + 1,
+            "step": step,
+            "display_name": meta["display_name"],
+            "status": "executed",
+            "executed": True,
+            "causal_produced_facts": [transition["produces_fact"]],
+            "causal_destroyed_facts": transition["destroys_facts"],
+            "missing_before_step": transition["missing_before_step"],
+            "before_executor_location": transition["before_executor_location"],
+            "after_executor_location": transition["after_executor_location"],
+            "goal_fact": session["goal_fact"],
+            "goal_achieved": goal_achieved,
+            "runtime_world_state_snapshot": transition["snapshot_after"],
+        }
+        feedback_items.append(feedback)
+        session["status"] = "goal_achieved_pending_confirmation" if goal_achieved else "teaching_in_progress"
+    session["step_feedback"].extend(feedback_items)
+    RUNTIME_WORLD_STATE_STORE[session_id] = state
+    STATE_STORE[session_id]["runtime_world_state"] = state
+    STATE_STORE[session_id]["current_stage_id"] = session["process_chain"][-1] if session["process_chain"] else None
+    STATE_STORE[session_id]["runtime_state"] = session["status"]
+    AUDIT_STORE[state["audit_record_id"]].update(
+        {
+            "outcome": session["status"],
+            "process_chain": session["process_chain"],
+            "last_step_feedback": feedback_items[-1] if feedback_items else None,
+        }
+    )
+    return {
+        "schema_version": "1.0.0",
+        "session_id": session_id,
+        "status": session["status"],
+        "goal_fact": session["goal_fact"],
+        "process_chain": session["process_chain"],
+        "step_feedback": feedback_items,
+        "runtime_world_state_snapshot": state,
+    }
+
+
+def finish_teaching_session(session_id: str, success_confirmed: bool = False) -> dict[str, Any]:
+    session = TEACHING_SESSION_STORE.get(session_id)
+    if not session:
+        return {"error": "teaching_session_not_found", "session_id": session_id}
+    if not session.get("process_chain"):
+        return {"error": "empty_teaching_session", "message": "还没有成功执行的教学步骤，不能固化经验", "session_id": session_id}
+    state = session["runtime_world_state_snapshot"]
+    goal_achieved = session["goal_fact"] in set(state.get("established_facts", []))
+    if not (goal_achieved or success_confirmed):
+        session["status"] = "awaiting_success_confirmation"
+        return {
+            "schema_version": "1.0.0",
+            "session_id": session_id,
+            "status": session["status"],
+            "goal_fact": session["goal_fact"],
+            "goal_achieved": False,
+            "message": "目标事实尚未成立；如确已成功，请带 success_confirmed=true 结束会话",
+            "runtime_world_state_snapshot": state,
+        }
+    result = teach_experience(session["source_utterance"], session["process_chain"])
+    if "experience" in result:
+        result["experience"]["context"]["human_intent_ref"] = "stepwise_teaching_session"
+        result["experience"]["action"]["parameters"]["source"] = "stepwise_teaching_session"
+        result["experience"]["governance_ref"]["audit_ref"] = state.get("audit_record_id")
+        library = load_experience_library()
+        library["experiences"] = [
+            result["experience"] if item.get("experience_id") == result["experience"]["experience_id"] else item
+            for item in library.get("experiences", [])
+        ]
+        save_experience_library(library)
+    release = release_runtime_world_state(session_id, "stepwise_teaching_finished")
+    session["status"] = "experience_saved" if result.get("decision") == "experience_created" else "closed_without_save"
+    session["experience_result"] = result
+    session["release_result"] = release
+    AUDIT_STORE[state["audit_record_id"]].update(
+        {
+            "outcome": session["status"],
+            "experience_id": result.get("experience", {}).get("experience_id"),
+            "release_token": release.get("release_token"),
+        }
+    )
+    return {
+        "schema_version": "1.0.0",
+        "session_id": session_id,
+        "status": session["status"],
+        "goal_fact": session["goal_fact"],
+        "goal_achieved": goal_achieved,
+        "experience_result": result,
+        "release_result": release,
+        "runtime_world_state_snapshot": RUNTIME_WORLD_STATE_STORE.get(session_id, state),
+    }
+
+
+def get_teaching_session(session_id: str) -> dict[str, Any]:
+    session = TEACHING_SESSION_STORE.get(session_id)
+    if not session:
+        return {"error": "teaching_session_not_found", "session_id": session_id}
+    return session
 
 
 def evaluate_space_admission(intent: dict[str, Any], cognitive_model: dict[str, Any]) -> dict[str, Any]:
@@ -2990,6 +3370,11 @@ class RellSampleHandler(BaseHTTPRequestHandler):
             result = get_execution_dispatch(dispatch_id)
             self._send_json(result, status=404 if "error" in result else 200)
             return
+        if path.startswith("/teaching/session/"):
+            session_id = path.removeprefix("/teaching/session/")
+            result = get_teaching_session(session_id)
+            self._send_json(result, status=404 if "error" in result else 200)
+            return
         if path.startswith("/process/status/"):
             task_id = path.removeprefix("/process/status/")
             self._send_json(get_status(task_id), status=200 if task_id in STATE_STORE else 404)
@@ -3054,6 +3439,18 @@ class RellSampleHandler(BaseHTTPRequestHandler):
             result = teach_experience_from_dialogue(body.get("utterance", ""), body.get("message", ""))
             self._send_json(result, status=400 if "error" in result else 200)
             return
+        if path == "/teaching/session/start":
+            result = start_teaching_session(body.get("utterance", ""), body.get("goal_fact"))
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/teaching/session/step":
+            result = execute_teaching_session_step(body.get("session_id", ""), body.get("teaching_input", body.get("step", "")))
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/teaching/session/finish":
+            result = finish_teaching_session(body.get("session_id", ""), bool(body.get("success_confirmed", False)))
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
         self._send_json({"error": "not_found"}, status=404)
 
     def log_message(self, format: str, *args: Any) -> None:
@@ -3089,7 +3486,7 @@ def main() -> None:
     server = HTTPServer((DEFAULT_HOST, DEFAULT_PORT), RellSampleHandler)
     print(f"RELL sample API listening on http://{DEFAULT_HOST}:{DEFAULT_PORT}")
     print(f"Demo page: http://{DEFAULT_HOST}:{DEFAULT_PORT}/")
-    print("Endpoints: POST /process/admit, POST /process/run, POST /experience/migrate, POST /execution/dispatch, GET /audit/{task_id}")
+    print("Endpoints: POST /process/admit, POST /process/run, POST /experience/migrate, POST /execution/dispatch, POST /teaching/session/start, GET /audit/{task_id}")
     server.serve_forever()
 
 

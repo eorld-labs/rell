@@ -54,6 +54,8 @@ def run_http_smoke() -> None:
     port = find_free_port()
     API_URL = f"http://127.0.0.1:{port}"
     env = {**os.environ, "RELL_SAMPLE_PORT": str(port)}
+    experience_library_file = ROOT / "data" / "experience_library.json"
+    original_library = experience_library_file.read_text(encoding="utf-8") if experience_library_file.exists() else None
     process = subprocess.Popen(
         [sys.executable, str(ROOT / "api_server.py")],
         cwd=REPO,
@@ -75,6 +77,21 @@ def run_http_smoke() -> None:
             {"execution_loop_payload": migration["execution_loop_payload"], "executor_type": "robot_sdk"},
         )
         dispatch_lookup = get_json(f"/execution/dispatch/{dispatch['dispatch_id']}")
+        teaching_session = post_json("/teaching/session/start", {"utterance": "到水源处接一杯水"})
+        teaching_step = post_json(
+            "/teaching/session/step",
+            {"session_id": teaching_session["session_id"], "teaching_input": "走向操作台"},
+        )
+        teaching_lookup = get_json(f"/teaching/session/{teaching_session['session_id']}")
+        for step_text in ["拿起杯子", "到水源处", "接一杯水"]:
+            teaching_step = post_json(
+                "/teaching/session/step",
+                {"session_id": teaching_session["session_id"], "teaching_input": step_text},
+            )
+        teaching_finish = post_json(
+            "/teaching/session/finish",
+            {"session_id": teaching_session["session_id"], "success_confirmed": True},
+        )
         release = post_json(
             "/runtime_world_state/release",
             {"task_id": migration["migration_task_id"], "release_reason": "http_smoke_finished"},
@@ -97,6 +114,8 @@ def run_http_smoke() -> None:
             raise AssertionError("demo page did not include dialogue teaching entry")
         if "p017Button" not in page:
             raise AssertionError("demo page did not include P017 minimal loop entry")
+        if "startTeachingSessionButton" not in page or "stepTeachingSessionButton" not in page:
+            raise AssertionError("demo page did not include stepwise teaching entries")
         if health.get("status") != "ok":
             raise AssertionError(f"health failed: {health}")
         if cognitive_model.get("prior_ref") != "semantic_prior_home_a_kitchen_v1":
@@ -113,6 +132,16 @@ def run_http_smoke() -> None:
             raise AssertionError(f"execution dispatch failed: {dispatch}")
         if dispatch_lookup.get("dispatch_id") != dispatch["dispatch_id"]:
             raise AssertionError(f"execution dispatch lookup failed: {dispatch_lookup}")
+        if teaching_session.get("status") != "teaching_in_progress":
+            raise AssertionError(f"stepwise teaching start failed: {teaching_session}")
+        if not teaching_step.get("step_feedback") or teaching_step["step_feedback"][0].get("status") != "executed":
+            raise AssertionError(f"stepwise teaching step failed: {teaching_step}")
+        if teaching_lookup.get("session_id") != teaching_session["session_id"]:
+            raise AssertionError(f"stepwise teaching lookup failed: {teaching_lookup}")
+        if teaching_finish.get("status") != "experience_saved":
+            raise AssertionError(f"stepwise teaching finish failed: {teaching_finish}")
+        if teaching_finish.get("release_result", {}).get("release_status") != "released":
+            raise AssertionError(f"stepwise teaching release failed: {teaching_finish}")
         if release.get("release_status") != "released" or not release.get("release_token"):
             raise AssertionError(f"runtime world state release failed: {release}")
         if run_result["audit_summary"]["outcome"] != "requires_human_confirmation":
@@ -136,6 +165,10 @@ def run_http_smoke() -> None:
             process.wait(timeout=2)
         except subprocess.TimeoutExpired:
             process.kill()
+        if original_library is None:
+            experience_library_file.unlink(missing_ok=True)
+        else:
+            experience_library_file.write_text(original_library, encoding="utf-8")
     print("[ok] api_server HTTP smoke")
 
 

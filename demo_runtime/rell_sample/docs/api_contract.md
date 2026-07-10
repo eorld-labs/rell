@@ -201,6 +201,71 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 
 经验库第一阶段存储在 `demo_runtime/rell_sample/data/experience_library.json`，用于演示“不会做 -> 人工教学 -> 经验形成 -> 数字执行体回放”的最小闭环。
 
+## POST /teaching/session/start
+
+用途：启动“边教边动”教学会话。该接口把网页中的数字执行主体作为第一阶段执行主体，生成任务期运行时世界状态快照，并等待用户逐步教学。
+
+请求示例：
+
+```json
+{
+  "utterance": "到水源处接一杯水"
+}
+```
+
+响应至少包括：
+
+- `session_id`：教学会话标识。
+- `goal_fact`：本轮教学希望达成的目标事实，例如 `cup_contains_water`。
+- `runtime_world_state_snapshot`：本轮教学期间的任务期运行时世界状态快照。
+- `status`：初始为 `teaching_in_progress`。
+
+## POST /teaching/session/step
+
+用途：接收一个或多个人工教学步骤，由数字执行主体立即判断并执行。若前提事实已满足，则调用运行时世界状态更新逻辑，返回因果产出事实、因果销毁事实和当前快照；若前提事实缺失，则返回缺失事实和建议先教学步骤，不强行执行。
+
+请求示例：
+
+```json
+{
+  "session_id": "teach_session_xxx",
+  "teaching_input": "走向操作台"
+}
+```
+
+典型反馈：
+
+```json
+{
+  "step": "move_to_counter",
+  "status": "executed",
+  "causal_produced_facts": ["executor_at_counter"],
+  "causal_destroyed_facts": ["executor_at_water_source"],
+  "goal_achieved": false
+}
+```
+
+若用户先教 `拿起杯子` 但执行体尚未到达操作台，响应会返回 `needs_more_teaching`，并在 `missing_before_step` 中列出 `executor_at_counter` 等缺失前提。
+
+## POST /teaching/session/finish
+
+用途：在目标事实已成立或用户确认成功后，把本次已执行过程链固化为经验记录，并释放任务期运行时世界状态快照。
+
+请求示例：
+
+```json
+{
+  "session_id": "teach_session_xxx",
+  "success_confirmed": true
+}
+```
+
+响应包括 `experience_result` 和 `release_result`。固化后的经验记录会生成 `causal_signature` 与 `invariant_contract`，并将来源标记为 `stepwise_teaching_session`。`release_result.release_token` 用于证明本次教学快照已经完成逻辑释放。
+
+## GET /teaching/session/{session_id}
+
+用途：查询边教边动会话，包括已执行过程链、每一步事实反馈、目标事实状态和当前任务期快照。该接口用于调试和演示，不替代长期经验库查询。
+
 ## GET /experience/gap/{gap_record_id}
 
 用途：查询迁移适配过程中生成的经验缺口记录。

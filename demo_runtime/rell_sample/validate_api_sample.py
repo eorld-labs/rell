@@ -18,6 +18,10 @@ from api_server import (
     run_process,
     teach_experience,
     teach_experience_from_dialogue,
+    start_teaching_session,
+    execute_teaching_session_step,
+    finish_teaching_session,
+    get_teaching_session,
     get_runtime_world_state,
     migrate_experience,
     release_runtime_world_state,
@@ -96,6 +100,33 @@ def main() -> None:
         raise AssertionError(f"dialogue teaching must create an experience: {dialogue_taught}")
     if dialogue_taught["experience"]["context"]["human_intent_ref"] != "dialogue_teaching":
         raise AssertionError(f"dialogue teaching must mark source: {dialogue_taught}")
+
+    stepwise_blocked = start_teaching_session("到水源处接一杯水")
+    blocked_feedback = execute_teaching_session_step(stepwise_blocked["session_id"], "拿起杯子")
+    first_blocked_item = blocked_feedback["step_feedback"][0]
+    if first_blocked_item.get("status") != "needs_more_teaching" or first_blocked_item.get("executed"):
+        raise AssertionError(f"stepwise teaching must not execute when prerequisites are missing: {blocked_feedback}")
+    if "executor_at_counter" not in first_blocked_item.get("missing_before_step", []):
+        raise AssertionError(f"stepwise teaching must expose missing prerequisite facts: {blocked_feedback}")
+
+    stepwise = start_teaching_session("到水源处接一杯水")
+    for text in ["走向操作台", "拿起杯子", "到水源处", "接一杯水"]:
+        step_result = execute_teaching_session_step(stepwise["session_id"], text)
+        if not step_result["step_feedback"][0].get("executed"):
+            raise AssertionError(f"stepwise teaching step should execute after prerequisites are met: {step_result}")
+    fetched_session = get_teaching_session(stepwise["session_id"])
+    if fetched_session.get("status") != "goal_achieved_pending_confirmation":
+        raise AssertionError(f"stepwise teaching must reach goal fact before finish: {fetched_session}")
+    if "cup_contains_water" not in fetched_session.get("runtime_world_state_snapshot", {}).get("established_facts", []):
+        raise AssertionError(f"stepwise teaching must update runtime world facts: {fetched_session}")
+    finished_session = finish_teaching_session(stepwise["session_id"])
+    if finished_session.get("status") != "experience_saved":
+        raise AssertionError(f"stepwise teaching must save experience after goal achieved: {finished_session}")
+    experience = finished_session.get("experience_result", {}).get("experience", {})
+    if experience.get("context", {}).get("human_intent_ref") != "stepwise_teaching_session":
+        raise AssertionError(f"stepwise teaching must mark experience source: {finished_session}")
+    if finished_session.get("release_result", {}).get("release_status") != "released":
+        raise AssertionError(f"stepwise teaching must release runtime world state: {finished_session}")
 
     causal_taught = teach_experience_from_dialogue(
         "",
@@ -256,7 +287,7 @@ def main() -> None:
         EXPERIENCE_LIBRARY_FILE.write_text(original_library, encoding="utf-8")
 
     print("API sample validation passed.")
-    print("Validated: admit, run success, teach experience, dialogue teaching, natural-language causal teaching, explicit route teaching, causal chain solving, causal short-goal solving, P017 migration adaptation, runtime world release, run channel_conflict, run simulated_success, get audit, get space.")
+    print("Validated: admit, run success, teach experience, dialogue teaching, stepwise teaching, natural-language causal teaching, explicit route teaching, causal chain solving, causal short-goal solving, P017 migration adaptation, runtime world release, run channel_conflict, run simulated_success, get audit, get space.")
 
 
 if __name__ == "__main__":
