@@ -411,6 +411,7 @@ def main() -> None:
     run_python("validate_api_sample.py")
     run_python("validate_p011_experience_internalization.py")
     run_python("validate_p013_task_semantics.py")
+    run_python("validate_p014_execution_recovery.py")
     run_python("validate_p015_preference_alignment.py")
     run_python("validate_p017_minimal_loop.py")
     run_http_smoke()

@@ -626,3 +626,32 @@ python demo_runtime\rell_sample\run_all_checks.py
 ```
 
 预期结果：两条命令均通过，并生成 `demo_runtime/output/rell_sample/p015_preference_alignment/` 下的证据文件。
+
+## 当日增补（2026-07-10）：P014 执行恢复工程证据收束
+
+当前 `rell_sample` 主链中，P014 的核心能力其实已经存在于恢复记录持久化、按任务查询、运行时冲突再适配和执行中途阻断恢复里，但此前这些证据主要散落在 `validate_api_sample.py` 和 HTTP 烟测的综合断言中，不利于单独举证。为此，本轮新增独立的 P014 工程证据包，把“恢复记录独立存储 -> 冲突生成恢复记录 -> 按任务和按标识查询 -> 运行时再适配恢复 -> 执行中途阻断恢复 -> 恢复库持续沉淀”的最小闭环固定下来。
+
+### 增补范围
+
+1. 新增 `demo_runtime/rell_sample/validate_p014_execution_recovery.py`，固定生成 P014 的六段证据输出。
+2. 新增输出目录 `demo_runtime/output/rell_sample/p014_execution_recovery/`，统一落盘 `00_summary.json`、`evidence_index.json` 和六个分段证据文件。
+3. 新增 `技术库/P014-执行恢复/P014执行恢复工程证据说明.md`，把验证命令、输出目录、关键字段和典型审查质疑对应关系写成中文说明。
+4. 将 `validate_p014_execution_recovery.py` 接入 `demo_runtime/rell_sample/run_all_checks.py`，使 P014 与 P011、P013、P015、P017 一样进入一键回归主链。
+
+### 当前证据覆盖点
+
+1. 恢复记录独立存储：证明恢复记录位于 `recovery_record_library.json`，而不是只存在于一次执行返回结果中。
+2. 冲突生成恢复记录：证明双通道验真冲突会形成结构化恢复记录，并输出偏离上下文、恢复动作和恢复结果。
+3. 查询与审计关联：证明恢复记录既能按 `recovery_id` 查询，也能按 `task_id` 查询，并和审计记录建立关联。
+4. 运行时再适配恢复：证明运行时事实冲突会触发 `readaptation`，并生成指向再适配流程的恢复记录。
+5. 执行中途阻断恢复：证明执行闭环遇到硬阻断时，会形成步骤级 `readaptation_required` 和恢复记录，而不是只返回失败。
+6. 恢复库持续沉淀：证明多类恢复事件会持续留存在恢复记录库中，形成后续复核和举证资产。
+
+### 本轮验收命令
+
+```powershell
+python demo_runtime\rell_sample\validate_p014_execution_recovery.py
+python demo_runtime\rell_sample\run_all_checks.py
+```
+
+预期结果：两条命令均通过，并生成 `demo_runtime/output/rell_sample/p014_execution_recovery/` 下的证据文件。
