@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "preference_records": [
+    {
+      "preference_id": "pref_full_cup_default",
+      "context_ref": "home_a_kitchen",
+      "preference_signal": "prefer",
+      "human_feedback": "默认接满一杯水后再结束接水。",
+      "applies_to": [
+        "goal:cup_contains_water",
+        "goal:water_poured",
+        "step:fill_cup_at_water_source"
+      ],
+      "strength": 0.8,
+      "enforcement_policy": "advisory",
+      "created_at": "2026-07-10T00:00:00+08:00"
+    },
+    {
+      "preference_id": "pref_no_spill_default",
+      "context_ref": "home_a_kitchen",
+      "preference_signal": "avoid",
+      "human_feedback": "倒水时优先避免泼洒，必要时应请求人工确认而不是盲目继续。",
+      "applies_to": [
+        "goal:water_poured",
+        "capability:pour_container"
+      ],
+      "strength": 1.0,
+      "enforcement_policy": "advisory",
+      "created_at": "2026-07-10T00:00:00+08:00"
+    }
+  ]
+}

@@ -28,6 +28,7 @@ COGNITIVE_MODEL_FILE = DATA / "digital_kitchen_cognitive_model.json"
 EXPERIENCE_LIBRARY_FILE = DATA / "experience_library.json"
 CONCEPT_LIBRARY_FILE = DATA / "concept_library.json"
 CONCEPT_CANDIDATE_LIBRARY_FILE = DATA / "concept_candidate_library.json"
+PREFERENCE_LIBRARY_FILE = DATA / "preference_record_library.json"
 P017_MINIMAL_LOOP_OUTPUT = ROOT.parent / "output" / "rell_sample" / "p017_minimal_loop"
 
 TIMELINE_SCENARIOS = {
@@ -660,6 +661,7 @@ def build_world_state_facts(cognitive_model: dict[str, Any]) -> set[str]:
 def build_initial_runtime_world_state(cognitive_model: dict[str, Any], intent: dict[str, Any]) -> dict[str, Any]:
     object_index = cognitive_model.get("object_region_index", {})
     fact_set = sorted(build_world_state_facts(cognitive_model))
+    preference_resolution = resolve_preferences_for_intent(intent, cognitive_model)
     object_locations = {
         object_id: {
             "location_type": "region",
@@ -686,6 +688,12 @@ def build_initial_runtime_world_state(cognitive_model: dict[str, Any], intent: d
         "established_facts": fact_set,
         "current_stage": None,
         "completed_stages": [],
+        "preference_context": {
+            "context_ref": preference_resolution.get("context_ref"),
+            "scope_tags": preference_resolution.get("scope_tags", []),
+            "resolution_policy": "human_preference_records_are_loaded_as_runtime_constraints_without_rewriting_experience_or_concept_layers",
+        },
+        "active_preferences": preference_resolution.get("preference_records", []),
         "runtime_environment": {
             "active_perturbations": [],
             "scheduled_perturbations": [],
@@ -1903,8 +1911,12 @@ INDEX_HTML = """<!doctype html>
         const executor = runtimeWorld.executor || {};
         const holding = (executor.holding || []).join(", ") || "none";
         const facts = (runtimeWorld.established_facts || []).join(", ");
+        const activePreferences = runtimeWorld.active_preferences || [];
         rows.push(`<div class="stage-row"><strong>运行时世界状态</strong><span>${runtimeWorld.lifecycle || "ephemeral"} / ${executor.location_ref || "-"}</span></div>`);
         rows.push(`<div class="stage-row"><strong>端侧工作记忆</strong><span>holding=${escapeHtml(holding)}；facts=${escapeHtml(facts)}</span></div>`);
+        if (activePreferences.length) {
+          rows.push(`<div class="stage-row"><strong>P015 偏好约束</strong><span>${escapeHtml(activePreferences.map(item => item.preference_id).join(", "))}</span></div>`);
+        }
         const runtimeEnv = runtimeWorld.runtime_environment || {};
         if ((runtimeEnv.active_perturbations || []).length || (runtimeEnv.scheduled_perturbations || []).length || runtimeEnv.last_preflight) {
           rows.push(`<div class="stage-row"><strong>偶然层扰动</strong><span>active=${escapeHtml(String((runtimeEnv.active_perturbations || []).length))} / scheduled=${escapeHtml(String((runtimeEnv.scheduled_perturbations || []).length))}</span></div>`);
@@ -2885,6 +2897,210 @@ def save_concept_candidate_library(library: dict[str, Any]) -> None:
 
 def save_experience_library(library: dict[str, Any]) -> None:
     EXPERIENCE_LIBRARY_FILE.write_text(json.dumps(library, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def load_preference_library() -> dict[str, Any]:
+    if not PREFERENCE_LIBRARY_FILE.exists():
+        return {"schema_version": "1.0.0", "preference_records": []}
+    return read_json(PREFERENCE_LIBRARY_FILE)
+
+
+def save_preference_library(library: dict[str, Any]) -> None:
+    PREFERENCE_LIBRARY_FILE.write_text(json.dumps(library, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def get_preference_context_ref(intent: dict[str, Any], cognitive_model: dict[str, Any] | None = None) -> str:
+    environment_summary = (cognitive_model or {}).get("local_environment_summary", {})
+    return str(
+        intent.get("context_ref")
+        or intent.get("space_ref")
+        or environment_summary.get("space_id")
+        or "global"
+    )
+
+
+def build_preference_scope_tags(intent: dict[str, Any], binding: dict[str, Any] | None = None) -> set[str]:
+    tags: set[str] = set()
+    goal_fact = intent.get("goal_fact")
+    if goal_fact:
+        tags.add(f"goal:{goal_fact}")
+    task_type = intent.get("task_type")
+    if task_type:
+        tags.add(f"task_type:{task_type}")
+    if binding is None:
+        for step in get_process_chain_for_intent(intent):
+            tags.add(f"step:{step}")
+            meta = STEP_LIBRARY.get(step, {})
+            capability = meta.get("capability")
+            target_region = meta.get("target_region")
+            target_object = meta.get("target_object")
+            if capability:
+                tags.add(f"capability:{capability}")
+            if target_region:
+                tags.add(f"region:{target_region}")
+            if target_object:
+                tags.add(f"object:{target_object}")
+    else:
+        step = binding.get("step")
+        capability = binding.get("capability")
+        if step:
+            tags.add(f"step:{step}")
+        if capability:
+            tags.add(f"capability:{capability}")
+        object_binding = binding.get("object_binding", {})
+        space_binding = binding.get("space_binding", {})
+        if object_binding.get("target_ref"):
+            tags.add(f"object:{object_binding['target_ref']}")
+        if space_binding.get("target_ref"):
+            tags.add(f"region:{space_binding['target_ref']}")
+    return tags
+
+
+def resolve_preferences_for_intent(intent: dict[str, Any], cognitive_model: dict[str, Any] | None = None) -> dict[str, Any]:
+    context_ref = get_preference_context_ref(intent, cognitive_model)
+    scope_tags = build_preference_scope_tags(intent)
+    matched_records: list[dict[str, Any]] = []
+    for raw in load_preference_library().get("preference_records", []):
+        record_context = str(raw.get("context_ref") or "global")
+        if record_context not in {context_ref, "global", "*"}:
+            continue
+        applies_to = [str(item) for item in raw.get("applies_to", []) if str(item).strip()]
+        matched_tags = sorted(set(applies_to) & scope_tags)
+        if applies_to and not matched_tags:
+            continue
+        normalized = dict(raw)
+        normalized["context_ref"] = record_context
+        normalized["applies_to"] = applies_to
+        normalized["matched_tags"] = matched_tags
+        normalized["enforcement_policy"] = raw.get("enforcement_policy", "advisory")
+        matched_records.append(normalized)
+    return {
+        "context_ref": context_ref,
+        "scope_tags": sorted(scope_tags),
+        "preference_records": matched_records,
+    }
+
+
+def evaluate_preference_constraints(
+    intent: dict[str, Any],
+    binding_candidate: dict[str, Any],
+    runtime_world_state: dict[str, Any],
+) -> dict[str, Any]:
+    active_preferences = runtime_world_state.get("active_preferences", [])
+    blocking_reasons: list[dict[str, Any]] = []
+    advisory_items: list[dict[str, Any]] = []
+    advisory_index: set[tuple[str, str]] = set()
+    for binding in binding_candidate.get("step_bindings", []):
+        binding_tags = build_preference_scope_tags(intent, binding)
+        for preference in active_preferences:
+            applies_to = set(preference.get("applies_to", []))
+            matched_tags = sorted(applies_to & binding_tags) if applies_to else []
+            if applies_to and not matched_tags:
+                continue
+            preference_id = preference.get("preference_id", "unknown_preference")
+            signal = preference.get("preference_signal", "prefer")
+            enforcement_policy = preference.get("enforcement_policy", "advisory")
+            item = {
+                "step": binding.get("step"),
+                "preference_id": preference_id,
+                "preference_signal": signal,
+                "matched_tags": matched_tags,
+                "human_feedback": preference.get("human_feedback", ""),
+                "enforcement_policy": enforcement_policy,
+                "strength": preference.get("strength"),
+            }
+            if enforcement_policy == "blocking" and signal in {"forbid", "reject", "avoid"}:
+                blocking_reasons.append({"reason": "human_preference_blocked_step", **item})
+                continue
+            advisory_key = (preference_id, binding.get("step", ""))
+            if advisory_key in advisory_index:
+                continue
+            advisory_index.add(advisory_key)
+            advisory_items.append(item)
+    return {
+        "blocking_reasons": blocking_reasons,
+        "advisory_items": advisory_items,
+    }
+
+
+def record_preference(
+    *,
+    context_ref: str,
+    preference_signal: str,
+    human_feedback: str,
+    applies_to: list[str] | None = None,
+    strength: float | None = None,
+    experience_ref: str | None = None,
+    enforcement_policy: str = "advisory",
+) -> dict[str, Any]:
+    applies_to = [str(item).strip() for item in (applies_to or []) if str(item).strip()]
+    if preference_signal not in {"accept", "reject", "correct", "avoid", "prefer", "forbid"}:
+        return {"error": "unsupported_preference_signal", "preference_signal": preference_signal}
+    if enforcement_policy not in {"advisory", "blocking"}:
+        return {"error": "unsupported_enforcement_policy", "enforcement_policy": enforcement_policy}
+    if not context_ref:
+        return {"error": "missing_context_ref"}
+    if not human_feedback.strip():
+        return {"error": "missing_human_feedback"}
+    if strength is None:
+        strength = 1.0 if enforcement_policy == "blocking" else 0.8
+    if strength < 0 or strength > 1:
+        return {"error": "invalid_strength", "strength": strength}
+    seed = "|".join(
+        [
+            context_ref,
+            preference_signal,
+            enforcement_policy,
+            human_feedback.strip(),
+            ",".join(sorted(applies_to)),
+            experience_ref or "none",
+        ]
+    )
+    preference_id = "pref_" + hashlib.sha1(seed.encode("utf-8")).hexdigest()[:12]
+    library = load_preference_library()
+    records = [item for item in library.get("preference_records", []) if item.get("preference_id") != preference_id]
+    record = {
+        "preference_id": preference_id,
+        "context_ref": context_ref,
+        "experience_ref": experience_ref,
+        "preference_signal": preference_signal,
+        "human_feedback": human_feedback.strip(),
+        "applies_to": applies_to,
+        "strength": strength,
+        "enforcement_policy": enforcement_policy,
+        "created_at": "2026-07-10T00:00:00+08:00",
+    }
+    records.append(record)
+    library["preference_records"] = records
+    save_preference_library(library)
+    return {
+        "schema_version": library.get("schema_version", "1.0.0"),
+        "preference_record": record,
+        "preference_records": records,
+    }
+
+
+def attach_preference_to_runtime_task(task_id: str, preference_record: dict[str, Any]) -> dict[str, Any]:
+    current = get_runtime_world_state(task_id)
+    if "error" in current:
+        return current
+    state = current["runtime_world_state_snapshot"]
+    active_preferences = state.setdefault("active_preferences", [])
+    if not any(item.get("preference_id") == preference_record.get("preference_id") for item in active_preferences):
+        active_preferences.append(dict(preference_record))
+    context = state.setdefault("preference_context", {})
+    scope_tags = set(context.get("scope_tags", []))
+    scope_tags.update(preference_record.get("applies_to", []))
+    context["scope_tags"] = sorted(scope_tags)
+    RUNTIME_WORLD_STATE_STORE[task_id] = state
+    if task_id in STATE_STORE:
+        STATE_STORE[task_id]["runtime_world_state"] = state
+    return {
+        "schema_version": "1.0.0",
+        "task_id": task_id,
+        "runtime_world_state_snapshot_id": state.get("runtime_world_state_snapshot_id"),
+        "active_preferences": active_preferences,
+    }
 
 
 def find_learned_experience(utterance: str) -> dict[str, Any] | None:
@@ -4039,6 +4255,9 @@ def build_execution_feasibility(
     blocked_steps: list[str] = []
     dynamic_blockers = build_dynamic_environment_blockers(runtime_world_state, get_process_chain_for_intent(intent))
     dynamic_blocked_steps = {item.get("step") for item in dynamic_blockers if item.get("step")}
+    preference_constraints = evaluate_preference_constraints(intent, binding_candidate, runtime_world_state)
+    preference_blockers = preference_constraints.get("blocking_reasons", [])
+    preference_blocked_steps = {item.get("step") for item in preference_blockers if item.get("step")}
     for binding in binding_candidate.get("step_bindings", []):
         step = binding["step"]
         capability = binding.get("capability")
@@ -4047,7 +4266,7 @@ def build_execution_feasibility(
             missing_capabilities.append({"step": step, "capability": capability})
         if step_missing_facts:
             missing_facts.append({"step": step, "missing_facts": step_missing_facts})
-        if step in dynamic_blocked_steps or step_missing_facts or (capability and capability not in supported_actions):
+        if step in dynamic_blocked_steps or step in preference_blocked_steps or step_missing_facts or (capability and capability not in supported_actions):
             blocked_steps.append(step)
             continue
         executable_steps.append(step)
@@ -4064,6 +4283,7 @@ def build_execution_feasibility(
     for item in missing_facts:
         reasons.append({"reason": "missing_prerequisite_fact", **item})
     reasons.extend(dynamic_blockers)
+    reasons.extend(preference_blockers)
     for item in runtime_world_state.get("runtime_conflicts", []):
         reasons.append({"reason": "runtime_fact_conflict", **item})
     if not reasons:
@@ -4086,6 +4306,7 @@ def build_execution_feasibility(
         "executable_steps": executable_steps,
         "blocked_steps": blocked_steps,
         "fact_projection_after_executable_steps": sorted(facts),
+        "preference_advisories": preference_constraints.get("advisory_items", []),
     }
 
 
@@ -4115,6 +4336,13 @@ def build_experience_gap_record(
         "target_causal_fact": intent.get("goal_fact"),
         "gap_type": feasibility.get("result"),
         "infeasible_reasons": feasibility.get("infeasible_reasons", []),
+        "preference_refs": sorted(
+            {
+                item.get("preference_id")
+                for item in feasibility.get("infeasible_reasons", [])
+                if item.get("reason") == "human_preference_blocked_step" and item.get("preference_id")
+            }
+        ),
         "blocked_steps": blocked_steps,
         "executable_steps": executable_steps,
         "recommended_actions": feasibility.get("recommended_actions", []),
@@ -4317,6 +4545,8 @@ def parse_runtime_query(question: str) -> dict[str, Any]:
         return {"query_type": "holding_state"}
     if any(token in normalized for token in ["在哪", "在哪里", "什么位置", "哪个区域"]):
         return {"query_type": "executor_location"}
+    if any(token in normalized for token in ["偏好", "偏好约束", "人类反馈", "用户要求"]):
+        return {"query_type": "preference_summary"}
     if any(token in normalized for token in ["现在状态", "当前状态", "世界状态"]):
         return {"query_type": "snapshot_summary"}
     return {"query_type": "unsupported"}
@@ -4353,6 +4583,7 @@ def query_runtime_world_state(
                 "当前水壶里有没有水",
                 "我手里拿着什么",
                 "我现在在哪",
+                "当前偏好约束是什么",
                 "当前状态",
             ],
             "source": "runtime_world_state_snapshot_only",
@@ -4401,6 +4632,15 @@ def query_runtime_world_state(
             "executor_location_ref": location_ref,
             "runtime_world_state_snapshot_id": state.get("runtime_world_state_snapshot_id"),
         }
+    elif query["query_type"] == "preference_summary":
+        active_preferences = state.get("active_preferences", [])
+        answer = "none" if not active_preferences else ",".join(item.get("preference_id", "") for item in active_preferences if item.get("preference_id"))
+        reason = "当前任务期运行时世界状态快照中的人类偏好约束"
+        evidence = {
+            "active_preferences": active_preferences,
+            "preference_context": state.get("preference_context", {}),
+            "runtime_world_state_snapshot_id": state.get("runtime_world_state_snapshot_id"),
+        }
     else:
         answer = "summary"
         reason = "当前任务期运行时世界状态快照摘要"
@@ -4409,6 +4649,7 @@ def query_runtime_world_state(
             "established_facts": sorted(established_facts),
             "current_stage": state.get("current_stage"),
             "completed_stages": state.get("completed_stages", []),
+            "active_preferences": state.get("active_preferences", []),
             "runtime_world_state_snapshot_id": state.get("runtime_world_state_snapshot_id"),
         }
 
@@ -4524,6 +4765,7 @@ def build_llm_context_view(task_id: str) -> dict[str, Any]:
         "executor": snapshot.get("executor", {}),
         "objects": objects,
         "established_facts": snapshot.get("established_facts", []),
+        "active_preferences": snapshot.get("active_preferences", []),
         "runtime_environment": snapshot.get("runtime_environment", {}),
         "available_actions_now": executable_now,
         "blocked_actions": needs_preconditions,
@@ -5297,6 +5539,9 @@ class RellSampleHandler(BaseHTTPRequestHandler):
         if path == "/experience/library":
             self._send_json(load_experience_library())
             return
+        if path == "/preference/library":
+            self._send_json(load_preference_library())
+            return
         if path == "/concept/library":
             self._send_json(load_concept_library())
             return
@@ -5423,6 +5668,27 @@ class RellSampleHandler(BaseHTTPRequestHandler):
             result = migrate_experience(body.get("utterance", "到水源处接一杯水"), profile if isinstance(profile, dict) else None)
             self._send_json(result)
             return
+        if path == "/preference/record":
+            context_ref = body.get("context_ref")
+            task_id = body.get("task_id") or body.get("session_id") or body.get("migration_task_id")
+            if not context_ref and task_id:
+                state_result = get_runtime_world_state(task_id)
+                if "error" not in state_result:
+                    context_ref = state_result.get("runtime_world_state_snapshot", {}).get("preference_context", {}).get("context_ref")
+            result = record_preference(
+                context_ref=str(context_ref or ""),
+                preference_signal=str(body.get("preference_signal") or ""),
+                human_feedback=str(body.get("human_feedback") or ""),
+                applies_to=body.get("applies_to") if isinstance(body.get("applies_to"), list) else None,
+                strength=body.get("strength") if isinstance(body.get("strength"), (int, float)) else None,
+                experience_ref=body.get("experience_ref"),
+                enforcement_policy=str(body.get("enforcement_policy") or "advisory"),
+            )
+            if task_id and "error" not in result:
+                attachment = attach_preference_to_runtime_task(task_id, result["preference_record"])
+                result["runtime_attachment"] = attachment
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
         if path == "/runtime_world_state/release":
             task_id = body.get("task_id") or body.get("migration_task_id")
             if not task_id:
@@ -5531,7 +5797,7 @@ def main() -> None:
     server = HTTPServer((DEFAULT_HOST, DEFAULT_PORT), RellSampleHandler)
     print(f"RELL sample API listening on http://{DEFAULT_HOST}:{DEFAULT_PORT}")
     print(f"Demo page: http://{DEFAULT_HOST}:{DEFAULT_PORT}/")
-    print("Endpoints: POST /semantic/route, POST /agent/query, POST /llm/context-view, POST /llm/prompt-contract, POST /llm/candidate-intent, POST /llm/candidate/validate, POST /concept/resolve, POST /concept/candidates/confirm, POST /process/admit, POST /process/run, POST /experience/migrate, POST /execution/dispatch, POST /runtime_world_state/query, POST /runtime_world_state/perturb, POST /teaching/session/start, GET /concept/library, GET /concept/candidates, GET /audit/{task_id}")
+    print("Endpoints: POST /semantic/route, POST /agent/query, POST /llm/context-view, POST /llm/prompt-contract, POST /llm/candidate-intent, POST /llm/candidate/validate, POST /concept/resolve, POST /concept/candidates/confirm, POST /process/admit, POST /process/run, POST /experience/migrate, POST /preference/record, POST /execution/dispatch, POST /runtime_world_state/query, POST /runtime_world_state/perturb, POST /teaching/session/start, GET /preference/library, GET /concept/library, GET /concept/candidates, GET /audit/{task_id}")
     server.serve_forever()
 
 

@@ -60,7 +60,7 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 
 例如执行 `move_to_water_source` 后，快照中的执行体位置会从上一空间区域更新为 `region_water_source`；执行 `pick_up_cup` 后，杯子的 `location_type` 会更新为 `executor_gripper`；执行 `fill_cup_at_water_source` 后，`established_facts` 中会出现 `cup_contains_water`。
 
-`execution_trace.runtime_world_state_policy` 记录该状态的非持久化策略。实际产品中可以按需将关键阶段、事实成立、失败恢复和人工确认写入审计或经验记录，但不需要将每一帧物理状态写入长期数据库。
+`execution_trace.runtime_world_state_policy` 记录该状态的非持久化策略。实际产品中可以按需将关键阶段、事实成立、失败恢复和人工确认写入审计或经验记录，但不需要将每一帧物理状态写入长期数据库。自 P015 偏好层接入起，当前任务期快照还会携带 `active_preferences` 和 `preference_context`，用于把人类偏好记录作为运行时约束读入当前任务，而不直接改写经验层、概念层或底层控制。
 
 自 P012 概念桥接实现起，`intent_translation` 中同步返回 `intent_frame`。该结构用于承接后续 LLM 或轻量 NLU 输出，但不允许语言模型直接绕过空间语义、概念层和因果层生成最终动作链。
 
@@ -240,6 +240,38 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 - `applicability_constraints`：绑定约束、所需运行时事实和禁止的底层字段；
 - `experience_link_policy`：明确 `direct_execution_allowed=false`，并说明该概念优先由哪一层承接。
 
+## GET /preference/library
+
+用途：查询当前样品中的人类偏好记录库。
+
+响应至少包括：
+- `preference_records[].preference_id`：偏好记录标识；
+- `context_ref`：偏好适用的空间或上下文；
+- `preference_signal`：例如 `prefer`、`avoid`、`forbid`；
+- `applies_to`：偏好作用范围，例如 `goal:water_poured`、`step:pick_up_cup`、`capability:pour_container`；
+- `enforcement_policy`：`advisory` 或 `blocking`。
+
+## POST /preference/record
+
+用途：写入新的人类偏好记录，并可选附着到当前任务期运行时世界状态快照。
+
+请求示例：
+```json
+{
+  "task_id": "migration_xxx",
+  "preference_signal": "forbid",
+  "human_feedback": "不要自动拿起杯子，先请求我确认。",
+  "applies_to": [
+    "step:pick_up_cup",
+    "object:object_cup_white_mug"
+  ],
+  "enforcement_policy": "blocking",
+  "strength": 1.0
+}
+```
+
+当携带 `task_id` 时，系统会在记录入库后把该偏好同步附着到当前任务期快照，使后续状态查询、可行性判断和解释链可以立即读取。
+
 ## POST /concept/resolve
 
 用途：把当前自然语言请求解析为概念层候选，作为经验层和编排层之间的可复用中间语义单元。该接口只做概念识别和边界声明，不直接下发动作。
@@ -364,6 +396,7 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 - `当前水壶里有没有水`
 - `我手里拿着什么`
 - `我现在在哪`
+- `当前偏好约束是什么`
 - `当前状态`
 
 这一步中的自然语言解析仍然是轻量规则层：语言只负责识别问题类型和对象指向，真正回答时只读取当前任务期运行时世界状态快照。

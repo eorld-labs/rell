@@ -7,6 +7,7 @@ from api_server import (
     CONCEPT_CANDIDATE_LIBRARY_FILE,
     CONCEPT_LIBRARY_FILE,
     EXPERIENCE_LIBRARY_FILE,
+    PREFERENCE_LIBRARY_FILE,
     admit_process,
     build_llm_context_view,
     build_llm_prompt_contract,
@@ -28,8 +29,10 @@ from api_server import (
     load_concept_candidate_library,
     load_concept_library,
     load_experience_library,
+    load_preference_library,
     migrate_experience,
     query_runtime_world_state,
+    record_preference,
     readapt_runtime_conflict,
     release_runtime_world_state,
     resolve_concepts_for_intent,
@@ -45,6 +48,7 @@ def main() -> None:
     original_experience_library = EXPERIENCE_LIBRARY_FILE.read_text(encoding="utf-8") if EXPERIENCE_LIBRARY_FILE.exists() else None
     original_concept_library = CONCEPT_LIBRARY_FILE.read_text(encoding="utf-8") if CONCEPT_LIBRARY_FILE.exists() else None
     original_candidate_library = CONCEPT_CANDIDATE_LIBRARY_FILE.read_text(encoding="utf-8") if CONCEPT_CANDIDATE_LIBRARY_FILE.exists() else None
+    original_preference_library = PREFERENCE_LIBRARY_FILE.read_text(encoding="utf-8") if PREFERENCE_LIBRARY_FILE.exists() else None
 
     EXPERIENCE_LIBRARY_FILE.write_text(
         json.dumps({"schema_version": "1.0.0", "experiences": []}, ensure_ascii=False, indent=2) + "\n",
@@ -268,6 +272,8 @@ def main() -> None:
             raise AssertionError(f"P017 migration must produce executable feasibility: {migration}")
         if not migration.get("binding_candidate", {}).get("step_bindings"):
             raise AssertionError(f"P017 migration must generate binding candidates: {migration}")
+        if not migration.get("runtime_world_state_snapshot", {}).get("active_preferences"):
+            raise AssertionError(f"P015 preference records must be loaded into current runtime snapshot: {migration}")
         payload = migration.get("execution_loop_payload")
         if not payload or not payload.get("runtime_world_state_snapshot_id"):
             raise AssertionError(f"P017 migration must generate open execution loop payload: {migration}")
@@ -277,6 +283,9 @@ def main() -> None:
         before_query = query_runtime_world_state(migration["migration_task_id"], "当前杯子有没有水")
         if before_query.get("answer") != "false" or before_query.get("source") != "runtime_world_state_snapshot_only":
             raise AssertionError(f"runtime world state query must answer from current snapshot before fill: {before_query}")
+        preference_query = query_runtime_world_state(migration["migration_task_id"], "当前偏好约束是什么")
+        if preference_query.get("query_type") != "preference_summary" or not preference_query.get("evidence", {}).get("active_preferences"):
+            raise AssertionError(f"runtime world state must answer preference summary from current snapshot: {preference_query}")
         dispatch = dispatch_execution_loop_payload(payload, "robot_sdk")
         if dispatch.get("outcome") != "fact_established":
             raise AssertionError(f"open execution loop dispatch must establish target fact: {dispatch}")
@@ -418,6 +427,30 @@ def main() -> None:
         if released_query.get("answer") != "unknown" or released_query.get("status") != "snapshot_released":
             raise AssertionError(f"released snapshot must not answer as current world state: {released_query}")
 
+        preference_library_before = load_preference_library()
+        if not preference_library_before.get("preference_records"):
+            raise AssertionError(f"P015 preference library must expose default human preferences: {preference_library_before}")
+        recorded_preference = record_preference(
+            context_ref="home_a_kitchen",
+            preference_signal="forbid",
+            human_feedback="不要自动拿起杯子，先请求我确认。",
+            applies_to=["step:pick_up_cup", "object:object_cup_white_mug"],
+            strength=1.0,
+            enforcement_policy="blocking",
+        )
+        if recorded_preference.get("error"):
+            raise AssertionError(f"preference record creation must succeed: {recorded_preference}")
+        preference_migration = migrate_experience("到水源处接一杯水")
+        if preference_migration.get("execution_feasibility", {}).get("result") != "partially_inexecutable":
+            raise AssertionError(f"blocking human preference must constrain later migration feasibility: {preference_migration}")
+        if not any(
+            item.get("reason") == "human_preference_blocked_step"
+            for item in preference_migration.get("execution_feasibility", {}).get("infeasible_reasons", [])
+        ):
+            raise AssertionError(f"preference-constrained migration must expose P015 reason in infeasible_reasons: {preference_migration}")
+        if recorded_preference["preference_record"]["preference_id"] not in preference_migration.get("experience_gap_record", {}).get("preference_refs", []):
+            raise AssertionError(f"experience gap must retain blocking preference reference: {preference_migration}")
+
         weak_profile = dict(migration["body_capability_profile"])
         weak_profile["supported_actions"] = ["navigate_to_region"]
         partial = migrate_experience("到水源处接一杯水", weak_profile)
@@ -482,6 +515,10 @@ def main() -> None:
             CONCEPT_CANDIDATE_LIBRARY_FILE.unlink(missing_ok=True)
         else:
             CONCEPT_CANDIDATE_LIBRARY_FILE.write_text(original_candidate_library, encoding="utf-8")
+        if original_preference_library is None:
+            PREFERENCE_LIBRARY_FILE.unlink(missing_ok=True)
+        else:
+            PREFERENCE_LIBRARY_FILE.write_text(original_preference_library, encoding="utf-8")
 
 
 if __name__ == "__main__":

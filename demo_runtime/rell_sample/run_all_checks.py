@@ -57,9 +57,11 @@ def run_http_smoke() -> None:
     experience_library_file = ROOT / "data" / "experience_library.json"
     concept_library_file = ROOT / "data" / "concept_library.json"
     concept_candidate_library_file = ROOT / "data" / "concept_candidate_library.json"
+    preference_library_file = ROOT / "data" / "preference_record_library.json"
     original_library = experience_library_file.read_text(encoding="utf-8") if experience_library_file.exists() else None
     original_concept_library = concept_library_file.read_text(encoding="utf-8") if concept_library_file.exists() else None
     original_candidate_library = concept_candidate_library_file.read_text(encoding="utf-8") if concept_candidate_library_file.exists() else None
+    original_preference_library = preference_library_file.read_text(encoding="utf-8") if preference_library_file.exists() else None
     process = subprocess.Popen(
         [sys.executable, str(ROOT / "api_server.py")],
         cwd=REPO,
@@ -73,6 +75,7 @@ def run_http_smoke() -> None:
         health = get_json("/health")
         cognitive_model = get_json("/space/cognitive-model")
         concept_library = get_json("/concept/library")
+        preference_library = get_json("/preference/library")
         p017_loop = get_json("/p017/minimal-loop")
         semantic_route = post_json("/semantic/route", {"utterance": "当前杯子有没有水"})
         agent_execution_preview = post_json("/agent/query", {"utterance": "到水源处接一杯水"})
@@ -127,6 +130,10 @@ def run_http_smoke() -> None:
         migration_query_before = post_json(
             "/runtime_world_state/query",
             {"task_id": migration["migration_task_id"], "question": "当前杯子有没有水"},
+        )
+        preference_query_before = post_json(
+            "/runtime_world_state/query",
+            {"task_id": migration["migration_task_id"], "question": "当前偏好约束是什么"},
         )
         agent_state_query_before = post_json(
             "/agent/query",
@@ -208,6 +215,21 @@ def run_http_smoke() -> None:
         gap_lookup = None
         if readaptation.get("experience_gap_record"):
             gap_lookup = get_json(f"/experience/gap/{readaptation['experience_gap_record']['gap_record_id']}")
+        recorded_preference = post_json(
+            "/preference/record",
+            {
+                "context_ref": "home_a_kitchen",
+                "preference_signal": "forbid",
+                "human_feedback": "不要自动拿起杯子，先请求我确认。",
+                "applies_to": ["step:pick_up_cup", "object:object_cup_white_mug"],
+                "enforcement_policy": "blocking",
+                "strength": 1.0,
+            },
+        )
+        preference_constrained_migration = post_json(
+            "/experience/migrate",
+            {"utterance": "到水源处接一杯水"},
+        )
         audit = get_json(f"/audit/{run_result['task_id']}")
         if "RELL 真实世界经验引擎样品" not in page:
             raise AssertionError("demo page did not render")
@@ -227,6 +249,8 @@ def run_http_smoke() -> None:
             raise AssertionError(f"space cognitive model failed: {cognitive_model}")
         if not any(item.get("concept_id") == "concept_spatial_region_navigation" for item in concept_library.get("concept_units", [])):
             raise AssertionError(f"concept library failed: {concept_library}")
+        if not preference_library.get("preference_records"):
+            raise AssertionError(f"preference library failed: {preference_library}")
         if not p017_loop.get("evidence_index") or len(p017_loop.get("evidence_files", {})) != 6:
             raise AssertionError(f"P017 minimal loop endpoint failed: {p017_loop}")
         if semantic_route.get("request_type") != "state_query":
@@ -263,6 +287,8 @@ def run_http_smoke() -> None:
             raise AssertionError(f"llm candidate validation failed: {llm_candidate_validation}")
         if migration_query_before.get("answer") != "false":
             raise AssertionError(f"runtime world state question should answer false before fill: {migration_query_before}")
+        if preference_query_before.get("query_type") != "preference_summary" or not preference_query_before.get("evidence", {}).get("active_preferences"):
+            raise AssertionError(f"runtime world state should answer preference summary from snapshot: {preference_query_before}")
         if agent_state_query_before.get("semantic_request", {}).get("request_type") != "state_query":
             raise AssertionError(f"agent state route failed: {agent_state_query_before}")
         if dispatch.get("outcome") != "fact_established":
@@ -307,6 +333,15 @@ def run_http_smoke() -> None:
             raise AssertionError(f"runtime readaptation lookup failed: {readaptation_lookup}")
         if gap_lookup and gap_lookup.get("gap_record_id") != readaptation["experience_gap_record"]["gap_record_id"]:
             raise AssertionError(f"experience gap lookup failed: {gap_lookup}")
+        if recorded_preference.get("preference_record", {}).get("preference_signal") != "forbid":
+            raise AssertionError(f"preference record endpoint failed: {recorded_preference}")
+        if preference_constrained_migration.get("execution_feasibility", {}).get("result") != "partially_inexecutable":
+            raise AssertionError(f"preference-constrained migration failed: {preference_constrained_migration}")
+        if not any(
+            item.get("reason") == "human_preference_blocked_step"
+            for item in preference_constrained_migration.get("execution_feasibility", {}).get("infeasible_reasons", [])
+        ):
+            raise AssertionError(f"preference-constrained migration must expose P015 reason: {preference_constrained_migration}")
         if not any(
             "adapter=simulated_pouring_robot" in event.get("payload_summary", "")
             for event in simulated_conflict_run["execution_trace"]["events"]
@@ -332,6 +367,10 @@ def run_http_smoke() -> None:
             concept_candidate_library_file.unlink(missing_ok=True)
         else:
             concept_candidate_library_file.write_text(original_candidate_library, encoding="utf-8")
+        if original_preference_library is None:
+            preference_library_file.unlink(missing_ok=True)
+        else:
+            preference_library_file.write_text(original_preference_library, encoding="utf-8")
     print("[ok] api_server HTTP smoke")
 
 
