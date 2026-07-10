@@ -190,6 +190,8 @@ def run_http_smoke() -> None:
             raise AssertionError("demo page did not include dialogue teaching entry")
         if "p017Button" not in page:
             raise AssertionError("demo page did not include P017 minimal loop entry")
+        if "conceptCandidatesButton" not in page or "confirmConceptCandidateButton" not in page:
+            raise AssertionError("demo page did not include concept promotion actions")
         if "startTeachingSessionButton" not in page or "stepTeachingSessionButton" not in page:
             raise AssertionError("demo page did not include stepwise teaching entries")
         if health.get("status") != "ok":

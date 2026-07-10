@@ -913,7 +913,7 @@ INDEX_HTML = """<!doctype html>
       align-items: start;
     }
     label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
-    textarea, select {
+    textarea, select, input {
       width: 100%;
       border: 1px solid var(--line);
       color: var(--ink);
@@ -930,6 +930,12 @@ INDEX_HTML = """<!doctype html>
       height: 38px;
       padding: 0 10px;
       margin-bottom: 12px;
+    }
+    input {
+      height: 38px;
+      padding: 0 10px;
+      margin-bottom: 12px;
+      box-sizing: border-box;
     }
     .actions {
       display: grid;
@@ -1253,6 +1259,12 @@ INDEX_HTML = """<!doctype html>
           <button id="libraryButton" class="secondary" title="查看当前经验库">经验库</button>
           <button id="p017Button" class="secondary" title="查看 P017 六段最小闭环证据">P017 最小闭环</button>
         </div>
+        <label for="conceptCandidateId" style="margin-top:12px;">概念候选确认</label>
+        <input id="conceptCandidateId" value="" placeholder="留空则自动选择第一个待确认候选" />
+        <div class="actions" style="margin-top:8px;">
+          <button id="conceptCandidatesButton" class="secondary" title="查看待人工确认的概念候选">概念候选</button>
+          <button id="confirmConceptCandidateButton" class="secondary" title="确认当前概念候选并晋升到概念库">确认晋升</button>
+        </div>
         <label for="stepwiseTeaching" style="margin-top:12px;">边教边动</label>
         <textarea id="stepwiseTeaching">走向操作台</textarea>
         <div class="actions" style="margin-top:8px;">
@@ -1321,6 +1333,9 @@ INDEX_HTML = """<!doctype html>
     const dialogueTeachButton = document.getElementById("dialogueTeachButton");
     const libraryButton = document.getElementById("libraryButton");
     const p017Button = document.getElementById("p017Button");
+    const conceptCandidatesButton = document.getElementById("conceptCandidatesButton");
+    const confirmConceptCandidateButton = document.getElementById("confirmConceptCandidateButton");
+    const conceptCandidateIdInput = document.getElementById("conceptCandidateId");
     const startTeachingSessionButton = document.getElementById("startTeachingSessionButton");
     const stepTeachingSessionButton = document.getElementById("stepTeachingSessionButton");
     const finishTeachingSessionButton = document.getElementById("finishTeachingSessionButton");
@@ -1344,6 +1359,7 @@ INDEX_HTML = """<!doctype html>
     const mapRobot = document.getElementById("mapRobot");
     const mapCupItem = document.getElementById("mapCupItem");
     let currentTeachingSessionId = "";
+    let currentConceptCandidateId = "";
 
     const eventLabel = {
       stage_started: "阶段启动",
@@ -1375,6 +1391,8 @@ INDEX_HTML = """<!doctype html>
       resetScene();
       serviceState.textContent = "待运行";
       currentTeachingSessionId = "";
+      currentConceptCandidateId = "";
+      conceptCandidateIdInput.value = "";
     }
 
     function resetScene() {
@@ -1653,6 +1671,14 @@ INDEX_HTML = """<!doctype html>
       return rows;
     }
 
+    function selectConceptCandidate(candidates) {
+      const pending = (candidates || []).find(item => item.status !== "promoted");
+      const selected = pending || (candidates || [])[0];
+      currentConceptCandidateId = selected?.candidate_id || "";
+      conceptCandidateIdInput.value = currentConceptCandidateId;
+      return selected;
+    }
+
     function renderStepwiseTeaching(result) {
       setText(taskMetric, result.session_id || currentTeachingSessionId || "-");
       setText(stateMetric, result.status || "-");
@@ -1769,6 +1795,7 @@ INDEX_HTML = """<!doctype html>
           setText(taskMetric, result.experience.experience_id);
           const signature = result.experience.causal_signature || {};
           const conceptRows = renderConceptCandidateRows(result.concept_promotion_candidates);
+          selectConceptCandidate(result.concept_promotion_candidates);
           factsEl.innerHTML = [
             `<div class="stage-row"><strong>经验形成</strong><span>${result.message}</span></div>`,
             `<div class="stage-row"><strong>过程链</strong><span>${result.experience.process_chain.join(" -> ")}</span></div>`,
@@ -1810,6 +1837,7 @@ INDEX_HTML = """<!doctype html>
           setText(taskMetric, result.experience.experience_id);
           const signature = result.experience.causal_signature || {};
           const conceptRows = renderConceptCandidateRows(result.concept_promotion_candidates);
+          selectConceptCandidate(result.concept_promotion_candidates);
           factsEl.innerHTML = [
             `<div class="stage-row"><strong>经验形成</strong><span>${result.message}</span></div>`,
             `<div class="stage-row"><strong>过程链</strong><span>${result.experience.process_chain.join(" -> ")}</span></div>`,
@@ -1842,6 +1870,31 @@ INDEX_HTML = """<!doctype html>
             return `<div class="stage-row"><strong>${item.experience_id}</strong><span>${item.source_utterance} / ${item.process_chain.join(" -> ")} / produces: ${signature.produces_fact || item.goal_fact} / invariants: ${invariant.storage_policy || "-"}</span></div>`;
           }).join("")
         : `<div class="stage-row"><strong>经验库</strong><span>暂无经验</span></div>`;
+    }
+
+    async function showConceptCandidates() {
+      conceptCandidatesButton.disabled = true;
+      serviceState.textContent = "读取概念候选";
+      try {
+        const result = await fetch("/concept/candidates").then(r => r.json());
+        appendLog("概念候选库：" + JSON.stringify(result, null, 2));
+        const candidates = result.concept_candidates || [];
+        const selected = selectConceptCandidate(candidates);
+        const rows = [
+          `<div class="stage-row"><strong>概念候选数量</strong><span>${candidates.length}</span></div>`,
+          `<div class="stage-row"><strong>当前候选</strong><span>${escapeHtml(selected?.candidate_id || "暂无待确认候选")}</span></div>`
+        ];
+        for (const item of candidates) {
+          rows.push(`<div class="stage-row"><strong>${escapeHtml(item.candidate_id || "-")}</strong><span>${escapeHtml(item.proposal_type || "-")} / ${escapeHtml(item.target_concept_id || "-")} / ${escapeHtml(item.status || "-")}</span></div>`);
+        }
+        factsEl.innerHTML = rows.join("");
+        serviceState.textContent = "候选已读取";
+      } catch (error) {
+        serviceState.textContent = "异常";
+        appendLog("概念候选读取异常：" + error.message);
+      } finally {
+        conceptCandidatesButton.disabled = false;
+      }
     }
 
     function pickField(payload, path) {
@@ -2000,6 +2053,7 @@ INDEX_HTML = """<!doctype html>
         if (experience) {
           appendLog("已固化经验：" + experience.experience_id + " / " + experience.process_chain.join(" -> "));
           const conceptCandidates = result.experience_result?.concept_promotion_candidates || [];
+          selectConceptCandidate(conceptCandidates);
           for (const item of conceptCandidates) {
             appendLog("概念候选：" + item.candidate_id + " / " + item.proposal_type + " -> " + item.target_concept_id);
           }
@@ -2069,11 +2123,61 @@ INDEX_HTML = """<!doctype html>
       }
     }
 
+    async function confirmConceptCandidate() {
+      confirmConceptCandidateButton.disabled = true;
+      serviceState.textContent = "确认概念晋升";
+      try {
+        let candidateId = conceptCandidateIdInput.value.trim() || currentConceptCandidateId;
+        if (!candidateId) {
+          const pending = await fetch("/concept/candidates").then(r => r.json());
+          candidateId = selectConceptCandidate(pending.concept_candidates || [])?.candidate_id || "";
+        }
+        if (!candidateId) {
+          appendLog("当前没有可确认的概念候选。");
+          serviceState.textContent = "暂无候选";
+          return;
+        }
+        const result = await fetch("/concept/candidates/confirm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ candidate_id: candidateId, confirmed_by: "demo_ui" })
+        }).then(r => r.json());
+        appendLog("概念确认结果：" + JSON.stringify(result, null, 2));
+        if (result.error) {
+          serviceState.textContent = "确认失败";
+          setText(outcomeMetric, "确认失败", "bad");
+          return;
+        }
+        currentConceptCandidateId = candidateId;
+        conceptCandidateIdInput.value = candidateId;
+        setText(stateMetric, "concept_promoted", "ok");
+        setText(outcomeMetric, "概念已晋升", "ok");
+        setText(taskMetric, result.promoted_concept_id || candidateId);
+        const promoted = result.promoted_concept_unit || {};
+        const rows = [
+          `<div class="stage-row"><strong>确认候选</strong><span>${escapeHtml(candidateId)}</span></div>`,
+          `<div class="stage-row"><strong>晋升概念</strong><span>${escapeHtml(result.promoted_concept_id || "-")}</span></div>`,
+          `<div class="stage-row"><strong>显示名称</strong><span>${escapeHtml(promoted.display_name || "-")}</span></div>`,
+          `<div class="stage-row"><strong>能力语义</strong><span>${escapeHtml((promoted.capability_semantics || []).join(", ") || "-")}</span></div>`,
+          `<div class="stage-row"><strong>来源经验</strong><span>${escapeHtml(result.source_experience_id || "-")}</span></div>`
+        ];
+        factsEl.innerHTML = rows.join("");
+        serviceState.textContent = "晋升完成";
+      } catch (error) {
+        serviceState.textContent = "异常";
+        appendLog("概念确认异常：" + error.message);
+      } finally {
+        confirmConceptCandidateButton.disabled = false;
+      }
+    }
+
     runButton.addEventListener("click", runProcess);
     teachButton.addEventListener("click", teachExperience);
     dialogueTeachButton.addEventListener("click", teachByDialogue);
     libraryButton.addEventListener("click", showExperienceLibrary);
     p017Button.addEventListener("click", showP017MinimalLoop);
+    conceptCandidatesButton.addEventListener("click", showConceptCandidates);
+    confirmConceptCandidateButton.addEventListener("click", confirmConceptCandidate);
     startTeachingSessionButton.addEventListener("click", startStepwiseTeaching);
     stepTeachingSessionButton.addEventListener("click", executeStepwiseTeaching);
     finishTeachingSessionButton.addEventListener("click", finishStepwiseTeaching);
