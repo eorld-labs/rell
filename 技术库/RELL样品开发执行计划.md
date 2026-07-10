@@ -597,3 +597,32 @@ python demo_runtime\rell_sample\run_all_checks.py
 ```
 
 预期结果：两条命令均通过，并生成 `demo_runtime/output/rell_sample/p011_experience_internalization/` 下的证据文件。
+
+## 当日增补（2026-07-10）：P015 人类偏好工程证据收束
+
+当前 `rell_sample` 主链中，P015 的核心能力其实已经存在于偏好记录、运行时快照附着、当前偏好问答和偏好约束可行性判断里，但此前这些证据主要散落在 `validate_api_sample.py` 的综合断言中，不利于单独举证。为此，本轮新增独立的 P015 工程证据包，把“偏好独立存储 -> 当前任务快照加载 -> 运行时偏好问答 -> 新偏好即时附着 -> 偏好约束可行性限定 -> 不改写经验层和概念层”的最小闭环固定下来。
+
+### 增补范围
+
+1. 新增 `demo_runtime/rell_sample/validate_p015_preference_alignment.py`，固定生成 P015 的六段证据输出。
+2. 新增输出目录 `demo_runtime/output/rell_sample/p015_preference_alignment/`，统一落盘 `00_summary.json`、`evidence_index.json` 和六个分段证据文件。
+3. 新增 `技术库/P015-人类偏好/P015人类偏好工程证据说明.md`，把验证命令、输出目录、关键字段和典型审查质疑对应关系写成中文说明。
+4. 将 `validate_p015_preference_alignment.py` 接入 `demo_runtime/rell_sample/run_all_checks.py`，使 P015 与 P011、P013、P014、P017 一样进入一键回归主链。
+
+### 当前证据覆盖点
+
+1. 偏好独立存储：证明偏好记录位于 `preference_record_library.json`，而不是直接写进经验库或概念库。
+2. 当前任务快照加载：证明迁移任务创建时，任务期运行时世界状态快照会加载匹配的 `active_preferences`。
+3. 运行时偏好问答：证明“当前偏好约束是什么”一类问题只从当前任务期快照读取答案。
+4. 新偏好即时附着：证明新增阻断型偏好后，可以即时附着到当前任务，并被同任务查询看到。
+5. 偏好约束可行性限定：证明阻断型偏好会把违反偏好的步骤标记为 `partially_inexecutable`，并保留 `human_preference_blocked_step` 原因。
+6. 层间边界不改写：证明偏好层的读写不会直接改写经验库或概念库的持久化内容。
+
+### 本轮验收命令
+
+```powershell
+python demo_runtime\rell_sample\validate_p015_preference_alignment.py
+python demo_runtime\rell_sample\run_all_checks.py
+```
+
+预期结果：两条命令均通过，并生成 `demo_runtime/output/rell_sample/p015_preference_alignment/` 下的证据文件。
