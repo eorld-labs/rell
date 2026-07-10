@@ -24,6 +24,7 @@ from api_server import (
     get_space_prior,
     get_teaching_session,
     handle_agent_query,
+    inject_runtime_perturbation,
     load_concept_candidate_library,
     load_concept_library,
     load_experience_library,
@@ -284,6 +285,52 @@ def main() -> None:
         after_query = query_runtime_world_state(migration["migration_task_id"], "当前杯子有没有水")
         if after_query.get("answer") != "true":
             raise AssertionError(f"runtime world state query must answer true after fill: {after_query}")
+
+        detour_migration = migrate_experience(migration["intent_translation"]["utterance"])
+        detour_injection = inject_runtime_perturbation(
+            detour_migration["migration_task_id"],
+            {"kind": "stool_in_walkway_detourable"},
+            apply_before_step="move_to_water_source",
+        )
+        if detour_injection.get("injected_perturbation", {}).get("status") != "scheduled":
+            raise AssertionError(f"detour perturbation must be schedulable before a later step: {detour_injection}")
+        detour_dispatch = dispatch_execution_loop_payload(detour_migration["execution_loop_payload"], "robot_sdk")
+        if detour_dispatch.get("outcome") != "fact_established":
+            raise AssertionError(f"detour perturbation should still allow execution to complete: {detour_dispatch}")
+        detour_feedback = next(
+            (item for item in detour_dispatch.get("fact_feedback", []) if item.get("step") == "move_to_water_source"),
+            None,
+        )
+        if not detour_feedback or detour_feedback.get("preflight_result") != "detour":
+            raise AssertionError(f"mid-run stool perturbation must trigger detour preflight on move step: {detour_dispatch}")
+        if not detour_feedback.get("route_adjustment", {}).get("preserved_process_chain"):
+            raise AssertionError(f"detour should preserve the process chain and only adjust local route: {detour_feedback}")
+
+        blocked_migration = migrate_experience(migration["intent_translation"]["utterance"])
+        blocked_injection = inject_runtime_perturbation(
+            blocked_migration["migration_task_id"],
+            {"kind": "cup_guard_door_closed"},
+            apply_before_step="pick_up_cup",
+        )
+        if blocked_injection.get("injected_perturbation", {}).get("status") != "scheduled":
+            raise AssertionError(f"door perturbation must be schedulable before blocked pickup: {blocked_injection}")
+        blocked_dispatch = dispatch_execution_loop_payload(blocked_migration["execution_loop_payload"], "robot_sdk")
+        if blocked_dispatch.get("outcome") != "readaptation_required":
+            raise AssertionError(f"closed access door must trigger stepwise readaptation instead of blind continuation: {blocked_dispatch}")
+        blocked_feedback = next(
+            (item for item in blocked_dispatch.get("fact_feedback", []) if item.get("step") == "pick_up_cup"),
+            None,
+        )
+        if not blocked_feedback or blocked_feedback.get("preflight_result") != "blocked":
+            raise AssertionError(f"blocked pickup must be stopped by current runtime snapshot preflight: {blocked_dispatch}")
+        stepwise_readaptation = blocked_dispatch.get("stepwise_readaptation", {})
+        if stepwise_readaptation.get("execution_feasibility", {}).get("result") not in {"partially_inexecutable", "infeasible"}:
+            raise AssertionError(f"stepwise readaptation must expose refreshed feasibility after the door closes: {blocked_dispatch}")
+        if not any(
+            item.get("reason") == "dynamic_environment_blocker"
+            for item in stepwise_readaptation.get("execution_feasibility", {}).get("infeasible_reasons", [])
+        ):
+            raise AssertionError(f"stepwise readaptation must explain the block using current runtime environment: {blocked_dispatch}")
 
         llm_context_view = build_llm_context_view(migration["migration_task_id"])
         if not llm_context_view.get("usable_as_current_world_state") or llm_context_view.get("source_policy") != "runtime_world_state_snapshot_only":

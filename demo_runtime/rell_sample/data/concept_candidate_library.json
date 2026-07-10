@@ -1,4 +1,309 @@
 {
   "schema_version": "1.0.0",
-  "concept_candidates": []
+  "concept_candidates": [
+    {
+      "candidate_id": "concept_candidate_88b8a4b25935",
+      "status": "promoted",
+      "proposal_type": "create_promoted_concept_unit",
+      "target_concept_id": "concept_promoted_water_poured_19b9929b",
+      "source_experience_id": "exp_671e207558",
+      "source_utterance": "给客人倒一杯水",
+      "goal_fact": "water_poured",
+      "abstract_process_chain": [
+        "move_to_counter",
+        "pick_up_cup",
+        "move_to_water_source",
+        "fill_cup_at_water_source",
+        "pour_water"
+      ],
+      "base_concept_refs": [
+        "concept_spatial_region_navigation",
+        "concept_interactive_object_acquisition",
+        "concept_fillable_container",
+        "concept_water_resource_zone",
+        "concept_liquid_transfer_task"
+      ],
+      "human_confirmation_required": true,
+      "promotion_rationale": "该经验已在数字空间中形成稳定过程链和不变量契约，可晋升为可复用任务概念候选",
+      "proposed_concept_unit": {
+        "concept_id": "concept_promoted_water_poured_19b9929b",
+        "display_name": "倒水服务任务晋升概念",
+        "concept_level": "task_processing",
+        "typical_action": "experience_promoted_task",
+        "typical_consequence": "water_poured",
+        "usage": "由已验证经验晋升而来，仍需经编排层、空间语义和任务期快照共同约束后使用",
+        "capability_semantics": [
+          "navigate_to_region",
+          "grasp_object",
+          "fill_container",
+          "pour_container"
+        ],
+        "effect_contract": {
+          "produces_facts": [
+            "water_poured"
+          ],
+          "destroys_facts": [
+            "executor_at_water_source",
+            "executor_at_doorway",
+            "executor_at_service_position",
+            "cup_at_counter",
+            "gripper_empty",
+            "executor_at_counter",
+            "cup_empty",
+            "cup_contains_water"
+          ],
+          "state_transition": "validated_experience_promoted_into_reusable_task_concept"
+        },
+        "applicability_constraints": {
+          "requires_space_binding": true,
+          "supported_binding_types": [
+            "task_goal",
+            "semantic_region",
+            "interactive_object"
+          ],
+          "required_runtime_facts": [
+            "cup_at_counter",
+            "gripper_empty",
+            "water_source_available",
+            "executor_at_counter"
+          ],
+          "forbidden_low_level_fields": [
+            "absolute_coordinates",
+            "robot_specific_joint_angles",
+            "fixed_execution_duration",
+            "single_body_trajectory_without_binding_slots"
+          ]
+        },
+        "runtime_contingency_hints": [
+          "概念晋升后仍不得直接控制执行器，必须回到经验层和编排层判断当前是否可执行",
+          "若运行时世界状态快照不支持该过程链，应输出不可执行或请求补充教学，而不是假定任务成立"
+        ],
+        "experience_link_policy": {
+          "role": "经验晋升任务概念",
+          "direct_execution_allowed": false,
+          "requires_orchestration": true,
+          "preferred_backing": [
+            "经验库",
+            "P017迁移适配",
+            "执行层局部能力"
+          ]
+        },
+        "derived_from_experiences": [
+          "exp_671e207558"
+        ],
+        "promotion_tags": {
+          "goal_fact": "water_poured",
+          "process_chain": [
+            "move_to_counter",
+            "pick_up_cup",
+            "move_to_water_source",
+            "fill_cup_at_water_source",
+            "pour_water"
+          ],
+          "base_concept_refs": [
+            "concept_spatial_region_navigation",
+            "concept_interactive_object_acquisition",
+            "concept_fillable_container",
+            "concept_water_resource_zone",
+            "concept_liquid_transfer_task"
+          ],
+          "source_utterance": "给客人倒一杯水"
+        }
+      },
+      "created_at": "2026-07-10T00:00:00+08:00",
+      "confirmed_by": "demo_ui",
+      "confirmed_at": "2026-07-10T00:00:00+08:00",
+      "promoted_concept_id": "concept_promoted_water_poured_19b9929b"
+    },
+    {
+      "candidate_id": "concept_candidate_e2c9beefdc21",
+      "status": "pending_confirmation",
+      "proposal_type": "strengthen_existing_concept",
+      "target_concept_id": "concept_spatial_region_navigation",
+      "source_experience_id": "exp_671e207558",
+      "source_utterance": "给客人倒一杯水",
+      "goal_fact": "water_poured",
+      "abstract_process_chain": [
+        "move_to_counter",
+        "pick_up_cup",
+        "move_to_water_source",
+        "fill_cup_at_water_source",
+        "pour_water"
+      ],
+      "base_concept_refs": [
+        "concept_spatial_region_navigation"
+      ],
+      "human_confirmation_required": true,
+      "promotion_rationale": "该经验可作为现有公共概念的新增工程证据，补强概念与真实经验之间的绑定",
+      "proposed_update": {
+        "derived_from_experiences_append": [
+          "exp_671e207558"
+        ],
+        "promotion_history_entry": {
+          "source_experience_id": "exp_671e207558",
+          "goal_fact": "water_poured",
+          "process_chain": [
+            "move_to_counter",
+            "pick_up_cup",
+            "move_to_water_source",
+            "fill_cup_at_water_source",
+            "pour_water"
+          ]
+        }
+      },
+      "created_at": "2026-07-10T00:00:00+08:00"
+    },
+    {
+      "candidate_id": "concept_candidate_f2a332da8bdd",
+      "status": "pending_confirmation",
+      "proposal_type": "strengthen_existing_concept",
+      "target_concept_id": "concept_interactive_object_acquisition",
+      "source_experience_id": "exp_671e207558",
+      "source_utterance": "给客人倒一杯水",
+      "goal_fact": "water_poured",
+      "abstract_process_chain": [
+        "move_to_counter",
+        "pick_up_cup",
+        "move_to_water_source",
+        "fill_cup_at_water_source",
+        "pour_water"
+      ],
+      "base_concept_refs": [
+        "concept_interactive_object_acquisition"
+      ],
+      "human_confirmation_required": true,
+      "promotion_rationale": "该经验可作为现有公共概念的新增工程证据，补强概念与真实经验之间的绑定",
+      "proposed_update": {
+        "derived_from_experiences_append": [
+          "exp_671e207558"
+        ],
+        "promotion_history_entry": {
+          "source_experience_id": "exp_671e207558",
+          "goal_fact": "water_poured",
+          "process_chain": [
+            "move_to_counter",
+            "pick_up_cup",
+            "move_to_water_source",
+            "fill_cup_at_water_source",
+            "pour_water"
+          ]
+        }
+      },
+      "created_at": "2026-07-10T00:00:00+08:00"
+    },
+    {
+      "candidate_id": "concept_candidate_5f8772be6022",
+      "status": "pending_confirmation",
+      "proposal_type": "strengthen_existing_concept",
+      "target_concept_id": "concept_fillable_container",
+      "source_experience_id": "exp_671e207558",
+      "source_utterance": "给客人倒一杯水",
+      "goal_fact": "water_poured",
+      "abstract_process_chain": [
+        "move_to_counter",
+        "pick_up_cup",
+        "move_to_water_source",
+        "fill_cup_at_water_source",
+        "pour_water"
+      ],
+      "base_concept_refs": [
+        "concept_fillable_container"
+      ],
+      "human_confirmation_required": true,
+      "promotion_rationale": "该经验可作为现有公共概念的新增工程证据，补强概念与真实经验之间的绑定",
+      "proposed_update": {
+        "derived_from_experiences_append": [
+          "exp_671e207558"
+        ],
+        "promotion_history_entry": {
+          "source_experience_id": "exp_671e207558",
+          "goal_fact": "water_poured",
+          "process_chain": [
+            "move_to_counter",
+            "pick_up_cup",
+            "move_to_water_source",
+            "fill_cup_at_water_source",
+            "pour_water"
+          ]
+        }
+      },
+      "created_at": "2026-07-10T00:00:00+08:00"
+    },
+    {
+      "candidate_id": "concept_candidate_d5054600e0c2",
+      "status": "pending_confirmation",
+      "proposal_type": "strengthen_existing_concept",
+      "target_concept_id": "concept_water_resource_zone",
+      "source_experience_id": "exp_671e207558",
+      "source_utterance": "给客人倒一杯水",
+      "goal_fact": "water_poured",
+      "abstract_process_chain": [
+        "move_to_counter",
+        "pick_up_cup",
+        "move_to_water_source",
+        "fill_cup_at_water_source",
+        "pour_water"
+      ],
+      "base_concept_refs": [
+        "concept_water_resource_zone"
+      ],
+      "human_confirmation_required": true,
+      "promotion_rationale": "该经验可作为现有公共概念的新增工程证据，补强概念与真实经验之间的绑定",
+      "proposed_update": {
+        "derived_from_experiences_append": [
+          "exp_671e207558"
+        ],
+        "promotion_history_entry": {
+          "source_experience_id": "exp_671e207558",
+          "goal_fact": "water_poured",
+          "process_chain": [
+            "move_to_counter",
+            "pick_up_cup",
+            "move_to_water_source",
+            "fill_cup_at_water_source",
+            "pour_water"
+          ]
+        }
+      },
+      "created_at": "2026-07-10T00:00:00+08:00"
+    },
+    {
+      "candidate_id": "concept_candidate_a91934dd5a93",
+      "status": "pending_confirmation",
+      "proposal_type": "strengthen_existing_concept",
+      "target_concept_id": "concept_liquid_transfer_task",
+      "source_experience_id": "exp_671e207558",
+      "source_utterance": "给客人倒一杯水",
+      "goal_fact": "water_poured",
+      "abstract_process_chain": [
+        "move_to_counter",
+        "pick_up_cup",
+        "move_to_water_source",
+        "fill_cup_at_water_source",
+        "pour_water"
+      ],
+      "base_concept_refs": [
+        "concept_liquid_transfer_task"
+      ],
+      "human_confirmation_required": true,
+      "promotion_rationale": "该经验可作为现有公共概念的新增工程证据，补强概念与真实经验之间的绑定",
+      "proposed_update": {
+        "derived_from_experiences_append": [
+          "exp_671e207558"
+        ],
+        "promotion_history_entry": {
+          "source_experience_id": "exp_671e207558",
+          "goal_fact": "water_poured",
+          "process_chain": [
+            "move_to_counter",
+            "pick_up_cup",
+            "move_to_water_source",
+            "fill_cup_at_water_source",
+            "pour_water"
+          ]
+        }
+      },
+      "created_at": "2026-07-10T00:00:00+08:00"
+    }
+  ]
 }

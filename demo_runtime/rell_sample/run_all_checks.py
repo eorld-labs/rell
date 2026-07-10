@@ -108,6 +108,10 @@ def run_http_smoke() -> None:
             "/concept/candidates/confirm",
             {"candidate_id": promoted_candidate["candidate_id"], "confirmed_by": "http_smoke"},
         ) if promoted_candidate else {"error": "missing_promoted_candidate"}
+        promoted_resolution = post_json(
+            "/concept/resolve",
+            {"task_id": migration["migration_task_id"], "utterance": "给客人倒一杯水"},
+        ) if confirmed_candidate.get("promoted_concept_id") else {"resolved_concepts": []}
         llm_candidate_validation = post_json(
             "/llm/candidate/validate",
             {
@@ -133,6 +137,22 @@ def run_http_smoke() -> None:
             {"execution_loop_payload": migration["execution_loop_payload"], "executor_type": "robot_sdk"},
         )
         dispatch_lookup = get_json(f"/execution/dispatch/{dispatch['dispatch_id']}")
+        perturb_migration = post_json(
+            "/experience/migrate",
+            {"utterance": migration.get("intent_translation", {}).get("utterance", "鍒版按婧愬鎺ヤ竴鏉按")},
+        )
+        perturb = post_json(
+            "/runtime_world_state/perturb",
+            {
+                "task_id": perturb_migration["migration_task_id"],
+                "perturbation": {"kind": "stool_in_walkway_detourable"},
+                "apply_before_step": "move_to_water_source",
+            },
+        )
+        perturb_dispatch = post_json(
+            "/execution/dispatch",
+            {"execution_loop_payload": perturb_migration["execution_loop_payload"], "executor_type": "robot_sdk"},
+        )
         migration_query_after = post_json(
             "/runtime_world_state/query",
             {"task_id": migration["migration_task_id"], "question": "当前杯子有没有水"},
@@ -172,7 +192,14 @@ def run_http_smoke() -> None:
             "/runtime_world_state/query",
             {"task_id": migration["migration_task_id"], "question": "当前杯子有没有水"},
         )
-        run_result = post_json("/process/run", {"scenario": "simulated_channel_conflict"})
+        run_result = post_json(
+            "/process/run",
+            {"scenario": "channel_conflict", "utterance": "执行倒水冲突演示"},
+        )
+        simulated_conflict_run = post_json(
+            "/process/run",
+            {"scenario": "simulated_channel_conflict", "utterance": "执行倒水冲突演示"},
+        )
         readaptation = post_json(
             "/runtime_world_state/readapt",
             {"task_id": run_result["task_id"], "utterance": "到水源处接一杯水"},
@@ -228,6 +255,10 @@ def run_http_smoke() -> None:
             raise AssertionError(f"concept candidates endpoint failed: {concept_candidates}")
         if confirmed_candidate.get("status") != "promoted":
             raise AssertionError(f"concept candidate confirm failed: {confirmed_candidate}")
+        if confirmed_candidate.get("promoted_concept_id") not in [
+            item.get("concept_id") for item in promoted_resolution.get("resolved_concepts", [])
+        ]:
+            raise AssertionError(f"promoted concept should be reusable in concept resolution: {promoted_resolution}")
         if not llm_candidate_validation.get("accepted_structure") or llm_candidate_validation.get("direct_execution_allowed"):
             raise AssertionError(f"llm candidate validation failed: {llm_candidate_validation}")
         if migration_query_before.get("answer") != "false":
@@ -238,6 +269,14 @@ def run_http_smoke() -> None:
             raise AssertionError(f"execution dispatch failed: {dispatch}")
         if dispatch_lookup.get("dispatch_id") != dispatch["dispatch_id"]:
             raise AssertionError(f"execution dispatch lookup failed: {dispatch_lookup}")
+        if perturb.get("injected_perturbation", {}).get("status") != "scheduled":
+            raise AssertionError(f"runtime perturbation endpoint failed: {perturb}")
+        detour_feedback = next(
+            (item for item in perturb_dispatch.get("fact_feedback", []) if item.get("step") == "move_to_water_source"),
+            None,
+        )
+        if perturb_dispatch.get("outcome") != "fact_established" or not detour_feedback or detour_feedback.get("preflight_result") != "detour":
+            raise AssertionError(f"runtime perturbation detour flow failed: {perturb_dispatch}")
         if migration_query_after.get("answer") != "true":
             raise AssertionError(f"runtime world state question should answer true after fill: {migration_query_after}")
         if migration_location_query.get("answer") != "region_water_source":
@@ -270,7 +309,7 @@ def run_http_smoke() -> None:
             raise AssertionError(f"experience gap lookup failed: {gap_lookup}")
         if not any(
             "adapter=simulated_pouring_robot" in event.get("payload_summary", "")
-            for event in run_result["execution_trace"]["events"]
+            for event in simulated_conflict_run["execution_trace"]["events"]
         ):
             raise AssertionError("HTTP smoke did not use simulated adapter")
         if audit.get("outcome") != "requires_human_confirmation":

@@ -8,17 +8,29 @@
       "typical_action": "navigate_to_region",
       "typical_consequence": "executor_at_target_region",
       "usage": "公共空间能力，不作为具体任务经验入库",
-      "capability_semantics": ["navigate_to_region"],
+      "capability_semantics": [
+        "navigate_to_region"
+      ],
       "effect_contract": {
-        "produces_facts": ["executor_at_bound_region"],
-        "destroys_facts": ["executor_at_previous_region"],
+        "produces_facts": [
+          "executor_at_bound_region"
+        ],
+        "destroys_facts": [
+          "executor_at_previous_region"
+        ],
         "state_transition": "executor_location_changes_to_bound_region"
       },
       "applicability_constraints": {
         "requires_space_binding": true,
-        "supported_binding_types": ["semantic_region"],
+        "supported_binding_types": [
+          "semantic_region"
+        ],
         "required_runtime_facts": [],
-        "forbidden_low_level_fields": ["absolute_coordinates", "joint_angles", "trajectory"]
+        "forbidden_low_level_fields": [
+          "absolute_coordinates",
+          "joint_angles",
+          "trajectory"
+        ]
       },
       "runtime_contingency_hints": [
         "路径受阻时回到编排层或局部避障能力，不由概念层直接改写运行时事实",
@@ -28,7 +40,11 @@
         "role": "公共能力概念",
         "direct_execution_allowed": false,
         "requires_orchestration": true,
-        "preferred_backing": ["经验库", "P016过程模板", "执行层局部能力"]
+        "preferred_backing": [
+          "经验库",
+          "P016过程模板",
+          "执行层局部能力"
+        ]
       }
     },
     {
@@ -38,17 +54,32 @@
       "typical_action": "grasp_object",
       "typical_consequence": "object_in_gripper",
       "usage": "用于从当前空间中定位并获取任务对象",
-      "capability_semantics": ["grasp_object"],
+      "capability_semantics": [
+        "grasp_object"
+      ],
       "effect_contract": {
-        "produces_facts": ["object_in_gripper"],
-        "destroys_facts": ["gripper_empty", "object_at_original_region"],
+        "produces_facts": [
+          "object_in_gripper"
+        ],
+        "destroys_facts": [
+          "gripper_empty",
+          "object_at_original_region"
+        ],
         "state_transition": "target_object_moves_into_executor_gripper"
       },
       "applicability_constraints": {
         "requires_space_binding": true,
-        "supported_binding_types": ["interactive_object"],
-        "required_runtime_facts": ["gripper_empty"],
-        "forbidden_low_level_fields": ["joint_angles", "gripper_pwm", "trajectory"]
+        "supported_binding_types": [
+          "interactive_object"
+        ],
+        "required_runtime_facts": [
+          "gripper_empty"
+        ],
+        "forbidden_low_level_fields": [
+          "joint_angles",
+          "gripper_pwm",
+          "trajectory"
+        ]
       },
       "runtime_contingency_hints": [
         "对象不可达或抓取失败时输出不可执行或需补充教学，不由概念层臆造成功事实",
@@ -58,7 +89,10 @@
         "role": "对象交互概念",
         "direct_execution_allowed": false,
         "requires_orchestration": true,
-        "preferred_backing": ["经验库", "执行层抓取器"]
+        "preferred_backing": [
+          "经验库",
+          "执行层抓取器"
+        ]
       }
     },
     {
@@ -68,17 +102,29 @@
       "typical_action": "fill_container",
       "typical_consequence": "container_contains_liquid",
       "usage": "用于把不同杯子、容器映射到接水经验",
-      "capability_semantics": ["fill_container"],
+      "capability_semantics": [
+        "fill_container"
+      ],
       "effect_contract": {
-        "produces_facts": ["container_contains_target_liquid"],
-        "destroys_facts": ["container_empty"],
+        "produces_facts": [
+          "container_contains_target_liquid"
+        ],
+        "destroys_facts": [
+          "container_empty"
+        ],
         "state_transition": "target_container_changes_from_empty_to_filled"
       },
       "applicability_constraints": {
         "requires_space_binding": true,
-        "supported_binding_types": ["fillable_container"],
+        "supported_binding_types": [
+          "fillable_container"
+        ],
         "required_runtime_facts": [],
-        "forbidden_low_level_fields": ["fixed_execution_duration", "trajectory", "joint_angles"]
+        "forbidden_low_level_fields": [
+          "fixed_execution_duration",
+          "trajectory",
+          "joint_angles"
+        ]
       },
       "runtime_contingency_hints": [
         "容器类型变化时由经验不变量契约重新绑定，不直接复用历史坐标和轨迹",
@@ -88,7 +134,10 @@
         "role": "对象语义概念",
         "direct_execution_allowed": false,
         "requires_orchestration": true,
-        "preferred_backing": ["P017迁移适配", "经验库"]
+        "preferred_backing": [
+          "P017迁移适配",
+          "经验库"
+        ]
       }
     },
     {
@@ -98,17 +147,28 @@
       "typical_action": "use_resource_zone",
       "typical_consequence": "water_resource_available",
       "usage": "用于把不同空间中的水龙头、饮水机或水源点映射为资源区",
-      "capability_semantics": ["use_resource_zone", "fill_container"],
+      "capability_semantics": [
+        "use_resource_zone",
+        "fill_container"
+      ],
       "effect_contract": {
-        "produces_facts": ["water_resource_available"],
+        "produces_facts": [
+          "water_resource_available"
+        ],
         "destroys_facts": [],
         "state_transition": "bound_resource_zone_can_supply_liquid"
       },
       "applicability_constraints": {
         "requires_space_binding": true,
-        "supported_binding_types": ["semantic_region", "resource_zone"],
+        "supported_binding_types": [
+          "semantic_region",
+          "resource_zone"
+        ],
         "required_runtime_facts": [],
-        "forbidden_low_level_fields": ["absolute_coordinates", "trajectory"]
+        "forbidden_low_level_fields": [
+          "absolute_coordinates",
+          "trajectory"
+        ]
       },
       "runtime_contingency_hints": [
         "资源区失效或观测冲突时应重新适配，不由概念层保持旧绑定",
@@ -118,7 +178,10 @@
         "role": "空间资源概念",
         "direct_execution_allowed": false,
         "requires_orchestration": true,
-        "preferred_backing": ["P010空间语义", "P017迁移适配"]
+        "preferred_backing": [
+          "P010空间语义",
+          "P017迁移适配"
+        ]
       }
     },
     {
@@ -128,17 +191,33 @@
       "typical_action": "pour_container",
       "typical_consequence": "liquid_transferred",
       "usage": "具体倒水类任务经验，由经验库或 P016 过程模板承载",
-      "capability_semantics": ["pour_container"],
+      "capability_semantics": [
+        "pour_container"
+      ],
       "effect_contract": {
-        "produces_facts": ["liquid_transferred_to_target"],
-        "destroys_facts": ["source_container_contains_liquid"],
+        "produces_facts": [
+          "liquid_transferred_to_target"
+        ],
+        "destroys_facts": [
+          "source_container_contains_liquid"
+        ],
         "state_transition": "liquid_moves_from_source_container_to_target"
       },
       "applicability_constraints": {
         "requires_space_binding": true,
-        "supported_binding_types": ["task_goal", "interactive_object", "semantic_region"],
-        "required_runtime_facts": ["source_container_contains_liquid"],
-        "forbidden_low_level_fields": ["trajectory", "joint_angles", "raw_control_signal"]
+        "supported_binding_types": [
+          "task_goal",
+          "interactive_object",
+          "semantic_region"
+        ],
+        "required_runtime_facts": [
+          "source_container_contains_liquid"
+        ],
+        "forbidden_low_level_fields": [
+          "trajectory",
+          "joint_angles",
+          "raw_control_signal"
+        ]
       },
       "runtime_contingency_hints": [
         "具体倒水路线和容器姿态由经验层和执行层共同决定",
@@ -148,7 +227,96 @@
         "role": "任务概念",
         "direct_execution_allowed": false,
         "requires_orchestration": true,
-        "preferred_backing": ["经验库", "P016过程模板", "P017迁移适配"]
+        "preferred_backing": [
+          "经验库",
+          "P016过程模板",
+          "P017迁移适配"
+        ]
+      }
+    },
+    {
+      "concept_id": "concept_promoted_water_poured_19b9929b",
+      "display_name": "倒水服务任务晋升概念",
+      "concept_level": "task_processing",
+      "typical_action": "experience_promoted_task",
+      "typical_consequence": "water_poured",
+      "usage": "由已验证经验晋升而来，仍需经编排层、空间语义和任务期快照共同约束后使用",
+      "capability_semantics": [
+        "navigate_to_region",
+        "grasp_object",
+        "fill_container",
+        "pour_container"
+      ],
+      "effect_contract": {
+        "produces_facts": [
+          "water_poured"
+        ],
+        "destroys_facts": [
+          "executor_at_water_source",
+          "executor_at_doorway",
+          "executor_at_service_position",
+          "cup_at_counter",
+          "gripper_empty",
+          "executor_at_counter",
+          "cup_empty",
+          "cup_contains_water"
+        ],
+        "state_transition": "validated_experience_promoted_into_reusable_task_concept"
+      },
+      "applicability_constraints": {
+        "requires_space_binding": true,
+        "supported_binding_types": [
+          "task_goal",
+          "semantic_region",
+          "interactive_object"
+        ],
+        "required_runtime_facts": [
+          "cup_at_counter",
+          "gripper_empty",
+          "water_source_available",
+          "executor_at_counter"
+        ],
+        "forbidden_low_level_fields": [
+          "absolute_coordinates",
+          "robot_specific_joint_angles",
+          "fixed_execution_duration",
+          "single_body_trajectory_without_binding_slots"
+        ]
+      },
+      "runtime_contingency_hints": [
+        "概念晋升后仍不得直接控制执行器，必须回到经验层和编排层判断当前是否可执行",
+        "若运行时世界状态快照不支持该过程链，应输出不可执行或请求补充教学，而不是假定任务成立"
+      ],
+      "experience_link_policy": {
+        "role": "经验晋升任务概念",
+        "direct_execution_allowed": false,
+        "requires_orchestration": true,
+        "preferred_backing": [
+          "经验库",
+          "P017迁移适配",
+          "执行层局部能力"
+        ]
+      },
+      "derived_from_experiences": [
+        "exp_671e207558"
+      ],
+      "promotion_tags": {
+        "goal_fact": "water_poured",
+        "process_chain": [
+          "move_to_counter",
+          "pick_up_cup",
+          "move_to_water_source",
+          "fill_cup_at_water_source",
+          "pour_water"
+        ],
+        "base_concept_refs": [
+          "concept_spatial_region_navigation",
+          "concept_interactive_object_acquisition",
+          "concept_fillable_container",
+          "concept_water_resource_zone",
+          "concept_liquid_transfer_task"
+        ],
+        "source_utterance": "给客人倒一杯水"
       }
     }
   ]

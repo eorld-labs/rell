@@ -291,6 +291,45 @@ STEP_LIBRARY = {
     },
 }
 
+RUNTIME_PERTURBATION_TEMPLATES = {
+    "stool_in_walkway_detourable": {
+        "label": "过道出现可绕开的凳子",
+        "effect_type": "navigation_detour",
+        "blocking_level": "soft",
+        "detour_available": True,
+        "target_steps": ["move_to_counter", "move_to_water_source", "pour_water"],
+        "target_regions": ["region_counter_operation", "region_water_source"],
+        "recommended_actions": ["detour_and_continue", "refresh_runtime_snapshot_after_step"],
+    },
+    "stool_blocks_walkway": {
+        "label": "过道被凳子完全阻塞",
+        "effect_type": "route_block",
+        "blocking_level": "hard",
+        "detour_available": False,
+        "target_steps": ["move_to_counter", "move_to_water_source", "pour_water"],
+        "target_regions": ["region_counter_operation", "region_water_source"],
+        "recommended_actions": ["trigger_readaptation", "request_human_confirmation", "trigger_supplemental_teaching"],
+    },
+    "cup_guard_door_closed": {
+        "label": "杯子取用位置前的门处于关闭状态",
+        "effect_type": "interaction_barrier",
+        "blocking_level": "hard",
+        "detour_available": False,
+        "target_steps": ["pick_up_cup"],
+        "target_regions": ["region_counter_operation"],
+        "recommended_actions": ["trigger_readaptation", "request_human_confirmation", "trigger_supplemental_teaching"],
+    },
+    "water_source_door_closed": {
+        "label": "水源区前的门处于关闭状态",
+        "effect_type": "interaction_barrier",
+        "blocking_level": "hard",
+        "detour_available": False,
+        "target_steps": ["move_to_water_source", "fill_cup_at_water_source"],
+        "target_regions": ["region_water_source"],
+        "recommended_actions": ["trigger_readaptation", "request_human_confirmation", "search_alternative_experience"],
+    },
+}
+
 
 GOAL_FACT_KEYWORDS = [
     ("water_poured", ["倒水", "倒一杯水", "给客人倒水"]),
@@ -647,11 +686,210 @@ def build_initial_runtime_world_state(cognitive_model: dict[str, Any], intent: d
         "established_facts": fact_set,
         "current_stage": None,
         "completed_stages": [],
+        "runtime_environment": {
+            "active_perturbations": [],
+            "scheduled_perturbations": [],
+            "perturbation_history": [],
+            "last_preflight": None,
+            "last_route_adjustment": None,
+            "last_blocked_step": None,
+        },
     }
 
 
 def clone_runtime_world_state(state: dict[str, Any]) -> dict[str, Any]:
     return json.loads(json.dumps(state, ensure_ascii=False))
+
+
+def ensure_runtime_environment(state: dict[str, Any]) -> dict[str, Any]:
+    env = state.setdefault("runtime_environment", {})
+    env.setdefault("active_perturbations", [])
+    env.setdefault("scheduled_perturbations", [])
+    env.setdefault("perturbation_history", [])
+    env.setdefault("last_preflight", None)
+    env.setdefault("last_route_adjustment", None)
+    env.setdefault("last_blocked_step", None)
+    return env
+
+
+def normalize_runtime_perturbation(
+    perturbation: dict[str, Any],
+    apply_before_step: str | None = None,
+) -> dict[str, Any]:
+    kind = str(perturbation.get("kind") or perturbation.get("perturbation_type") or "").strip()
+    if kind not in RUNTIME_PERTURBATION_TEMPLATES:
+        return {"error": "unsupported_runtime_perturbation", "kind": kind, "allowed_kinds": sorted(RUNTIME_PERTURBATION_TEMPLATES)}
+    template = RUNTIME_PERTURBATION_TEMPLATES[kind]
+    seed = "|".join([kind, apply_before_step or "immediate", json.dumps(perturbation, ensure_ascii=False, sort_keys=True)])
+    perturbation_id = "perturb_" + hashlib.sha1(seed.encode("utf-8")).hexdigest()[:12]
+    record = {
+        "perturbation_id": perturbation_id,
+        "kind": kind,
+        "label": perturbation.get("label") or template["label"],
+        "effect_type": perturbation.get("effect_type") or template["effect_type"],
+        "blocking_level": perturbation.get("blocking_level") or template["blocking_level"],
+        "detour_available": bool(perturbation.get("detour_available", template["detour_available"])),
+        "target_steps": list(perturbation.get("target_steps") or template["target_steps"]),
+        "target_regions": list(perturbation.get("target_regions") or template["target_regions"]),
+        "recommended_actions": list(perturbation.get("recommended_actions") or template["recommended_actions"]),
+        "apply_before_step": apply_before_step,
+        "status": "scheduled" if apply_before_step else "active",
+        "notes": perturbation.get("notes"),
+        "source": perturbation.get("source", "runtime_test_injection"),
+        "created_at": "2026-07-10T00:00:00+08:00",
+    }
+    return record
+
+
+def runtime_perturbation_applies_to_step(perturbation: dict[str, Any], step: str, meta: dict[str, Any]) -> bool:
+    if step in set(perturbation.get("target_steps", [])):
+        return True
+    target_region = meta.get("target_region")
+    if target_region and target_region in set(perturbation.get("target_regions", [])):
+        return True
+    return False
+
+
+def activate_scheduled_perturbations_for_step(state: dict[str, Any], step: str) -> list[dict[str, Any]]:
+    env = ensure_runtime_environment(state)
+    activated: list[dict[str, Any]] = []
+    remaining: list[dict[str, Any]] = []
+    for item in env.get("scheduled_perturbations", []):
+        if item.get("apply_before_step") == step:
+            item["status"] = "active"
+            activated.append(item)
+            env["active_perturbations"].append(item)
+            env["perturbation_history"].append(
+                {
+                    "event": "activated_before_step",
+                    "step": step,
+                    "perturbation_id": item.get("perturbation_id"),
+                    "kind": item.get("kind"),
+                }
+            )
+        else:
+            remaining.append(item)
+    env["scheduled_perturbations"] = remaining
+    return activated
+
+
+def evaluate_runtime_step_preflight(state: dict[str, Any], step: str, meta: dict[str, Any]) -> dict[str, Any]:
+    env = ensure_runtime_environment(state)
+    activated = activate_scheduled_perturbations_for_step(state, step)
+    relevant = [
+        item
+        for item in env.get("active_perturbations", [])
+        if runtime_perturbation_applies_to_step(item, step, meta)
+    ]
+    hard_blockers = [item for item in relevant if item.get("blocking_level") == "hard" or not item.get("detour_available", False)]
+    if hard_blockers:
+        result = {
+            "result": "blocked",
+            "step": step,
+            "activated_perturbations": activated,
+            "blocking_perturbations": hard_blockers,
+            "recommended_actions": sorted({action for item in hard_blockers for action in item.get("recommended_actions", [])}),
+            "reason": "runtime_environment_changed_and_step_requires_re_adaptation",
+        }
+        env["last_preflight"] = result
+        env["last_blocked_step"] = step
+        return result
+    detours = [item for item in relevant if item.get("effect_type") == "navigation_detour" and item.get("detour_available")]
+    if detours:
+        adjustment = {
+            "adjustment_type": "local_detour",
+            "step": step,
+            "preserved_process_chain": True,
+            "detour_basis": [item.get("perturbation_id") for item in detours],
+            "reason": "runtime_environment_changed_but_local_navigation_can_detour",
+        }
+        result = {
+            "result": "detour",
+            "step": step,
+            "activated_perturbations": activated,
+            "route_adjustment": adjustment,
+            "recommended_actions": ["continue_execution", "refresh_runtime_snapshot_after_step"],
+        }
+        env["last_preflight"] = result
+        env["last_route_adjustment"] = adjustment
+        return result
+    result = {
+        "result": "executable",
+        "step": step,
+        "activated_perturbations": activated,
+        "recommended_actions": ["continue_execution"],
+    }
+    env["last_preflight"] = result
+    return result
+
+
+def build_dynamic_environment_blockers(
+    runtime_world_state: dict[str, Any],
+    steps: list[str],
+) -> list[dict[str, Any]]:
+    env = ensure_runtime_environment(runtime_world_state)
+    reasons: list[dict[str, Any]] = []
+    for step in steps:
+        meta = STEP_LIBRARY.get(step, {})
+        for item in env.get("active_perturbations", []):
+            if not runtime_perturbation_applies_to_step(item, step, meta):
+                continue
+            if item.get("blocking_level") == "hard" or not item.get("detour_available", False):
+                reasons.append(
+                    {
+                        "reason": "dynamic_environment_blocker",
+                        "step": step,
+                        "perturbation_id": item.get("perturbation_id"),
+                        "perturbation_kind": item.get("kind"),
+                        "blocking_level": item.get("blocking_level"),
+                    }
+                )
+    return reasons
+
+
+def inject_runtime_perturbation(
+    task_id: str,
+    perturbation: dict[str, Any],
+    apply_before_step: str | None = None,
+) -> dict[str, Any]:
+    current = get_runtime_world_state(task_id)
+    if "error" in current:
+        return current
+    state = current["runtime_world_state_snapshot"]
+    env = ensure_runtime_environment(state)
+    record = normalize_runtime_perturbation(perturbation, apply_before_step)
+    if "error" in record:
+        return record
+    if record.get("status") == "scheduled":
+        env["scheduled_perturbations"].append(record)
+        env["perturbation_history"].append(
+            {
+                "event": "scheduled",
+                "perturbation_id": record.get("perturbation_id"),
+                "kind": record.get("kind"),
+                "apply_before_step": apply_before_step,
+            }
+        )
+    else:
+        env["active_perturbations"].append(record)
+        env["perturbation_history"].append(
+            {
+                "event": "activated_immediately",
+                "perturbation_id": record.get("perturbation_id"),
+                "kind": record.get("kind"),
+            }
+        )
+    RUNTIME_WORLD_STATE_STORE[task_id] = state
+    if task_id in STATE_STORE:
+        STATE_STORE[task_id]["runtime_world_state"] = state
+    return {
+        "schema_version": "1.0.0",
+        "task_id": task_id,
+        "runtime_world_state_snapshot_id": state.get("runtime_world_state_snapshot_id"),
+        "injected_perturbation": record,
+        "runtime_environment": env,
+        "runtime_world_state_snapshot": state,
+    }
 
 
 def apply_step_to_runtime_world_state(state: dict[str, Any], step: str, meta: dict[str, Any], sequence: int) -> dict[str, Any]:
@@ -1132,6 +1370,17 @@ INDEX_HTML = """<!doctype html>
     .map-service { left: 72%; top: 58%; width: 15%; height: 16%; border-radius: 999px; background: #fff8e8; }
     .map-door { left: 5%; top: 55%; width: 9%; height: 18%; background: #f4efe6; }
     .map-risk { left: 84%; top: 13%; width: 12%; height: 18%; background: #f9e7e5; border-color: #b66a61; color: #7e2e27; }
+    .map-clickable {
+      cursor: pointer;
+      box-shadow: inset 0 0 0 1px rgba(23,32,38,.06);
+    }
+    .map-clickable:hover {
+      box-shadow: inset 0 0 0 2px var(--accent);
+    }
+    .map-clickable.active {
+      box-shadow: inset 0 0 0 2px var(--accent);
+      background: #dfeee7;
+    }
     .map-object {
       position: absolute;
       width: 18px;
@@ -1277,6 +1526,28 @@ INDEX_HTML = """<!doctype html>
         <div class="actions" style="margin-top:8px;">
           <button id="askRuntimeQuestionButton" class="secondary" title="从当前任务期运行时世界状态快照回答问题">问当前状态</button>
         </div>
+        <label for="perturbationKind" style="margin-top:12px;">中途扰动 / 偶然层</label>
+        <select id="perturbationKind">
+          <option value="stool_in_walkway_detourable">过道放凳子（可绕开）</option>
+          <option value="stool_blocks_walkway">过道凳子完全堵路</option>
+          <option value="cup_guard_door_closed">杯子前门关闭</option>
+          <option value="water_source_door_closed">水源前门关闭</option>
+        </select>
+        <label for="perturbationStep" style="margin-top:12px;">在第几步前生效</label>
+        <select id="perturbationStep">
+          <option value="move_to_counter">move_to_counter</option>
+          <option value="pick_up_cup">pick_up_cup</option>
+          <option value="move_to_water_source" selected>move_to_water_source</option>
+          <option value="fill_cup_at_water_source">fill_cup_at_water_source</option>
+          <option value="pour_water">pour_water</option>
+        </select>
+        <div class="actions" style="margin-top:8px;">
+          <button id="preparePerturbationTaskButton" class="secondary" title="创建迁移适配任务，供偶然层注入扰动">准备扰动测试</button>
+          <button id="injectPerturbationButton" class="secondary" title="向当前任务期快照注入偶然层扰动">注入扰动</button>
+        </div>
+        <div class="actions" style="margin-top:8px;">
+          <button id="runPerturbationDispatchButton" class="secondary" title="在注入扰动后执行迁移链">执行扰动链</button>
+        </div>
       </section>
       <section>
         <div class="summary">
@@ -1309,10 +1580,10 @@ INDEX_HTML = """<!doctype html>
         <div id="spaceMap" class="space-map">
           <div class="map-region map-water">水源区</div>
           <div class="map-region map-counter">操作台</div>
-          <div class="map-region map-walkway">可行动区</div>
+          <div id="walkwayPerturbRegion" class="map-region map-walkway map-clickable" title="点击预设过道扰动">可行动区</div>
           <div class="map-region map-cup">杯</div>
           <div class="map-region map-service">服务位</div>
-          <div class="map-region map-door">门</div>
+          <div id="doorPerturbRegion" class="map-region map-door map-clickable" title="点击预设关门扰动">门</div>
           <div class="map-region map-risk">风险区</div>
           <div class="map-path"></div>
           <div class="map-object map-kettle" title="object_kettle_steel_1l"></div>
@@ -1340,6 +1611,13 @@ INDEX_HTML = """<!doctype html>
     const stepTeachingSessionButton = document.getElementById("stepTeachingSessionButton");
     const finishTeachingSessionButton = document.getElementById("finishTeachingSessionButton");
     const askRuntimeQuestionButton = document.getElementById("askRuntimeQuestionButton");
+    const preparePerturbationTaskButton = document.getElementById("preparePerturbationTaskButton");
+    const injectPerturbationButton = document.getElementById("injectPerturbationButton");
+    const runPerturbationDispatchButton = document.getElementById("runPerturbationDispatchButton");
+    const perturbationKind = document.getElementById("perturbationKind");
+    const perturbationStep = document.getElementById("perturbationStep");
+    const walkwayPerturbRegion = document.getElementById("walkwayPerturbRegion");
+    const doorPerturbRegion = document.getElementById("doorPerturbRegion");
     const clearButton = document.getElementById("clearButton");
     const logEl = document.getElementById("log");
     const factsEl = document.getElementById("facts");
@@ -1360,6 +1638,8 @@ INDEX_HTML = """<!doctype html>
     const mapCupItem = document.getElementById("mapCupItem");
     let currentTeachingSessionId = "";
     let currentConceptCandidateId = "";
+    let currentMigrationTaskId = "";
+    let currentExecutionLoopPayload = null;
 
     const eventLabel = {
       stage_started: "阶段启动",
@@ -1392,6 +1672,8 @@ INDEX_HTML = """<!doctype html>
       serviceState.textContent = "待运行";
       currentTeachingSessionId = "";
       currentConceptCandidateId = "";
+      currentMigrationTaskId = "";
+      currentExecutionLoopPayload = null;
       conceptCandidateIdInput.value = "";
     }
 
@@ -1537,6 +1819,42 @@ INDEX_HTML = """<!doctype html>
         .replaceAll('"', "&quot;");
     }
 
+    function setPerturbationPreset(kind, step) {
+      perturbationKind.value = kind;
+      perturbationStep.value = step;
+      walkwayPerturbRegion.classList.toggle("active", kind.includes("walkway"));
+      doorPerturbRegion.classList.toggle("active", kind.includes("door_closed"));
+    }
+
+    async function triggerMapPerturbation(kind, step, label) {
+      setPerturbationPreset(kind, step);
+      appendLog("已从空间图选择偶然层扰动：" + label + "；将直接注入当前任务期快照。");
+      await injectPerturbation();
+    }
+
+    function rememberMigrationEnvelope(result) {
+      currentMigrationTaskId = result.migration_task_id || currentMigrationTaskId;
+      currentExecutionLoopPayload = result.execution_loop_payload || currentExecutionLoopPayload;
+      if (result.migration_task_id) {
+        setText(taskMetric, result.migration_task_id);
+      }
+    }
+
+    function renderPerturbationFacts(title, payload) {
+      const env = payload.runtime_world_state_snapshot?.runtime_environment || payload.runtime_environment || {};
+      const perturbation = payload.injected_perturbation || {};
+      const rows = [
+        `<div class="stage-row"><strong>${escapeHtml(title)}</strong><span>${escapeHtml(payload.task_id || currentMigrationTaskId || "-")}</span></div>`,
+        `<div class="stage-row"><strong>扰动类型</strong><span>${escapeHtml(perturbation.kind || "-")} / ${escapeHtml(perturbation.label || "-")}</span></div>`,
+        `<div class="stage-row"><strong>生效时机</strong><span>${escapeHtml(perturbation.apply_before_step || "immediate")} / ${escapeHtml(perturbation.status || "-")}</span></div>`,
+        `<div class="stage-row"><strong>当前偶然层状态</strong><span>active=${escapeHtml(String((env.active_perturbations || []).length))} / scheduled=${escapeHtml(String((env.scheduled_perturbations || []).length))}</span></div>`
+      ];
+      if (env.last_preflight) {
+        rows.push(`<div class="stage-row"><strong>最近预检</strong><span>${escapeHtml(env.last_preflight.step || "-")} / ${escapeHtml(env.last_preflight.result || "-")}</span></div>`);
+      }
+      factsEl.innerHTML = rows.join("");
+    }
+
     function describeCausalReasoning(reasoning) {
       return (reasoning || []).map(item => {
         if (item.status === "already_established") {
@@ -1587,6 +1905,19 @@ INDEX_HTML = """<!doctype html>
         const facts = (runtimeWorld.established_facts || []).join(", ");
         rows.push(`<div class="stage-row"><strong>运行时世界状态</strong><span>${runtimeWorld.lifecycle || "ephemeral"} / ${executor.location_ref || "-"}</span></div>`);
         rows.push(`<div class="stage-row"><strong>端侧工作记忆</strong><span>holding=${escapeHtml(holding)}；facts=${escapeHtml(facts)}</span></div>`);
+        const runtimeEnv = runtimeWorld.runtime_environment || {};
+        if ((runtimeEnv.active_perturbations || []).length || (runtimeEnv.scheduled_perturbations || []).length || runtimeEnv.last_preflight) {
+          rows.push(`<div class="stage-row"><strong>偶然层扰动</strong><span>active=${escapeHtml(String((runtimeEnv.active_perturbations || []).length))} / scheduled=${escapeHtml(String((runtimeEnv.scheduled_perturbations || []).length))}</span></div>`);
+          if (runtimeEnv.last_preflight) {
+            rows.push(`<div class="stage-row"><strong>步骤前预检</strong><span>${escapeHtml(runtimeEnv.last_preflight.step || "-")} / ${escapeHtml(runtimeEnv.last_preflight.result || "-")}</span></div>`);
+          }
+        }
+      }
+      if (result.stepwise_readaptation) {
+        const readapt = result.stepwise_readaptation;
+        rows.push(`<div class="stage-row"><strong>重新适配</strong><span>${escapeHtml(readapt.readaptation_id || "-")} / ${escapeHtml(readapt.trigger || "-")}</span></div>`);
+        rows.push(`<div class="stage-row"><strong>剩余步骤</strong><span>${escapeHtml((readapt.remaining_steps || []).join(" -> ") || "-")}</span></div>`);
+        rows.push(`<div class="stage-row"><strong>刷新可行性</strong><span>${escapeHtml(readapt.execution_feasibility?.result || "-")}</span></div>`);
       }
       if (result.teaching_hint?.teachable) {
         rows.push(`<div class="stage-row"><strong>可教学</strong><span>${result.teaching_hint.reason}</span></div>`);
@@ -2072,7 +2403,7 @@ INDEX_HTML = """<!doctype html>
       serviceState.textContent = "读取当前状态";
       try {
         const question = document.getElementById("runtimeQuestion").value.trim() || "当前杯子有没有水";
-        const taskId = currentTeachingSessionId || taskMetric.textContent.trim();
+        const taskId = currentTeachingSessionId || currentMigrationTaskId || taskMetric.textContent.trim();
         if (!taskId || taskId === "-") {
           appendLog("当前没有可查询的任务或会话，请先运行或启动教学会话。");
           serviceState.textContent = "缺少上下文";
@@ -2123,6 +2454,136 @@ INDEX_HTML = """<!doctype html>
       }
     }
 
+    async function preparePerturbationTask() {
+      preparePerturbationTaskButton.disabled = true;
+      serviceState.textContent = "准备扰动测试";
+      const utterance = document.getElementById("utterance").value.trim();
+      appendLog("创建迁移适配任务，用于偶然层扰动测试：" + utterance);
+      try {
+        const result = await fetch("/experience/migrate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ utterance })
+        }).then(r => r.json());
+        appendLog("迁移适配结果：" + JSON.stringify(result, null, 2));
+        if (result.error || !result.execution_loop_payload) {
+          serviceState.textContent = "准备失败";
+          setText(outcomeMetric, result.execution_feasibility?.result || "prepare_failed", "bad");
+          renderFacts({
+            audit_summary: { stage_summary: [], fact_summary: [], stop_reason: result.error || result.execution_feasibility?.result || "prepare_failed" },
+            runtime_world_state: result.runtime_world_state_snapshot || result.runtime_world_state,
+            intent_translation: result.intent_translation,
+            stepwise_readaptation: null
+          });
+          return;
+        }
+        rememberMigrationEnvelope(result);
+        setText(admitMetric, result.execution_feasibility?.result || "executable", "ok");
+        setText(stateMetric, "migration_adapted", "ok");
+        setText(outcomeMetric, "ready_for_perturbation", "warn");
+        renderPerturbationFacts("扰动测试任务已就绪", result);
+        serviceState.textContent = "扰动任务已就绪";
+      } catch (error) {
+        serviceState.textContent = "异常";
+        appendLog("准备扰动任务异常：" + error.message);
+      } finally {
+        preparePerturbationTaskButton.disabled = false;
+      }
+    }
+
+    async function injectPerturbation() {
+      injectPerturbationButton.disabled = true;
+      serviceState.textContent = "注入偶然层扰动";
+      try {
+        if (!currentMigrationTaskId || !currentExecutionLoopPayload) {
+          await preparePerturbationTask();
+        }
+        if (!currentMigrationTaskId) {
+          serviceState.textContent = "无任务";
+          return;
+        }
+        const payload = {
+          task_id: currentMigrationTaskId,
+          perturbation: { kind: perturbationKind.value },
+          apply_before_step: perturbationStep.value
+        };
+        appendLog("注入偶然层扰动：" + JSON.stringify(payload, null, 2));
+        const result = await fetch("/runtime_world_state/perturb", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }).then(r => r.json());
+        appendLog("扰动注入结果：" + JSON.stringify(result, null, 2));
+        if (result.error) {
+          serviceState.textContent = "注入失败";
+          setText(outcomeMetric, "perturb_failed", "bad");
+          return;
+        }
+        setText(stateMetric, "runtime_perturbed", "warn");
+        setText(outcomeMetric, result.injected_perturbation?.status || "perturbed", "warn");
+        renderPerturbationFacts("偶然层扰动已注入", result);
+        serviceState.textContent = "扰动已注入";
+      } catch (error) {
+        serviceState.textContent = "异常";
+        appendLog("扰动注入异常：" + error.message);
+      } finally {
+        injectPerturbationButton.disabled = false;
+      }
+    }
+
+    async function runPerturbationDispatch() {
+      runPerturbationDispatchButton.disabled = true;
+      serviceState.textContent = "执行扰动链";
+      try {
+        if (!currentMigrationTaskId || !currentExecutionLoopPayload) {
+          await preparePerturbationTask();
+        }
+        if (!currentExecutionLoopPayload) {
+          serviceState.textContent = "无执行链";
+          return;
+        }
+        appendLog("执行带扰动的迁移链：" + JSON.stringify(currentExecutionLoopPayload, null, 2));
+        const result = await fetch("/execution/dispatch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ execution_loop_payload: currentExecutionLoopPayload, executor_type: "robot_sdk" })
+        }).then(r => r.json());
+        appendLog("扰动执行结果：" + JSON.stringify(result, null, 2));
+        if (result.error) {
+          serviceState.textContent = "执行失败";
+          setText(outcomeMetric, "dispatch_failed", "bad");
+          return;
+        }
+        const outcomeClass = result.outcome === "fact_established" ? "ok" : (result.outcome === "readaptation_required" ? "warn" : "bad");
+        setText(stateMetric, result.outcome === "readaptation_required" ? "readaptation_required" : "execution_feedback_received", outcomeClass);
+        setText(outcomeMetric, result.outcome || "-", outcomeClass);
+        setText(taskMetric, result.task_id || currentMigrationTaskId || "-");
+        renderFacts({
+          audit_summary: {
+            stage_summary: (result.fact_feedback || []).map(item => ({
+              stage_id: item.step,
+              result: item.preflight_result || item.fact_status,
+              notes: item.reason || (item.route_adjustment ? JSON.stringify(item.route_adjustment) : "")
+            })),
+            fact_summary: (result.fact_feedback || []).map(item => ({
+              fact_id: item.fact_id || item.step,
+              state: item.fact_status,
+              channel_notes: item.preflight_result || "-"
+            })),
+            stop_reason: result.outcome === "readaptation_required" ? "runtime_environment_changed" : null
+          },
+          runtime_world_state: result.runtime_world_state_snapshot,
+          stepwise_readaptation: result.stepwise_readaptation
+        });
+        serviceState.textContent = result.outcome === "readaptation_required" ? "需要重新适配" : "扰动链已执行";
+      } catch (error) {
+        serviceState.textContent = "异常";
+        appendLog("扰动链执行异常：" + error.message);
+      } finally {
+        runPerturbationDispatchButton.disabled = false;
+      }
+    }
+
     async function confirmConceptCandidate() {
       confirmConceptCandidateButton.disabled = true;
       serviceState.textContent = "确认概念晋升";
@@ -2154,15 +2615,29 @@ INDEX_HTML = """<!doctype html>
         setText(outcomeMetric, "概念已晋升", "ok");
         setText(taskMetric, result.promoted_concept_id || candidateId);
         const promoted = result.promoted_concept_unit || {};
+        const utterance = document.getElementById("utterance").value.trim();
+        const verificationTaskId = currentTeachingSessionId || "";
+        const verification = await fetch("/concept/resolve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ utterance, task_id: verificationTaskId || null })
+        }).then(r => r.json());
+        appendLog("概念复用验证：" + JSON.stringify(verification, null, 2));
+        const verificationConcepts = verification.resolved_concepts || [];
+        const reused = verificationConcepts.some(item => item.concept_id === result.promoted_concept_id);
+        const verificationReason = verificationConcepts.find(item => item.concept_id === result.promoted_concept_id)?.activation_reason || "-";
         const rows = [
           `<div class="stage-row"><strong>确认候选</strong><span>${escapeHtml(candidateId)}</span></div>`,
           `<div class="stage-row"><strong>晋升概念</strong><span>${escapeHtml(result.promoted_concept_id || "-")}</span></div>`,
           `<div class="stage-row"><strong>显示名称</strong><span>${escapeHtml(promoted.display_name || "-")}</span></div>`,
           `<div class="stage-row"><strong>能力语义</strong><span>${escapeHtml((promoted.capability_semantics || []).join(", ") || "-")}</span></div>`,
-          `<div class="stage-row"><strong>来源经验</strong><span>${escapeHtml(result.source_experience_id || "-")}</span></div>`
+          `<div class="stage-row"><strong>来源经验</strong><span>${escapeHtml(result.source_experience_id || "-")}</span></div>`,
+          `<div class="stage-row"><strong>复用验证</strong><span>${reused ? "已命中当前任务解析" : "当前任务未命中该晋升概念"}</span></div>`,
+          `<div class="stage-row"><strong>验证依据</strong><span>${escapeHtml(verificationReason)}</span></div>`,
+          `<div class="stage-row"><strong>解析概念</strong><span>${escapeHtml(verificationConcepts.map(item => item.concept_id).join(", ") || "-")}</span></div>`
         ];
         factsEl.innerHTML = rows.join("");
-        serviceState.textContent = "晋升完成";
+        serviceState.textContent = reused ? "晋升并已复用" : "晋升完成";
       } catch (error) {
         serviceState.textContent = "异常";
         appendLog("概念确认异常：" + error.message);
@@ -2182,8 +2657,18 @@ INDEX_HTML = """<!doctype html>
     stepTeachingSessionButton.addEventListener("click", executeStepwiseTeaching);
     finishTeachingSessionButton.addEventListener("click", finishStepwiseTeaching);
     askRuntimeQuestionButton.addEventListener("click", askRuntimeQuestion);
+    preparePerturbationTaskButton.addEventListener("click", preparePerturbationTask);
+    injectPerturbationButton.addEventListener("click", injectPerturbation);
+    runPerturbationDispatchButton.addEventListener("click", runPerturbationDispatch);
+    walkwayPerturbRegion.addEventListener("click", async () => {
+      await triggerMapPerturbation("stool_in_walkway_detourable", "move_to_water_source", "过道放凳子（可绕开）");
+    });
+    doorPerturbRegion.addEventListener("click", async () => {
+      await triggerMapPerturbation("cup_guard_door_closed", "pick_up_cup", "杯子前门关闭");
+    });
     clearButton.addEventListener("click", clearView);
     clearView();
+    setPerturbationPreset(perturbationKind.value, perturbationStep.value);
   </script>
 </body>
 </html>
@@ -3256,8 +3741,39 @@ def run_process_chain_experience(intent: dict[str, Any], utterance: str, space_a
     runtime_world_state_initial = clone_runtime_world_state(runtime_world_state)
     world_state_transitions = []
     before_state = "ready"
+    profile = build_default_body_capability_profile()
+    stepwise_readaptation = None
     for index, step in enumerate(intent.get("candidate_process_chain", []), start=1):
         meta = STEP_LIBRARY[step]
+        preflight = evaluate_runtime_step_preflight(runtime_world_state, step, meta)
+        if preflight.get("result") == "blocked":
+            remaining_steps = [step] + list(intent.get("candidate_process_chain", [])[index:])
+            stepwise_readaptation = build_stepwise_readaptation(
+                task_id,
+                intent.get("goal_fact"),
+                remaining_steps,
+                runtime_world_state,
+                profile,
+            )
+            stage_summary.append(
+                {
+                    "stage_id": step,
+                    "result": "blocked",
+                    "notes": "运行时环境发生变化，当前步骤需重新适配",
+                }
+            )
+            events.append(
+                {
+                    "event_id": f"evt_{index:02d}_{step}_blocked",
+                    "consumed_sequence": index,
+                    "trigger_reason": "step_preflight_blocked",
+                    "before_state": before_state,
+                    "after_state": "readaptation_required",
+                    "payload_summary": f"step={step} blocked_by_runtime_environment readaptation={stepwise_readaptation['readaptation_id']}",
+                    "preflight": preflight,
+                }
+            )
+            break
         after_state = f"{step}_completed"
         target = meta.get("target_region") or meta.get("target_object", "unknown_target")
         fact = meta["produces_fact"]
@@ -3285,6 +3801,8 @@ def run_process_chain_experience(intent: dict[str, Any], utterance: str, space_a
                     "before_executor_location": transition["before_executor_location"],
                     "after_executor_location": transition["after_executor_location"],
                 },
+                "preflight_result": preflight.get("result"),
+                "route_adjustment": preflight.get("route_adjustment"),
             }
         )
         stage_summary.append(
@@ -3300,7 +3818,7 @@ def run_process_chain_experience(intent: dict[str, Any], utterance: str, space_a
         "schema_version": "1.0.0",
         "task_id": task_id,
         "process_instance_id": intent["experience_id"],
-        "outcome": "completed",
+        "outcome": "readaptation_required" if stepwise_readaptation else "completed",
         "stage_summary": stage_summary,
         "fact_summary": fact_summary,
         "stop_reason": None,
@@ -3311,10 +3829,12 @@ def run_process_chain_experience(intent: dict[str, Any], utterance: str, space_a
         "schema_version": "1.0.0",
         "task_id": task_id,
         "process_instance_id": intent["experience_id"],
-        "current_stage_id": intent.get("candidate_process_chain", [None])[-1],
-        "runtime_state": "completed",
+        "current_stage_id": runtime_world_state.get("current_stage"),
+        "runtime_state": "readaptation_required" if stepwise_readaptation else "completed",
         "utterance": utterance,
         "runtime_world_state": runtime_world_state,
+        "execution_feasibility": stepwise_readaptation.get("execution_feasibility", {}) if stepwise_readaptation else None,
+        "body_capability_profile": profile,
     }
     execution_trace = {
         "schema_version": "1.0.0",
@@ -3325,6 +3845,7 @@ def run_process_chain_experience(intent: dict[str, Any], utterance: str, space_a
         "runtime_world_state_initial": runtime_world_state_initial,
         "runtime_world_state_final": runtime_world_state,
         "runtime_world_state_policy": runtime_world_state["persistence_policy"],
+        "stepwise_readaptation": stepwise_readaptation,
     }
     AUDIT_STORE[task_id] = audit_summary
     STATE_STORE[task_id] = stage_runtime_state
@@ -3347,6 +3868,7 @@ def run_process_chain_experience(intent: dict[str, Any], utterance: str, space_a
         "stage_runtime_state": stage_runtime_state,
         "execution_trace": execution_trace,
         "runtime_world_state": runtime_world_state,
+        "stepwise_readaptation": stepwise_readaptation,
         "experience_ref": intent["experience_id"],
         "space_context": build_space_context(cognitive_model),
     }
@@ -3394,7 +3916,15 @@ def build_migration_task_id(utterance: str, intent: dict[str, Any]) -> str:
             intent.get("candidate_process") or intent.get("goal_fact") or "none",
         ]
     )
-    return "migration_" + hashlib.sha1(seed.encode("utf-8")).hexdigest()[:12]
+    base = "migration_" + hashlib.sha1(seed.encode("utf-8")).hexdigest()[:12]
+    if base not in RUNTIME_WORLD_STATE_STORE and base not in STATE_STORE:
+        return base
+    suffix = 2
+    while True:
+        candidate = f"{base}_{suffix}"
+        if candidate not in RUNTIME_WORLD_STATE_STORE and candidate not in STATE_STORE:
+            return candidate
+        suffix += 1
 
 
 def get_process_chain_for_intent(intent: dict[str, Any]) -> list[str]:
@@ -3507,6 +4037,8 @@ def build_execution_feasibility(
     missing_facts: list[dict[str, Any]] = []
     executable_steps: list[str] = []
     blocked_steps: list[str] = []
+    dynamic_blockers = build_dynamic_environment_blockers(runtime_world_state, get_process_chain_for_intent(intent))
+    dynamic_blocked_steps = {item.get("step") for item in dynamic_blockers if item.get("step")}
     for binding in binding_candidate.get("step_bindings", []):
         step = binding["step"]
         capability = binding.get("capability")
@@ -3515,7 +4047,7 @@ def build_execution_feasibility(
             missing_capabilities.append({"step": step, "capability": capability})
         if step_missing_facts:
             missing_facts.append({"step": step, "missing_facts": step_missing_facts})
-        if step_missing_facts or (capability and capability not in supported_actions):
+        if step in dynamic_blocked_steps or step_missing_facts or (capability and capability not in supported_actions):
             blocked_steps.append(step)
             continue
         executable_steps.append(step)
@@ -3531,6 +4063,7 @@ def build_execution_feasibility(
         reasons.append({"reason": "missing_body_capability", **item})
     for item in missing_facts:
         reasons.append({"reason": "missing_prerequisite_fact", **item})
+    reasons.extend(dynamic_blockers)
     for item in runtime_world_state.get("runtime_conflicts", []):
         reasons.append({"reason": "runtime_fact_conflict", **item})
     if not reasons:
@@ -3647,6 +4180,50 @@ def build_execution_loop_payload(
     }
 
 
+def build_stepwise_readaptation(
+    task_id: str,
+    target_causal_fact: str | None,
+    remaining_steps: list[str],
+    runtime_world_state: dict[str, Any],
+    body_capability_profile: dict[str, Any],
+) -> dict[str, Any]:
+    cognitive_model = get_cognitive_model()
+    intent = {
+        "decision": "executable",
+        "task_type": "runtime_readaptation",
+        "goal_fact": target_causal_fact,
+        "candidate_process_chain": remaining_steps,
+    }
+    binding_candidate = build_binding_candidates(intent, cognitive_model, runtime_world_state, body_capability_profile)
+    feasibility = build_execution_feasibility(intent, binding_candidate, runtime_world_state, body_capability_profile)
+    readaptation_seed = "|".join(
+        [
+            task_id,
+            ",".join(remaining_steps),
+            runtime_world_state.get("runtime_world_state_snapshot_id", "none"),
+            json.dumps(feasibility.get("infeasible_reasons", []), ensure_ascii=False, sort_keys=True),
+        ]
+    )
+    readaptation_id = "readapt_" + hashlib.sha1(readaptation_seed.encode("utf-8")).hexdigest()[:12]
+    gap_record = build_experience_gap_record(readaptation_id, intent, binding_candidate, feasibility)
+    if gap_record:
+        EXPERIENCE_GAP_STORE[gap_record["gap_record_id"]] = gap_record
+    record = {
+        "schema_version": "1.0.0",
+        "readaptation_id": readaptation_id,
+        "source_task_id": task_id,
+        "trigger": "step_preflight_blocked",
+        "remaining_steps": remaining_steps,
+        "runtime_world_state_snapshot": clone_runtime_world_state(runtime_world_state),
+        "binding_candidate": binding_candidate,
+        "execution_feasibility": feasibility,
+        "experience_gap_record": gap_record,
+        "recommended_next_steps": feasibility.get("recommended_actions", []),
+    }
+    READAPTATION_STORE[readaptation_id] = record
+    return record
+
+
 def migrate_experience(utterance: str = "到水源处接一杯水", body_capability_profile: dict[str, Any] | None = None) -> dict[str, Any]:
     intent = translate_intent(utterance)
     cognitive_model = get_cognitive_model()
@@ -3670,6 +4247,7 @@ def migrate_experience(utterance: str = "到水源处接一杯水", body_capabil
         "runtime_state": "migration_adapted",
         "runtime_world_state": runtime_world_state,
         "execution_feasibility": feasibility,
+        "body_capability_profile": profile,
         "experience_gap_record_id": gap_record.get("gap_record_id") if gap_record else None,
     }
     AUDIT_STORE[runtime_world_state["audit_record_id"]] = {
@@ -3946,6 +4524,7 @@ def build_llm_context_view(task_id: str) -> dict[str, Any]:
         "executor": snapshot.get("executor", {}),
         "objects": objects,
         "established_facts": snapshot.get("established_facts", []),
+        "runtime_environment": snapshot.get("runtime_environment", {}),
         "available_actions_now": executable_now,
         "blocked_actions": needs_preconditions,
         "model_role_constraints": {
@@ -4412,6 +4991,7 @@ def readapt_runtime_conflict(
         "runtime_state": "readaptation_required",
         "runtime_world_state": runtime_world_state,
         "execution_feasibility": feasibility,
+        "body_capability_profile": profile,
         "experience_gap_record_id": gap_record.get("gap_record_id") if gap_record else None,
     }
     AUDIT_STORE[runtime_world_state["audit_record_id"]] = {
@@ -4479,6 +5059,8 @@ def dispatch_execution_loop_payload(payload: dict[str, Any], executor_type: str 
     dispatch_seed = "|".join([payload.get("execution_callback_id", ""), executor_type, snapshot_id or "none"])
     dispatch_id = "dispatch_" + hashlib.sha1(dispatch_seed.encode("utf-8")).hexdigest()[:12]
     feedback: list[dict[str, Any]] = []
+    stepwise_readaptation = None
+    profile = STATE_STORE.get(task_id, {}).get("body_capability_profile") or build_default_body_capability_profile()
     for index, item in enumerate(payload.get("execution_step_payload", []), start=1):
         step = item.get("step")
         meta = STEP_LIBRARY.get(step)
@@ -4492,6 +5074,43 @@ def dispatch_execution_loop_payload(payload: dict[str, Any], executor_type: str 
                 }
             )
             continue
+        preflight = evaluate_runtime_step_preflight(state, step, meta)
+        if preflight.get("result") == "blocked":
+            remaining_steps = [step] + [
+                rest.get("step")
+                for rest in payload.get("execution_step_payload", [])[index:]
+                if rest.get("step")
+            ]
+            stepwise_readaptation = build_stepwise_readaptation(
+                task_id,
+                payload.get("target_causal_fact"),
+                remaining_steps,
+                state,
+                profile,
+            )
+            gap_record = stepwise_readaptation.get("experience_gap_record")
+            feedback.append(
+                {
+                    "step": step,
+                    "executor_type": executor_type,
+                    "fact_status": "human_confirmation",
+                    "reason": preflight.get("reason"),
+                    "preflight_result": "blocked",
+                    "blocking_perturbations": preflight.get("blocking_perturbations", []),
+                    "recommended_actions": preflight.get("recommended_actions", []),
+                    "readaptation_id": stepwise_readaptation.get("readaptation_id"),
+                }
+            )
+            state["last_execution_dispatch_id"] = dispatch_id
+            state["last_execution_executor_type"] = executor_type
+            state["last_execution_fact_feedback"] = feedback
+            if task_id in STATE_STORE:
+                STATE_STORE[task_id]["runtime_world_state"] = state
+                STATE_STORE[task_id]["runtime_state"] = "readaptation_required"
+                STATE_STORE[task_id]["execution_feasibility"] = stepwise_readaptation.get("execution_feasibility", {})
+                STATE_STORE[task_id]["experience_gap_record_id"] = gap_record.get("gap_record_id") if gap_record else None
+                STATE_STORE[task_id]["last_readaptation_id"] = stepwise_readaptation.get("readaptation_id")
+            break
         transition = apply_step_to_runtime_world_state(state, step, meta, index)
         fact_status = "fact_established" if not transition["missing_before_step"] else "fact_not_established"
         feedback.append(
@@ -4505,11 +5124,16 @@ def dispatch_execution_loop_payload(payload: dict[str, Any], executor_type: str 
                 "missing_before_step": transition["missing_before_step"],
                 "before_executor_location": transition["before_executor_location"],
                 "after_executor_location": transition["after_executor_location"],
+                "preflight_result": preflight.get("result"),
+                "route_adjustment": preflight.get("route_adjustment"),
             }
         )
     target_fact = payload.get("target_causal_fact")
     established_facts = set(state.get("established_facts", []))
-    outcome = "fact_established" if target_fact in established_facts else "fact_not_established"
+    if stepwise_readaptation:
+        outcome = "readaptation_required"
+    else:
+        outcome = "fact_established" if target_fact in established_facts else "fact_not_established"
     state["last_execution_dispatch_id"] = dispatch_id
     state["last_execution_executor_type"] = executor_type
     state["last_execution_fact_feedback"] = feedback
@@ -4529,6 +5153,7 @@ def dispatch_execution_loop_payload(payload: dict[str, Any], executor_type: str 
             "outcome": outcome,
             "fact_feedback": feedback,
             "runtime_world_state_snapshot_id": snapshot_id,
+            "stepwise_readaptation_id": stepwise_readaptation.get("readaptation_id") if stepwise_readaptation else None,
         }
     )
     record = {
@@ -4542,6 +5167,7 @@ def dispatch_execution_loop_payload(payload: dict[str, Any], executor_type: str 
         "outcome": outcome,
         "fact_feedback": feedback,
         "runtime_world_state_snapshot": state,
+        "stepwise_readaptation": stepwise_readaptation,
         "audit_record_id": audit_record_id,
     }
     EXECUTION_DISPATCH_STORE[dispatch_id] = record
@@ -4817,6 +5443,18 @@ class RellSampleHandler(BaseHTTPRequestHandler):
             )
             self._send_json(result, status=400 if "error" in result else 200)
             return
+        if path == "/runtime_world_state/perturb":
+            task_id = body.get("task_id") or body.get("session_id") or body.get("migration_task_id") or body.get("source_task_id")
+            if not task_id:
+                self._send_json({"error": "missing_task_id"}, status=400)
+                return
+            perturbation = body.get("perturbation")
+            if not isinstance(perturbation, dict):
+                self._send_json({"error": "missing_perturbation_object"}, status=400)
+                return
+            result = inject_runtime_perturbation(task_id, perturbation, body.get("apply_before_step"))
+            self._send_json(result, status=404 if "error" in result else 200)
+            return
         if path == "/runtime_world_state/readapt":
             task_id = body.get("task_id") or body.get("source_task_id")
             if not task_id:
@@ -4893,7 +5531,7 @@ def main() -> None:
     server = HTTPServer((DEFAULT_HOST, DEFAULT_PORT), RellSampleHandler)
     print(f"RELL sample API listening on http://{DEFAULT_HOST}:{DEFAULT_PORT}")
     print(f"Demo page: http://{DEFAULT_HOST}:{DEFAULT_PORT}/")
-    print("Endpoints: POST /semantic/route, POST /agent/query, POST /llm/context-view, POST /llm/prompt-contract, POST /llm/candidate-intent, POST /llm/candidate/validate, POST /concept/resolve, POST /concept/candidates/confirm, POST /process/admit, POST /process/run, POST /experience/migrate, POST /execution/dispatch, POST /runtime_world_state/query, POST /teaching/session/start, GET /concept/library, GET /concept/candidates, GET /audit/{task_id}")
+    print("Endpoints: POST /semantic/route, POST /agent/query, POST /llm/context-view, POST /llm/prompt-contract, POST /llm/candidate-intent, POST /llm/candidate/validate, POST /concept/resolve, POST /concept/candidates/confirm, POST /process/admit, POST /process/run, POST /experience/migrate, POST /execution/dispatch, POST /runtime_world_state/query, POST /runtime_world_state/perturb, POST /teaching/session/start, GET /concept/library, GET /concept/candidates, GET /audit/{task_id}")
     server.serve_forever()
 
 
