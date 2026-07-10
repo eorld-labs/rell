@@ -55,7 +55,11 @@ def run_http_smoke() -> None:
     API_URL = f"http://127.0.0.1:{port}"
     env = {**os.environ, "RELL_SAMPLE_PORT": str(port)}
     experience_library_file = ROOT / "data" / "experience_library.json"
+    concept_library_file = ROOT / "data" / "concept_library.json"
+    concept_candidate_library_file = ROOT / "data" / "concept_candidate_library.json"
     original_library = experience_library_file.read_text(encoding="utf-8") if experience_library_file.exists() else None
+    original_concept_library = concept_library_file.read_text(encoding="utf-8") if concept_library_file.exists() else None
+    original_candidate_library = concept_candidate_library_file.read_text(encoding="utf-8") if concept_candidate_library_file.exists() else None
     process = subprocess.Popen(
         [sys.executable, str(ROOT / "api_server.py")],
         cwd=REPO,
@@ -68,15 +72,83 @@ def run_http_smoke() -> None:
         page = get_text("/")
         health = get_json("/health")
         cognitive_model = get_json("/space/cognitive-model")
+        concept_library = get_json("/concept/library")
         p017_loop = get_json("/p017/minimal-loop")
+        semantic_route = post_json("/semantic/route", {"utterance": "当前杯子有没有水"})
+        agent_execution_preview = post_json("/agent/query", {"utterance": "到水源处接一杯水"})
         admit = post_json("/process/admit", {})
         migration = post_json("/experience/migrate", {"utterance": "到水源处接一杯水"})
         migration_state = get_json(f"/runtime_world_state/{migration['migration_task_id']}")
+        llm_context_view = post_json("/llm/context-view", {"task_id": migration["migration_task_id"]})
+        llm_prompt_contract = post_json(
+            "/llm/prompt-contract",
+            {"task_id": migration["migration_task_id"], "utterance": "到水源处接一杯水"},
+        )
+        llm_candidate_intent = post_json(
+            "/llm/candidate-intent",
+            {"task_id": migration["migration_task_id"], "utterance": "到水源处接一杯水"},
+        )
+        concept_resolution = post_json(
+            "/concept/resolve",
+            {"task_id": migration["migration_task_id"], "utterance": "走到门旁边，再去操作台拿杯子，到水源处接一杯水"},
+        )
+        taught_experience = post_json(
+            "/experience/teach",
+            {
+                "utterance": "走向操作台，然后拿起杯子，到水源处接一杯水，然后倒水",
+                "steps": "走向操作台\n拿起杯子\n到水源处\n接一杯水\n倒水",
+            },
+        )
+        concept_candidates = get_json("/concept/candidates")
+        promoted_candidate = next(
+            (item for item in taught_experience.get("concept_promotion_candidates", []) if item.get("proposal_type") == "create_promoted_concept_unit"),
+            None,
+        )
+        confirmed_candidate = post_json(
+            "/concept/candidates/confirm",
+            {"candidate_id": promoted_candidate["candidate_id"], "confirmed_by": "http_smoke"},
+        ) if promoted_candidate else {"error": "missing_promoted_candidate"}
+        llm_candidate_validation = post_json(
+            "/llm/candidate/validate",
+            {
+                "task_id": migration["migration_task_id"],
+                "candidate": {
+                    "candidate_type": "candidate_plan",
+                    "goal_fact": "cup_contains_water",
+                    "candidate_process_chain": ["move_to_counter", "pick_up_cup", "move_to_water_source", "fill_cup_at_water_source"],
+                    "confidence": 0.77,
+                },
+            },
+        )
+        migration_query_before = post_json(
+            "/runtime_world_state/query",
+            {"task_id": migration["migration_task_id"], "question": "当前杯子有没有水"},
+        )
+        agent_state_query_before = post_json(
+            "/agent/query",
+            {"task_id": migration["migration_task_id"], "utterance": "当前杯子有没有水"},
+        )
         dispatch = post_json(
             "/execution/dispatch",
             {"execution_loop_payload": migration["execution_loop_payload"], "executor_type": "robot_sdk"},
         )
         dispatch_lookup = get_json(f"/execution/dispatch/{dispatch['dispatch_id']}")
+        migration_query_after = post_json(
+            "/runtime_world_state/query",
+            {"task_id": migration["migration_task_id"], "question": "当前杯子有没有水"},
+        )
+        migration_location_query = post_json(
+            "/runtime_world_state/query",
+            {"task_id": migration["migration_task_id"], "question": "我现在在哪"},
+        )
+        agent_teaching_route = post_json(
+            "/agent/query",
+            {"utterance": "教你：走向操作台，然后拿起杯子"},
+        )
+        agent_execution_run = post_json(
+            "/agent/query",
+            {"utterance": "到水源处接一杯水", "auto_execute": True, "scenario": "auto"},
+        )
         teaching_session = post_json("/teaching/session/start", {"utterance": "到水源处接一杯水"})
         teaching_step = post_json(
             "/teaching/session/step",
@@ -95,6 +167,10 @@ def run_http_smoke() -> None:
         release = post_json(
             "/runtime_world_state/release",
             {"task_id": migration["migration_task_id"], "release_reason": "http_smoke_finished"},
+        )
+        migration_query_released = post_json(
+            "/runtime_world_state/query",
+            {"task_id": migration["migration_task_id"], "question": "当前杯子有没有水"},
         )
         run_result = post_json("/process/run", {"scenario": "simulated_channel_conflict"})
         readaptation = post_json(
@@ -120,18 +196,54 @@ def run_http_smoke() -> None:
             raise AssertionError(f"health failed: {health}")
         if cognitive_model.get("prior_ref") != "semantic_prior_home_a_kitchen_v1":
             raise AssertionError(f"space cognitive model failed: {cognitive_model}")
+        if not any(item.get("concept_id") == "concept_spatial_region_navigation" for item in concept_library.get("concept_units", [])):
+            raise AssertionError(f"concept library failed: {concept_library}")
         if not p017_loop.get("evidence_index") or len(p017_loop.get("evidence_files", {})) != 6:
             raise AssertionError(f"P017 minimal loop endpoint failed: {p017_loop}")
+        if semantic_route.get("request_type") != "state_query":
+            raise AssertionError(f"semantic route failed: {semantic_route}")
+        if agent_execution_preview.get("semantic_request", {}).get("request_type") != "task_execution":
+            raise AssertionError(f"agent execution preview route failed: {agent_execution_preview}")
+        if agent_execution_preview.get("route_result", {}).get("space_admission", {}).get("decision") != "allowed":
+            raise AssertionError(f"agent execution preview admission failed: {agent_execution_preview}")
         if admit.get("decision") != "allowed":
             raise AssertionError(f"admit failed: {admit}")
         if migration.get("execution_feasibility", {}).get("result") != "executable":
             raise AssertionError(f"migration failed: {migration}")
         if migration_state.get("release_status") != "not_released":
             raise AssertionError(f"runtime world state query failed: {migration_state}")
+        if not llm_context_view.get("usable_as_current_world_state"):
+            raise AssertionError(f"llm context view failed: {llm_context_view}")
+        if llm_prompt_contract.get("handoff_contract", {}).get("validator_endpoint") != "/llm/candidate/validate":
+            raise AssertionError(f"llm prompt contract failed: {llm_prompt_contract}")
+        if llm_candidate_intent.get("llm_input_contract", {}).get("next_endpoint") != "/llm/candidate/validate":
+            raise AssertionError(f"llm candidate intent failed: {llm_candidate_intent}")
+        if not any(item.get("concept_id") == "concept_fillable_container" for item in concept_resolution.get("resolved_concepts", [])):
+            raise AssertionError(f"concept resolution failed: {concept_resolution}")
+        if not taught_experience.get("concept_promotion_candidates"):
+            raise AssertionError(f"teaching must expose concept promotion candidates: {taught_experience}")
+        if not concept_candidates.get("concept_candidates"):
+            raise AssertionError(f"concept candidates endpoint failed: {concept_candidates}")
+        if confirmed_candidate.get("status") != "promoted":
+            raise AssertionError(f"concept candidate confirm failed: {confirmed_candidate}")
+        if not llm_candidate_validation.get("accepted_structure") or llm_candidate_validation.get("direct_execution_allowed"):
+            raise AssertionError(f"llm candidate validation failed: {llm_candidate_validation}")
+        if migration_query_before.get("answer") != "false":
+            raise AssertionError(f"runtime world state question should answer false before fill: {migration_query_before}")
+        if agent_state_query_before.get("semantic_request", {}).get("request_type") != "state_query":
+            raise AssertionError(f"agent state route failed: {agent_state_query_before}")
         if dispatch.get("outcome") != "fact_established":
             raise AssertionError(f"execution dispatch failed: {dispatch}")
         if dispatch_lookup.get("dispatch_id") != dispatch["dispatch_id"]:
             raise AssertionError(f"execution dispatch lookup failed: {dispatch_lookup}")
+        if migration_query_after.get("answer") != "true":
+            raise AssertionError(f"runtime world state question should answer true after fill: {migration_query_after}")
+        if migration_location_query.get("answer") != "region_water_source":
+            raise AssertionError(f"runtime world state should answer current location from snapshot: {migration_location_query}")
+        if agent_teaching_route.get("route_result", {}).get("decision") != "routed_to_teaching":
+            raise AssertionError(f"agent teaching route failed: {agent_teaching_route}")
+        if agent_execution_run.get("route_result", {}).get("audit_summary", {}).get("outcome") != "completed":
+            raise AssertionError(f"agent execution run failed: {agent_execution_run}")
         if teaching_session.get("status") != "teaching_in_progress":
             raise AssertionError(f"stepwise teaching start failed: {teaching_session}")
         if not teaching_step.get("step_feedback") or teaching_step["step_feedback"][0].get("status") != "executed":
@@ -144,6 +256,8 @@ def run_http_smoke() -> None:
             raise AssertionError(f"stepwise teaching release failed: {teaching_finish}")
         if release.get("release_status") != "released" or not release.get("release_token"):
             raise AssertionError(f"runtime world state release failed: {release}")
+        if migration_query_released.get("answer") != "unknown" or migration_query_released.get("status") != "snapshot_released":
+            raise AssertionError(f"released runtime world state should not answer as current state: {migration_query_released}")
         if run_result["audit_summary"]["outcome"] != "requires_human_confirmation":
             raise AssertionError(f"run failed: {run_result}")
         if readaptation.get("execution_feasibility", {}).get("result") != "requires_human_confirmation":
@@ -169,6 +283,14 @@ def run_http_smoke() -> None:
             experience_library_file.unlink(missing_ok=True)
         else:
             experience_library_file.write_text(original_library, encoding="utf-8")
+        if original_concept_library is None:
+            concept_library_file.unlink(missing_ok=True)
+        else:
+            concept_library_file.write_text(original_concept_library, encoding="utf-8")
+        if original_candidate_library is None:
+            concept_candidate_library_file.unlink(missing_ok=True)
+        else:
+            concept_candidate_library_file.write_text(original_candidate_library, encoding="utf-8")
     print("[ok] api_server HTTP smoke")
 
 

@@ -1,0 +1,155 @@
+{
+  "schema_version": "1.0.0",
+  "concept_units": [
+    {
+      "concept_id": "concept_spatial_region_navigation",
+      "display_name": "空间目标导航概念",
+      "concept_level": "action_way",
+      "typical_action": "navigate_to_region",
+      "typical_consequence": "executor_at_target_region",
+      "usage": "公共空间能力，不作为具体任务经验入库",
+      "capability_semantics": ["navigate_to_region"],
+      "effect_contract": {
+        "produces_facts": ["executor_at_bound_region"],
+        "destroys_facts": ["executor_at_previous_region"],
+        "state_transition": "executor_location_changes_to_bound_region"
+      },
+      "applicability_constraints": {
+        "requires_space_binding": true,
+        "supported_binding_types": ["semantic_region"],
+        "required_runtime_facts": [],
+        "forbidden_low_level_fields": ["absolute_coordinates", "joint_angles", "trajectory"]
+      },
+      "runtime_contingency_hints": [
+        "路径受阻时回到编排层或局部避障能力，不由概念层直接改写运行时事实",
+        "概念层只声明到达目标区域这一必要效果，不声明具体轨迹"
+      ],
+      "experience_link_policy": {
+        "role": "公共能力概念",
+        "direct_execution_allowed": false,
+        "requires_orchestration": true,
+        "preferred_backing": ["经验库", "P016过程模板", "执行层局部能力"]
+      }
+    },
+    {
+      "concept_id": "concept_interactive_object_acquisition",
+      "display_name": "可交互对象获取概念",
+      "concept_level": "task_processing",
+      "typical_action": "grasp_object",
+      "typical_consequence": "object_in_gripper",
+      "usage": "用于从当前空间中定位并获取任务对象",
+      "capability_semantics": ["grasp_object"],
+      "effect_contract": {
+        "produces_facts": ["object_in_gripper"],
+        "destroys_facts": ["gripper_empty", "object_at_original_region"],
+        "state_transition": "target_object_moves_into_executor_gripper"
+      },
+      "applicability_constraints": {
+        "requires_space_binding": true,
+        "supported_binding_types": ["interactive_object"],
+        "required_runtime_facts": ["gripper_empty"],
+        "forbidden_low_level_fields": ["joint_angles", "gripper_pwm", "trajectory"]
+      },
+      "runtime_contingency_hints": [
+        "对象不可达或抓取失败时输出不可执行或需补充教学，不由概念层臆造成功事实",
+        "抓取姿态由执行层或本体局部能力决定，不写入概念层"
+      ],
+      "experience_link_policy": {
+        "role": "对象交互概念",
+        "direct_execution_allowed": false,
+        "requires_orchestration": true,
+        "preferred_backing": ["经验库", "执行层抓取器"]
+      }
+    },
+    {
+      "concept_id": "concept_fillable_container",
+      "display_name": "可盛装容器概念",
+      "concept_level": "object",
+      "typical_action": "fill_container",
+      "typical_consequence": "container_contains_liquid",
+      "usage": "用于把不同杯子、容器映射到接水经验",
+      "capability_semantics": ["fill_container"],
+      "effect_contract": {
+        "produces_facts": ["container_contains_target_liquid"],
+        "destroys_facts": ["container_empty"],
+        "state_transition": "target_container_changes_from_empty_to_filled"
+      },
+      "applicability_constraints": {
+        "requires_space_binding": true,
+        "supported_binding_types": ["fillable_container"],
+        "required_runtime_facts": [],
+        "forbidden_low_level_fields": ["fixed_execution_duration", "trajectory", "joint_angles"]
+      },
+      "runtime_contingency_hints": [
+        "容器类型变化时由经验不变量契约重新绑定，不直接复用历史坐标和轨迹",
+        "液位或出水状态应由运行时事实回传确认"
+      ],
+      "experience_link_policy": {
+        "role": "对象语义概念",
+        "direct_execution_allowed": false,
+        "requires_orchestration": true,
+        "preferred_backing": ["P017迁移适配", "经验库"]
+      }
+    },
+    {
+      "concept_id": "concept_water_resource_zone",
+      "display_name": "水源资源区概念",
+      "concept_level": "context",
+      "typical_action": "use_resource_zone",
+      "typical_consequence": "water_resource_available",
+      "usage": "用于把不同空间中的水龙头、饮水机或水源点映射为资源区",
+      "capability_semantics": ["use_resource_zone", "fill_container"],
+      "effect_contract": {
+        "produces_facts": ["water_resource_available"],
+        "destroys_facts": [],
+        "state_transition": "bound_resource_zone_can_supply_liquid"
+      },
+      "applicability_constraints": {
+        "requires_space_binding": true,
+        "supported_binding_types": ["semantic_region", "resource_zone"],
+        "required_runtime_facts": [],
+        "forbidden_low_level_fields": ["absolute_coordinates", "trajectory"]
+      },
+      "runtime_contingency_hints": [
+        "资源区失效或观测冲突时应重新适配，不由概念层保持旧绑定",
+        "概念层只声明资源角色，不声明底层阀门或传感器控制细节"
+      ],
+      "experience_link_policy": {
+        "role": "空间资源概念",
+        "direct_execution_allowed": false,
+        "requires_orchestration": true,
+        "preferred_backing": ["P010空间语义", "P017迁移适配"]
+      }
+    },
+    {
+      "concept_id": "concept_liquid_transfer_task",
+      "display_name": "液体转移任务概念",
+      "concept_level": "task_processing",
+      "typical_action": "pour_container",
+      "typical_consequence": "liquid_transferred",
+      "usage": "具体倒水类任务经验，由经验库或 P016 过程模板承载",
+      "capability_semantics": ["pour_container"],
+      "effect_contract": {
+        "produces_facts": ["liquid_transferred_to_target"],
+        "destroys_facts": ["source_container_contains_liquid"],
+        "state_transition": "liquid_moves_from_source_container_to_target"
+      },
+      "applicability_constraints": {
+        "requires_space_binding": true,
+        "supported_binding_types": ["task_goal", "interactive_object", "semantic_region"],
+        "required_runtime_facts": ["source_container_contains_liquid"],
+        "forbidden_low_level_fields": ["trajectory", "joint_angles", "raw_control_signal"]
+      },
+      "runtime_contingency_hints": [
+        "具体倒水路线和容器姿态由经验层和执行层共同决定",
+        "若运行时检测到液体未转移成功，应回传事实失败而非默认完成"
+      ],
+      "experience_link_policy": {
+        "role": "任务概念",
+        "direct_execution_allowed": false,
+        "requires_orchestration": true,
+        "preferred_backing": ["经验库", "P016过程模板", "P017迁移适配"]
+      }
+    }
+  ]
+}

@@ -81,6 +81,213 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 
 翻译层会保留门旁边、服务位、操作台和水源处四个空间约束，概念层匹配“空间目标导航概念”“可盛装容器概念”和“水源资源区概念”，再由因果层确认该显式路线能达成 `cup_contains_water`。
 
+## POST /semantic/route
+
+用途：统一语义路由器骨架。该接口不直接执行任务，而是将自然语言归入 `state_query`、`task_execution`、`teaching`、`clarification` 或 `unknown`，并输出统一语义帧。当前样品先用轻量规则路由，后续可在不改变下游执行主链的前提下，把复杂输入升级为更大的语义模型。
+
+请求示例：
+
+```json
+{
+  "utterance": "当前杯子有没有水"
+}
+```
+
+响应至少包括：
+
+- `request_type`：语义请求类别。
+- `route_reason`：本次归类依据。
+- `preferred_model_tier`：当前建议走 `rule_router_only` 还是 `llm_escalatable`。
+- `intent_frame`：与任务、空间、对象和事实相关的统一结构化语义。
+
+## POST /agent/query
+
+用途：统一自然语言入口。该接口先调用 `/semantic/route` 完成语义分流，再根据请求类型调用现有能力：
+
+- `state_query`：进入当前任务期运行时世界状态快照查询；
+- `task_execution`：进入任务翻译或执行；
+- `teaching`：进入教学解析；
+- `clarification`：进入执行原因说明。
+
+请求示例：
+
+```json
+{
+  "task_id": "migration_xxx",
+  "utterance": "当前杯子有没有水"
+}
+```
+
+对于 `task_execution`，可选传入：
+
+```json
+{
+  "utterance": "到水源处接一杯水",
+  "auto_execute": true,
+  "scenario": "auto"
+}
+```
+
+这样会在路由后直接调用当前样品的执行链路；若未传 `auto_execute` 或其值为 `false`，则仅返回翻译结果而不执行。
+在当前样品中，首页“运行任务”也已经改为经由 `POST /agent/query` 进入：先以 `auto_execute=false` 获取 `semantic_request`、`intent_translation` 和 `space_admission`，再以 `auto_execute=true` 在同一入口下触发执行。这样状态问答、任务执行和后续教学链路共用同一条自然语言主线。
+
+## POST /llm/context-view
+
+用途：为未来大模型接入提供只读的当前任务期世界状态语义视图。该接口严格从当前任务期运行时世界状态快照生成上下文，不回退到长期经验库，也不允许通过该接口写入事实。
+
+请求示例：
+
+```json
+{
+  "task_id": "migration_xxx"
+}
+```
+
+响应至少包括：
+
+- `usable_as_current_world_state`：当前快照是否仍可作为模型读取的当前世界状态；
+- `source_policy`：固定为 `runtime_world_state_snapshot_only`；
+- `task_context`：任务运行状态、目标事实、当前阶段和快照标识；
+- `executor`、`objects`、`established_facts`：供模型读取的当前语义状态；
+- `available_actions_now`、`blocked_actions`：由确定性规则从当前快照推导出的动作候选；
+- `model_role_constraints`：明确模型不能写事实、不能生成底层控制、必须回到校验器和编排层。
+
+若快照已经释放，则 `usable_as_current_world_state=false`，并返回 `context_status=snapshot_released`，表示不能再把该快照当作当前世界状态喂给模型。
+
+## POST /llm/prompt-contract
+
+用途：生成稳定的大模型提示词契约。该接口不调用大模型，而是把语义请求、候选意图预览、概念层解析结果、可选的当前任务期运行时世界状态快照视图以及输出边界打包为统一契约，供后续模型调用层复用。
+
+请求示例：
+```json
+{
+  "task_id": "migration_xxx",
+  "utterance": "到水源处接一杯水"
+}
+```
+
+响应至少包括：
+- `role_definition`：明确模型仅负责长程或陌生任务的语义理解、候选建议和澄清，不参与连续控制与最终执行决策；
+- `input_packet.semantic_request`：统一语义路由结果；
+- `input_packet.intent_translation_preview`：当前任务的候选目标事实和候选过程链预览；
+- `input_packet.concept_resolution`：概念层解析结果摘要；
+- `input_packet.runtime_context_view`：可选的当前任务期运行时世界状态语义视图；
+- `system_constraints`：禁止输出底层控制、禁止写回任务期快照、禁止臆造未观测事实；
+- `output_contract`：允许的候选类型、禁止字段和下一跳校验端点；
+- `handoff_contract`：固定声明 `validator_endpoint=/llm/candidate/validate`，且 `direct_execution_allowed=false`。
+
+## POST /llm/candidate-intent
+
+用途：生成未来大模型调用前的标准输入包。该接口不调用大模型，而是输出 `semantic_request`、`intent_translation_preview`、可选的 `runtime_context_view` 和模型输入约束，作为后续提示词或模型调用层的稳定边界。
+
+请求示例：
+
+```json
+{
+  "task_id": "migration_xxx",
+  "utterance": "到水源处接一杯水"
+}
+```
+
+响应中的 `llm_input_contract` 会显式给出：
+
+- `allowed_candidate_types`：当前仅允许 `intent_frame_patch`、`candidate_plan`、`clarification_answer`；
+- `forbidden_output_fields`：禁止输出绝对坐标、关节角、轨迹、运行时事实写回字段等；
+- `next_endpoint`：固定为 `/llm/candidate/validate`，用于要求模型候选输出必须先通过确定性校验。
+
+响应中的 `concept_resolution` 会给出与当前语义请求匹配的概念层候选，用于明确哪些公共概念可复用、哪些仍需回到经验层或执行层判断。
+
+## POST /llm/candidate/validate
+
+用途：对模型候选输出做确定性校验。该接口只检查“结构是否安全、字段是否越权、步骤是否可识别”，不直接执行候选计划。
+
+请求示例：
+
+```json
+{
+  "task_id": "migration_xxx",
+  "candidate": {
+    "candidate_type": "candidate_plan",
+    "goal_fact": "cup_contains_water",
+    "candidate_process_chain": [
+      "move_to_counter",
+      "pick_up_cup",
+      "move_to_water_source",
+      "fill_cup_at_water_source"
+    ],
+    "confidence": 0.77
+  }
+}
+```
+
+响应至少包括：
+
+- `accepted_structure`：候选结构是否通过；
+- `validation_errors`、`validation_warnings`：越权字段、未知步骤或上下文提醒；
+- `direct_execution_allowed`：固定为 `false`；
+- `must_reenter_orchestration_layer`：固定为 `true`。
+
+也就是说，大模型未来即使参与理解、澄清或候选建议，仍不能绕过空间语义、本体能力、任务期快照和编排层，直接生成底层动作控制。
+
+## GET /concept/library
+
+用途：查询当前样品的概念层公共语义单元库。该接口返回的概念单元用于承接公共空间能力、对象语义和任务语义，不直接替代经验层、因果层或执行层。
+
+响应至少包括：
+- `concept_units[].concept_id`、`display_name`、`concept_level`；
+- `capability_semantics`：该概念对应的公共能力语义；
+- `effect_contract`：必要效果事实，而非轨迹或关节角；
+- `applicability_constraints`：绑定约束、所需运行时事实和禁止的底层字段；
+- `experience_link_policy`：明确 `direct_execution_allowed=false`，并说明该概念优先由哪一层承接。
+
+## POST /concept/resolve
+
+用途：把当前自然语言请求解析为概念层候选，作为经验层和编排层之间的可复用中间语义单元。该接口只做概念识别和边界声明，不直接下发动作。
+
+请求示例：
+```json
+{
+  "task_id": "migration_xxx",
+  "utterance": "走到门旁边，再去操作台拿杯子，到水源处接一杯水"
+}
+```
+
+响应至少包括：
+- `semantic_request`：统一语义路由结果；
+- `intent_frame_summary`：目标事实、显式过程链、空间约束和对象约束摘要；
+- `resolved_concepts`：概念层候选，每个候选带有 `activation_reason`、`effect_contract`、`runtime_binding_status` 和 `experience_link_policy`；
+- `concept_resolution_policy`：明确概念层只提供可复用语义单元，`direct_execution_allowed=false`，且必须重新进入编排层。
+
+## GET /concept/candidates
+
+用途：查询由成功经验自动生成、但尚未人工确认的概念晋升候选。该接口用于承接“经验 -> 概念候选 -> 人工确认晋升”的最小闭环。
+
+响应至少包括：
+- `concept_candidates[].candidate_id`：候选标识；
+- `proposal_type`：`create_promoted_concept_unit` 或 `strengthen_existing_concept`；
+- `target_concept_id`：将要新建或补强的概念标识；
+- `source_experience_id`：来源经验；
+- `promotion_rationale`：晋升理由；
+- `human_confirmation_required`：固定为 `true`。
+
+## POST /concept/candidates/confirm
+
+用途：对概念晋升候选做人工确认。确认后，候选概念将正式写入概念库，或补强现有概念与真实经验之间的证据关系。
+
+请求示例：
+```json
+{
+  "candidate_id": "concept_candidate_xxx",
+  "confirmed_by": "human_reviewer"
+}
+```
+
+响应至少包括：
+- `status=promoted`；
+- `promoted_concept_id`：确认后进入概念库或被补强的概念标识；
+- `promoted_concept_unit`：确认后的概念单元内容或补强后的概念内容；
+- `source_experience_id`：概念候选来源经验。
+
 ## POST /experience/migrate
 
 用途：执行 P017 迁移适配控制器主链。该接口不直接控制机器人电机，而是把待迁移经验记录、当前空间语义数据、本体能力画像和任务期运行时世界状态快照组合起来，生成绑定候选、执行可行性结果和开放执行闭环调用载荷。
@@ -129,6 +336,38 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 
 响应包括 `release_token`、`release_status`、`release_reason` 和 `audit_record_id`。释放在样品中表现为逻辑释放和审计关联，实际产品中可对应物理删除、缓存清空、任务标识解绑、权限隔离或停止作为后续任务事实输入。
 
+## POST /runtime_world_state/query
+
+用途：直接从当前任务期运行时世界状态快照回答状态问题，不回退到长期空间语义存量，不根据执行历史做补充推理。当前样品先支持“当前杯子有没有水”这一类状态查询。
+
+请求示例：
+
+```json
+{
+  "task_id": "migration_xxx",
+  "question": "当前杯子有没有水"
+}
+```
+
+响应中的 `answer` 取值为 `true`、`false`、`unknown` 或 `conflict`：
+
+- `true`：当前快照中存在 `cup_contains_water`。
+- `false`：当前快照中存在 `cup_empty` 且不存在 `cup_contains_water`。
+- `unknown`：当前快照中两者都不存在，或快照已经释放，不再代表当前世界状态。
+- `conflict`：当前快照中同时存在 `cup_contains_water` 与 `cup_empty`。
+
+该接口的 `source` 固定为 `runtime_world_state_snapshot_only`，用于明确回答依据只能来自当前任务期运行时世界状态快照。
+
+当前样品支持的自然语言问题包括：
+
+- `当前杯子有没有水`
+- `当前水壶里有没有水`
+- `我手里拿着什么`
+- `我现在在哪`
+- `当前状态`
+
+这一步中的自然语言解析仍然是轻量规则层：语言只负责识别问题类型和对象指向，真正回答时只读取当前任务期运行时世界状态快照。
+
 ## GET /audit/{task_id}
 
 用途：查询最近一次运行写入内存的审计摘要。
@@ -149,6 +388,8 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 ```
 
 第一阶段采用轻量规则映射表解析教学步骤，不调用通用规划器，不自动生成新的 P016 过程模板。生成的经验链先标记为数字空间可回放经验，后续再进入人工审核、真机验证或模板化沉淀。若同一输入已经能被目标因果事实和因果层求解，则运行时优先采用因果求解结果，教学经验作为候选经验和审计依据保留。
+
+当经验成功生成后，响应中还会附带 `concept_promotion_candidates`。这些候选由经验记录、因果签名和经验不变量契约自动抽取生成，用于后续人工确认是否将该经验晋升为概念层公共语义单元，或补强现有概念。
 
 ## POST /experience/dialogue-teach
 

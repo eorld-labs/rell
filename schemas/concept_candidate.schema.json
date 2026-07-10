@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/concept_candidate.schema.json",
+  "title": "ConceptCandidate",
+  "type": "object",
+  "required": [
+    "candidate_id",
+    "status",
+    "proposal_type",
+    "target_concept_id",
+    "source_experience_id",
+    "human_confirmation_required"
+  ],
+  "properties": {
+    "candidate_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "proposal_type": {
+      "type": "string"
+    },
+    "target_concept_id": {
+      "type": "string"
+    },
+    "source_experience_id": {
+      "type": "string"
+    },
+    "source_utterance": {
+      "type": "string"
+    },
+    "goal_fact": {
+      "type": ["string", "null"]
+    },
+    "abstract_process_chain": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "base_concept_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "human_confirmation_required": {
+      "type": "boolean"
+    },
+    "promotion_rationale": {
+      "type": "string"
+    },
+    "proposed_concept_unit": {
+      "type": "object"
+    },
+    "proposed_update": {
+      "type": "object"
+    },
+    "confirmed_by": {
+      "type": "string"
+    },
+    "confirmed_at": {
+      "type": "string"
+    },
+    "promoted_concept_id": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}

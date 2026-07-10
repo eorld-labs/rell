@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/concept_unit.schema.json",
+  "title": "ConceptUnit",
+  "type": "object",
+  "required": [
+    "concept_id",
+    "display_name",
+    "concept_level",
+    "capability_semantics",
+    "effect_contract",
+    "applicability_constraints",
+    "experience_link_policy"
+  ],
+  "properties": {
+    "concept_id": {
+      "type": "string"
+    },
+    "display_name": {
+      "type": "string"
+    },
+    "concept_level": {
+      "type": "string"
+    },
+    "typical_action": {
+      "type": ["string", "null"]
+    },
+    "typical_consequence": {
+      "type": ["string", "null"]
+    },
+    "usage": {
+      "type": "string"
+    },
+    "capability_semantics": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "effect_contract": {
+      "type": "object",
+      "required": ["produces_facts", "destroys_facts"],
+      "properties": {
+        "produces_facts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "destroys_facts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "state_transition": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "applicability_constraints": {
+      "type": "object",
+      "properties": {
+        "requires_space_binding": {
+          "type": "boolean"
+        },
+        "supported_binding_types": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "required_runtime_facts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "forbidden_low_level_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "runtime_contingency_hints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "experience_link_policy": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string"
+        },
+        "direct_execution_allowed": {
+          "type": "boolean"
+        },
+        "requires_orchestration": {
+          "type": "boolean"
+        },
+        "preferred_backing": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}
