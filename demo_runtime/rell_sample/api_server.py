@@ -29,6 +29,7 @@ EXPERIENCE_LIBRARY_FILE = DATA / "experience_library.json"
 CONCEPT_LIBRARY_FILE = DATA / "concept_library.json"
 CONCEPT_CANDIDATE_LIBRARY_FILE = DATA / "concept_candidate_library.json"
 PREFERENCE_LIBRARY_FILE = DATA / "preference_record_library.json"
+RECOVERY_LIBRARY_FILE = DATA / "recovery_record_library.json"
 P017_MINIMAL_LOOP_OUTPUT = ROOT.parent / "output" / "rell_sample" / "p017_minimal_loop"
 
 TIMELINE_SCENARIOS = {
@@ -2899,6 +2900,16 @@ def save_experience_library(library: dict[str, Any]) -> None:
     EXPERIENCE_LIBRARY_FILE.write_text(json.dumps(library, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def load_recovery_library() -> dict[str, Any]:
+    if not RECOVERY_LIBRARY_FILE.exists():
+        return {"schema_version": "1.0.0", "recovery_records": []}
+    return read_json(RECOVERY_LIBRARY_FILE)
+
+
+def save_recovery_library(library: dict[str, Any]) -> None:
+    RECOVERY_LIBRARY_FILE.write_text(json.dumps(library, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
 def load_preference_library() -> dict[str, Any]:
     if not PREFERENCE_LIBRARY_FILE.exists():
         return {"schema_version": "1.0.0", "preference_records": []}
@@ -2907,6 +2918,194 @@ def load_preference_library() -> dict[str, Any]:
 
 def save_preference_library(library: dict[str, Any]) -> None:
     PREFERENCE_LIBRARY_FILE.write_text(json.dumps(library, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def build_recovery_action(
+    outcome: str,
+    stop_reason: str | None = None,
+    gap_record: dict[str, Any] | None = None,
+    readaptation_id: str | None = None,
+) -> dict[str, Any]:
+    recommended_actions = list(gap_record.get("recommended_actions", [])) if gap_record else []
+    if readaptation_id:
+        return {
+            "action_type": "trigger_readaptation",
+            "parameters": {
+                "readaptation_id": readaptation_id,
+                "recommended_actions": recommended_actions or ["request_human_confirmation", "search_alternative_experience"],
+            },
+            "human_intervention": True,
+        }
+    if outcome in {"requires_human_confirmation", "readaptation_required"}:
+        return {
+            "action_type": "request_human_confirmation",
+            "parameters": {
+                "reason": stop_reason or outcome,
+                "recommended_actions": recommended_actions or ["request_human_confirmation", "terminate_execution"],
+            },
+            "human_intervention": True,
+        }
+    if gap_record and any(item in recommended_actions for item in ["trigger_supplemental_teaching", "search_alternative_experience"]):
+        return {
+            "action_type": "request_teaching_or_alternative_experience",
+            "parameters": {
+                "reason": stop_reason or outcome,
+                "recommended_actions": recommended_actions,
+                "experience_gap_record_id": gap_record.get("gap_record_id"),
+            },
+            "human_intervention": True,
+        }
+    return {
+        "action_type": "record_failure_and_wait",
+        "parameters": {
+            "reason": stop_reason or outcome,
+            "recommended_actions": recommended_actions or ["terminate_execution"],
+        },
+        "human_intervention": False,
+    }
+
+
+def build_recovery_outcome_type(outcome: str) -> str:
+    if outcome in {"recovered"}:
+        return "recovered"
+    if outcome in {"partially_inexecutable", "partially_recovered"}:
+        return "partially_recovered"
+    if outcome in {"requires_human_confirmation", "readaptation_required"}:
+        return "escalated"
+    return "failed"
+
+
+def persist_recovery_record(
+    *,
+    task_id: str,
+    failed_experience_ref: str,
+    deviation_type: str,
+    observed_state: str,
+    expected_state: str,
+    recovery_action: dict[str, Any],
+    recovery_outcome_type: str,
+    notes: str,
+    audit_record_id: str | None = None,
+    runtime_world_state_snapshot_id: str | None = None,
+    source_refs: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    seed = "|".join(
+        [
+            task_id,
+            failed_experience_ref,
+            deviation_type,
+            observed_state,
+            expected_state,
+            recovery_action.get("action_type", "unknown"),
+            recovery_outcome_type,
+        ]
+    )
+    recovery_id = "recovery_" + hashlib.sha1(seed.encode("utf-8")).hexdigest()[:12]
+    record = {
+        "schema_version": "1.0.0",
+        "recovery_id": recovery_id,
+        "task_id": task_id,
+        "audit_record_id": audit_record_id,
+        "runtime_world_state_snapshot_id": runtime_world_state_snapshot_id,
+        "failed_experience_ref": failed_experience_ref,
+        "deviation_context": {
+            "deviation_type": deviation_type,
+            "observed_state": observed_state,
+            "expected_state": expected_state,
+        },
+        "recovery_action": recovery_action,
+        "recovery_outcome": {
+            "outcome_type": recovery_outcome_type,
+            "notes": notes,
+        },
+        "source_refs": source_refs or {},
+    }
+    library = load_recovery_library()
+    records = [item for item in library.get("recovery_records", []) if item.get("recovery_id") != recovery_id]
+    records.append(record)
+    library["recovery_records"] = records
+    save_recovery_library(library)
+    return record
+
+
+def attach_recovery_record_to_context(
+    recovery_record: dict[str, Any],
+    *,
+    task_id: str | None = None,
+    audit_record_id: str | None = None,
+) -> None:
+    recovery_id = recovery_record.get("recovery_id")
+    if not recovery_id:
+        return
+    if task_id and task_id in STATE_STORE:
+        state = STATE_STORE[task_id]
+        refs = state.setdefault("recovery_record_ids", [])
+        if recovery_id not in refs:
+            refs.append(recovery_id)
+    if task_id and task_id in RUNTIME_WORLD_STATE_STORE:
+        runtime_state = RUNTIME_WORLD_STATE_STORE[task_id]
+        refs = runtime_state.setdefault("recovery_record_ids", [])
+        if recovery_id not in refs:
+            refs.append(recovery_id)
+    target_audit = None
+    if audit_record_id and audit_record_id in AUDIT_STORE:
+        target_audit = AUDIT_STORE[audit_record_id]
+    elif task_id and task_id in AUDIT_STORE:
+        target_audit = AUDIT_STORE[task_id]
+    if target_audit is not None:
+        refs = target_audit.setdefault("recovery_record_ids", [])
+        if recovery_id not in refs:
+            refs.append(recovery_id)
+
+
+def build_recovery_record_for_task(
+    *,
+    task_id: str,
+    failed_experience_ref: str,
+    outcome: str,
+    stop_reason: str | None,
+    expected_state: str,
+    observed_state: str,
+    audit_record_id: str | None = None,
+    runtime_world_state_snapshot_id: str | None = None,
+    gap_record: dict[str, Any] | None = None,
+    readaptation_id: str | None = None,
+    source_refs: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    recovery_action = build_recovery_action(outcome, stop_reason=stop_reason, gap_record=gap_record, readaptation_id=readaptation_id)
+    recovery_outcome_type = build_recovery_outcome_type(outcome)
+    notes = stop_reason or outcome
+    record = persist_recovery_record(
+        task_id=task_id,
+        failed_experience_ref=failed_experience_ref,
+        deviation_type=stop_reason or outcome,
+        observed_state=observed_state,
+        expected_state=expected_state,
+        recovery_action=recovery_action,
+        recovery_outcome_type=recovery_outcome_type,
+        notes=notes,
+        audit_record_id=audit_record_id,
+        runtime_world_state_snapshot_id=runtime_world_state_snapshot_id,
+        source_refs=source_refs,
+    )
+    attach_recovery_record_to_context(record, task_id=task_id, audit_record_id=audit_record_id)
+    return record
+
+
+def get_recovery_record(recovery_id: str) -> dict[str, Any]:
+    for item in load_recovery_library().get("recovery_records", []):
+        if item.get("recovery_id") == recovery_id:
+            return item
+    return {"error": "recovery_record_not_found", "recovery_id": recovery_id}
+
+
+def get_recovery_records_for_task(task_id: str) -> dict[str, Any]:
+    items = [item for item in load_recovery_library().get("recovery_records", []) if item.get("task_id") == task_id]
+    return {
+        "schema_version": "1.0.0",
+        "task_id": task_id,
+        "recovery_records": items,
+    }
 
 
 def get_preference_context_ref(intent: dict[str, Any], cognitive_model: dict[str, Any] | None = None) -> str:
@@ -4067,6 +4266,25 @@ def run_process_chain_experience(intent: dict[str, Any], utterance: str, space_a
     STATE_STORE[task_id] = stage_runtime_state
     TRACE_STORE[task_id] = execution_trace
     RUNTIME_WORLD_STATE_STORE[task_id] = runtime_world_state
+    recovery_record = None
+    if stepwise_readaptation:
+        gap_record = stepwise_readaptation.get("experience_gap_record")
+        recovery_record = build_recovery_record_for_task(
+            task_id=task_id,
+            failed_experience_ref=intent["experience_id"],
+            outcome="readaptation_required",
+            stop_reason="step_preflight_blocked",
+            expected_state=f"goal_fact:{intent.get('goal_fact') or 'unknown'}",
+            observed_state=f"blocked_step:{stepwise_readaptation.get('remaining_steps', ['unknown'])[0]}",
+            audit_record_id=task_id,
+            runtime_world_state_snapshot_id=runtime_world_state.get("runtime_world_state_snapshot_id"),
+            gap_record=gap_record,
+            readaptation_id=stepwise_readaptation.get("readaptation_id"),
+            source_refs={
+                "stepwise_readaptation_id": stepwise_readaptation.get("readaptation_id"),
+                "experience_gap_record_id": gap_record.get("gap_record_id") if gap_record else None,
+            },
+        )
     return {
         "task_id": task_id,
         "scenario": "causal_digital_experience" if intent["task_type"] == "causal_process_chain" else "learned_digital_experience",
@@ -4085,6 +4303,7 @@ def run_process_chain_experience(intent: dict[str, Any], utterance: str, space_a
         "execution_trace": execution_trace,
         "runtime_world_state": runtime_world_state,
         "stepwise_readaptation": stepwise_readaptation,
+        "recovery_record": recovery_record,
         "experience_ref": intent["experience_id"],
         "space_context": build_space_context(cognitive_model),
     }
@@ -5247,6 +5466,24 @@ def readapt_runtime_conflict(
         "outcome": feasibility["result"],
         "release_status": runtime_world_state["release_status"],
     }
+    recovery_record = build_recovery_record_for_task(
+        task_id=readaptation_id,
+        failed_experience_ref=task_id,
+        outcome=feasibility["result"],
+        stop_reason="runtime_fact_conflict",
+        expected_state=f"goal_fact:{intent.get('goal_fact') or 'unknown'}",
+        observed_state="runtime_conflict_detected",
+        audit_record_id=runtime_world_state["audit_record_id"],
+        runtime_world_state_snapshot_id=runtime_world_state.get("runtime_world_state_snapshot_id"),
+        gap_record=gap_record,
+        readaptation_id=readaptation_id,
+        source_refs={
+            "source_task_id": task_id,
+            "runtime_conflicts": conflict_items,
+            "experience_gap_record_id": gap_record.get("gap_record_id") if gap_record else None,
+        },
+    )
+    record["recovery_record"] = recovery_record
     return record
 
 
@@ -5398,6 +5635,27 @@ def dispatch_execution_loop_payload(payload: dict[str, Any], executor_type: str 
             "stepwise_readaptation_id": stepwise_readaptation.get("readaptation_id") if stepwise_readaptation else None,
         }
     )
+    recovery_record = None
+    if stepwise_readaptation:
+        gap_record = stepwise_readaptation.get("experience_gap_record")
+        blocked_step = next((item.get("step") for item in feedback if item.get("preflight_result") == "blocked"), None)
+        recovery_record = build_recovery_record_for_task(
+            task_id=task_id,
+            failed_experience_ref=payload.get("execution_callback_id") or task_id,
+            outcome=outcome,
+            stop_reason="step_preflight_blocked",
+            expected_state=f"goal_fact:{target_fact or 'unknown'}",
+            observed_state=f"blocked_step:{blocked_step or 'unknown'}",
+            audit_record_id=audit_record_id,
+            runtime_world_state_snapshot_id=snapshot_id,
+            gap_record=gap_record,
+            readaptation_id=stepwise_readaptation.get("readaptation_id"),
+            source_refs={
+                "execution_dispatch_id": dispatch_id,
+                "stepwise_readaptation_id": stepwise_readaptation.get("readaptation_id"),
+                "experience_gap_record_id": gap_record.get("gap_record_id") if gap_record else None,
+            },
+        )
     record = {
         "schema_version": "1.0.0",
         "dispatch_id": dispatch_id,
@@ -5410,6 +5668,7 @@ def dispatch_execution_loop_payload(payload: dict[str, Any], executor_type: str 
         "fact_feedback": feedback,
         "runtime_world_state_snapshot": state,
         "stepwise_readaptation": stepwise_readaptation,
+        "recovery_record": recovery_record,
         "audit_record_id": audit_record_id,
     }
     EXECUTION_DISPATCH_STORE[dispatch_id] = record
@@ -5446,6 +5705,28 @@ def run_process(scenario: str = "success", utterance: str = "给客人倒一杯�
     AUDIT_STORE[task_id] = result["audit_summary"]
     STATE_STORE[task_id] = result["stage_runtime_state"]
     TRACE_STORE[task_id] = result["execution_trace"]
+    recovery_record = None
+    if result["audit_summary"].get("outcome") != "completed":
+        stop_reason = result["audit_summary"].get("stop_reason") or result["audit_summary"].get("outcome")
+        expected_fact = next(
+            (item.get("fact_id") for item in result["audit_summary"].get("fact_summary", []) if item.get("state") == "conflicted"),
+            None,
+        ) or intent.get("goal_fact") or "task_goal_not_reached"
+        observed_stage = result["stage_runtime_state"].get("current_stage_id") or result["stage_runtime_state"].get("runtime_state") or "unknown"
+        recovery_record = build_recovery_record_for_task(
+            task_id=task_id,
+            failed_experience_ref=result["audit_summary"].get("process_instance_id") or task_id,
+            outcome=result["audit_summary"].get("outcome", "failed"),
+            stop_reason=stop_reason,
+            expected_state=f"goal_fact:{expected_fact}",
+            observed_state=f"runtime_state:{observed_stage}",
+            audit_record_id=task_id,
+            runtime_world_state_snapshot_id=result["stage_runtime_state"].get("runtime_world_state", {}).get("runtime_world_state_snapshot_id"),
+            source_refs={
+                "scenario": scenario,
+                "task_type": intent.get("task_type"),
+            },
+        )
     return {
         "task_id": task_id,
         "scenario": scenario,
@@ -5455,6 +5736,7 @@ def run_process(scenario: str = "success", utterance: str = "给客人倒一杯�
         "audit_summary": result["audit_summary"],
         "stage_runtime_state": result["stage_runtime_state"],
         "execution_trace": result["execution_trace"],
+        "recovery_record": recovery_record,
         "space_context": build_space_context(cognitive_model),
     }
 
@@ -5539,6 +5821,9 @@ class RellSampleHandler(BaseHTTPRequestHandler):
         if path == "/experience/library":
             self._send_json(load_experience_library())
             return
+        if path == "/recovery/library":
+            self._send_json(load_recovery_library())
+            return
         if path == "/preference/library":
             self._send_json(load_preference_library())
             return
@@ -5564,6 +5849,15 @@ class RellSampleHandler(BaseHTTPRequestHandler):
         if path.startswith("/experience/gap/"):
             gap_record_id = path.removeprefix("/experience/gap/")
             result = get_experience_gap(gap_record_id)
+            self._send_json(result, status=404 if "error" in result else 200)
+            return
+        if path.startswith("/recovery/task/"):
+            task_id = path.removeprefix("/recovery/task/")
+            self._send_json(get_recovery_records_for_task(task_id))
+            return
+        if path.startswith("/recovery/"):
+            recovery_id = path.removeprefix("/recovery/")
+            result = get_recovery_record(recovery_id)
             self._send_json(result, status=404 if "error" in result else 200)
             return
         if path.startswith("/runtime_readaptation/"):
@@ -5797,7 +6091,7 @@ def main() -> None:
     server = HTTPServer((DEFAULT_HOST, DEFAULT_PORT), RellSampleHandler)
     print(f"RELL sample API listening on http://{DEFAULT_HOST}:{DEFAULT_PORT}")
     print(f"Demo page: http://{DEFAULT_HOST}:{DEFAULT_PORT}/")
-    print("Endpoints: POST /semantic/route, POST /agent/query, POST /llm/context-view, POST /llm/prompt-contract, POST /llm/candidate-intent, POST /llm/candidate/validate, POST /concept/resolve, POST /concept/candidates/confirm, POST /process/admit, POST /process/run, POST /experience/migrate, POST /preference/record, POST /execution/dispatch, POST /runtime_world_state/query, POST /runtime_world_state/perturb, POST /teaching/session/start, GET /preference/library, GET /concept/library, GET /concept/candidates, GET /audit/{task_id}")
+    print("Endpoints: POST /semantic/route, POST /agent/query, POST /llm/context-view, POST /llm/prompt-contract, POST /llm/candidate-intent, POST /llm/candidate/validate, POST /concept/resolve, POST /concept/candidates/confirm, POST /process/admit, POST /process/run, POST /experience/migrate, POST /preference/record, POST /execution/dispatch, POST /runtime_world_state/query, POST /runtime_world_state/perturb, POST /teaching/session/start, GET /recovery/library, GET /recovery/task/{task_id}, GET /recovery/{recovery_id}, GET /preference/library, GET /concept/library, GET /concept/candidates, GET /audit/{task_id}")
     server.serve_forever()
 
 

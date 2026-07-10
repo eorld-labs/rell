@@ -8,6 +8,7 @@ from api_server import (
     CONCEPT_LIBRARY_FILE,
     EXPERIENCE_LIBRARY_FILE,
     PREFERENCE_LIBRARY_FILE,
+    RECOVERY_LIBRARY_FILE,
     admit_process,
     build_llm_context_view,
     build_llm_prompt_contract,
@@ -20,6 +21,8 @@ from api_server import (
     get_cognitive_model,
     get_execution_dispatch,
     get_experience_gap,
+    get_recovery_record,
+    get_recovery_records_for_task,
     get_readaptation,
     get_runtime_world_state,
     get_space_prior,
@@ -30,6 +33,7 @@ from api_server import (
     load_concept_library,
     load_experience_library,
     load_preference_library,
+    load_recovery_library,
     migrate_experience,
     query_runtime_world_state,
     record_preference,
@@ -49,12 +53,14 @@ def main() -> None:
     original_concept_library = CONCEPT_LIBRARY_FILE.read_text(encoding="utf-8") if CONCEPT_LIBRARY_FILE.exists() else None
     original_candidate_library = CONCEPT_CANDIDATE_LIBRARY_FILE.read_text(encoding="utf-8") if CONCEPT_CANDIDATE_LIBRARY_FILE.exists() else None
     original_preference_library = PREFERENCE_LIBRARY_FILE.read_text(encoding="utf-8") if PREFERENCE_LIBRARY_FILE.exists() else None
+    original_recovery_library = RECOVERY_LIBRARY_FILE.read_text(encoding="utf-8") if RECOVERY_LIBRARY_FILE.exists() else None
 
     EXPERIENCE_LIBRARY_FILE.write_text(
         json.dumps({"schema_version": "1.0.0", "experiences": []}, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
     CONCEPT_CANDIDATE_LIBRARY_FILE.unlink(missing_ok=True)
+    RECOVERY_LIBRARY_FILE.unlink(missing_ok=True)
 
     try:
         admission = admit_process()
@@ -468,11 +474,23 @@ def main() -> None:
         conflict = run_process("channel_conflict")
         if conflict["audit_summary"]["outcome"] != "requires_human_confirmation":
             raise AssertionError("conflict API run must require human confirmation")
+        if not conflict.get("recovery_record"):
+            raise AssertionError(f"conflict API run must create a recovery record: {conflict}")
+        conflict_recovery = get_recovery_record(conflict["recovery_record"]["recovery_id"])
+        if conflict_recovery.get("recovery_id") != conflict["recovery_record"]["recovery_id"]:
+            raise AssertionError(f"recovery record must be queryable by id: {conflict_recovery}")
+        task_recoveries = get_recovery_records_for_task(conflict["task_id"])
+        if not any(item.get("recovery_id") == conflict["recovery_record"]["recovery_id"] for item in task_recoveries.get("recovery_records", [])):
+            raise AssertionError(f"recovery records must be queryable by task: {task_recoveries}")
         readaptation = readapt_runtime_conflict(conflict["task_id"], "到水源处接一杯水")
         if readaptation.get("execution_feasibility", {}).get("result") != "requires_human_confirmation":
             raise AssertionError(f"runtime conflict must produce human-confirmation readaptation: {readaptation}")
         if not readaptation.get("runtime_world_state_snapshot", {}).get("runtime_conflicts"):
             raise AssertionError(f"readaptation snapshot must carry runtime conflicts: {readaptation}")
+        if not readaptation.get("recovery_record"):
+            raise AssertionError(f"readaptation must create a recovery record: {readaptation}")
+        if not load_recovery_library().get("recovery_records"):
+            raise AssertionError("recovery library must persist generated recovery records")
         agent_clarification = handle_agent_query("为什么不能执行", task_id=readaptation["readaptation_id"])
         if agent_clarification.get("semantic_request", {}).get("request_type") != "clarification":
             raise AssertionError(f"agent query must route clarification input: {agent_clarification}")
@@ -519,6 +537,10 @@ def main() -> None:
             PREFERENCE_LIBRARY_FILE.unlink(missing_ok=True)
         else:
             PREFERENCE_LIBRARY_FILE.write_text(original_preference_library, encoding="utf-8")
+        if original_recovery_library is None:
+            RECOVERY_LIBRARY_FILE.unlink(missing_ok=True)
+        else:
+            RECOVERY_LIBRARY_FILE.write_text(original_recovery_library, encoding="utf-8")
 
 
 if __name__ == "__main__":

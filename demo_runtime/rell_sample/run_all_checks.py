@@ -58,10 +58,12 @@ def run_http_smoke() -> None:
     concept_library_file = ROOT / "data" / "concept_library.json"
     concept_candidate_library_file = ROOT / "data" / "concept_candidate_library.json"
     preference_library_file = ROOT / "data" / "preference_record_library.json"
+    recovery_library_file = ROOT / "data" / "recovery_record_library.json"
     original_library = experience_library_file.read_text(encoding="utf-8") if experience_library_file.exists() else None
     original_concept_library = concept_library_file.read_text(encoding="utf-8") if concept_library_file.exists() else None
     original_candidate_library = concept_candidate_library_file.read_text(encoding="utf-8") if concept_candidate_library_file.exists() else None
     original_preference_library = preference_library_file.read_text(encoding="utf-8") if preference_library_file.exists() else None
+    original_recovery_library = recovery_library_file.read_text(encoding="utf-8") if recovery_library_file.exists() else None
     process = subprocess.Popen(
         [sys.executable, str(ROOT / "api_server.py")],
         cwd=REPO,
@@ -76,6 +78,7 @@ def run_http_smoke() -> None:
         cognitive_model = get_json("/space/cognitive-model")
         concept_library = get_json("/concept/library")
         preference_library = get_json("/preference/library")
+        recovery_library_before = get_json("/recovery/library")
         p017_loop = get_json("/p017/minimal-loop")
         semantic_route = post_json("/semantic/route", {"utterance": "当前杯子有没有水"})
         agent_execution_preview = post_json("/agent/query", {"utterance": "到水源处接一杯水"})
@@ -212,6 +215,13 @@ def run_http_smoke() -> None:
             {"task_id": run_result["task_id"], "utterance": "到水源处接一杯水"},
         )
         readaptation_lookup = get_json(f"/runtime_readaptation/{readaptation['readaptation_id']}")
+        recovery_library_after = get_json("/recovery/library")
+        recovery_task_lookup = get_json(f"/recovery/task/{run_result['task_id']}")
+        recovery_lookup = (
+            get_json(f"/recovery/{run_result['recovery_record']['recovery_id']}")
+            if run_result.get("recovery_record", {}).get("recovery_id")
+            else {"error": "missing_recovery_record"}
+        )
         gap_lookup = None
         if readaptation.get("experience_gap_record"):
             gap_lookup = get_json(f"/experience/gap/{readaptation['experience_gap_record']['gap_record_id']}")
@@ -251,6 +261,8 @@ def run_http_smoke() -> None:
             raise AssertionError(f"concept library failed: {concept_library}")
         if not preference_library.get("preference_records"):
             raise AssertionError(f"preference library failed: {preference_library}")
+        if recovery_library_before.get("recovery_records") not in ([], None):
+            raise AssertionError(f"recovery library should start empty in smoke test: {recovery_library_before}")
         if not p017_loop.get("evidence_index") or len(p017_loop.get("evidence_files", {})) != 6:
             raise AssertionError(f"P017 minimal loop endpoint failed: {p017_loop}")
         if semantic_route.get("request_type") != "state_query":
@@ -327,10 +339,20 @@ def run_http_smoke() -> None:
             raise AssertionError(f"released runtime world state should not answer as current state: {migration_query_released}")
         if run_result["audit_summary"]["outcome"] != "requires_human_confirmation":
             raise AssertionError(f"run failed: {run_result}")
+        if not run_result.get("recovery_record"):
+            raise AssertionError(f"recovery record must be returned for conflict run: {run_result}")
+        if recovery_lookup.get("recovery_id") != run_result["recovery_record"]["recovery_id"]:
+            raise AssertionError(f"recovery lookup failed: {recovery_lookup}")
+        if not any(item.get("recovery_id") == run_result["recovery_record"]["recovery_id"] for item in recovery_task_lookup.get("recovery_records", [])):
+            raise AssertionError(f"task recovery lookup failed: {recovery_task_lookup}")
         if readaptation.get("execution_feasibility", {}).get("result") != "requires_human_confirmation":
             raise AssertionError(f"runtime readaptation failed: {readaptation}")
         if readaptation_lookup.get("readaptation_id") != readaptation["readaptation_id"]:
             raise AssertionError(f"runtime readaptation lookup failed: {readaptation_lookup}")
+        if not readaptation.get("recovery_record"):
+            raise AssertionError(f"readaptation must create recovery record: {readaptation}")
+        if len(recovery_library_after.get("recovery_records", [])) < 2:
+            raise AssertionError(f"recovery library must contain runtime and readaptation records: {recovery_library_after}")
         if gap_lookup and gap_lookup.get("gap_record_id") != readaptation["experience_gap_record"]["gap_record_id"]:
             raise AssertionError(f"experience gap lookup failed: {gap_lookup}")
         if recorded_preference.get("preference_record", {}).get("preference_signal") != "forbid":
@@ -371,6 +393,10 @@ def run_http_smoke() -> None:
             preference_library_file.unlink(missing_ok=True)
         else:
             preference_library_file.write_text(original_preference_library, encoding="utf-8")
+        if original_recovery_library is None:
+            recovery_library_file.unlink(missing_ok=True)
+        else:
+            recovery_library_file.write_text(original_recovery_library, encoding="utf-8")
     print("[ok] api_server HTTP smoke")
 
 

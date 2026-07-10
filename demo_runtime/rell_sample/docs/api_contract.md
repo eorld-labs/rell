@@ -342,6 +342,26 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 
 当本体能力画像缺少步骤能力、空间对象缺失或任务期前提事实不成立时，`execution_feasibility.infeasible_reasons` 会返回缺失能力、缺失绑定目标或缺失前提事实，并给出人工确认、替代经验搜索、补充教学、降级执行或终止执行等建议动作。
 
+## GET /recovery/library
+
+用途：查询当前样品中的补救/恢复记录库。该接口用于把执行失败、运行时冲突、人工确认升级和再适配建议固化为结构化记录，而不是只停留在一次性的日志输出中。
+
+响应至少包括：
+- `recovery_records[].recovery_id`：补救记录标识；
+- `task_id`：对应的任务标识；
+- `failed_experience_ref`：触发补救记录的失败过程、执行回调或经验引用；
+- `deviation_context`：偏离类型、观测状态和期望状态；
+- `recovery_action`：建议的补救动作、参数和是否需要人工介入；
+- `recovery_outcome`：`recovered`、`partially_recovered`、`failed` 或 `escalated`。
+
+## GET /recovery/task/{task_id}
+
+用途：按任务查询补救/恢复记录。该接口用于把某次执行中的失败、冲突和再适配记录与当前任务、审计摘要和任务期快照关联起来，便于复核单次任务的完整恢复链路。
+
+## GET /recovery/{recovery_id}
+
+用途：按标识查询单条补救/恢复记录，用于定位某次失败后的补救建议、人工确认入口和后续再适配来源。
+
 ## GET /runtime_world_state/{task_id}
 
 用途：查询任务期运行时世界状态快照。该快照用于当前任务执行期间的事实对齐和工作记忆，不作为长期世界数据库保存。

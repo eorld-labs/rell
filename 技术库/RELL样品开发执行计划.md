@@ -1,5 +1,38 @@
 # RELL 样品开发执行计划
 
+## 当日增补（2026-07-10）：P014 执行恢复证据补强
+
+本轮补强的目标不是再写一套孤立的补救脚本，而是把 P014 从早期 `run_skill_cocreation.py` 中的静态补救痕迹，升级为 `demo_runtime/rell_sample/` 主链中的动态恢复记录闭环。恢复逻辑现在随执行主链共同发生，并可被查询、审计和复核。
+
+### 增补范围
+
+1. 在 `demo_runtime/rell_sample/api_server.py` 中新增恢复记录主链函数：`load_recovery_library()`、`save_recovery_library()`、`build_recovery_action()`、`build_recovery_outcome_type()`、`persist_recovery_record()`、`attach_recovery_record_to_context()`、`build_recovery_record_for_task()`、`get_recovery_record()` 和 `get_recovery_records_for_task()`。
+2. 在 `demo_runtime/rell_sample/data/recovery_record_library.json` 中固定恢复记录持久化载体，使失败、冲突和补救结果不只停留在运行期内存。
+3. 将恢复记录接入四类关键阻断路径：步骤前检查阻断、运行时冲突再适配、执行闭环分发中途阻断、普通运行结果非 `completed` 的异常收口。
+4. 在 `demo_runtime/rell_sample/docs/api_contract.md` 中补入恢复记录查询接口，形成字段级接口证据。
+5. 在 `demo_runtime/rell_sample/validate_api_sample.py` 和 `demo_runtime/rell_sample/run_all_checks.py` 中补入恢复记录查询、库持久化和 HTTP smoke 校验。
+
+### 当前接口补强
+
+1. `GET /recovery/library`：返回恢复记录库摘要与记录列表。
+2. `GET /recovery/task/{task_id}`：按任务查询恢复记录，证明恢复动作与任务期快照、执行痕迹和审计链路可关联。
+3. `GET /recovery/{recovery_id}`：按恢复记录标识查询单条记录，证明恢复结果具备可复核性。
+
+### 工程证据意义
+
+1. 证明 P014 不再只是“出错后人工补一句说明”，而是“执行偏离/冲突/阻断 -> 形成恢复记录 -> 查询与审计 -> 支持再适配”的主链能力。
+2. 证明恢复记录与 `task_id`、运行时世界状态快照、执行回传和审计记录存在结构化关联，可直接作为专利答复和研发留痕材料。
+3. 证明 RELL 样品在 P017 迁移主链之外，已经把执行恢复层沉到同一套 API 和校验体系中，避免 P014 证据停留在旧样品。
+
+### 本轮验收命令
+
+```powershell
+python demo_runtime\rell_sample\validate_api_sample.py
+python demo_runtime\rell_sample\run_all_checks.py
+```
+
+预期结果：两条命令均通过，且恢复记录查询接口、恢复库持久化和 HTTP smoke 检查全部通过。
+
 依据文件：`技术库/RELL样品落地0到1计划.md`
 
 ## 一、开发目标
