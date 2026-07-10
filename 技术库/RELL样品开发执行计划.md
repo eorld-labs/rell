@@ -570,3 +570,30 @@ P017 提交后，样品工程的第一主线调整为“数字执行主体先跑
 7. 概念晋升继续坚持人工确认闸门：经验成功形成后自动生成 `concept_promotion_candidates`，只有通过 `POST /concept/candidates/confirm` 做人工确认，才允许把候选写入概念库或补强现有概念。
 8. 已确认晋升的概念必须能够反向参与 `POST /concept/resolve` 的概念匹配，证明“经验 -> 概念候选 -> 人确认晋升 -> 后续复用”闭环已经真正生效。
 9. DEMO 页面需要直接暴露“查看概念候选”和“确认晋升”入口，避免概念闭环停留在接口层，影响内部演示、录屏和后续教学流程串联。
+## 当日增补（2026-07-10）：P011 物理经验内化工程证据收束
+
+当前 `rell_sample` 主链中，P011 的核心能力其实已经存在于经验教学、经验库沉淀、因果签名生成、经验不变量契约生成和后续经验复用推理里，但此前这些证据主要散落在综合校验和接口回归中，不利于单独举证。为此，本轮新增独立的 P011 工程证据包，把“真实教学形成经验 -> 经验库沉淀 -> 后续任务复用经验 -> 明确剥离不可迁移细节”的最小闭环固定下来。
+
+### 增补范围
+
+1. 新增 `demo_runtime/rell_sample/validate_p011_experience_internalization.py`，固定生成 P011 的六段证据输出。
+2. 新增输出目录 `demo_runtime/output/rell_sample/p011_experience_internalization/`，统一落盘 `00_summary.json`、`evidence_index.json` 和六个分段证据文件。
+3. 新增 `技术库/P011-物理经验内化机制/P011物理经验内化工程证据说明.md`，把验证命令、输出目录、关键字段和典型审查质疑对应关系写成中文说明。
+4. 将 `validate_p011_experience_internalization.py` 接入 `demo_runtime/rell_sample/run_all_checks.py`，使 P011 与 P013、P014、P017 一样进入一键回归主链。
+
+### 当前证据覆盖点
+
+1. 经验三元结构：证明经验记录包含 `context`、`action`、`outcome`，并同时保留 `causal_signature` 和 `invariant_contract`。
+2. 对话教学入库：证明对话教学能够形成结构化经验记录，并将来源标记为 `dialogue_teaching`。
+3. 边教边动反馈：证明系统在缺失前提时返回 `needs_more_teaching` 和 `missing_before_step`，在成功后固化经验并释放任务期快照。
+4. 经验复用推理：证明后续任务的因果推理中存在 `source=experience_library` 的推理来源，表明系统优先复用历史经验。
+5. 不可迁移字段剥离：证明经验不变量契约明确排除绝对坐标、机器人专用关节角和固定执行时长等字段。
+
+### 本轮验收命令
+
+```powershell
+python demo_runtime\rell_sample\validate_p011_experience_internalization.py
+python demo_runtime\rell_sample\run_all_checks.py
+```
+
+预期结果：两条命令均通过，并生成 `demo_runtime/output/rell_sample/p011_experience_internalization/` 下的证据文件。
