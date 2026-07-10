@@ -26,6 +26,7 @@ DEFAULT_PORT = int(os.environ.get("RELL_SAMPLE_PORT", "8876"))
 SPACE_PRIOR_FILE = DATA / "digital_kitchen_semantic_prior.json"
 COGNITIVE_MODEL_FILE = DATA / "digital_kitchen_cognitive_model.json"
 EXPERIENCE_LIBRARY_FILE = DATA / "experience_library.json"
+P017_MINIMAL_LOOP_OUTPUT = ROOT.parent / "output" / "rell_sample" / "p017_minimal_loop"
 
 TIMELINE_SCENARIOS = {
     "success": "mock_timeline_success.json",
@@ -107,6 +108,10 @@ P012_CONCEPT_LIBRARY = {
 AUDIT_STORE: dict[str, dict[str, Any]] = {}
 STATE_STORE: dict[str, dict[str, Any]] = {}
 TRACE_STORE: dict[str, dict[str, Any]] = {}
+RUNTIME_WORLD_STATE_STORE: dict[str, dict[str, Any]] = {}
+EXPERIENCE_GAP_STORE: dict[str, dict[str, Any]] = {}
+READAPTATION_STORE: dict[str, dict[str, Any]] = {}
+EXECUTION_DISPATCH_STORE: dict[str, dict[str, Any]] = {}
 
 
 STEP_LIBRARY = {
@@ -369,6 +374,9 @@ def build_initial_runtime_world_state(cognitive_model: dict[str, Any], intent: d
     return {
         "schema_version": "1.0.0",
         "lifecycle": "ephemeral_task_memory",
+        "snapshot_lifecycle_state": "active",
+        "release_status": "not_released",
+        "release_token": None,
         "persistence_policy": "任务执行期间端侧生成和更新；任务结束后仅关键事件进入 trace 和经验记录，不作为长期世界数据库保存",
         "source_layers": ["p010_subject_cognitive_model", "adapter_observation_stream", "p016_fact_transition"],
         "task_ref": intent.get("experience_id") or intent.get("candidate_process"),
@@ -909,6 +917,33 @@ INDEX_HTML = """<!doctype html>
     .stage-row:last-child { border-bottom: 0; }
     .stage-row strong { font-size: 14px; }
     .stage-row span { color: var(--muted); font-size: 13px; }
+    .p017-card {
+      border: 1px solid var(--line);
+      margin-bottom: 10px;
+      padding: 10px;
+      display: grid;
+      gap: 6px;
+      background: #fbfcfc;
+    }
+    .p017-card summary {
+      cursor: pointer;
+      font-weight: 700;
+      color: var(--ink);
+    }
+    .p017-card code {
+      background: #edf2f1;
+      padding: 2px 4px;
+    }
+    .p017-json {
+      margin: 6px 0 0;
+      padding: 10px;
+      max-height: 260px;
+      overflow: auto;
+      background: #0f171b;
+      color: #d8efe8;
+      font: 12px/1.5 Consolas, "Microsoft YaHei", monospace;
+      white-space: pre-wrap;
+    }
     .ok { color: var(--accent); }
     .warn { color: var(--warn); }
     .bad { color: var(--bad); }
@@ -958,6 +993,7 @@ INDEX_HTML = """<!doctype html>
         </div>
         <div class="actions" style="margin-top:8px;">
           <button id="libraryButton" class="secondary" title="查看当前经验库">经验库</button>
+          <button id="p017Button" class="secondary" title="查看 P017 六段最小闭环证据">P017 最小闭环</button>
         </div>
       </section>
       <section>
@@ -1014,6 +1050,7 @@ INDEX_HTML = """<!doctype html>
     const teachButton = document.getElementById("teachButton");
     const dialogueTeachButton = document.getElementById("dialogueTeachButton");
     const libraryButton = document.getElementById("libraryButton");
+    const p017Button = document.getElementById("p017Button");
     const clearButton = document.getElementById("clearButton");
     const logEl = document.getElementById("log");
     const factsEl = document.getElementById("facts");
@@ -1465,10 +1502,64 @@ INDEX_HTML = """<!doctype html>
         : `<div class="stage-row"><strong>经验库</strong><span>暂无经验</span></div>`;
     }
 
+    function pickField(payload, path) {
+      return path.split(".").reduce((value, key) => value && value[key], payload);
+    }
+
+    async function showP017MinimalLoop() {
+      p017Button.disabled = true;
+      serviceState.textContent = "读取 P017 证据";
+      try {
+        const result = await fetch("/p017/minimal-loop").then(r => r.json());
+        if (result.error) {
+          factsEl.innerHTML = `<div class="stage-row"><strong>P017 最小闭环</strong><span>${escapeHtml(result.error)}：请先运行 python demo_runtime\\rell_sample\\validate_p017_minimal_loop.py</span></div>`;
+          appendLog("P017 最小闭环证据读取失败：" + JSON.stringify(result, null, 2));
+          return;
+        }
+        appendLog("P017 最小闭环证据：" + JSON.stringify(result.summary, null, 2));
+        setText(admitMetric, "P017", "ok");
+        setText(stateMetric, "minimal_loop", "ok");
+        setText(outcomeMetric, "evidence_ready", "ok");
+        setText(taskMetric, result.summary?.migration_task_id || "-");
+        const items = result.evidence_index?.evidence_items || [];
+        const files = result.evidence_files || {};
+        const rows = [
+          `<div class="stage-row"><strong>P017 最小闭环证据</strong><span>${escapeHtml(result.evidence_index?.summary || "六段最小闭环工程证据")}</span></div>`,
+          `<div class="stage-row"><strong>输出目录</strong><span>${escapeHtml(result.output_dir || "-")}</span></div>`
+        ];
+        for (const item of items) {
+          const payload = files[item.file] || {};
+          const fields = (item.key_fields || []).map(field => {
+            const value = pickField(payload, field);
+            const text = Array.isArray(value) ? `${value.length} item(s)` : (typeof value === "object" && value ? JSON.stringify(value) : value);
+            return `<span><code>${escapeHtml(field)}</code> = ${escapeHtml(text ?? "-")}</span>`;
+          }).join("");
+          rows.push(`
+            <details class="p017-card">
+              <summary>${escapeHtml(item.file)}｜${escapeHtml(item.claim_1_step)}</summary>
+              <span><strong>技术特征：</strong>${escapeHtml(item.technical_feature)}</span>
+              <span><strong>代码来源：</strong>${escapeHtml((item.code_sources || []).join(" / "))}</span>
+              <span><strong>审查用途：</strong>${escapeHtml(item.examination_use || "-")}</span>
+              <div>${fields}</div>
+              <pre class="p017-json">${escapeHtml(JSON.stringify(payload, null, 2))}</pre>
+            </details>
+          `);
+        }
+        factsEl.innerHTML = rows.join("");
+        serviceState.textContent = "P017 证据就绪";
+      } catch (error) {
+        serviceState.textContent = "异常";
+        appendLog("P017 最小闭环读取异常：" + error.message);
+      } finally {
+        p017Button.disabled = false;
+      }
+    }
+
     runButton.addEventListener("click", runProcess);
     teachButton.addEventListener("click", teachExperience);
     dialogueTeachButton.addEventListener("click", teachByDialogue);
     libraryButton.addEventListener("click", showExperienceLibrary);
+    p017Button.addEventListener("click", showP017MinimalLoop);
     clearButton.addEventListener("click", clearView);
     clearView();
   </script>
@@ -2101,6 +2192,7 @@ def run_process_chain_experience(intent: dict[str, Any], utterance: str, space_a
     AUDIT_STORE[task_id] = audit_summary
     STATE_STORE[task_id] = stage_runtime_state
     TRACE_STORE[task_id] = execution_trace
+    RUNTIME_WORLD_STATE_STORE[task_id] = runtime_world_state
     return {
         "task_id": task_id,
         "scenario": "causal_digital_experience" if intent["task_type"] == "causal_process_chain" else "learned_digital_experience",
@@ -2155,6 +2247,603 @@ def build_space_context(cognitive_model: dict[str, Any]) -> dict[str, Any]:
         "object_count": cognitive_model["local_environment_summary"]["object_count"],
         "binding_candidates": cognitive_model["binding_candidates"],
     }
+
+
+def build_migration_task_id(utterance: str, intent: dict[str, Any]) -> str:
+    seed = "|".join(
+        [
+            normalize_text(utterance),
+            intent.get("task_type", "unknown"),
+            intent.get("candidate_process") or intent.get("goal_fact") or "none",
+        ]
+    )
+    return "migration_" + hashlib.sha1(seed.encode("utf-8")).hexdigest()[:12]
+
+
+def get_process_chain_for_intent(intent: dict[str, Any]) -> list[str]:
+    chain = list(intent.get("candidate_process_chain", []))
+    if chain:
+        return chain
+    if intent.get("task_type") == "pour_water":
+        return ["pour_water"]
+    candidate = intent.get("candidate_process")
+    if candidate in STEP_LIBRARY:
+        return [candidate]
+    return []
+
+
+def build_default_body_capability_profile() -> dict[str, Any]:
+    profile = MockRobotAdapter(read_json(DATA / "mock_timeline_success.json"), SerialEventQueue()).report_executor_profile()
+    step_capabilities = sorted({meta.get("capability") for meta in STEP_LIBRARY.values() if meta.get("capability")})
+    profile["supported_actions"] = sorted(set(profile.get("supported_actions", [])) | set(step_capabilities))
+    profile["profile_source"] = "stage_one_mock_executor_profile"
+    return profile
+
+
+def build_binding_candidates(
+    intent: dict[str, Any],
+    cognitive_model: dict[str, Any],
+    runtime_world_state: dict[str, Any],
+    body_capability_profile: dict[str, Any],
+) -> dict[str, Any]:
+    regions = {item["region_id"]: item for item in cognitive_model.get("space_region_table", [])}
+    objects = cognitive_model.get("object_region_index", {})
+    chain = get_process_chain_for_intent(intent)
+    candidate_id = "binding_" + hashlib.sha1(("|".join(chain) or intent.get("task_type", "unknown")).encode("utf-8")).hexdigest()[:10]
+    step_bindings: list[dict[str, Any]] = []
+    missing_targets: list[dict[str, Any]] = []
+    for step in chain:
+        meta = STEP_LIBRARY.get(step, {})
+        target_region = meta.get("target_region")
+        target_object = meta.get("target_object")
+        binding: dict[str, Any] = {
+            "step": step,
+            "capability": meta.get("capability"),
+            "requires_facts": meta.get("requires_facts", []),
+            "produces_fact": meta.get("produces_fact"),
+            "destroys_facts": meta.get("destroys_facts", []),
+        }
+        if target_region:
+            if target_region in regions:
+                binding["space_binding"] = {
+                    "binding_type": "semantic_region",
+                    "target_ref": target_region,
+                    "region_type": regions[target_region].get("region_type"),
+                    "mapping_method": "topology_invariant_to_current_space_semantics",
+                }
+            else:
+                missing_targets.append({"step": step, "target_type": "semantic_region", "target_ref": target_region})
+        if target_object:
+            if target_object in objects:
+                binding["object_binding"] = {
+                    "binding_type": "interactive_object",
+                    "target_ref": target_object,
+                    "region_ref": objects[target_object].get("region_ref"),
+                    "mapping_method": "object_affordance_to_current_space_semantics",
+                }
+            else:
+                missing_targets.append({"step": step, "target_type": "object", "target_ref": target_object})
+        if meta.get("capability"):
+            binding["capability_binding"] = {
+                "required_capability": meta["capability"],
+                "supported": meta["capability"] in set(body_capability_profile.get("supported_actions", [])),
+                "profile_ref": body_capability_profile.get("executor_id"),
+            }
+        if meta.get("produces_fact"):
+            binding["termination_verification"] = {
+                "fact": meta["produces_fact"],
+                "verification_basis": ["runtime_world_state", "execution_loop_feedback", "human_confirmation_if_needed"],
+            }
+        step_bindings.append(binding)
+    return {
+        "binding_candidate_id": candidate_id,
+        "generation_basis": [
+            "experience_invariant_contract",
+            "current_space_semantic_data",
+            "body_capability_profile",
+            "runtime_world_state_snapshot",
+        ],
+        "step_bindings": step_bindings,
+        "missing_targets": missing_targets,
+        "runtime_world_state_snapshot_id": runtime_world_state.get("runtime_world_state_snapshot_id"),
+    }
+
+
+def build_execution_feasibility(
+    intent: dict[str, Any],
+    binding_candidate: dict[str, Any],
+    runtime_world_state: dict[str, Any],
+    body_capability_profile: dict[str, Any],
+) -> dict[str, Any]:
+    if intent.get("decision") != "executable":
+        return {
+            "result": "requires_supplemental_teaching",
+            "executable": False,
+            "infeasible_reasons": [{"reason": intent.get("reason", "unsupported_intent"), "source": "intent_translation"}],
+            "recommended_actions": ["trigger_supplemental_teaching", "search_alternative_experience", "terminate_execution"],
+            "executable_steps": [],
+            "blocked_steps": [],
+        }
+    supported_actions = set(body_capability_profile.get("supported_actions", []))
+    facts = set(runtime_world_state.get("established_facts", []))
+    missing_capabilities: list[dict[str, Any]] = []
+    missing_facts: list[dict[str, Any]] = []
+    executable_steps: list[str] = []
+    blocked_steps: list[str] = []
+    for binding in binding_candidate.get("step_bindings", []):
+        step = binding["step"]
+        capability = binding.get("capability")
+        step_missing_facts = [fact for fact in binding.get("requires_facts", []) if fact not in facts]
+        if capability and capability not in supported_actions:
+            missing_capabilities.append({"step": step, "capability": capability})
+        if step_missing_facts:
+            missing_facts.append({"step": step, "missing_facts": step_missing_facts})
+        if step_missing_facts or (capability and capability not in supported_actions):
+            blocked_steps.append(step)
+            continue
+        executable_steps.append(step)
+        for destroyed in binding.get("destroys_facts", []):
+            facts.discard(destroyed)
+        produced = binding.get("produces_fact")
+        if produced:
+            facts.add(produced)
+    reasons: list[dict[str, Any]] = []
+    for item in binding_candidate.get("missing_targets", []):
+        reasons.append({"reason": "missing_binding_target", **item})
+    for item in missing_capabilities:
+        reasons.append({"reason": "missing_body_capability", **item})
+    for item in missing_facts:
+        reasons.append({"reason": "missing_prerequisite_fact", **item})
+    for item in runtime_world_state.get("runtime_conflicts", []):
+        reasons.append({"reason": "runtime_fact_conflict", **item})
+    if not reasons:
+        result = "executable"
+        recommended_actions = ["dispatch_to_execution_loop"]
+    elif runtime_world_state.get("runtime_conflicts"):
+        result = "requires_human_confirmation"
+        recommended_actions = ["request_human_confirmation", "trigger_readaptation", "search_alternative_experience", "terminate_execution"]
+    elif executable_steps:
+        result = "partially_inexecutable"
+        recommended_actions = ["downgrade_executable_steps", "request_human_confirmation", "search_alternative_experience"]
+    else:
+        result = "infeasible"
+        recommended_actions = ["request_human_confirmation", "search_alternative_experience", "trigger_supplemental_teaching", "terminate_execution"]
+    return {
+        "result": result,
+        "executable": result == "executable",
+        "infeasible_reasons": reasons,
+        "recommended_actions": recommended_actions,
+        "executable_steps": executable_steps,
+        "blocked_steps": blocked_steps,
+        "fact_projection_after_executable_steps": sorted(facts),
+    }
+
+
+def build_experience_gap_record(
+    migration_task_id: str,
+    intent: dict[str, Any],
+    binding_candidate: dict[str, Any],
+    feasibility: dict[str, Any],
+) -> dict[str, Any] | None:
+    if feasibility.get("result") == "executable":
+        return None
+    seed = "|".join(
+        [
+            migration_task_id,
+            feasibility.get("result", "unknown"),
+            ",".join(feasibility.get("blocked_steps", [])),
+        ]
+    )
+    gap_record_id = "gap_" + hashlib.sha1(seed.encode("utf-8")).hexdigest()[:12]
+    blocked_steps = feasibility.get("blocked_steps", [])
+    executable_steps = feasibility.get("executable_steps", [])
+    return {
+        "schema_version": "1.0.0",
+        "gap_record_id": gap_record_id,
+        "migration_task_id": migration_task_id,
+        "runtime_world_state_snapshot_id": binding_candidate.get("runtime_world_state_snapshot_id"),
+        "target_causal_fact": intent.get("goal_fact"),
+        "gap_type": feasibility.get("result"),
+        "infeasible_reasons": feasibility.get("infeasible_reasons", []),
+        "blocked_steps": blocked_steps,
+        "executable_steps": executable_steps,
+        "recommended_actions": feasibility.get("recommended_actions", []),
+        "teaching_request": {
+            "endpoint": "POST /experience/teach",
+            "reason": "supplement missing process, capability, binding, or verification evidence",
+            "candidate_process_chain": get_process_chain_for_intent(intent),
+        },
+        "alternative_experience_query": {
+            "goal_fact": intent.get("goal_fact"),
+            "missing_capabilities": [
+                item.get("capability")
+                for item in feasibility.get("infeasible_reasons", [])
+                if item.get("reason") == "missing_body_capability"
+            ],
+            "missing_targets": [
+                item.get("target_ref")
+                for item in feasibility.get("infeasible_reasons", [])
+                if item.get("reason") == "missing_binding_target"
+            ],
+        },
+        "downgrade_execution_plan": {
+            "enabled": bool(executable_steps and blocked_steps),
+            "steps": executable_steps,
+        },
+    }
+
+
+def build_execution_loop_payload(
+    migration_task_id: str,
+    intent: dict[str, Any],
+    binding_candidate: dict[str, Any],
+    feasibility: dict[str, Any],
+) -> dict[str, Any] | None:
+    if feasibility.get("result") not in {"executable", "partially_inexecutable"}:
+        return None
+    steps = feasibility.get("executable_steps") or get_process_chain_for_intent(intent)
+    return {
+        "execution_callback_id": "exec_" + migration_task_id.removeprefix("migration_"),
+        "execution_loop_type": "open_execution_loop",
+        "target_causal_fact": intent.get("goal_fact"),
+        "runtime_world_state_snapshot_id": binding_candidate.get("runtime_world_state_snapshot_id"),
+        "execution_step_payload": [
+            {
+                "step": step,
+                "display_name": STEP_LIBRARY.get(step, {}).get("display_name"),
+                "capability": STEP_LIBRARY.get(step, {}).get("capability"),
+            }
+            for step in steps
+        ],
+        "binding_candidate_payload": binding_candidate,
+        "execution_constraints": {
+            "must_return_fact_status": True,
+            "allowed_feedback": [
+                "fact_established",
+                "fact_not_established",
+                "failure",
+                "conflict",
+                "recovered",
+                "human_confirmation",
+            ],
+        },
+    }
+
+
+def migrate_experience(utterance: str = "到水源处接一杯水", body_capability_profile: dict[str, Any] | None = None) -> dict[str, Any]:
+    intent = translate_intent(utterance)
+    cognitive_model = get_cognitive_model()
+    migration_task_id = build_migration_task_id(utterance, intent)
+    runtime_world_state = build_initial_runtime_world_state(cognitive_model, {**intent, "experience_id": migration_task_id})
+    runtime_world_state["migration_task_id"] = migration_task_id
+    runtime_world_state["runtime_world_state_snapshot_id"] = migration_task_id + "_snapshot"
+    runtime_world_state["audit_record_id"] = "audit_" + migration_task_id.removeprefix("migration_")
+    profile = body_capability_profile or build_default_body_capability_profile()
+    binding_candidate = build_binding_candidates(intent, cognitive_model, runtime_world_state, profile)
+    feasibility = build_execution_feasibility(intent, binding_candidate, runtime_world_state, profile)
+    execution_payload = build_execution_loop_payload(migration_task_id, intent, binding_candidate, feasibility)
+    gap_record = build_experience_gap_record(migration_task_id, intent, binding_candidate, feasibility)
+    if gap_record:
+        EXPERIENCE_GAP_STORE[gap_record["gap_record_id"]] = gap_record
+    RUNTIME_WORLD_STATE_STORE[migration_task_id] = runtime_world_state
+    STATE_STORE[migration_task_id] = {
+        "schema_version": "1.0.0",
+        "task_id": migration_task_id,
+        "current_stage_id": None,
+        "runtime_state": "migration_adapted",
+        "runtime_world_state": runtime_world_state,
+        "execution_feasibility": feasibility,
+        "experience_gap_record_id": gap_record.get("gap_record_id") if gap_record else None,
+    }
+    AUDIT_STORE[runtime_world_state["audit_record_id"]] = {
+        "schema_version": "1.0.0",
+        "audit_record_id": runtime_world_state["audit_record_id"],
+        "migration_task_id": migration_task_id,
+        "runtime_world_state_snapshot_id": runtime_world_state["runtime_world_state_snapshot_id"],
+        "binding_candidate_id": binding_candidate["binding_candidate_id"],
+        "execution_callback_id": execution_payload.get("execution_callback_id") if execution_payload else None,
+        "experience_gap_record_id": gap_record.get("gap_record_id") if gap_record else None,
+        "outcome": feasibility["result"],
+        "release_status": runtime_world_state["release_status"],
+    }
+    return {
+        "schema_version": "1.0.0",
+        "migration_task_id": migration_task_id,
+        "intent_translation": intent,
+        "current_space_semantic_data": build_space_context(cognitive_model),
+        "body_capability_profile": profile,
+        "runtime_world_state_snapshot": runtime_world_state,
+        "binding_candidate": binding_candidate,
+        "execution_feasibility": feasibility,
+        "experience_gap_record": gap_record,
+        "execution_loop_payload": execution_payload,
+        "audit_record_id": runtime_world_state["audit_record_id"],
+    }
+
+
+def get_runtime_world_state(task_id: str) -> dict[str, Any]:
+    state = RUNTIME_WORLD_STATE_STORE.get(task_id)
+    if not state:
+        stage_state = STATE_STORE.get(task_id, {})
+        state = stage_state.get("runtime_world_state")
+    if not state:
+        return {"error": "runtime_world_state_not_found", "task_id": task_id}
+    return {
+        "schema_version": "1.0.0",
+        "task_id": task_id,
+        "runtime_world_state_snapshot": state,
+        "release_status": state.get("release_status", "unknown"),
+        "release_token": state.get("release_token"),
+        "audit_record_id": state.get("audit_record_id"),
+    }
+
+
+def release_runtime_world_state(task_id: str, reason: str = "task_finished") -> dict[str, Any]:
+    current = get_runtime_world_state(task_id)
+    if "error" in current:
+        return current
+    state = current["runtime_world_state_snapshot"]
+    token_seed = "|".join([task_id, state.get("runtime_world_state_snapshot_id", ""), reason])
+    release_token = "release_" + hashlib.sha1(token_seed.encode("utf-8")).hexdigest()[:12]
+    state["snapshot_lifecycle_state"] = "released"
+    state["release_status"] = "released"
+    state["release_reason"] = reason
+    state["release_token"] = release_token
+    state["released_at"] = "2026-07-10T00:00:00+08:00"
+    RUNTIME_WORLD_STATE_STORE[task_id] = state
+    if task_id in STATE_STORE:
+        STATE_STORE[task_id]["runtime_world_state"] = state
+    audit_record_id = state.get("audit_record_id") or "audit_" + task_id.removeprefix("migration_")
+    audit = AUDIT_STORE.setdefault(audit_record_id, {"schema_version": "1.0.0", "audit_record_id": audit_record_id})
+    audit.update(
+        {
+            "task_id": task_id,
+            "runtime_world_state_snapshot_id": state.get("runtime_world_state_snapshot_id"),
+            "release_status": "released",
+            "release_token": release_token,
+            "release_reason": reason,
+        }
+    )
+    return {
+        "schema_version": "1.0.0",
+        "task_id": task_id,
+        "runtime_world_state_snapshot_id": state.get("runtime_world_state_snapshot_id"),
+        "release_status": "released",
+        "release_token": release_token,
+        "release_reason": reason,
+        "audit_record_id": audit_record_id,
+    }
+
+
+def build_runtime_conflict_items(audit: dict[str, Any], trace: dict[str, Any]) -> list[dict[str, Any]]:
+    conflict_items: list[dict[str, Any]] = []
+    for item in audit.get("fact_summary", []):
+        if item.get("state") != "conflicted":
+            continue
+        conflict_items.append(
+            {
+                "fact_id": item.get("fact_id"),
+                "conflict_state": item.get("state"),
+                "channel_notes": item.get("channel_notes"),
+                "source": "audit_fact_summary",
+            }
+        )
+    if conflict_items:
+        return conflict_items
+    observations: dict[str, dict[str, str]] = {}
+    for event in trace.get("events", []):
+        if event.get("trigger_reason") != "observation_update":
+            continue
+        summary = event.get("payload_summary", "")
+        if ":" not in summary or "=" not in summary:
+            continue
+        fact_part, state_part = summary.split("=", 1)
+        fact_id, channel_id = fact_part.split(":", 1)
+        state = state_part.split(" ", 1)[0]
+        observations.setdefault(fact_id, {})[channel_id] = state
+    for fact_id, channels in observations.items():
+        if len(set(channels.values())) > 1:
+            conflict_items.append(
+                {
+                    "fact_id": fact_id,
+                    "conflict_state": "conflicted",
+                    "channel_notes": json.dumps(channels, ensure_ascii=False, sort_keys=True),
+                    "source": "execution_trace_observations",
+                }
+            )
+    return conflict_items
+
+
+def readapt_runtime_conflict(
+    task_id: str,
+    utterance: str = "到水源处接一杯水",
+    body_capability_profile: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    audit = AUDIT_STORE.get(task_id)
+    trace = TRACE_STORE.get(task_id, {})
+    if not audit:
+        return {"error": "audit_not_found", "task_id": task_id}
+    conflict_items = build_runtime_conflict_items(audit, trace)
+    if not conflict_items:
+        return {"error": "runtime_conflict_not_found", "task_id": task_id}
+    intent = translate_intent(utterance)
+    cognitive_model = get_cognitive_model()
+    readaptation_seed = "|".join([task_id, normalize_text(utterance), json.dumps(conflict_items, sort_keys=True)])
+    readaptation_id = "readapt_" + hashlib.sha1(readaptation_seed.encode("utf-8")).hexdigest()[:12]
+    runtime_world_state = build_initial_runtime_world_state(cognitive_model, {**intent, "experience_id": readaptation_id})
+    runtime_world_state["migration_task_id"] = readaptation_id
+    runtime_world_state["runtime_world_state_snapshot_id"] = readaptation_id + "_snapshot"
+    runtime_world_state["audit_record_id"] = "audit_" + readaptation_id.removeprefix("readapt_")
+    runtime_world_state["conflict_source_task_id"] = task_id
+    runtime_world_state["runtime_conflicts"] = conflict_items
+    runtime_world_state["snapshot_revision_reason"] = "execution_loop_returned_conflicting_fact_status"
+    profile = body_capability_profile or build_default_body_capability_profile()
+    binding_candidate = build_binding_candidates(intent, cognitive_model, runtime_world_state, profile)
+    feasibility = build_execution_feasibility(intent, binding_candidate, runtime_world_state, profile)
+    gap_record = build_experience_gap_record(readaptation_id, intent, binding_candidate, feasibility)
+    if gap_record:
+        EXPERIENCE_GAP_STORE[gap_record["gap_record_id"]] = gap_record
+    record = {
+        "schema_version": "1.0.0",
+        "readaptation_id": readaptation_id,
+        "source_task_id": task_id,
+        "runtime_conflicts": conflict_items,
+        "runtime_world_state_snapshot": runtime_world_state,
+        "binding_candidate": binding_candidate,
+        "execution_feasibility": feasibility,
+        "experience_gap_record": gap_record,
+        "recommended_next_steps": feasibility.get("recommended_actions", []),
+    }
+    READAPTATION_STORE[readaptation_id] = record
+    RUNTIME_WORLD_STATE_STORE[readaptation_id] = runtime_world_state
+    STATE_STORE[readaptation_id] = {
+        "schema_version": "1.0.0",
+        "task_id": readaptation_id,
+        "current_stage_id": None,
+        "runtime_state": "readaptation_required",
+        "runtime_world_state": runtime_world_state,
+        "execution_feasibility": feasibility,
+        "experience_gap_record_id": gap_record.get("gap_record_id") if gap_record else None,
+    }
+    AUDIT_STORE[runtime_world_state["audit_record_id"]] = {
+        "schema_version": "1.0.0",
+        "audit_record_id": runtime_world_state["audit_record_id"],
+        "readaptation_id": readaptation_id,
+        "source_task_id": task_id,
+        "runtime_world_state_snapshot_id": runtime_world_state["runtime_world_state_snapshot_id"],
+        "binding_candidate_id": binding_candidate["binding_candidate_id"],
+        "experience_gap_record_id": gap_record.get("gap_record_id") if gap_record else None,
+        "outcome": feasibility["result"],
+        "release_status": runtime_world_state["release_status"],
+    }
+    return record
+
+
+def get_experience_gap(gap_record_id: str) -> dict[str, Any]:
+    record = EXPERIENCE_GAP_STORE.get(gap_record_id)
+    if not record:
+        return {"error": "experience_gap_not_found", "gap_record_id": gap_record_id}
+    return record
+
+
+def get_readaptation(readaptation_id: str) -> dict[str, Any]:
+    record = READAPTATION_STORE.get(readaptation_id)
+    if not record:
+        return {"error": "readaptation_not_found", "readaptation_id": readaptation_id}
+    return record
+
+
+def find_task_id_by_snapshot(snapshot_id: str | None) -> str | None:
+    if not snapshot_id:
+        return None
+    for task_id, state in RUNTIME_WORLD_STATE_STORE.items():
+        if state.get("runtime_world_state_snapshot_id") == snapshot_id:
+            return task_id
+    for task_id, stage_state in STATE_STORE.items():
+        state = stage_state.get("runtime_world_state", {})
+        if state.get("runtime_world_state_snapshot_id") == snapshot_id:
+            return task_id
+    return None
+
+
+def dispatch_execution_loop_payload(payload: dict[str, Any], executor_type: str = "digital_executor") -> dict[str, Any]:
+    allowed_executors = {
+        "process_template_executor",
+        "digital_executor",
+        "simulated_robot",
+        "ros_controller",
+        "robot_sdk",
+        "vla_policy",
+    }
+    if executor_type not in allowed_executors:
+        return {"error": "unsupported_executor_type", "allowed_executor_types": sorted(allowed_executors)}
+    snapshot_id = payload.get("runtime_world_state_snapshot_id")
+    task_id = find_task_id_by_snapshot(snapshot_id)
+    if not task_id:
+        return {"error": "runtime_world_state_not_found", "runtime_world_state_snapshot_id": snapshot_id}
+    current = get_runtime_world_state(task_id)
+    if "error" in current:
+        return current
+    state = current["runtime_world_state_snapshot"]
+    if state.get("release_status") == "released":
+        return {"error": "runtime_world_state_released", "task_id": task_id, "release_token": state.get("release_token")}
+    dispatch_seed = "|".join([payload.get("execution_callback_id", ""), executor_type, snapshot_id or "none"])
+    dispatch_id = "dispatch_" + hashlib.sha1(dispatch_seed.encode("utf-8")).hexdigest()[:12]
+    feedback: list[dict[str, Any]] = []
+    for index, item in enumerate(payload.get("execution_step_payload", []), start=1):
+        step = item.get("step")
+        meta = STEP_LIBRARY.get(step)
+        if not meta:
+            feedback.append(
+                {
+                    "step": step,
+                    "fact_status": "failure",
+                    "reason": "unknown_step",
+                    "executor_type": executor_type,
+                }
+            )
+            continue
+        transition = apply_step_to_runtime_world_state(state, step, meta, index)
+        fact_status = "fact_established" if not transition["missing_before_step"] else "fact_not_established"
+        feedback.append(
+            {
+                "step": step,
+                "executor_type": executor_type,
+                "fact_id": transition["produces_fact"],
+                "fact_status": fact_status,
+                "causal_produced_facts": [transition["produces_fact"]],
+                "causal_destroyed_facts": transition["destroys_facts"],
+                "missing_before_step": transition["missing_before_step"],
+                "before_executor_location": transition["before_executor_location"],
+                "after_executor_location": transition["after_executor_location"],
+            }
+        )
+    target_fact = payload.get("target_causal_fact")
+    established_facts = set(state.get("established_facts", []))
+    outcome = "fact_established" if target_fact in established_facts else "fact_not_established"
+    state["last_execution_dispatch_id"] = dispatch_id
+    state["last_execution_executor_type"] = executor_type
+    state["last_execution_fact_feedback"] = feedback
+    RUNTIME_WORLD_STATE_STORE[task_id] = state
+    if task_id in STATE_STORE:
+        STATE_STORE[task_id]["runtime_world_state"] = state
+        STATE_STORE[task_id]["runtime_state"] = "execution_feedback_received"
+        STATE_STORE[task_id]["last_execution_dispatch_id"] = dispatch_id
+    audit_record_id = state.get("audit_record_id") or "audit_" + task_id.removeprefix("migration_")
+    audit = AUDIT_STORE.setdefault(audit_record_id, {"schema_version": "1.0.0", "audit_record_id": audit_record_id})
+    audit.update(
+        {
+            "task_id": task_id,
+            "execution_dispatch_id": dispatch_id,
+            "execution_callback_id": payload.get("execution_callback_id"),
+            "executor_type": executor_type,
+            "outcome": outcome,
+            "fact_feedback": feedback,
+            "runtime_world_state_snapshot_id": snapshot_id,
+        }
+    )
+    record = {
+        "schema_version": "1.0.0",
+        "dispatch_id": dispatch_id,
+        "task_id": task_id,
+        "execution_callback_id": payload.get("execution_callback_id"),
+        "executor_type": executor_type,
+        "accepted_interface": "open_execution_loop_fact_feedback_v1",
+        "target_causal_fact": target_fact,
+        "outcome": outcome,
+        "fact_feedback": feedback,
+        "runtime_world_state_snapshot": state,
+        "audit_record_id": audit_record_id,
+    }
+    EXECUTION_DISPATCH_STORE[dispatch_id] = record
+    return record
+
+
+def get_execution_dispatch(dispatch_id: str) -> dict[str, Any]:
+    record = EXECUTION_DISPATCH_STORE.get(dispatch_id)
+    if not record:
+        return {"error": "execution_dispatch_not_found", "dispatch_id": dispatch_id}
+    return record
 
 
 def run_process(scenario: str = "success", utterance: str = "给客人倒一杯水") -> dict[str, Any]:
@@ -2215,6 +2904,42 @@ def get_status(task_id: str) -> dict[str, Any]:
     return state
 
 
+def get_p017_minimal_loop_evidence() -> dict[str, Any]:
+    if not P017_MINIMAL_LOOP_OUTPUT.exists():
+        return {
+            "error": "p017_minimal_loop_output_not_found",
+            "output_dir": str(P017_MINIMAL_LOOP_OUTPUT),
+            "validation_command": "python demo_runtime\\rell_sample\\validate_p017_minimal_loop.py",
+        }
+    required_files = [
+        "evidence_index.json",
+        "00_summary.json",
+        "01_experience_record.json",
+        "02_migration_context.json",
+        "03_runtime_world_state_snapshot.json",
+        "04_binding_and_feasibility.json",
+        "05_execution_fact_feedback.json",
+        "06_release_and_audit.json",
+    ]
+    missing = [name for name in required_files if not (P017_MINIMAL_LOOP_OUTPUT / name).exists()]
+    if missing:
+        return {
+            "error": "p017_minimal_loop_evidence_incomplete",
+            "output_dir": str(P017_MINIMAL_LOOP_OUTPUT),
+            "missing_files": missing,
+            "validation_command": "python demo_runtime\\rell_sample\\validate_p017_minimal_loop.py",
+        }
+    evidence_files = {name: read_json(P017_MINIMAL_LOOP_OUTPUT / name) for name in required_files if name not in {"evidence_index.json", "00_summary.json"}}
+    return {
+        "schema_version": "1.0.0",
+        "output_dir": str(P017_MINIMAL_LOOP_OUTPUT),
+        "validation_command": "python demo_runtime\\rell_sample\\validate_p017_minimal_loop.py",
+        "evidence_index": read_json(P017_MINIMAL_LOOP_OUTPUT / "evidence_index.json"),
+        "summary": read_json(P017_MINIMAL_LOOP_OUTPUT / "00_summary.json"),
+        "evidence_files": evidence_files,
+    }
+
+
 class RellSampleHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
@@ -2237,9 +2962,33 @@ class RellSampleHandler(BaseHTTPRequestHandler):
         if path == "/experience/library":
             self._send_json(load_experience_library())
             return
+        if path == "/p017/minimal-loop":
+            result = get_p017_minimal_loop_evidence()
+            self._send_json(result, status=404 if "error" in result else 200)
+            return
         if path.startswith("/audit/"):
             task_id = path.removeprefix("/audit/")
             self._send_json(get_audit(task_id), status=200 if task_id in AUDIT_STORE else 404)
+            return
+        if path.startswith("/runtime_world_state/"):
+            task_id = path.removeprefix("/runtime_world_state/")
+            result = get_runtime_world_state(task_id)
+            self._send_json(result, status=404 if "error" in result else 200)
+            return
+        if path.startswith("/experience/gap/"):
+            gap_record_id = path.removeprefix("/experience/gap/")
+            result = get_experience_gap(gap_record_id)
+            self._send_json(result, status=404 if "error" in result else 200)
+            return
+        if path.startswith("/runtime_readaptation/"):
+            readaptation_id = path.removeprefix("/runtime_readaptation/")
+            result = get_readaptation(readaptation_id)
+            self._send_json(result, status=404 if "error" in result else 200)
+            return
+        if path.startswith("/execution/dispatch/"):
+            dispatch_id = path.removeprefix("/execution/dispatch/")
+            result = get_execution_dispatch(dispatch_id)
+            self._send_json(result, status=404 if "error" in result else 200)
             return
         if path.startswith("/process/status/"):
             task_id = path.removeprefix("/process/status/")
@@ -2261,6 +3010,40 @@ class RellSampleHandler(BaseHTTPRequestHandler):
             return
         if path == "/process/run":
             result = run_process(body.get("scenario", "success"), body.get("utterance", "给客人倒一杯水"))
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/experience/migrate":
+            profile = body.get("body_capability_profile")
+            result = migrate_experience(body.get("utterance", "到水源处接一杯水"), profile if isinstance(profile, dict) else None)
+            self._send_json(result)
+            return
+        if path == "/runtime_world_state/release":
+            task_id = body.get("task_id") or body.get("migration_task_id")
+            if not task_id:
+                self._send_json({"error": "missing_task_id"}, status=400)
+                return
+            result = release_runtime_world_state(task_id, body.get("release_reason", "task_finished"))
+            self._send_json(result, status=404 if "error" in result else 200)
+            return
+        if path == "/runtime_world_state/readapt":
+            task_id = body.get("task_id") or body.get("source_task_id")
+            if not task_id:
+                self._send_json({"error": "missing_task_id"}, status=400)
+                return
+            profile = body.get("body_capability_profile")
+            result = readapt_runtime_conflict(
+                task_id,
+                body.get("utterance", "到水源处接一杯水"),
+                profile if isinstance(profile, dict) else None,
+            )
+            self._send_json(result, status=404 if "error" in result else 200)
+            return
+        if path == "/execution/dispatch":
+            payload = body.get("execution_loop_payload") or body.get("payload")
+            if not isinstance(payload, dict):
+                self._send_json({"error": "missing_execution_loop_payload"}, status=400)
+                return
+            result = dispatch_execution_loop_payload(payload, body.get("executor_type", "digital_executor"))
             self._send_json(result, status=400 if "error" in result else 200)
             return
         if path == "/experience/teach":
@@ -2306,7 +3089,7 @@ def main() -> None:
     server = HTTPServer((DEFAULT_HOST, DEFAULT_PORT), RellSampleHandler)
     print(f"RELL sample API listening on http://{DEFAULT_HOST}:{DEFAULT_PORT}")
     print(f"Demo page: http://{DEFAULT_HOST}:{DEFAULT_PORT}/")
-    print("Endpoints: POST /process/admit, POST /process/run, GET /audit/{task_id}")
+    print("Endpoints: POST /process/admit, POST /process/run, POST /experience/migrate, POST /execution/dispatch, GET /audit/{task_id}")
     server.serve_forever()
 
 

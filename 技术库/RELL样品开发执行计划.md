@@ -398,3 +398,64 @@
 10. 一份 audit_summary。
 
 只要以上十项成立，样品即可进入阶段二：仿真/日志驱动联调。
+
+## 八、P017 提交后工程修订
+
+P017 已按“一种跨空间跨本体的真实经验迁移执行方法及系统”提交后，RELL 样品的后续工程补强不再只围绕 P016 Runtime 阶段跃迁，而应把 P017 的迁移适配控制器主链显式做成可运行证据。
+
+### 8.1 今天优先补强的工程主链
+
+1. 增加迁移适配控制器接口：在现有经验记录、当前空间语义数据、本体能力画像和任务期运行时世界状态快照基础上，生成绑定候选以及执行可行性结果。
+2. 增加不可执行、部分不可执行和需降级执行的结构化结果：输出不可执行原因、缺失对象、缺失能力、缺失事实前提、建议动作、替代经验候选或教学入口。
+3. 增加任务期快照释放可观测字段：为任务期运行时世界状态快照生成快照标识，执行后生成释放令牌、释放状态和审计关联，证明快照不作为长期世界数据库继续参与后续任务。
+4. 增加开放执行闭环调用载荷：把通过适配的经验步骤、绑定候选、执行约束和任务期快照标识组织为可发送给 ROS、机器人 SDK、仿真执行器、数字执行体或其他执行闭环的载荷。
+
+### 8.2 计划调整后的最小 API
+
+在原有 `POST /process/admit`、`POST /process/run`、`GET /audit/{task_id}` 基础上，新增或补强以下 API 作为工程证据：
+
+1. `POST /experience/migrate`：接收任务意图或经验记录标识，返回迁移任务标识、任务期快照标识、绑定候选、执行可行性结果、不可执行原因和执行闭环调用载荷。
+2. `GET /runtime_world_state/{task_id}`：返回任务期运行时世界状态快照、生命周期状态、释放状态和审计关联。
+3. `POST /runtime_world_state/release`：触发任务期快照释放，返回释放令牌、释放状态、释放原因和审计记录标识。
+
+### 8.3 工程验收补充
+
+1. 成功路径应能展示从经验不变量契约到绑定候选、执行可行性结果、执行闭环调用载荷、事实回传和快照释放的完整链路。
+2. 不可执行路径应能展示当前空间语义、本体能力画像或任务期事实缺失导致的阻断，不进入底层执行闭环。
+3. 部分不可执行或需降级执行路径应能展示可执行步骤集合、不可执行步骤集合、降级动作或人工确认入口。
+4. 审计记录应能关联 `migration_task_id`、`runtime_world_state_snapshot_id`、`binding_candidate_id`、`execution_callback_id`、`release_token` 和 `audit_record_id`。
+
+### 8.4 分案工程种子的落实顺序
+
+1. 第一优先级：迁移适配控制器 / SDK / API 接口闭环，直接对应商业形态和取证难点。当前已形成 `POST /experience/migrate`。
+2. 第二优先级：任务期快照可观测与释放证明，支撑状态隔离和审计。当前已形成 `GET /runtime_world_state/{task_id}` 与 `POST /runtime_world_state/release`。
+3. 第三优先级：不可执行结果到教学入口和经验缺口记录，支撑安全边界和产品闭环。当前已形成 `experience_gap_record` 与 `GET /experience/gap/{gap_record_id}`。
+4. 第四优先级：运行时冲突处理与重新适配，复用现有 channel_conflict 场景继续加厚。当前已形成 `POST /runtime_world_state/readapt` 与 `GET /runtime_readaptation/{readaptation_id}`。
+5. 第五优先级：执行闭环开放接口、多类型执行器兼容和数字执行体迁移，作为接口文档和 API 载荷持续补强。当前已形成 `POST /execution/dispatch` 与 `GET /execution/dispatch/{dispatch_id}`，支持 `process_template_executor`、`digital_executor`、`simulated_robot`、`ros_controller`、`robot_sdk` 和 `vla_policy` 等执行器类型的统一事实回传。
+
+### 8.5 P017 最小特征闭环证据
+
+为便于后续审查意见答复和工程证据复核，新增 `demo_runtime/rell_sample/validate_p017_minimal_loop.py`，将 P017 的最小特征闭环固定为可重复运行的六段 JSON 证据链。
+
+输出目录：`demo_runtime/output/rell_sample/p017_minimal_loop/`
+
+输出文件：
+1. `01_experience_record.json`：经验记录、目标因果事实、过程链、因果签名和经验不变量契约。
+2. `02_migration_context.json`：当前空间语义数据、本体能力画像和任务意图。
+3. `03_runtime_world_state_snapshot.json`：任务期运行时世界状态快照、生命周期和释放状态。
+4. `04_binding_and_feasibility.json`：绑定候选、执行可行性结果和执行闭环调用载荷。
+5. `05_execution_fact_feedback.json`：开放执行闭环分发、事实状态回传和任务期快照更新。
+6. `06_release_and_audit.json`：快照释放令牌、释放状态和审计记录。
+
+验证命令：`python demo_runtime\rell_sample\validate_p017_minimal_loop.py`
+
+### 8.6 P017 最小闭环展示模式
+
+在 DEMO 首页新增“P017 最小闭环”入口，并新增 `GET /p017/minimal-loop` 接口读取最小闭环证据包。
+
+展示内容：
+1. 读取 `evidence_index.json` 中的技术特征、权利要求步骤、关键字段、代码来源和审查答复用途。
+2. 读取六个分段证据 JSON，并在页面中按经验记录、迁移上下文、任务期快照、绑定与可行性、执行事实回传、快照释放与审计展示。
+3. 每段证据以可展开卡片形式展示核心字段和原始 JSON，便于录屏、截图和内部复核。
+
+接口：`GET /p017/minimal-loop`

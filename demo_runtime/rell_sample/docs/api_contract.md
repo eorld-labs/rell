@@ -81,6 +81,54 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 
 翻译层会保留门旁边、服务位、操作台和水源处四个空间约束，概念层匹配“空间目标导航概念”“可盛装容器概念”和“水源资源区概念”，再由因果层确认该显式路线能达成 `cup_contains_water`。
 
+## POST /experience/migrate
+
+用途：执行 P017 迁移适配控制器主链。该接口不直接控制机器人电机，而是把待迁移经验记录、当前空间语义数据、本体能力画像和任务期运行时世界状态快照组合起来，生成绑定候选、执行可行性结果和开放执行闭环调用载荷。
+
+请求示例：
+
+```json
+{
+  "utterance": "到水源处接一杯水"
+}
+```
+
+响应至少包括：
+
+- `migration_task_id`：迁移任务标识。
+- `runtime_world_state_snapshot.runtime_world_state_snapshot_id`：任务期运行时世界状态快照标识。
+- `binding_candidate`：经验不变量契约在当前空间语义、本体能力画像和任务期快照下的绑定方案。
+- `execution_feasibility`：可执行、不可执行、部分不可执行、需降级执行、需人工确认、需补充教学或需搜索替代经验中的结构化结果。
+- `execution_loop_payload`：可发送给 ROS、机器人 SDK、仿真执行器、数字执行体或其他执行闭环的开放调用载荷。
+
+当本体能力画像缺少步骤能力、空间对象缺失或任务期前提事实不成立时，`execution_feasibility.infeasible_reasons` 会返回缺失能力、缺失绑定目标或缺失前提事实，并给出人工确认、替代经验搜索、补充教学、降级执行或终止执行等建议动作。
+
+## GET /runtime_world_state/{task_id}
+
+用途：查询任务期运行时世界状态快照。该快照用于当前任务执行期间的事实对齐和工作记忆，不作为长期世界数据库保存。
+
+响应至少包括：
+
+- `runtime_world_state_snapshot`：快照内容。
+- `release_status`：当前释放状态。
+- `release_token`：释放令牌，未释放时为空。
+- `audit_record_id`：与审计记录的关联。
+
+## POST /runtime_world_state/release
+
+用途：触发任务期快照释放，证明任务期临时事实在任务结束后不再直接作为后续任务适配判断依据。
+
+请求示例：
+
+```json
+{
+  "task_id": "migration_xxx",
+  "release_reason": "task_finished"
+}
+```
+
+响应包括 `release_token`、`release_status`、`release_reason` 和 `audit_record_id`。释放在样品中表现为逻辑释放和审计关联，实际产品中可对应物理删除、缓存清空、任务标识解绑、权限隔离或停止作为后续任务事实输入。
+
 ## GET /audit/{task_id}
 
 用途：查询最近一次运行写入内存的审计摘要。
@@ -153,11 +201,86 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 
 经验库第一阶段存储在 `demo_runtime/rell_sample/data/experience_library.json`，用于演示“不会做 -> 人工教学 -> 经验形成 -> 数字执行体回放”的最小闭环。
 
+## GET /experience/gap/{gap_record_id}
+
+用途：查询迁移适配过程中生成的经验缺口记录。
+
+当 `POST /experience/migrate` 或运行时再适配结果不是 `executable` 时，系统会生成 `experience_gap_record`。该记录包含阻断步骤、不可执行原因、建议动作、补充教学入口、替代经验检索条件和可降级执行步骤，用于把“不可执行/部分不可执行”结果接入后续教学闭环。
+
+## POST /runtime_world_state/readapt
+
+用途：在执行闭环返回事实冲突后，基于更新后的任务期运行时世界状态快照重新生成绑定候选和执行可行性结果。
+
+请求示例：
+
+```json
+{
+  "task_id": "task_pour_water_001",
+  "utterance": "到水源处接一杯水"
+}
+```
+
+当审计记录或执行 trace 中存在不同观测通道对同一事实给出冲突状态时，响应会返回 `readaptation_id`、`runtime_conflicts`、新的 `runtime_world_state_snapshot`、`binding_candidate`、`execution_feasibility` 和可选的 `experience_gap_record`。该接口用于演示“执行闭环事实回传 -> 冲突进入任务期快照 -> 重新适配或请求人工确认”的链路。
+
+## GET /runtime_readaptation/{readaptation_id}
+
+用途：查询运行时冲突再适配记录。该记录不替代原执行审计，而是记录冲突发生后的再适配快照、绑定候选、可行性结果和建议动作。
+
+## POST /execution/dispatch
+
+用途：接收 `POST /experience/migrate` 返回的 `execution_loop_payload`，并通过统一开放执行闭环接口分发给不同类型的执行器。
+
+请求示例：
+
+```json
+{
+  "executor_type": "robot_sdk",
+  "execution_loop_payload": {
+    "execution_callback_id": "exec_xxx",
+    "runtime_world_state_snapshot_id": "migration_xxx_snapshot",
+    "target_causal_fact": "cup_contains_water",
+    "execution_step_payload": []
+  }
+}
+```
+
+`executor_type` 当前支持 `process_template_executor`、`digital_executor`、`simulated_robot`、`ros_controller`、`robot_sdk` 和 `vla_policy`。样品阶段不会真实控制外部机器人，而是验证统一接口约束：执行器必须返回 `fact_established`、`fact_not_established`、`failure`、`conflict`、`recovered` 或 `human_confirmation` 等事实状态。响应会返回 `dispatch_id`、`fact_feedback`、更新后的 `runtime_world_state_snapshot` 和 `audit_record_id`。
+
+## GET /execution/dispatch/{dispatch_id}
+
+用途：查询执行闭环分发记录和事实回传结果。该记录用于证明迁移适配控制器能够通过开放接口调用不同底层执行模块，并将因果产出事实和因果销毁事实回写任务期快照。
+
+## GET /p017/minimal-loop
+
+用途：读取 P017 最小特征闭环证据包，用于首页“P017 最小闭环”展示模式。
+
+该接口读取 `demo_runtime/output/rell_sample/p017_minimal_loop/` 下的 `evidence_index.json`、`00_summary.json` 以及六个分段证据 JSON，返回每段证据对应的技术特征、权利要求步骤、关键字段、代码来源和原始 JSON 内容。
+
+使用前可运行：
+
+```powershell
+python .\demo_runtime\rell_sample\validate_p017_minimal_loop.py
+```
+
 ## 调试接口
 
 `GET /process/status/{task_id}` 为调试接口，不作为对外承诺接口。
 
 ## 验收命令
+
+生成 P017 最小特征闭环证据：
+
+```powershell
+python .\demo_runtime\rell_sample\validate_p017_minimal_loop.py
+```
+
+输出目录：
+
+```text
+demo_runtime/output/rell_sample/p017_minimal_loop/
+```
+
+全量样品验收：
 
 ```powershell
 python .\demo_runtime\rell_sample\run_all_checks.py

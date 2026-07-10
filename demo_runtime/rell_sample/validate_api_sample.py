@@ -6,13 +6,21 @@ from api_server import (
     EXPERIENCE_LIBRARY_FILE,
     AUDIT_STORE,
     admit_process,
+    dispatch_execution_loop_payload,
     get_audit,
     get_cognitive_model,
+    get_experience_gap,
+    get_execution_dispatch,
+    get_readaptation,
     get_space_prior,
     load_experience_library,
+    readapt_runtime_conflict,
     run_process,
     teach_experience,
     teach_experience_from_dialogue,
+    get_runtime_world_state,
+    migrate_experience,
+    release_runtime_world_state,
 )
 
 
@@ -168,9 +176,57 @@ def main() -> None:
     if "长期世界数据库" not in routed_run.get("execution_trace", {}).get("runtime_world_state_policy", ""):
         raise AssertionError(f"execution trace must document non-persistent runtime world policy: {routed_run.get('execution_trace')}")
 
+    migration = migrate_experience("到水源处接一杯水")
+    if migration["execution_feasibility"]["result"] != "executable":
+        raise AssertionError(f"P017 migration must produce executable feasibility: {migration}")
+    if not migration.get("binding_candidate", {}).get("step_bindings"):
+        raise AssertionError(f"P017 migration must generate binding candidates: {migration}")
+    payload = migration.get("execution_loop_payload")
+    if not payload or not payload.get("runtime_world_state_snapshot_id"):
+        raise AssertionError(f"P017 migration must generate open execution loop payload: {migration}")
+    migration_state = get_runtime_world_state(migration["migration_task_id"])
+    if migration_state.get("release_status") != "not_released":
+        raise AssertionError(f"runtime world state should be queryable before release: {migration_state}")
+    dispatch = dispatch_execution_loop_payload(payload, "robot_sdk")
+    if dispatch.get("outcome") != "fact_established":
+        raise AssertionError(f"open execution loop dispatch must establish target fact: {dispatch}")
+    if "cup_contains_water" not in dispatch.get("runtime_world_state_snapshot", {}).get("established_facts", []):
+        raise AssertionError(f"dispatch must update runtime world state facts: {dispatch}")
+    fetched_dispatch = get_execution_dispatch(dispatch["dispatch_id"])
+    if fetched_dispatch.get("dispatch_id") != dispatch["dispatch_id"]:
+        raise AssertionError(f"execution dispatch record must be queryable: {fetched_dispatch}")
+    release = release_runtime_world_state(migration["migration_task_id"], "validation_finished")
+    if release.get("release_status") != "released" or not release.get("release_token"):
+        raise AssertionError(f"runtime world state release must issue token: {release}")
+    released_state = get_runtime_world_state(migration["migration_task_id"])
+    if released_state.get("runtime_world_state_snapshot", {}).get("snapshot_lifecycle_state") != "released":
+        raise AssertionError(f"released runtime world state must be marked released: {released_state}")
+
+    weak_profile = dict(migration["body_capability_profile"])
+    weak_profile["supported_actions"] = ["navigate_to_region"]
+    partial = migrate_experience("到水源处接一杯水", weak_profile)
+    if partial["execution_feasibility"]["result"] not in {"partially_inexecutable", "infeasible"}:
+        raise AssertionError(f"weak body capability profile must produce infeasible or partial result: {partial}")
+    if not partial["execution_feasibility"]["infeasible_reasons"]:
+        raise AssertionError(f"infeasible migration must expose reasons: {partial}")
+    gap_record = partial.get("experience_gap_record")
+    if not gap_record or not gap_record.get("teaching_request"):
+        raise AssertionError(f"infeasible migration must create an experience gap record: {partial}")
+    fetched_gap = get_experience_gap(gap_record["gap_record_id"])
+    if fetched_gap.get("gap_record_id") != gap_record["gap_record_id"]:
+        raise AssertionError(f"experience gap record must be queryable: {fetched_gap}")
+
     conflict = run_process("channel_conflict")
     if conflict["audit_summary"]["outcome"] != "requires_human_confirmation":
         raise AssertionError("conflict API run must require human confirmation")
+    readaptation = readapt_runtime_conflict(conflict["task_id"], "到水源处接一杯水")
+    if readaptation.get("execution_feasibility", {}).get("result") != "requires_human_confirmation":
+        raise AssertionError(f"runtime conflict must produce human-confirmation readaptation: {readaptation}")
+    if not readaptation.get("runtime_world_state_snapshot", {}).get("runtime_conflicts"):
+        raise AssertionError(f"readaptation snapshot must carry runtime conflicts: {readaptation}")
+    fetched_readaptation = get_readaptation(readaptation["readaptation_id"])
+    if fetched_readaptation.get("readaptation_id") != readaptation["readaptation_id"]:
+        raise AssertionError(f"readaptation record must be queryable: {fetched_readaptation}")
 
     simulated = run_process("simulated_success")
     if simulated["audit_summary"]["outcome"] != "completed":
@@ -200,7 +256,7 @@ def main() -> None:
         EXPERIENCE_LIBRARY_FILE.write_text(original_library, encoding="utf-8")
 
     print("API sample validation passed.")
-    print("Validated: admit, run success, teach experience, dialogue teaching, natural-language causal teaching, explicit route teaching, causal chain solving, causal short-goal solving, run channel_conflict, run simulated_success, get audit, get space.")
+    print("Validated: admit, run success, teach experience, dialogue teaching, natural-language causal teaching, explicit route teaching, causal chain solving, causal short-goal solving, P017 migration adaptation, runtime world release, run channel_conflict, run simulated_success, get audit, get space.")
 
 
 if __name__ == "__main__":
