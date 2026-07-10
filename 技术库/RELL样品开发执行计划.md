@@ -33,6 +33,34 @@ python demo_runtime\rell_sample\run_all_checks.py
 
 预期结果：两条命令均通过，且恢复记录查询接口、恢复库持久化和 HTTP smoke 检查全部通过。
 
+## 当日增补（2026-07-10）：P013 任务语义翻译证据收束
+
+在当前样品中，P013 的实际能力已经存在于统一语义入口、因果求解、显式路线保真、对话教学和边教边动主链中，但此前主要散落在 `validate_api_sample.py` 的综合断言里，不利于后续单独举证。为此，本轮新增独立的 P013 校验脚本和证据输出目录，将任务语义翻译层从“代码里有”收束为“可重复运行、可落盘、可答复”的工程证据包。
+
+### 增补范围
+
+1. 新增 `demo_runtime/rell_sample/validate_p013_task_semantics.py`，固定 P013 的六段证据输出。
+2. 新增输出目录 `demo_runtime/output/rell_sample/p013_task_semantics/`，统一落盘 `00_summary.json`、`evidence_index.json` 和六个分段证据文件。
+3. 新增 `技术库/P013-任务语义翻译/P013任务语义翻译工程证据说明.md`，把验证命令、输出目录、证据字段和典型审查质疑对应关系写成可直接翻阅的中文说明。
+4. 将 `validate_p013_task_semantics.py` 接入 `demo_runtime/rell_sample/run_all_checks.py`，使 P013 与 P014、P017 一样进入一键回归主链。
+
+### 当前证据覆盖点
+
+1. 统一语义入口：证明 `task_execution`、`state_query`、`teaching` 和 `clarification` 四类请求能够落成结构化 `semantic_request`。
+2. 目标事实与过程链：证明短句意图和长句意图都能翻译为目标因果事实和可执行过程链，而不是停留在文本标签。
+3. 显式路线保真：证明“门旁边 -> 服务位 -> 操作台 -> 水源处”等空间语义路线可保留进入任务计划。
+4. 教学与反馈闭环：证明对话教学、边教边动、缺失前提反馈和任务经验沉淀已经形成闭环。
+5. LLM 边界：证明统一入口、概念解析和提示词契约共同约束语言模型只做语义理解，不直接下发执行。
+
+### 本轮验收命令
+
+```powershell
+python demo_runtime\rell_sample\validate_p013_task_semantics.py
+python demo_runtime\rell_sample\run_all_checks.py
+```
+
+预期结果：两条命令均通过，并生成 `demo_runtime/output/rell_sample/p013_task_semantics/` 下的证据文件。
+
 依据文件：`技术库/RELL样品落地0到1计划.md`
 
 ## 一、开发目标

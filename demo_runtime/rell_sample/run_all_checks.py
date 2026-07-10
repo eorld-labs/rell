@@ -257,6 +257,8 @@ def run_http_smoke() -> None:
             raise AssertionError(f"health failed: {health}")
         if cognitive_model.get("prior_ref") != "semantic_prior_home_a_kitchen_v1":
             raise AssertionError(f"space cognitive model failed: {cognitive_model}")
+        if not p017_loop.get("evidence_index") or len(p017_loop.get("evidence_files", [])) < 6:
+            raise AssertionError(f"P017 minimal loop endpoint must expose evidence index and segmented files: {p017_loop}")
         if not any(item.get("concept_id") == "concept_spatial_region_navigation" for item in concept_library.get("concept_units", [])):
             raise AssertionError(f"concept library failed: {concept_library}")
         if not preference_library.get("preference_records"):
@@ -407,6 +409,7 @@ def main() -> None:
     run_python("validate_runtime_sample.py")
     run_python("validate_simulated_robot_sample.py")
     run_python("validate_api_sample.py")
+    run_python("validate_p013_task_semantics.py")
     run_python("validate_p017_minimal_loop.py")
     run_http_smoke()
     print("All RELL sample checks passed.")
