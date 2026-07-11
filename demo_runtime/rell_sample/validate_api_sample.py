@@ -10,6 +10,7 @@ from api_server import (
     PREFERENCE_LIBRARY_FILE,
     RECOVERY_LIBRARY_FILE,
     admit_process,
+    build_runtime_explanation_view,
     build_llm_context_view,
     build_llm_prompt_contract,
     build_semantic_request_frame,
@@ -272,6 +273,13 @@ def main() -> None:
         semantic_execution = build_semantic_request_frame("到水源处接一杯水", semantic_model)
         if semantic_execution.get("request_type") != "task_execution":
             raise AssertionError(f"semantic router must classify task execution input: {semantic_execution}")
+        if semantic_execution.get("intent_confidence", 0) < 0.7 or semantic_execution.get("clarification_needed"):
+            raise AssertionError(f"clear execution utterance should keep high confidence without clarification: {semantic_execution}")
+        ambiguous_execution = build_semantic_request_frame("把那个给我弄一下", semantic_model)
+        if ambiguous_execution.get("request_type") != "task_execution":
+            raise AssertionError(f"ambiguous utterance should still stay in task_execution candidate lane: {ambiguous_execution}")
+        if not ambiguous_execution.get("clarification_needed") or ambiguous_execution.get("intent_confidence", 1) >= semantic_execution.get("intent_confidence", 0):
+            raise AssertionError(f"ambiguous utterance must trigger clarification and lower confidence: {ambiguous_execution}")
 
         migration = migrate_experience("到水源处接一杯水")
         if migration["execution_feasibility"]["result"] != "executable":
@@ -286,6 +294,9 @@ def main() -> None:
         migration_state = get_runtime_world_state(migration["migration_task_id"])
         if migration_state.get("release_status") != "not_released":
             raise AssertionError(f"runtime world state should be queryable before release: {migration_state}")
+        runtime_explanation_before = build_runtime_explanation_view(migration["migration_task_id"])
+        if runtime_explanation_before.get("status_answers", {}).get("next_step", {}).get("answer") != "move_to_counter":
+            raise AssertionError(f"runtime explanation view must expose first planned step before dispatch: {runtime_explanation_before}")
         before_query = query_runtime_world_state(migration["migration_task_id"], "当前杯子有没有水")
         if before_query.get("answer") != "false" or before_query.get("source") != "runtime_world_state_snapshot_only":
             raise AssertionError(f"runtime world state query must answer from current snapshot before fill: {before_query}")
@@ -300,6 +311,11 @@ def main() -> None:
         after_query = query_runtime_world_state(migration["migration_task_id"], "当前杯子有没有水")
         if after_query.get("answer") != "true":
             raise AssertionError(f"runtime world state query must answer true after fill: {after_query}")
+        runtime_explanation = build_runtime_explanation_view(migration["migration_task_id"])
+        if runtime_explanation.get("status_answers", {}).get("current_action", {}).get("answer") != "fill_cup_at_water_source":
+            raise AssertionError(f"runtime explanation view must expose current action from snapshot: {runtime_explanation}")
+        if runtime_explanation.get("status_answers", {}).get("goal_fact", {}).get("answer") != "cup_contains_water":
+            raise AssertionError(f"runtime explanation view must retain current task goal fact: {runtime_explanation}")
 
         detour_migration = migrate_experience(migration["intent_translation"]["utterance"])
         detour_injection = inject_runtime_perturbation(
@@ -405,17 +421,35 @@ def main() -> None:
         location_query = query_runtime_world_state(migration["migration_task_id"], "我现在在哪")
         if location_query.get("answer") != "region_water_source" or location_query.get("query_type") != "executor_location":
             raise AssertionError(f"runtime world state location question must resolve from current snapshot: {location_query}")
+        current_action_query = query_runtime_world_state(migration["migration_task_id"], "\u4f60\u73b0\u5728\u5728\u505a\u4ec0\u4e48")
+        if current_action_query.get("query_type") != "current_action" or current_action_query.get("answer") != "fill_cup_at_water_source":
+            raise AssertionError(f"runtime world state current-action question must resolve from explanation view: {current_action_query}")
+        next_step_query = query_runtime_world_state(migration["migration_task_id"], "\u4e0b\u4e00\u6b65\u505a\u4ec0\u4e48")
+        if next_step_query.get("query_type") != "next_step" or next_step_query.get("answer") != "none":
+            raise AssertionError(f"runtime world state next-step question must expose goal-achieved idle state: {next_step_query}")
+        if "\u76ee\u6807\u5df2\u8fbe\u6210" not in (next_step_query.get("reason") or ""):
+            raise AssertionError(f"runtime world state next-step reason must explain why there is no further step: {next_step_query}")
         agent_state_query = handle_agent_query("当前杯子有没有水", task_id=migration["migration_task_id"])
         if agent_state_query.get("semantic_request", {}).get("request_type") != "state_query":
             raise AssertionError(f"agent query must route state question: {agent_state_query}")
         if agent_state_query.get("route_result", {}).get("answer") != "true":
             raise AssertionError(f"agent query must answer state question from current snapshot: {agent_state_query}")
+        state_explanation = agent_state_query.get("route_result", {}).get("runtime_explanation_view", {})
+        if state_explanation.get("status_answers", {}).get("current_action", {}).get("answer") != "fill_cup_at_water_source":
+            raise AssertionError(f"agent query state answer must attach runtime explanation view: {agent_state_query}")
         agent_execution_run = handle_agent_query("到水源处接一杯水", scenario="auto", auto_execute=True)
         if agent_execution_run.get("route_result", {}).get("audit_summary", {}).get("outcome") != "completed":
             raise AssertionError(f"agent query auto_execute must run through unified execution path: {agent_execution_run}")
         agent_teaching_query = handle_agent_query("教你：走向操作台，然后拿起杯子")
         if agent_teaching_query.get("route_result", {}).get("decision") != "routed_to_teaching":
             raise AssertionError(f"agent query must route teaching input: {agent_teaching_query}")
+        if "走向操作台" not in (agent_teaching_query.get("route_result", {}).get("teaching_feedback", {}).get("acknowledgement") or ""):
+            raise AssertionError(f"teaching route must acknowledge parsed teaching steps: {agent_teaching_query}")
+        agent_clarification_needed = handle_agent_query("把那个给我弄一下", auto_execute=False)
+        if agent_clarification_needed.get("route_result", {}).get("decision") != "clarification_required":
+            raise AssertionError(f"ambiguous execution request must require clarification before execution: {agent_clarification_needed}")
+        if not agent_clarification_needed.get("route_result", {}).get("clarification_prompt"):
+            raise AssertionError(f"clarification-required result must contain clarification prompt: {agent_clarification_needed}")
 
         fetched_dispatch = get_execution_dispatch(dispatch["dispatch_id"])
         if fetched_dispatch.get("dispatch_id") != dispatch["dispatch_id"]:

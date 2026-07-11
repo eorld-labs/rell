@@ -1,5 +1,141 @@
 # RELL 样品开发执行计划
 
+## 当日增补（2026-07-11）：端侧概念内化层落稿与实施拆解
+
+在 P017 主链、统一语义入口、状态问答、边教边动和最小教学闭环已经初步跑通后，当前样品的下一瓶颈已经从“能不能执行”转移为“端侧能不能形成稳定工作语义”。因此，本轮新增端侧概念内化层主线，将高频任务语义、高频状态语义和高频教学语义从云端依赖中剥离，沉到本体侧，形成端脑自己的概念、状态和经验闭环。
+
+这一轮不是为了增加一个新层好看，而是为了固定以下主判断：
+
+1. 直接经验沉在本体侧，构成端脑；
+2. 外域经验沉在云脑，作为候选补给；
+3. 执行主体的长期主路线不是“大模型直接控制动作”，而是“概念 + 状态 + 经验”交织形成的端侧自行推理；
+4. 云脑只增益，不替代端脑主体。
+
+### 增补目标
+
+本轮增补以四个递进版本推进：
+
+1. 第一版：状态概念内化；
+2. 第二版：高频动作概念内化；
+3. 第三版：教学语言拆层；
+4. 第四版：云脑补给桥。
+
+### 第一版：状态概念内化
+
+目标：让执行主体稳定理解并回答高频状态问题，且回答来源只允许来自当前任务期运行时世界状态快照或当前运行上下文。
+
+建议新增或补强文件：
+
+1. `demo_runtime/rell_sample/concept_core/concept_units.py`
+2. `demo_runtime/rell_sample/concept_core/query_router.py`
+3. `demo_runtime/rell_sample/concept_core/concept_bridge.py`
+4. `demo_runtime/rell_sample/data/concept_library.json`
+5. `demo_runtime/rell_sample/api_server.py`
+
+本版要完成的事：
+
+1. 固定状态概念词表，至少覆盖“有水/没水”“现在/下一步”“在哪”“拿着什么”“当前偏好”；
+2. 把“当前杯子有没有水”“你现在在哪”“你现在在做什么”“下一步做什么”等高频问句映射到统一 `query_type`；
+3. 把 `query_type` 映射到任务期运行时世界状态快照槽位，如 `established_facts`、`executor.location_ref`、`current_stage`、`completed_stages`、`active_preferences`；
+4. 当当前目标已达成时，稳定输出“等待新的任务指令”，而不是遗留上一步动作名；
+5. 所有状态回答都附带来源字段，明确来自 `runtime_world_state_snapshot_only` 或 `runtime_world_state_snapshot_and_current_runtime_context_only`。
+
+验收口径：
+
+1. 高状态类问句命中率稳定；
+2. 不依赖大模型也能完成核心状态问答；
+3. 回答不从长期经验库和历史日志补推当前真值；
+4. 当前动作、下一步和已完成步骤的表达与运行时快照保持一致。
+
+### 第二版：高频动作概念内化
+
+目标：让执行主体对高频动作表达形成稳定概念桥接，而不是每次靠单句硬编码或等待大模型重写。
+
+建议新增或补强文件：
+
+1. `demo_runtime/rell_sample/concept_core/concept_parser.py`
+2. `demo_runtime/rell_sample/concept_core/concept_units.py`
+3. `demo_runtime/rell_sample/concept_core/concept_bridge.py`
+4. `demo_runtime/rell_sample/api_server.py`
+5. `demo_runtime/rell_sample/docs/api_contract.md`
+
+本版要完成的事：
+
+1. 为“接一杯水”“倒水”“拿起杯子”“去水源处”“去操作台”“绕开障碍”建立本地动作概念；
+2. 允许动作概念桥接到目标因果事实、候选过程链或候选经验，而不是直接下发动作用脚本；
+3. 把动作概念解析结果统一落成 `intent_frame` 或 `semantic_request`，继续交给编排层和 P017 可行性主链裁决；
+4. 让“任务执行”入口和“语义预览”入口共用同一套概念解析主链。
+
+验收口径：
+
+1. 高频任务短句不依赖云端即可稳定落到目标事实或候选过程链；
+2. 概念层只给候选，不直接执行；
+3. 复杂、歧义或陌生输入仍可保留 `llm_escalatable` 升级位。
+
+### 第三版：教学语言拆层
+
+目标：让教学输入不再被当作平铺自然语言，而是稳定拆成目标约束、过程约束、可变区间和偏好约束。
+
+建议新增或补强文件：
+
+1. `demo_runtime/rell_sample/concept_core/concept_parser.py`
+2. `demo_runtime/rell_sample/concept_core/teaching_frames.py`
+3. `demo_runtime/rell_sample/api_server.py`
+4. `demo_runtime/rell_sample/docs/api_contract.md`
+5. `demo_runtime/rell_sample/validate_api_sample.py`
+
+本版要完成的事：
+
+1. 把“先去拿杯子再接水”“轻一点”“先别做这个”“你可以自己换个顺序但结果要对”一类表达分层结构化；
+2. 显式区分教学中的结果导向、过程导向、严格跟随和局部变通授权；
+3. 让教学链路稳定回答“我理解了什么”“我缺什么前提”“我现在做到哪一步”“这一步是否发生偏离”；
+4. 将偏离后的追认优先写入端侧偏好记忆与审计流，而不是直接写进公共经验库。
+
+验收口径：
+
+1. 单步教学闭环稳定；
+2. 缺前提、偏离、恢复和追认都有结构化解释；
+3. 自主预算默认仍受 P015 当前偏好与治理层边界约束。
+
+### 第四版：云脑补给桥
+
+目标：在不破坏端脑主体性的前提下，给端侧概念层增加陌生语义和外域经验补给能力。
+
+建议新增或补强文件：
+
+1. `demo_runtime/rell_sample/concept_core/cloud_recall.py`
+2. `demo_runtime/rell_sample/concept_core/concept_bridge.py`
+3. `demo_runtime/rell_sample/api_server.py`
+4. `demo_runtime/rell_sample/docs/api_contract.md`
+
+本版要完成的事：
+
+1. 固定 `CloudRecallPacket` 一类结构，声明端侧概念缺口、当前目标事实和当前运行时摘要；
+2. 云端返回结果只允许是候选概念、候选过程链、候选经验或澄清问题；
+3. 云脑返回结果必须重新进入端侧概念层、编排层和可行性判断主链，不能绕过本地裁决；
+4. 在云脑不可用时，端侧最小状态问答和高频动作链路仍能正常工作。
+
+验收口径：
+
+1. 云脑缺席不使本地最小主链瘫痪；
+2. 云脑输出不会直接变成执行控制；
+3. 外域经验始终以候选补给而不是本地主体替代的方式进入系统。
+
+### 本轮建议实施顺序
+
+1. 先做第一版，把状态概念主干做稳；
+2. 再做第二版，把高频动作概念桥接到目标事实和候选过程链；
+3. 再做第三版，把教学语言拆到目标、过程、偏好和局部变通四层；
+4. 最后再做第四版，引入云脑补给桥但不改变端脑优先原则。
+
+### 本轮工程纪律
+
+1. 概念层不直接下发执行动作；
+2. 状态回答不允许用历史经验替代当前世界状态真值；
+3. 云脑不允许绕过编排层和执行层；
+4. 概念晋升仍坚持“先经验，后晋升，人工确认再入库”；
+5. 所有新接口优先并入现有统一语义入口，不另起一套平行入口。
+
 ## 当日增补（2026-07-10）：P014 执行恢复证据补强
 
 本轮补强的目标不是再写一套孤立的补救脚本，而是把 P014 从早期 `run_skill_cocreation.py` 中的静态补救痕迹，升级为 `demo_runtime/rell_sample/` 主链中的动态恢复记录闭环。恢复逻辑现在随执行主链共同发生，并可被查询、审计和复核。

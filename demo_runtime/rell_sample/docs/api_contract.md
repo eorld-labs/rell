@@ -98,6 +98,10 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 - `request_type`：语义请求类别。
 - `route_reason`：本次归类依据。
 - `preferred_model_tier`：当前建议走 `rule_router_only` 还是 `llm_escalatable`。
+- `intent_confidence`：系统对本次语义理解是否可靠的当前把握程度。
+- `clarification_needed` / `clarification_reason`：是否需要先追问，以及触发原因。
+- `confidence_reasons`：置信度形成依据，便于说明系统究竟卡在对象、方位、动作还是概念匹配。
+- `alternative_interpretations`：当前样品下的候选解释或追问方向。
 - `intent_frame`：与任务、空间、对象和事实相关的统一结构化语义。
 
 ## POST /agent/query
@@ -108,6 +112,15 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 - `task_execution`：进入任务翻译或执行；
 - `teaching`：进入教学解析；
 - `clarification`：进入执行原因说明。
+
+当 `task_execution` 的 `intent_confidence` 过低，或存在缺少共享指称、方位参照未落地、动作语义过于模糊等情况时，接口会优先返回：
+
+- `decision=clarification_required`
+- `clarification_prompt`
+- `clarification_reason`
+- `alternative_interpretations`
+
+此时仅说明“我还需要你补充什么”，不会直接进入执行。
 
 请求示例：
 
@@ -130,6 +143,15 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 
 这样会在路由后直接调用当前样品的执行链路；若未传 `auto_execute` 或其值为 `false`，则仅返回翻译结果而不执行。
 在当前样品中，首页“运行任务”也已经改为经由 `POST /agent/query` 进入：先以 `auto_execute=false` 获取 `semantic_request`、`intent_translation` 和 `space_admission`，再以 `auto_execute=true` 在同一入口下触发执行。这样状态问答、任务执行和后续教学链路共用同一条自然语言主线。
+
+对于 `state_query`，响应中的 `route_result` 现还会附带 `runtime_explanation_view`，用于把当前任务期运行时世界状态快照进一步外化为：
+
+- `current_action`：当前正在做什么；
+- `next_step`：若还能继续，当前任务链上的下一步是什么；
+- `goal_fact`：当前任务的目标因果事实；
+- `time_layers`：即时状态、任务状态、会话状态三层解释视图。
+
+该解释视图仍坚持 `runtime_world_state_snapshot_and_current_runtime_context_only`，不回退到长期记忆臆造当前事实。
 
 ## POST /llm/context-view
 
@@ -540,6 +562,8 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 ```
 
 若用户先教 `拿起杯子` 但执行体尚未到达操作台，响应会返回 `needs_more_teaching`，并在 `missing_before_step` 中列出 `executor_at_counter` 等缺失前提。
+
+通过 `POST /agent/query` 走 `teaching` 路由时，当前样品还会先返回 `teaching_feedback.acknowledgement`，用于把“我理解你这次在教我什么”复述出来；若本轮教学仍过于模糊，则会沿用 `clarification_needed` / `clarification_reason` 先请求补充更具体步骤。
 
 ## POST /teaching/session/finish
 

@@ -247,6 +247,10 @@ def run_http_smoke() -> None:
             raise AssertionError("demo page did not include learned experience animation mapping")
         if "dialogueTeachButton" not in page:
             raise AssertionError("demo page did not include dialogue teaching entry")
+        if "renderSemanticSignalRows" not in page or "renderRuntimeExplanationRows" not in page:
+            raise AssertionError("demo page did not include interaction-layer explanation renderers")
+        if "????" not in page or "??????" not in page or "????" not in page:
+            raise AssertionError("demo page did not include interaction-layer visible labels")
         if "p017Button" not in page:
             raise AssertionError("demo page did not include P017 minimal loop entry")
         if "conceptCandidatesButton" not in page or "confirmConceptCandidateButton" not in page:
