@@ -11,6 +11,8 @@ from urllib.parse import urlparse
 
 from concept_core import (
     build_cloud_recall_packet,
+    build_concept_evidence_packet,
+    build_gap_evidence_packet,
     build_teaching_frame,
     resolve_action_concepts,
     build_released_runtime_query_result,
@@ -501,6 +503,11 @@ def build_concept_unit_view(
                 "goal_fact": runtime_context_view.get("task_context", {}).get("goal_fact"),
             }
         )
+    match_basis = ["semantic_constraint_match", "concept_library_unit_match"]
+    if runtime_context_view:
+        match_basis.append("runtime_snapshot_binding")
+    if concept.get("derived_from_experiences"):
+        match_basis.append("experience_backed_promoted_concept")
     return {
         "concept_id": concept["concept_id"],
         "display_name": concept["display_name"],
@@ -517,6 +524,14 @@ def build_concept_unit_view(
         "formation_basis": "情境描述信息、空间语义、对象约束和目标因果事实共同约束；当前样品先以轻量规则抽取候选概念，后续由交互经验记录持续更新",
         "runtime_binding_status": runtime_binding_status,
         "direct_execution_allowed": False,
+        "concept_evidence": build_concept_evidence_packet(
+            concept,
+            concept_type="semantic_concept",
+            activation_reason=activation_reason,
+            match_basis=match_basis,
+            confidence=0.84 if runtime_context_view else 0.8,
+            runtime_context_view=runtime_context_view,
+        ),
     }
 
 
@@ -6384,6 +6399,33 @@ def build_llm_context_view(task_id: str) -> dict[str, Any]:
     }
 
 
+def collect_concept_evidence_packets(
+    resolved_concepts: list[dict[str, Any]],
+    action_concepts: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    packets: list[dict[str, Any]] = []
+    for item in [*resolved_concepts, *action_concepts]:
+        packet = item.get("concept_evidence")
+        if packet:
+            packets.append(packet)
+    return packets
+
+
+def build_concept_evidence_summary(evidence_packets: list[dict[str, Any]]) -> dict[str, Any]:
+    direct_execution_allowed = any(
+        packet.get("fallback_policy", {}).get("direct_execution_allowed")
+        for packet in evidence_packets
+    )
+    return {
+        "evidence_packet_count": len(evidence_packets),
+        "local_concept_ids": [packet.get("concept_id") for packet in evidence_packets],
+        "all_candidate_only": all(packet.get("fallback_policy", {}).get("candidate_only") for packet in evidence_packets),
+        "direct_execution_allowed": direct_execution_allowed,
+        "must_reenter_orchestration_layer": True,
+        "evidence_role": "explain_local_concept_match_and_execution_boundary",
+    }
+
+
 def resolve_concepts_for_intent(utterance: str, task_id: str | None = None) -> dict[str, Any]:
     cognitive_model = get_cognitive_model()
     intent_frame = build_intent_frame(utterance, cognitive_model)
@@ -6405,6 +6447,8 @@ def resolve_concepts_for_intent(utterance: str, task_id: str | None = None) -> d
     resolution_id = "concept_resolution_" + hashlib.sha1(
         "|".join([normalize_text(utterance), task_id or "none"]).encode("utf-8")
     ).hexdigest()[:12]
+    action_concepts = intent_frame.get("action_concepts", [])
+    evidence_packets = collect_concept_evidence_packets(concept_matches, action_concepts)
     return {
         "schema_version": "1.0.0",
         "resolution_id": resolution_id,
@@ -6418,8 +6462,10 @@ def resolve_concepts_for_intent(utterance: str, task_id: str | None = None) -> d
             "spatial_constraints": intent_frame.get("spatial_constraints", []),
             "object_constraints": intent_frame.get("object_constraints", []),
         },
-        "action_concepts": intent_frame.get("action_concepts", []),
+        "action_concepts": action_concepts,
         "resolved_concepts": concept_matches,
+        "concept_evidence_packets": evidence_packets,
+        "concept_evidence_summary": build_concept_evidence_summary(evidence_packets),
         "runtime_context_view": runtime_context_view,
         "concept_resolution_policy": {
             "concept_layer_role": "提供可复用语义单元，不直接替代经验层、因果层或执行层",
@@ -6458,11 +6504,17 @@ def build_cloud_recall_preview(
         normalize_text_fn=normalize_text,
     )
     should_request = bool(cloud_recall_packet.get("local_concept_gap"))
+    gap_evidence = build_gap_evidence_packet(
+        utterance,
+        gaps=cloud_recall_packet.get("local_concept_gap", []),
+        runtime_context_view=runtime_context_view if runtime_context_view and "error" not in runtime_context_view else None,
+    )
     if not should_request:
         return {
             "schema_version": "1.0.0",
             "should_request_cloud_recall": False,
             "cloud_recall_packet": cloud_recall_packet,
+            "concept_gap_evidence": gap_evidence,
             "cloud_recall_result": {
                 "schema_version": "1.0.0",
                 "availability": "local_concepts_sufficient",
@@ -6479,6 +6531,7 @@ def build_cloud_recall_preview(
         "schema_version": "1.0.0",
         "should_request_cloud_recall": True,
         "cloud_recall_packet": cloud_recall_packet,
+        "concept_gap_evidence": gap_evidence,
         "cloud_recall_result": request_cloud_concept_support(
             cloud_recall_packet,
             normalize_text_fn=normalize_text,

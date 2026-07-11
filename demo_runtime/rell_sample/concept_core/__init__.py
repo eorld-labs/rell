@@ -9,6 +9,7 @@ from .concept_bridge import (
     build_runtime_state_query_result,
     build_unsupported_runtime_query_result,
 )
+from .concept_evidence import build_concept_evidence_packet, build_gap_evidence_packet
 from .concept_parser import resolve_action_concepts
 from .concept_units import (
     STATE_CONCEPT_UNITS,
@@ -24,6 +25,8 @@ __all__ = [
     "STATE_CONCEPT_UNITS",
     "build_teaching_frame",
     "build_cloud_recall_packet",
+    "build_concept_evidence_packet",
+    "build_gap_evidence_packet",
     "build_released_runtime_query_result",
     "build_runtime_state_query_result",
     "build_supported_runtime_questions",

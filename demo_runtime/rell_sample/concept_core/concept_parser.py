@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from .action_units import find_action_concept_by_step, find_action_concepts_by_text
+from .concept_evidence import build_concept_evidence_packet
 
 
 def _build_action_concept_view(
@@ -11,6 +12,8 @@ def _build_action_concept_view(
     activation_reason: str,
     step_detected_explicitly: bool,
 ) -> dict[str, Any]:
+    match_basis = ["explicit_process_chain_step"] if step_detected_explicitly else ["local_action_alias_match"]
+    confidence = 0.92 if step_detected_explicitly else 0.78
     return {
         "concept_id": concept.get("concept_id"),
         "display_name": concept.get("display_name"),
@@ -22,6 +25,13 @@ def _build_action_concept_view(
         "source_policy": concept.get("source_policy"),
         "direct_execution_allowed": False,
         "must_reenter_orchestration_layer": True,
+        "concept_evidence": build_concept_evidence_packet(
+            concept,
+            concept_type="action_concept",
+            activation_reason=activation_reason,
+            match_basis=match_basis,
+            confidence=confidence,
+        ),
     }
 
 

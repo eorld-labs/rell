@@ -514,6 +514,13 @@ def main() -> None:
                 raise AssertionError(f"concept resolution must expose reusable local action concepts for the utterance: {concept_resolution}")
         if concept_resolution.get("concept_resolution_policy", {}).get("direct_execution_allowed"):
             raise AssertionError(f"concept resolution must stay above execution and require orchestration: {concept_resolution}")
+        concept_evidence_packets = concept_resolution.get("concept_evidence_packets", [])
+        if not concept_evidence_packets:
+            raise AssertionError(f"concept resolution must expose evidence packets for local concept trust decisions: {concept_resolution}")
+        if any(packet.get("fallback_policy", {}).get("direct_execution_allowed") for packet in concept_evidence_packets):
+            raise AssertionError(f"concept evidence packets must not grant direct execution: {concept_resolution}")
+        if not concept_resolution.get("concept_evidence_summary", {}).get("all_candidate_only"):
+            raise AssertionError(f"concept evidence summary must keep local concepts candidate-only: {concept_resolution}")
 
         llm_prompt_contract = build_llm_prompt_contract("到水源处接一杯水", migration["migration_task_id"])
         if llm_prompt_contract.get("handoff_contract", {}).get("validator_endpoint") != "/llm/candidate/validate":
@@ -537,6 +544,8 @@ def main() -> None:
         cloud_recall_ambiguous = build_cloud_recall_preview("把那个给我弄一下")
         if not cloud_recall_ambiguous.get("should_request_cloud_recall"):
             raise AssertionError(f"ambiguous task must request cloud recall preview: {cloud_recall_ambiguous}")
+        if cloud_recall_ambiguous.get("concept_gap_evidence", {}).get("fallback_policy", {}).get("direct_execution_allowed"):
+            raise AssertionError(f"concept gap evidence must forbid direct execution: {cloud_recall_ambiguous}")
         if not cloud_recall_ambiguous.get("cloud_recall_result", {}).get("clarification_questions"):
             raise AssertionError(f"ambiguous task must produce clarification questions from cloud recall: {cloud_recall_ambiguous}")
         if cloud_recall_ambiguous.get("cloud_recall_result", {}).get("direct_execution_allowed"):
@@ -580,6 +589,9 @@ def main() -> None:
         location_concepts = location_query.get("state_concept_resolution", {}).get("matched_state_concepts", [])
         if not any(item.get("concept_id") == "state_concept_executor_location" for item in location_concepts):
             raise AssertionError(f"runtime world state location query must pass through concept core state concept routing: {location_query}")
+        location_evidence = [item.get("concept_evidence") for item in location_concepts if item.get("concept_evidence")]
+        if not location_evidence or any(item.get("fallback_policy", {}).get("direct_execution_allowed") for item in location_evidence):
+            raise AssertionError(f"state concept routing must expose non-executing evidence packets: {location_query}")
         current_action_query = query_runtime_world_state(migration["migration_task_id"], "\u4f60\u73b0\u5728\u5728\u505a\u4ec0\u4e48")
         if current_action_query.get("query_type") != "current_action" or current_action_query.get("answer") != "fill_cup_at_water_source":
             raise AssertionError(f"runtime world state current-action question must resolve from explanation view: {current_action_query}")

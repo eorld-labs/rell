@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+from .concept_evidence import build_concept_evidence_packet
 from .concept_units import find_state_concepts_by_text
 
 
@@ -14,6 +15,14 @@ def _build_concept_resolution_payload(matched_concepts: list[dict[str, Any]]) ->
                 "query_type": item.get("query_type"),
                 "source_policy": item.get("source_policy"),
                 "source_slots": item.get("source_slots", []),
+                "concept_evidence": build_concept_evidence_packet(
+                    item,
+                    concept_type="state_query_concept",
+                    activation_reason="状态提问命中端侧高频查询概念",
+                    match_basis=["local_state_query_alias_match", "runtime_snapshot_slot_binding"],
+                    confidence=0.96,
+                    fallback_policy="answer_from_runtime_snapshot_or_report_unsupported",
+                ),
             }
             for item in matched_concepts
         ]
