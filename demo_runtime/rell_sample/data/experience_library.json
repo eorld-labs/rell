@@ -1181,6 +1181,245 @@
       "confirmed_concept_candidate_ids": [
         "concept_candidate_88b8a4b25935"
       ]
+    },
+    {
+      "experience_id": "exp_9346485826",
+      "status": "validated_in_digital_space",
+      "source_utterance": "去操作台拿杯子",
+      "aliases": [
+        "去操作台拿杯子"
+      ],
+      "task_type": "learned_process_chain",
+      "process_chain": [
+        "move_to_counter",
+        "pick_up_cup"
+      ],
+      "teaching_steps": [
+        "走向操作台",
+        "拿起杯子"
+      ],
+      "goal_fact": "cup_in_gripper",
+      "causal_signature": {
+        "schema_version": "1.0.0",
+        "requires_facts": [
+          "cup_at_counter",
+          "gripper_empty"
+        ],
+        "produces_fact": "cup_in_gripper",
+        "destroys_facts": [
+          "executor_at_water_source",
+          "executor_at_doorway",
+          "executor_at_service_position",
+          "cup_at_counter",
+          "gripper_empty"
+        ],
+        "expands_to": [
+          "move_to_counter",
+          "pick_up_cup"
+        ],
+        "reasoning": [
+          {
+            "step": "move_to_counter",
+            "requires_facts": [],
+            "external_requirements_added": [],
+            "produces_fact": "executor_at_counter",
+            "destroys_facts": [
+              "executor_at_water_source",
+              "executor_at_doorway",
+              "executor_at_service_position"
+            ]
+          },
+          {
+            "step": "pick_up_cup",
+            "requires_facts": [
+              "executor_at_counter",
+              "cup_at_counter",
+              "gripper_empty"
+            ],
+            "external_requirements_added": [
+              "cup_at_counter",
+              "gripper_empty"
+            ],
+            "produces_fact": "cup_in_gripper",
+            "destroys_facts": [
+              "cup_at_counter",
+              "gripper_empty"
+            ]
+          }
+        ],
+        "solver_enabled": false
+      },
+      "invariant_contract": {
+        "schema_version": "1.0.0",
+        "storage_policy": "store_invariants_not_concrete_parameters",
+        "invariant_dimensions": [
+          "topology_relation",
+          "exploratory_direction_and_physical_constraint",
+          "fact_based_termination_condition"
+        ],
+        "forbidden_storage": [
+          "absolute_coordinates",
+          "robot_specific_joint_angles",
+          "fixed_execution_duration",
+          "single_body_trajectory_without_binding_slots"
+        ],
+        "topology_invariants": [
+          {
+            "step": "move_to_counter",
+            "relation": "executor_reaches_semantic_region",
+            "target_ref": "region_counter_operation",
+            "stored_as": "semantic_region_relation_not_absolute_coordinates"
+          },
+          {
+            "step": "pick_up_cup",
+            "relation": "end_effector_reaches_graspable_object",
+            "target_ref": "object_cup_white_mug",
+            "stored_as": "object_affordance_and_relative_reach_relation"
+          }
+        ],
+        "action_constraints": [
+          {
+            "step": "move_to_counter",
+            "direction_policy": "navigate_toward_bound_region",
+            "physical_limits": [
+              "respect_walkable_area",
+              "avoid_restricted_region"
+            ],
+            "not_stored": [
+              "fixed_path_points",
+              "absolute_pose_sequence"
+            ]
+          },
+          {
+            "step": "pick_up_cup",
+            "direction_policy": "approach_object_until_graspable",
+            "physical_limits": [
+              "respect_gripper_force_limit",
+              "keep_object_stable"
+            ],
+            "not_stored": [
+              "fixed_joint_angles",
+              "fixed_gripper_duration"
+            ]
+          }
+        ],
+        "termination_conditions": [
+          {
+            "step": "move_to_counter",
+            "terminate_when": "executor_at_counter == established",
+            "verification_basis": "runtime_world_state_and_observation_channels",
+            "not_stored": "fixed_duration"
+          },
+          {
+            "step": "pick_up_cup",
+            "terminate_when": "cup_in_gripper == established",
+            "verification_basis": "runtime_world_state_and_observation_channels",
+            "not_stored": "fixed_duration"
+          }
+        ],
+        "binding_slots": [
+          "region_counter_operation",
+          "object_cup_white_mug"
+        ],
+        "runtime_binding": {
+          "space_source": "P010 subject cognitive model",
+          "concept_source": "P012 concept match",
+          "execution_source": "P016 runtime transition and verification",
+          "body_specific_solution": "provided_by_robot_adapter_or_vendor_controller"
+        }
+      },
+      "context": {
+        "task_ref": "去操作台拿杯子",
+        "space_refs": [
+          "home_a_kitchen",
+          "semantic_prior_home_a_kitchen_v1"
+        ],
+        "human_intent_ref": "manual_teaching"
+      },
+      "action": {
+        "action_type": "process_chain",
+        "target_refs": [
+          "region_counter_operation",
+          "object_cup_white_mug"
+        ],
+        "parameters": {
+          "source": "manual_teaching",
+          "teaching_frame": {
+            "schema_version": "1.0.0",
+            "teaching_frame_version": "v1",
+            "source_text": "走向操作台\n拿起杯子",
+            "normalized_text": "走向操作台拿起杯子",
+            "goal_constraints": {
+              "goal_fact": null,
+              "goal_expression_detected": false,
+              "goal_expression_markers": []
+            },
+            "process_constraints": {
+              "ordered_steps": [
+                "move_to_counter",
+                "pick_up_cup"
+              ],
+              "sequence_markers": [],
+              "process_guidance_strength": "medium",
+              "supports_stepwise_execution": true
+            },
+            "preference_constraints": [],
+            "flexibility_policy": {
+              "mode": "ordered_preference_default",
+              "rationale": "当前教学中存在明确步骤顺序，默认优先遵循过程顺序",
+              "human_override_required": false
+            },
+            "parsed_steps": [
+              "move_to_counter",
+              "pick_up_cup"
+            ],
+            "teaching_mode": "stepwise_when_possible"
+          }
+        }
+      },
+      "teaching_contract": {
+        "schema_version": "1.0.0",
+        "teaching_frame_version": "v1",
+        "source_text": "走向操作台\n拿起杯子",
+        "normalized_text": "走向操作台拿起杯子",
+        "goal_constraints": {
+          "goal_fact": null,
+          "goal_expression_detected": false,
+          "goal_expression_markers": []
+        },
+        "process_constraints": {
+          "ordered_steps": [
+            "move_to_counter",
+            "pick_up_cup"
+          ],
+          "sequence_markers": [],
+          "process_guidance_strength": "medium",
+          "supports_stepwise_execution": true
+        },
+        "preference_constraints": [],
+        "flexibility_policy": {
+          "mode": "ordered_preference_default",
+          "rationale": "当前教学中存在明确步骤顺序，默认优先遵循过程顺序",
+          "human_override_required": false
+        },
+        "parsed_steps": [
+          "move_to_counter",
+          "pick_up_cup"
+        ],
+        "teaching_mode": "stepwise_when_possible"
+      },
+      "outcome": {
+        "outcome_type": "candidate_created",
+        "state_delta": "manual steps translated into a digital process-chain experience",
+        "evidence_refs": [
+          "POST /experience/teach",
+          "GET /experience/library"
+        ]
+      },
+      "governance_ref": {
+        "audit_ref": "teaching_session"
+      },
+      "created_at": "2026-07-09T00:00:00+08:00"
     }
   ]
 }

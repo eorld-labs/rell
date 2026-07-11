@@ -304,6 +304,162 @@
         }
       },
       "created_at": "2026-07-10T00:00:00+08:00"
+    },
+    {
+      "candidate_id": "concept_candidate_4555dbe8a2fb",
+      "status": "pending_confirmation",
+      "proposal_type": "create_promoted_concept_unit",
+      "target_concept_id": "concept_promoted_cup_in_gripper_58f2c0e8",
+      "source_experience_id": "exp_9346485826",
+      "source_utterance": "去操作台拿杯子",
+      "goal_fact": "cup_in_gripper",
+      "abstract_process_chain": [
+        "move_to_counter",
+        "pick_up_cup"
+      ],
+      "base_concept_refs": [
+        "concept_spatial_region_navigation",
+        "concept_interactive_object_acquisition"
+      ],
+      "human_confirmation_required": true,
+      "promotion_rationale": "该经验已在数字空间中形成稳定过程链和不变量契约，可晋升为可复用任务概念候选",
+      "proposed_concept_unit": {
+        "concept_id": "concept_promoted_cup_in_gripper_58f2c0e8",
+        "display_name": "经验晋升任务概念",
+        "concept_level": "task_processing",
+        "typical_action": "experience_promoted_task",
+        "typical_consequence": "cup_in_gripper",
+        "usage": "由已验证经验晋升而来，仍需经编排层、空间语义和任务期快照共同约束后使用",
+        "capability_semantics": [
+          "navigate_to_region",
+          "grasp_object"
+        ],
+        "effect_contract": {
+          "produces_facts": [
+            "cup_in_gripper"
+          ],
+          "destroys_facts": [
+            "executor_at_water_source",
+            "executor_at_doorway",
+            "executor_at_service_position",
+            "cup_at_counter",
+            "gripper_empty"
+          ],
+          "state_transition": "validated_experience_promoted_into_reusable_task_concept"
+        },
+        "applicability_constraints": {
+          "requires_space_binding": true,
+          "supported_binding_types": [
+            "task_goal",
+            "semantic_region",
+            "interactive_object"
+          ],
+          "required_runtime_facts": [
+            "cup_at_counter",
+            "gripper_empty"
+          ],
+          "forbidden_low_level_fields": [
+            "absolute_coordinates",
+            "robot_specific_joint_angles",
+            "fixed_execution_duration",
+            "single_body_trajectory_without_binding_slots"
+          ]
+        },
+        "runtime_contingency_hints": [
+          "概念晋升后仍不得直接控制执行器，必须回到经验层和编排层判断当前是否可执行",
+          "若运行时世界状态快照不支持该过程链，应输出不可执行或请求补充教学，而不是假定任务成立"
+        ],
+        "experience_link_policy": {
+          "role": "经验晋升任务概念",
+          "direct_execution_allowed": false,
+          "requires_orchestration": true,
+          "preferred_backing": [
+            "经验库",
+            "P017迁移适配",
+            "执行层局部能力"
+          ]
+        },
+        "derived_from_experiences": [
+          "exp_9346485826"
+        ],
+        "promotion_tags": {
+          "goal_fact": "cup_in_gripper",
+          "process_chain": [
+            "move_to_counter",
+            "pick_up_cup"
+          ],
+          "base_concept_refs": [
+            "concept_spatial_region_navigation",
+            "concept_interactive_object_acquisition"
+          ],
+          "source_utterance": "去操作台拿杯子"
+        }
+      },
+      "created_at": "2026-07-10T00:00:00+08:00"
+    },
+    {
+      "candidate_id": "concept_candidate_71388ed61493",
+      "status": "pending_confirmation",
+      "proposal_type": "strengthen_existing_concept",
+      "target_concept_id": "concept_spatial_region_navigation",
+      "source_experience_id": "exp_9346485826",
+      "source_utterance": "去操作台拿杯子",
+      "goal_fact": "cup_in_gripper",
+      "abstract_process_chain": [
+        "move_to_counter",
+        "pick_up_cup"
+      ],
+      "base_concept_refs": [
+        "concept_spatial_region_navigation"
+      ],
+      "human_confirmation_required": true,
+      "promotion_rationale": "该经验可作为现有公共概念的新增工程证据，补强概念与真实经验之间的绑定",
+      "proposed_update": {
+        "derived_from_experiences_append": [
+          "exp_9346485826"
+        ],
+        "promotion_history_entry": {
+          "source_experience_id": "exp_9346485826",
+          "goal_fact": "cup_in_gripper",
+          "process_chain": [
+            "move_to_counter",
+            "pick_up_cup"
+          ]
+        }
+      },
+      "created_at": "2026-07-10T00:00:00+08:00"
+    },
+    {
+      "candidate_id": "concept_candidate_ce32ecd37c35",
+      "status": "pending_confirmation",
+      "proposal_type": "strengthen_existing_concept",
+      "target_concept_id": "concept_interactive_object_acquisition",
+      "source_experience_id": "exp_9346485826",
+      "source_utterance": "去操作台拿杯子",
+      "goal_fact": "cup_in_gripper",
+      "abstract_process_chain": [
+        "move_to_counter",
+        "pick_up_cup"
+      ],
+      "base_concept_refs": [
+        "concept_interactive_object_acquisition"
+      ],
+      "human_confirmation_required": true,
+      "promotion_rationale": "该经验可作为现有公共概念的新增工程证据，补强概念与真实经验之间的绑定",
+      "proposed_update": {
+        "derived_from_experiences_append": [
+          "exp_9346485826"
+        ],
+        "promotion_history_entry": {
+          "source_experience_id": "exp_9346485826",
+          "goal_fact": "cup_in_gripper",
+          "process_chain": [
+            "move_to_counter",
+            "pick_up_cup"
+          ]
+        }
+      },
+      "created_at": "2026-07-10T00:00:00+08:00"
     }
   ]
 }

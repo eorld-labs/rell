@@ -1,6 +1,6 @@
 # Robot Adapter Contract
 
-本接口是 RELL Runtime 与机器人、仿真或 Mock 数据之间的硬边界。
+本接口是 EORLD-RELL Runtime 与机器人、仿真或 Mock 数据之间的硬边界。为保持既有代码路径和工程证据链稳定，内部目录与模块名仍沿用 `rell_sample` 技术代号。
 
 ## 基本原则
 

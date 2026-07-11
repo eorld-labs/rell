@@ -1,6 +1,6 @@
 # Robot Adapter Integration Guide
 
-本文用于指导机器人厂商、仿真平台或中试中心将真实机器人 SDK 接入 RELL 样品 Runtime。
+本文用于指导机器人厂商、仿真平台或中试中心将真实机器人 SDK 接入 EORLD-RELL 样品 Runtime。为保持既有代码路径和工程证据链稳定，本文中的内部目录与模块名仍沿用 `rell_sample` 技术代号。
 
 ## 一、接入原则
 

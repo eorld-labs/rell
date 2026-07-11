@@ -64,6 +64,10 @@ def run_http_smoke() -> None:
     original_candidate_library = concept_candidate_library_file.read_text(encoding="utf-8") if concept_candidate_library_file.exists() else None
     original_preference_library = preference_library_file.read_text(encoding="utf-8") if preference_library_file.exists() else None
     original_recovery_library = recovery_library_file.read_text(encoding="utf-8") if recovery_library_file.exists() else None
+    recovery_library_file.write_text(
+        json.dumps({"schema_version": "1.0.0", "recovery_records": []}, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
     process = subprocess.Popen(
         [sys.executable, str(ROOT / "api_server.py")],
         cwd=REPO,
@@ -249,7 +253,7 @@ def run_http_smoke() -> None:
             raise AssertionError("demo page did not include dialogue teaching entry")
         if "renderSemanticSignalRows" not in page or "renderRuntimeExplanationRows" not in page:
             raise AssertionError("demo page did not include interaction-layer explanation renderers")
-        if "????" not in page or "??????" not in page or "????" not in page:
+        if "交互判定" not in page or "意图置信度" not in page or "云脑补给" not in page:
             raise AssertionError("demo page did not include interaction-layer visible labels")
         if "p017Button" not in page:
             raise AssertionError("demo page did not include P017 minimal loop entry")

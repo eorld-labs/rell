@@ -1,6 +1,6 @@
-# RELL Sample
+# EORLD-RELL Sample
 
-本目录是 RELL 样品从 0 到 1 的纯软件样品。当前已包含阶段零数据契约、Mock 剧本、P016 Runtime Core、SimulatedRobotAdapter、最小 API 和交互演示页面。
+本目录是 EORLD-RELL 从 0 到 1 的纯软件样品。当前已包含阶段零数据契约、Mock 剧本、P016 Runtime Core、SimulatedRobotAdapter、最小 API 和交互演示页面。为保持既有证据链、脚本路径和技术代号稳定，内部目录名仍保留为 `rell_sample`。
 
 ## 当前范围
 

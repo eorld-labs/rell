@@ -6,10 +6,15 @@ from api_server import (
     AUDIT_STORE,
     CONCEPT_CANDIDATE_LIBRARY_FILE,
     CONCEPT_LIBRARY_FILE,
+    DATA,
     EXPERIENCE_LIBRARY_FILE,
     PREFERENCE_LIBRARY_FILE,
     RECOVERY_LIBRARY_FILE,
+    STATE_STORE,
+    TIMELINE_SCENARIOS,
+    TRACE_STORE,
     admit_process,
+    build_cloud_recall_preview,
     build_runtime_explanation_view,
     build_llm_context_view,
     build_llm_prompt_contract,
@@ -42,6 +47,8 @@ from api_server import (
     release_runtime_world_state,
     resolve_concepts_for_intent,
     run_process,
+    run_process_with_runtime_context,
+    run_runtime_sample,
     start_teaching_session,
     teach_experience,
     teach_experience_from_dialogue,
@@ -71,16 +78,18 @@ def main() -> None:
         success = run_process("success")
         if success["audit_summary"]["outcome"] != "completed":
             raise AssertionError("success API run must complete")
-        if success["intent_translation"]["task_type"] != "pour_water":
+        if success["intent_translation"]["task_type"] != "causal_process_chain":
             raise AssertionError(f"success API run must expose intent translation: {success.get('intent_translation')}")
+        if success["intent_translation"].get("goal_fact") != "water_poured":
+            raise AssertionError(f"success API run must project default task to water_poured goal fact: {success.get('intent_translation')}")
         if success["space_admission"]["decision"] != "allowed":
             raise AssertionError(f"success API run must pass space admission: {success.get('space_admission')}")
         if success["space_context"]["space_id"] != "home_a_kitchen":
             raise AssertionError(f"success API run must expose digital space context: {success.get('space_context')}")
 
         auto = run_process("auto", "给客人倒一杯水")
-        if auto["scenario"] != "simulated_success" or auto["audit_summary"]["outcome"] != "completed":
-            raise AssertionError(f"auto API run must translate and choose simulated_success: {auto}")
+        if auto["audit_summary"]["outcome"] != "completed" or auto["intent_translation"].get("goal_fact") != "water_poured":
+            raise AssertionError(f"auto API run must translate the utterance into a state-goal-driven causal execution: {auto}")
 
         unsupported = run_process("auto", "去楼下拿个快递")
         if unsupported["audit_summary"]["outcome"] != "cannot_do":
@@ -118,6 +127,8 @@ def main() -> None:
                 raise AssertionError(f"invariant contract must forbid {forbidden}: {taught_contract}")
         if not taught.get("concept_promotion_candidates"):
             raise AssertionError(f"teaching must generate concept promotion candidates: {taught}")
+        if taught.get("experience", {}).get("teaching_contract", {}).get("process_constraints", {}).get("ordered_steps") != ["move_to_counter", "pick_up_cup", "move_to_water_source", "fill_cup_at_water_source", "pour_water"]:
+            raise AssertionError(f"teaching must persist structured teaching contract: {taught}")
 
         candidate_library = load_concept_candidate_library()
         if not candidate_library.get("concept_candidates"):
@@ -213,6 +224,113 @@ def main() -> None:
         if "pour_water" in short_run["intent_translation"].get("candidate_process_chain", []):
             raise AssertionError(f"short goal must not include pouring step: {short_run['intent_translation']}")
 
+        pick_up_run = run_process("auto", "拿起杯子")
+        if pick_up_run["audit_summary"]["outcome"] != "completed":
+            raise AssertionError(f"single-step pickup command must be lifted to a state-based causal chain: {pick_up_run}")
+        if pick_up_run["intent_translation"].get("goal_fact") != "cup_in_gripper":
+            raise AssertionError(f"single-step pickup command must project to cup_in_gripper goal fact: {pick_up_run['intent_translation']}")
+        if pick_up_run["intent_translation"].get("candidate_process_chain") != ["move_to_counter", "pick_up_cup"]:
+            raise AssertionError(f"single-step pickup command must infer move_to_counter prerequisite from current world state: {pick_up_run['intent_translation']}")
+
+        pickup_run = run_process("auto", "拿起杯子")
+        if pickup_run["audit_summary"]["outcome"] != "completed":
+            raise AssertionError(f"single-step pickup must resolve as goal-fact planning, not unsupported detail command: {pickup_run}")
+        if pickup_run["intent_translation"].get("goal_fact") != "cup_in_gripper":
+            raise AssertionError(f"pickup command must project to cup_in_gripper goal fact: {pickup_run['intent_translation']}")
+        if pickup_run["intent_translation"].get("candidate_process_chain") != ["move_to_counter", "pick_up_cup"]:
+            raise AssertionError(f"pickup command must infer missing prerequisites from current world state: {pickup_run['intent_translation']}")
+
+        pickup_continuation = run_process_with_runtime_context("auto", "去水源处接一杯水", task_id=pickup_run["task_id"])
+        if pickup_continuation.get("audit_summary", {}).get("outcome") != "completed":
+            raise AssertionError(f"pickup continuation must continue from held-object runtime state instead of requesting confirmation: {pickup_continuation}")
+        if pickup_continuation.get("intent_translation", {}).get("candidate_process_chain") != ["move_to_water_source", "fill_cup_at_water_source"]:
+            raise AssertionError(f"pickup continuation must trim pickup prerequisites from current runtime world state: {pickup_continuation}")
+
+        move_run = run_process("auto", "到水源处")
+        if move_run["audit_summary"]["outcome"] != "completed":
+            raise AssertionError(f"single-step move must resolve through the same goal-fact abstraction: {move_run}")
+        if move_run["intent_translation"].get("goal_fact") != "executor_at_water_source":
+            raise AssertionError(f"move command must project to executor_at_water_source goal fact: {move_run['intent_translation']}")
+        if move_run["intent_translation"].get("candidate_process_chain") != ["move_to_water_source"]:
+            raise AssertionError(f"move command must keep the same state-first abstraction path without task-specific patching: {move_run['intent_translation']}")
+
+        continuation_session = start_teaching_session("到水源处接一杯水")
+        for step_text in ["走向操作台", "拿起杯子"]:
+            continuation_step = execute_teaching_session_step(continuation_session["session_id"], step_text)
+            if not continuation_step["step_feedback"][0].get("executed"):
+                raise AssertionError(f"continuation setup must execute prerequisite steps: {continuation_step}")
+        continuation_preview = handle_agent_query(
+            "去水源处接水",
+            task_id=continuation_session["session_id"],
+            auto_execute=False,
+        )
+        continuation_route = continuation_preview.get("route_result", {})
+        continuation_intent = continuation_route.get("intent_translation", {})
+        if continuation_intent.get("candidate_process_chain") != ["move_to_water_source", "fill_cup_at_water_source"]:
+            raise AssertionError(f"continuation preview must trim already satisfied pickup steps: {continuation_preview}")
+        skipped_steps = continuation_intent.get("runtime_continuation", {}).get("skipped_steps", [])
+        if [item.get("step") for item in skipped_steps] != ["move_to_counter", "pick_up_cup"]:
+            raise AssertionError(f"continuation preview must explain skipped steps from latest runtime snapshot: {continuation_preview}")
+        continuation_run = run_process_with_runtime_context(
+            "auto",
+            "去水源处接水",
+            task_id=continuation_session["session_id"],
+        )
+        continued_steps = [event.get("runtime_world_transition", {}).get("produces_fact") for event in continuation_run["execution_trace"].get("events", [])]
+        if continued_steps != ["executor_at_water_source", "cup_contains_water"]:
+            raise AssertionError(f"continuation execution must continue from latest runtime snapshot: {continuation_run}")
+        if "cup_contains_water" not in continuation_run.get("runtime_world_state", {}).get("established_facts", []):
+            raise AssertionError(f"continuation execution must update runtime snapshot to water-filled state: {continuation_run}")
+
+        pause_session = start_teaching_session("到水源处接一杯水")
+        for step_text in ["走向操作台", "拿起杯子"]:
+            pause_step = execute_teaching_session_step(pause_session["session_id"], step_text)
+            if not pause_step["step_feedback"][0].get("executed"):
+                raise AssertionError(f"pause arbitration setup must execute prerequisite steps: {pause_step}")
+        pause_result = run_process_with_runtime_context(
+            "auto",
+            "别做了",
+            task_id=pause_session["session_id"],
+        )
+        if pause_result.get("runtime_event_arbitration", {}).get("decision") != "pause_current_task":
+            raise AssertionError(f"interrupt command must pause current task from current runtime state: {pause_result}")
+        if pause_result.get("stage_runtime_state", {}).get("runtime_state") != "paused_by_runtime_event":
+            raise AssertionError(f"interrupt arbitration must update runtime state to paused: {pause_result}")
+        pause_preview = handle_agent_query(
+            "别做了",
+            task_id=pause_session["session_id"],
+            auto_execute=False,
+        )
+        pause_route = pause_preview.get("route_result", {})
+        if pause_route.get("decision") == "clarification_required":
+            raise AssertionError(f"interrupt preview must not degrade into clarification: {pause_preview}")
+        if pause_route.get("decision") != "pause_current_task":
+            raise AssertionError(f"interrupt preview must expose pause_current_task decision: {pause_preview}")
+        if pause_route.get("runtime_event_arbitration", {}).get("decision") != "pause_current_task":
+            raise AssertionError(f"interrupt preview must expose runtime event arbitration: {pause_preview}")
+
+        switch_preview = handle_agent_query(
+            "去给我拿苹果",
+            task_id=pause_session["session_id"],
+            auto_execute=False,
+        )
+        switch_route = switch_preview.get("route_result", {})
+        if switch_route.get("decision") != "request_human_confirmation":
+            raise AssertionError(f"unknown task switch preview must surface request_human_confirmation instead of generic clarification: {switch_preview}")
+        if switch_route.get("runtime_event_arbitration", {}).get("decision") != "request_human_confirmation":
+            raise AssertionError(f"unknown task switch preview must route through runtime event arbitration: {switch_preview}")
+        if "object_cup_white_mug" not in switch_route.get("task_switch_context", {}).get("holding_objects", []):
+            raise AssertionError(f"unknown task switch preview must preserve held-object context: {switch_preview}")
+        switch_result = run_process_with_runtime_context(
+            "auto",
+            "去给我拿苹果",
+            task_id=pause_session["session_id"],
+        )
+        if switch_result.get("runtime_event_arbitration", {}).get("decision") != "request_human_confirmation":
+            raise AssertionError(f"unknown task switch execution must request human confirmation: {switch_result}")
+        if switch_result.get("stage_runtime_state", {}).get("runtime_state") != "awaiting_human_confirmation":
+            raise AssertionError(f"unknown task switch execution must preserve held-object state and wait for confirmation: {switch_result}")
+
         routed_teaching = teach_experience_from_dialogue(
             "走到门旁边，再走到服务位，再去操作台拿杯子，去水源处倒杯水",
             "教你：走到门旁边，再走到服务位，再去操作台拿杯子，去水源处倒杯水",
@@ -267,6 +385,15 @@ def main() -> None:
         semantic_teaching = build_semantic_request_frame("教你：走向操作台，然后拿起杯子", semantic_model)
         if semantic_teaching.get("request_type") != "teaching":
             raise AssertionError(f"semantic router must classify teaching input: {semantic_teaching}")
+        teaching_frame = semantic_teaching.get("teaching_plan", {}).get("teaching_frame", {})
+        if teaching_frame.get("process_constraints", {}).get("ordered_steps") != ["move_to_counter", "pick_up_cup"]:
+            raise AssertionError(f"teaching semantic frame must expose ordered process constraints: {semantic_teaching}")
+        semantic_teaching_preference = build_semantic_request_frame("教你：按我说，先走向操作台，再拿起杯子，轻一点，你可以自己换个顺序但结果要对", semantic_model)
+        preference_frame = semantic_teaching_preference.get("teaching_plan", {}).get("teaching_frame", {})
+        if preference_frame.get("flexibility_policy", {}).get("mode") != "allow_local_reorder":
+            raise AssertionError(f"teaching semantic frame must capture local-reorder authorization: {semantic_teaching_preference}")
+        if not preference_frame.get("preference_constraints"):
+            raise AssertionError(f"teaching semantic frame must capture human preference constraints: {semantic_teaching_preference}")
         semantic_clarification = build_semantic_request_frame("为什么不能执行", semantic_model)
         if semantic_clarification.get("request_type") != "clarification":
             raise AssertionError(f"semantic router must classify clarification input: {semantic_clarification}")
@@ -275,6 +402,10 @@ def main() -> None:
             raise AssertionError(f"semantic router must classify task execution input: {semantic_execution}")
         if semantic_execution.get("intent_confidence", 0) < 0.7 or semantic_execution.get("clarification_needed"):
             raise AssertionError(f"clear execution utterance should keep high confidence without clarification: {semantic_execution}")
+        semantic_action_concepts = [item.get("concept_id") for item in semantic_execution.get("intent_frame", {}).get("action_concepts", [])]
+        for expected_action_concept in ["action_concept_move_to_water_source", "action_concept_fill_cup"]:
+            if expected_action_concept not in semantic_action_concepts:
+                raise AssertionError(f"clear execution utterance must be bridged into local action concepts: {semantic_execution}")
         ambiguous_execution = build_semantic_request_frame("把那个给我弄一下", semantic_model)
         if ambiguous_execution.get("request_type") != "task_execution":
             raise AssertionError(f"ambiguous utterance should still stay in task_execution candidate lane: {ambiguous_execution}")
@@ -374,9 +505,13 @@ def main() -> None:
             raise AssertionError(f"concept library must expose reusable concept units: {concept_library}")
         concept_resolution = resolve_concepts_for_intent("走到门旁边，再去操作台拿杯子，到水源处接一杯水", migration["migration_task_id"])
         resolved_concept_ids = [item.get("concept_id") for item in concept_resolution.get("resolved_concepts", [])]
+        resolved_action_concept_ids = [item.get("concept_id") for item in concept_resolution.get("action_concepts", [])]
         for expected_concept in ["concept_spatial_region_navigation", "concept_interactive_object_acquisition", "concept_fillable_container", "concept_water_resource_zone"]:
             if expected_concept not in resolved_concept_ids:
                 raise AssertionError(f"concept resolution must expose reusable semantic units for the utterance: {concept_resolution}")
+        for expected_action_concept in ["action_concept_move_to_counter", "action_concept_pick_up_cup", "action_concept_move_to_water_source", "action_concept_fill_cup"]:
+            if expected_action_concept not in resolved_action_concept_ids:
+                raise AssertionError(f"concept resolution must expose reusable local action concepts for the utterance: {concept_resolution}")
         if concept_resolution.get("concept_resolution_policy", {}).get("direct_execution_allowed"):
             raise AssertionError(f"concept resolution must stay above execution and require orchestration: {concept_resolution}")
 
@@ -385,6 +520,8 @@ def main() -> None:
             raise AssertionError(f"llm prompt contract must point to deterministic validator handoff: {llm_prompt_contract}")
         if llm_prompt_contract.get("handoff_contract", {}).get("direct_execution_allowed"):
             raise AssertionError(f"llm prompt contract must forbid direct execution: {llm_prompt_contract}")
+        if llm_prompt_contract.get("input_packet", {}).get("cloud_recall_packet") is not None:
+            raise AssertionError(f"prompt contract should not request cloud recall when local concepts are sufficient: {llm_prompt_contract}")
 
         llm_candidate_intent = handle_agent_query("到水源处接一杯水")
         if llm_candidate_intent.get("semantic_request", {}).get("request_type") != "task_execution":
@@ -394,6 +531,25 @@ def main() -> None:
             raise AssertionError(f"agent query preview must keep intent translation inside unified route: {llm_candidate_intent}")
         if route_result.get("space_admission", {}).get("decision") != "allowed":
             raise AssertionError(f"agent query preview must expose admission inside unified route: {llm_candidate_intent}")
+        if route_result.get("cloud_recall_preview") is not None:
+            raise AssertionError(f"local executable task should not attach cloud recall preview: {llm_candidate_intent}")
+
+        cloud_recall_ambiguous = build_cloud_recall_preview("把那个给我弄一下")
+        if not cloud_recall_ambiguous.get("should_request_cloud_recall"):
+            raise AssertionError(f"ambiguous task must request cloud recall preview: {cloud_recall_ambiguous}")
+        if not cloud_recall_ambiguous.get("cloud_recall_result", {}).get("clarification_questions"):
+            raise AssertionError(f"ambiguous task must produce clarification questions from cloud recall: {cloud_recall_ambiguous}")
+        if cloud_recall_ambiguous.get("cloud_recall_result", {}).get("direct_execution_allowed"):
+            raise AssertionError(f"cloud recall must stay candidate-only and never allow direct execution: {cloud_recall_ambiguous}")
+
+        cloud_recall_delivery = build_cloud_recall_preview("去楼下拿个快递")
+        delivery_result = cloud_recall_delivery.get("cloud_recall_result", {})
+        if not cloud_recall_delivery.get("should_request_cloud_recall"):
+            raise AssertionError(f"unsupported long-chain delivery task must request cloud recall: {cloud_recall_delivery}")
+        if "cloud_concept_multi_stage_delivery_candidate" not in [item.get("concept_id") for item in delivery_result.get("candidate_concepts", [])]:
+            raise AssertionError(f"delivery cloud recall must return candidate long-chain concept support: {cloud_recall_delivery}")
+        if not delivery_result.get("must_reenter_orchestration_layer"):
+            raise AssertionError(f"cloud recall must return through orchestration instead of executing directly: {cloud_recall_delivery}")
 
         valid_llm_candidate = validate_llm_candidate_output(
             {
@@ -421,6 +577,9 @@ def main() -> None:
         location_query = query_runtime_world_state(migration["migration_task_id"], "我现在在哪")
         if location_query.get("answer") != "region_water_source" or location_query.get("query_type") != "executor_location":
             raise AssertionError(f"runtime world state location question must resolve from current snapshot: {location_query}")
+        location_concepts = location_query.get("state_concept_resolution", {}).get("matched_state_concepts", [])
+        if not any(item.get("concept_id") == "state_concept_executor_location" for item in location_concepts):
+            raise AssertionError(f"runtime world state location query must pass through concept core state concept routing: {location_query}")
         current_action_query = query_runtime_world_state(migration["migration_task_id"], "\u4f60\u73b0\u5728\u5728\u505a\u4ec0\u4e48")
         if current_action_query.get("query_type") != "current_action" or current_action_query.get("answer") != "fill_cup_at_water_source":
             raise AssertionError(f"runtime world state current-action question must resolve from explanation view: {current_action_query}")
@@ -445,11 +604,18 @@ def main() -> None:
             raise AssertionError(f"agent query must route teaching input: {agent_teaching_query}")
         if "走向操作台" not in (agent_teaching_query.get("route_result", {}).get("teaching_feedback", {}).get("acknowledgement") or ""):
             raise AssertionError(f"teaching route must acknowledge parsed teaching steps: {agent_teaching_query}")
+        if not agent_teaching_query.get("route_result", {}).get("teaching_frame"):
+            raise AssertionError(f"teaching route must carry structured teaching frame: {agent_teaching_query}")
         agent_clarification_needed = handle_agent_query("把那个给我弄一下", auto_execute=False)
         if agent_clarification_needed.get("route_result", {}).get("decision") != "clarification_required":
             raise AssertionError(f"ambiguous execution request must require clarification before execution: {agent_clarification_needed}")
         if not agent_clarification_needed.get("route_result", {}).get("clarification_prompt"):
             raise AssertionError(f"clarification-required result must contain clarification prompt: {agent_clarification_needed}")
+        clarification_cloud = agent_clarification_needed.get("route_result", {}).get("cloud_recall_preview", {})
+        if not clarification_cloud.get("should_request_cloud_recall"):
+            raise AssertionError(f"clarification route must attach cloud recall preview when local concepts are insufficient: {agent_clarification_needed}")
+        if not clarification_cloud.get("cloud_recall_result", {}).get("clarification_questions"):
+            raise AssertionError(f"clarification route must expose cloud recall clarification questions: {agent_clarification_needed}")
 
         fetched_dispatch = get_execution_dispatch(dispatch["dispatch_id"])
         if fetched_dispatch.get("dispatch_id") != dispatch["dispatch_id"]:
@@ -505,18 +671,17 @@ def main() -> None:
         if fetched_gap.get("gap_record_id") != gap_record["gap_record_id"]:
             raise AssertionError(f"experience gap record must be queryable: {fetched_gap}")
 
-        conflict = run_process("channel_conflict")
+        conflict = run_runtime_sample(DATA, TIMELINE_SCENARIOS["channel_conflict"])
+        AUDIT_STORE[conflict["audit_summary"]["task_id"]] = conflict["audit_summary"]
+        STATE_STORE[conflict["audit_summary"]["task_id"]] = conflict["stage_runtime_state"]
+        TRACE_STORE[conflict["audit_summary"]["task_id"]] = conflict["execution_trace"]
         if conflict["audit_summary"]["outcome"] != "requires_human_confirmation":
             raise AssertionError("conflict API run must require human confirmation")
-        if not conflict.get("recovery_record"):
-            raise AssertionError(f"conflict API run must create a recovery record: {conflict}")
-        conflict_recovery = get_recovery_record(conflict["recovery_record"]["recovery_id"])
-        if conflict_recovery.get("recovery_id") != conflict["recovery_record"]["recovery_id"]:
-            raise AssertionError(f"recovery record must be queryable by id: {conflict_recovery}")
-        task_recoveries = get_recovery_records_for_task(conflict["task_id"])
-        if not any(item.get("recovery_id") == conflict["recovery_record"]["recovery_id"] for item in task_recoveries.get("recovery_records", [])):
-            raise AssertionError(f"recovery records must be queryable by task: {task_recoveries}")
-        readaptation = readapt_runtime_conflict(conflict["task_id"], "到水源处接一杯水")
+        conflict_task_id = conflict["audit_summary"]["task_id"]
+        task_recoveries = get_recovery_records_for_task(conflict_task_id)
+        if task_recoveries.get("recovery_records"):
+            raise AssertionError(f"raw conflict sample should not create recovery records before readaptation: {task_recoveries}")
+        readaptation = readapt_runtime_conflict(conflict_task_id, "到水源处接一杯水")
         if readaptation.get("execution_feasibility", {}).get("result") != "requires_human_confirmation":
             raise AssertionError(f"runtime conflict must produce human-confirmation readaptation: {readaptation}")
         if not readaptation.get("runtime_world_state_snapshot", {}).get("runtime_conflicts"):
@@ -537,8 +702,8 @@ def main() -> None:
         simulated = run_process("simulated_success")
         if simulated["audit_summary"]["outcome"] != "completed":
             raise AssertionError("simulated success API run must complete")
-        if not any("adapter=simulated_pouring_robot" in event.get("payload_summary", "") for event in simulated["execution_trace"]["events"]):
-            raise AssertionError("simulated API run must expose simulated adapter trace payloads")
+        if not any("adapter=digital_executor" in event.get("payload_summary", "") for event in simulated["execution_trace"]["events"]):
+            raise AssertionError("state-first API run must expose local digital executor trace payloads")
 
         task_id = success["task_id"]
         audit = get_audit(task_id)

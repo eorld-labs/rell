@@ -1,4 +1,4 @@
-# RELL Sample API Contract
+# EORLD-RELL Sample API Contract
 
 第一阶段对外仍以运行、准入和审计为主；经验教学接口作为样品学习闭环的最小入口，暂不扩展为通用规划或模板学习 API。自因果链最小实现起，`/process/run` 在检测到目标因果事实时，会优先通过因果层反向搜索形成过程链，而不是要求每一种自然语言任务都枚举为独立经验。
 
@@ -67,6 +67,7 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 `intent_frame` 至少包括：
 
 - `goal_fact`：由人类输入翻译得到的目标因果事实。
+- `action_concepts`：由端侧概念内化层识别出的高频动作概念候选，例如“前往操作台”“拿起杯子”“前往水源处”“接水”“倒水”，它们只负责桥接语义，不直接下发执行。
 - `spatial_constraints`：从输入中抽取并绑定到 P010 主体侧空间认知模型的空间目标，例如 `门旁边 -> region_doorway`。
 - `object_constraints`：从输入中抽取并绑定到当前空间对象的对象目标，例如 `杯子 -> object_cup_white_mug`。
 - `concept_matches`：P012 概念层候选，例如空间目标导航概念、可盛装容器概念、水源资源区概念。
@@ -103,6 +104,13 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 - `confidence_reasons`：置信度形成依据，便于说明系统究竟卡在对象、方位、动作还是概念匹配。
 - `alternative_interpretations`：当前样品下的候选解释或追问方向。
 - `intent_frame`：与任务、空间、对象和事实相关的统一结构化语义。
+
+当 `request_type=teaching` 时，响应中的 `teaching_plan.teaching_frame` 还会进一步把教学输入拆成四层：
+
+- `goal_constraints`：本次教学想达成的目标事实；
+- `process_constraints`：本次教学给出的步骤顺序与过程强度；
+- `preference_constraints`：如“轻一点”“先别自动做”“等我确认”这类人类偏好或阻断约束；
+- `flexibility_policy`：本次教学是否允许局部重排、是否要求严格跟随。
 
 ## POST /agent/query
 
@@ -152,6 +160,8 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 - `time_layers`：即时状态、任务状态、会话状态三层解释视图。
 
 该解释视图仍坚持 `runtime_world_state_snapshot_and_current_runtime_context_only`，不回退到长期记忆臆造当前事实。
+
+对于 `teaching`，响应中的 `route_result` 还会直接携带 `teaching_frame`，用于把本轮教学中的目标约束、过程约束、偏好约束和局部变通授权分开保留，而不是把整段教学文本直接当作单一脚本。
 
 ## POST /llm/context-view
 
@@ -294,6 +304,38 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 
 当携带 `task_id` 时，系统会在记录入库后把该偏好同步附着到当前任务期快照，使后续状态查询、可行性判断和解释链可以立即读取。
 
+## POST /concept/cloud-recall
+
+用途：当端侧概念内化层无法稳定理解当前任务语义时，向“云脑补给桥”发起候选补给请求。该接口当前返回的是本地模拟的 cloud brain stub，不直接执行任务，只返回候选概念、候选过程链和澄清问题。
+
+请求示例：
+```json
+{
+  "task_id": "migration_xxx",
+  "utterance": "把那个给我弄一下"
+}
+```
+
+响应至少包括：
+- `should_request_cloud_recall`：当前输入是否已触发端侧概念缺口；
+- `cloud_recall_packet.local_concept_gap`：端侧识别到的缺口类型；
+- `cloud_recall_packet.runtime_context_summary`：发送给云脑的当前任务摘要；
+- `cloud_recall_result.candidate_concepts`：云脑返回的候选概念；
+- `cloud_recall_result.candidate_process_chain`：云脑返回的候选过程链；
+- `cloud_recall_result.clarification_questions`：仍需向人追问的澄清问题；
+- `direct_execution_allowed=false`；
+- `must_reenter_orchestration_layer=true`。
+
+说明：
+- 该接口只做外域经验和陌生任务语义的候选补给；
+- 返回结果不得直接写入运行时世界状态快照；
+- 返回结果不得直接下发执行层；
+- 所有候选结果必须重新回到编排层做空间语义、本体能力、概念层、经验层和任务期快照联合校验。
+
+另外：
+- `POST /llm/prompt-contract` 在检测到端侧概念缺口时，会在 `input_packet.cloud_recall_packet` 中带出同构的云脑补给请求包；
+- `POST /llm/candidate-intent` 会在 `cloud_recall_preview` 中带出同构的候选补给预览，供后续模型调用层复用。
+
 ## POST /concept/resolve
 
 用途：把当前自然语言请求解析为概念层候选，作为经验层和编排层之间的可复用中间语义单元。该接口只做概念识别和边界声明，不直接下发动作。
@@ -309,6 +351,7 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 响应至少包括：
 - `semantic_request`：统一语义路由结果；
 - `intent_frame_summary`：目标事实、显式过程链、空间约束和对象约束摘要；
+- `action_concepts`：端侧动作概念候选，说明这次输入在本地动作语义层命中了哪些可复用动作单元；
 - `resolved_concepts`：概念层候选，每个候选带有 `activation_reason`、`effect_contract`、`runtime_binding_status` 和 `experience_link_policy`；
 - `concept_resolution_policy`：明确概念层只提供可复用语义单元，`direct_execution_allowed=false`，且必须重新进入编排层。
 
@@ -432,6 +475,8 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 
 该接口的 `source` 固定为 `runtime_world_state_snapshot_only`，用于明确回答依据只能来自当前任务期运行时世界状态快照。
 
+自端侧概念内化层第一版主干接入后，响应中还会附带 `state_concept_resolution.matched_state_concepts`，用于说明这次状态提问先命中了哪一个端侧状态概念单元，再映射到当前任务期运行时世界状态快照或当前运行上下文槽位完成回答。也就是说，状态问答不再只是零散规则命中，而是已经进入可复用的端侧概念主干。
+
 当前样品支持的自然语言问题包括：
 
 - `当前杯子有没有水`
@@ -463,6 +508,8 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 ```
 
 第一阶段采用轻量规则映射表解析教学步骤，不调用通用规划器，不自动生成新的 P016 过程模板。生成的经验链先标记为数字空间可回放经验，后续再进入人工审核、真机验证或模板化沉淀。若同一输入已经能被目标因果事实和因果层求解，则运行时优先采用因果求解结果，教学经验作为候选经验和审计依据保留。
+
+当前样品中，教学经验还会在经验记录里保存 `teaching_contract`，用于把本次教学中的目标约束、过程约束、偏好约束和局部变通授权一并保存下来，而不是只保存过程链本身。
 
 当经验成功生成后，响应中还会附带 `concept_promotion_candidates`。这些候选由经验记录、因果签名和经验不变量契约自动抽取生成，用于后续人工确认是否将该经验晋升为概念层公共语义单元，或补强现有概念。
 

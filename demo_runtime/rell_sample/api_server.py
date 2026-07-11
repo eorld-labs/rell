@@ -9,6 +9,16 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+from concept_core import (
+    build_cloud_recall_packet,
+    build_teaching_frame,
+    resolve_action_concepts,
+    build_released_runtime_query_result,
+    build_runtime_state_query_result,
+    build_unsupported_runtime_query_result,
+    request_cloud_concept_support,
+    resolve_runtime_state_query,
+)
 from runtime_core import (
     MockRobotAdapter,
     P016Runtime,
@@ -344,6 +354,8 @@ CLARIFICATION_TARGET_KEYWORDS = ["不能执行", "不会做", "失败", "冲突"
 DEICTIC_OBJECT_KEYWORDS = ["那个", "这个", "那本", "这本", "那个东西", "这个东西"]
 AMBIGUOUS_ACTION_KEYWORDS = ["弄一下", "处理一下", "搞一下", "安排一下"]
 WEAK_DIRECTION_KEYWORDS = ["右边", "左边", "前面", "后面", "那边", "这边"]
+INTERRUPT_TASK_KEYWORDS = ["别做了", "先别做", "暂停", "停止", "停下", "取消", "先不要"]
+TASK_SWITCH_SIGNAL_KEYWORDS = ["去", "拿", "取", "给", "帮", "送", "放", "搬", "找", "削", "做", "倒", "接"]
 LLM_FORBIDDEN_OUTPUT_FIELDS = {
     "absolute_coordinates",
     "joint_angles",
@@ -367,6 +379,20 @@ def infer_goal_fact(text: str) -> str | None:
         if any(keyword in text for keyword in keywords):
             return goal_fact
     return None
+
+
+def looks_like_new_task_request(utterance: str) -> bool:
+    text = (utterance or "").strip()
+    if not text:
+        return False
+    return any(keyword in text for keyword in TASK_SWITCH_SIGNAL_KEYWORDS)
+
+
+def infer_goal_fact_from_detected_steps(detected_steps: list[str]) -> str | None:
+    if not detected_steps:
+        return None
+    last_step = detected_steps[-1]
+    return STEP_LIBRARY.get(last_step, {}).get("produces_fact")
 
 
 def _find_alias_mentions(text: str, aliases: list[str]) -> list[dict[str, Any]]:
@@ -574,6 +600,11 @@ def build_intent_frame(text: str, cognitive_model: dict[str, Any]) -> dict[str, 
     goal_fact = infer_goal_fact(text)
     spatial_constraints = extract_spatial_constraints(text, cognitive_model)
     object_constraints = extract_object_constraints(text, cognitive_model)
+    action_concepts = resolve_action_concepts(
+        text,
+        detected_steps,
+        normalize_text_fn=normalize_text,
+    )
     concept_matches = build_concept_matches(text, goal_fact, spatial_constraints, object_constraints, detected_steps)
     return {
         "schema_version": "1.0.0",
@@ -581,6 +612,7 @@ def build_intent_frame(text: str, cognitive_model: dict[str, Any]) -> dict[str, 
         "utterance": text,
         "goal_fact": goal_fact,
         "explicit_process_chain": detected_steps,
+        "action_concepts": action_concepts,
         "spatial_constraints": spatial_constraints,
         "object_constraints": object_constraints,
         "concept_matches": concept_matches,
@@ -606,6 +638,7 @@ def build_semantic_request_frame(
     runtime_query = parse_runtime_query(utterance) if utterance else {"query_type": "unsupported"}
     request_type = "task_execution"
     route_reason = "默认按任务执行处理"
+    interrupt_requested = bool(task_id and any(keyword in utterance for keyword in INTERRUPT_TASK_KEYWORDS))
 
     if not utterance:
         request_type = "unknown"
@@ -630,6 +663,7 @@ def build_semantic_request_frame(
     alternative_interpretations: list[dict[str, Any]] = []
     clarification_needed = False
     clarification_reason = None
+    task_switch_candidate = False
 
     if request_type == "unknown":
         confidence = 0.05
@@ -651,10 +685,29 @@ def build_semantic_request_frame(
             clarification_reason = "teaching_step_not_parsed"
             confidence_reasons.append("教学输入未解析出明确步骤，需要补充更具体示教")
     else:
+        if interrupt_requested:
+            confidence = 0.97
+            clarification_needed = False
+            clarification_reason = None
+            confidence_reasons.append("命中活动任务运行时中断词，需优先回到事件仲裁层")
         object_constraints = intent_frame.get("object_constraints", []) if intent_frame else []
         spatial_constraints = intent_frame.get("spatial_constraints", []) if intent_frame else []
         detected_steps = intent_frame.get("explicit_process_chain", []) if intent_frame else []
         concept_matches = intent_frame.get("concept_matches", []) if intent_frame else []
+        task_switch_candidate = bool(
+            task_id
+            and not interrupt_requested
+            and not detected_steps
+            and not concept_matches
+            and not object_constraints
+            and not spatial_constraints
+            and looks_like_new_task_request(utterance)
+        )
+        if task_switch_candidate:
+            confidence = max(confidence, 0.88)
+            clarification_needed = False
+            clarification_reason = None
+            confidence_reasons.append("命中活动任务中的新目标切换表达，需先进入事件仲裁并保留当前持物状态")
         if any(token in utterance for token in DEICTIC_OBJECT_KEYWORDS):
             confidence -= 0.22
             clarification_needed = True
@@ -676,7 +729,7 @@ def build_semantic_request_frame(
             clarification_needed = True
             clarification_reason = clarification_reason or "direction_reference_not_grounded"
             confidence_reasons.append("出现方位描述，但当前未成功绑定到空间语义参照")
-        if not detected_steps and not concept_matches:
+        if not interrupt_requested and not task_switch_candidate and not detected_steps and not concept_matches:
             confidence -= 0.2
             clarification_needed = True
             clarification_reason = clarification_reason or "no_process_or_concept_match"
@@ -694,6 +747,14 @@ def build_semantic_request_frame(
             confidence_reasons.append("检测到多步动作，但自然语言顺序标记较弱")
 
     confidence = max(0.05, min(round(confidence, 2), 0.99))
+    teaching_frame = None
+    if request_type == "teaching":
+        teaching_frame = build_teaching_frame(
+            utterance,
+            parse_teaching_steps_fn=parse_teaching_steps,
+            infer_goal_fact_fn=infer_goal_fact,
+            normalize_text_fn=normalize_text,
+        )
 
     return {
         "schema_version": "1.0.0",
@@ -708,12 +769,15 @@ def build_semantic_request_frame(
         "intent_confidence": confidence,
         "clarification_needed": clarification_needed,
         "clarification_reason": clarification_reason,
+        "interrupt_requested": interrupt_requested,
+        "task_switch_candidate": task_switch_candidate,
         "confidence_reasons": confidence_reasons,
         "alternative_interpretations": alternative_interpretations,
         "intent_frame": intent_frame,
         "runtime_query": runtime_query if request_type == "state_query" else None,
         "teaching_plan": {
-            "parsed_steps": parse_teaching_steps(utterance),
+            "parsed_steps": teaching_frame.get("parsed_steps", []) if teaching_frame else parse_teaching_steps(utterance),
+            "teaching_frame": teaching_frame,
             "recommended_endpoint": "/experience/dialogue-teach",
         } if request_type == "teaching" else None,
     }
@@ -785,6 +849,18 @@ def build_initial_runtime_world_state(cognitive_model: dict[str, Any], intent: d
 
 def clone_runtime_world_state(state: dict[str, Any]) -> dict[str, Any]:
     return json.loads(json.dumps(state, ensure_ascii=False))
+
+
+def get_active_runtime_snapshot(task_id: str | None) -> dict[str, Any] | None:
+    if not task_id:
+        return None
+    current = get_runtime_world_state(task_id)
+    if "error" in current:
+        return None
+    snapshot = current.get("runtime_world_state_snapshot") or {}
+    if snapshot.get("release_status") == "released":
+        return None
+    return snapshot
 
 
 def ensure_runtime_environment(state: dict[str, Any]) -> dict[str, Any]:
@@ -1030,6 +1106,60 @@ def apply_step_to_runtime_world_state(state: dict[str, Any], step: str, meta: di
     }
 
 
+def step_already_satisfied_in_runtime_world_state(
+    runtime_world_state: dict[str, Any],
+    step: str,
+    meta: dict[str, Any],
+) -> bool:
+    facts = set(runtime_world_state.get("established_facts", []))
+    produced_fact = meta.get("produces_fact")
+    if produced_fact and produced_fact not in facts:
+        return False
+    if meta.get("capability") == "navigate_to_region" and meta.get("target_region"):
+        return runtime_world_state.get("executor", {}).get("location_ref") == meta.get("target_region")
+    if step == "pick_up_cup":
+        object_id = meta.get("target_object", "object_cup_white_mug")
+        return object_id in set(runtime_world_state.get("executor", {}).get("holding", []))
+    if step == "fill_cup_at_water_source":
+        object_state_facts = set(
+            runtime_world_state.get("object_locations", {}).get("object_cup_white_mug", {}).get("state_facts", [])
+        )
+        return "cup_contains_water" in object_state_facts
+    return bool(produced_fact and produced_fact in facts)
+
+
+def project_process_chain_against_runtime_world_state(
+    process_chain: list[str],
+    runtime_world_state: dict[str, Any],
+) -> dict[str, Any]:
+    projected_state = clone_runtime_world_state(runtime_world_state)
+    remaining_steps: list[str] = []
+    skipped_steps: list[dict[str, Any]] = []
+    for step in process_chain:
+        meta = STEP_LIBRARY.get(step, {})
+        if not meta:
+            remaining_steps.append(step)
+            continue
+        if step_already_satisfied_in_runtime_world_state(projected_state, step, meta):
+            skipped_steps.append(
+                {
+                    "step": step,
+                    "produces_fact": meta.get("produces_fact"),
+                    "skip_reason": "already_established_in_runtime_world_state_snapshot",
+                }
+            )
+            continue
+        remaining_steps.append(step)
+        apply_step_to_runtime_world_state(projected_state, step, meta, len(remaining_steps))
+    return {
+        "continued_process_chain": remaining_steps,
+        "skipped_steps": skipped_steps,
+        "source_snapshot_id": runtime_world_state.get("runtime_world_state_snapshot_id"),
+        "continued_from_facts": list(runtime_world_state.get("established_facts", [])),
+        "projected_facts_after_chain": list(projected_state.get("established_facts", [])),
+    }
+
+
 def build_process_registry() -> dict[str, dict[str, Any]]:
     registry = {step_id: dict(meta) for step_id, meta in STEP_LIBRARY.items()}
     for item in load_experience_library().get("experiences", []):
@@ -1179,7 +1309,7 @@ INDEX_HTML = """<!doctype html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>RELL 真实世界经验引擎样品</title>
+  <title>EORLD-RELL 真实世界经验引擎样品</title>
   <style>
     :root {
       color-scheme: light;
@@ -1265,6 +1395,16 @@ INDEX_HTML = """<!doctype html>
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 8px;
+    }
+    .inline-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .inline-actions button {
+      height: 30px;
+      padding: 0 10px;
+      white-space: nowrap;
     }
     button {
       height: 38px;
@@ -1506,6 +1646,44 @@ INDEX_HTML = """<!doctype html>
       width: 36%;
       height: 2px;
       border-top: 2px dashed #7c918a;
+      transition: left .24s linear, top .24s linear, width .24s linear, border-color .18s linear;
+    }
+    .map-path.detour {
+      left: 18%;
+      top: 72%;
+      width: 48%;
+      border-top-color: #b8860b;
+    }
+    .map-path.blocked {
+      left: 24%;
+      top: 63%;
+      width: 22%;
+      border-top-color: #b24d4d;
+    }
+    .map-detour-badge {
+      position: absolute;
+      right: 10px;
+      bottom: 10px;
+      padding: 6px 8px;
+      border: 1px solid #7d8c88;
+      background: rgba(255,255,255,.94);
+      font-size: 12px;
+      color: var(--ink);
+      display: none;
+      z-index: 6;
+    }
+    .map-detour-badge.active {
+      display: block;
+    }
+    .map-detour-badge.detour {
+      border-color: #b8860b;
+      color: #7a5a00;
+      background: #fff7dc;
+    }
+    .map-detour-badge.blocked {
+      border-color: #b24d4d;
+      color: #7b2424;
+      background: #fdeaea;
     }
     .stage-row {
       border-bottom: 1px solid var(--line);
@@ -1557,7 +1735,7 @@ INDEX_HTML = """<!doctype html>
 <body>
   <main>
     <header>
-      <h1>RELL 真实世界经验引擎样品</h1>
+      <h1>EORLD-RELL 真实世界经验引擎样品</h1>
       <div id="serviceState" class="status-pill">待运行</div>
     </header>
     <div class="grid">
@@ -1671,7 +1849,8 @@ INDEX_HTML = """<!doctype html>
           <div class="map-region map-service">服务位</div>
           <div id="doorPerturbRegion" class="map-region map-door map-clickable" title="点击预设关门扰动">门</div>
           <div class="map-region map-risk">风险区</div>
-          <div class="map-path"></div>
+          <div id="mapPath" class="map-path"></div>
+          <div id="mapDetourBadge" class="map-detour-badge"></div>
           <div class="map-object map-kettle" title="object_kettle_steel_1l"></div>
           <div class="map-object map-sensor" title="sensor_depth_front"></div>
           <div id="mapCupItem" class="map-cup-item" title="object_cup_white_mug"></div>
@@ -1722,10 +1901,15 @@ INDEX_HTML = """<!doctype html>
     const targetValue = document.getElementById("targetValue");
     const mapRobot = document.getElementById("mapRobot");
     const mapCupItem = document.getElementById("mapCupItem");
+    const mapPath = document.getElementById("mapPath");
+    const mapDetourBadge = document.getElementById("mapDetourBadge");
+    const utteranceInput = document.getElementById("utterance");
+    const scenarioSelect = document.getElementById("scenario");
     let currentTeachingSessionId = "";
     let currentConceptCandidateId = "";
     let currentMigrationTaskId = "";
     let currentExecutionLoopPayload = null;
+    let currentRuntimeWorldState = null;
 
     const eventLabel = {
       stage_started: "阶段启动",
@@ -1735,6 +1919,15 @@ INDEX_HTML = """<!doctype html>
       runtime_failure: "Runtime 失败",
       learned_step_executed: "教学经验步骤",
       causal_step_executed: "因果推导步骤"
+    };
+    const stepDisplayNameMap = {
+      move_to_doorway: "走到门旁边",
+      move_to_service_position: "走到服务位",
+      move_to_counter: "走向操作台",
+      pick_up_cup: "拿起杯子",
+      move_to_water_source: "到水源处",
+      fill_cup_at_water_source: "接一杯水",
+      pour_water: "倒水"
     };
 
     function setText(node, value, className = "") {
@@ -1747,19 +1940,29 @@ INDEX_HTML = """<!doctype html>
       logEl.scrollTop = logEl.scrollHeight;
     }
 
-    function clearView() {
+    function buildReadableChainUtterance(chain, separator = "，然后") {
+      return (chain || []).map(step => stepDisplayNameMap[step] || step).join(separator);
+    }
+
+    function clearView(options = {}) {
+      const { resetContext = true } = options;
       logEl.textContent = "";
       factsEl.innerHTML = "";
       setText(admitMetric, "-");
       setText(stateMetric, "-");
       setText(outcomeMetric, "-");
-      setText(taskMetric, "-");
+      if (resetContext) {
+        setText(taskMetric, "-");
+      }
       resetScene();
       serviceState.textContent = "待运行";
-      currentTeachingSessionId = "";
-      currentConceptCandidateId = "";
-      currentMigrationTaskId = "";
-      currentExecutionLoopPayload = null;
+      if (resetContext) {
+        currentTeachingSessionId = "";
+        currentConceptCandidateId = "";
+        currentMigrationTaskId = "";
+        currentExecutionLoopPayload = null;
+        currentRuntimeWorldState = null;
+      }
       conceptCandidateIdInput.value = "";
     }
 
@@ -1783,6 +1986,94 @@ INDEX_HTML = """<!doctype html>
       setText(factValue, "-");
       setText(learnedStepValue, "-");
       setText(targetValue, "-");
+      clearRouteAdjustmentVisualization();
+    }
+
+    function clearRouteAdjustmentVisualization() {
+      mapPath.classList.remove("detour", "blocked");
+      mapDetourBadge.classList.remove("active", "detour", "blocked");
+      mapDetourBadge.textContent = "";
+    }
+
+    function applyRouteAdjustmentVisualization(routeAdjustment, options = {}) {
+      clearRouteAdjustmentVisualization();
+      if (!routeAdjustment) {
+        return;
+      }
+      const step = routeAdjustment.step || "-";
+      const blocked = options.blocked || routeAdjustment.adjustment_type === "blocked";
+      const modeClass = blocked ? "blocked" : "detour";
+      mapPath.classList.add(modeClass);
+      mapDetourBadge.classList.add("active", modeClass);
+      mapDetourBadge.textContent = blocked
+        ? `阻断：${step} 需重适配`
+        : `绕行中：${step} 保持主链`;
+    }
+
+    function regionToMapPose(regionRef) {
+      const poseMap = {
+        region_floor_walkway: { robotX: "28%", robotY: "60%", cupX: "63%", cupY: "22%" },
+        region_counter_operation: { robotX: "63%", robotY: "58%", cupX: "63%", cupY: "22%" },
+        region_water_source: { robotX: "28%", robotY: "58%", cupX: "29%", cupY: "55%" },
+        region_doorway: { robotX: "10%", robotY: "64%", cupX: "63%", cupY: "22%" },
+        region_service_position: { robotX: "78%", robotY: "66%", cupX: "63%", cupY: "22%" }
+      };
+      return poseMap[regionRef] || poseMap.region_floor_walkway;
+    }
+
+    function regionToHeldCupPose(regionRef) {
+      const poseMap = {
+        region_floor_walkway: { cupX: "28%", cupY: "57%" },
+        region_counter_operation: { cupX: "63%", cupY: "55%" },
+        region_water_source: { cupX: "29%", cupY: "55%" },
+        region_doorway: { cupX: "10%", cupY: "61%" },
+        region_service_position: { cupX: "78%", cupY: "63%" }
+      };
+      return poseMap[regionRef] || poseMap.region_floor_walkway;
+    }
+
+    function applyRuntimeWorldStateToScene(runtimeWorldState) {
+      if (!runtimeWorldState) {
+        return;
+      }
+      resetScene();
+      const executor = runtimeWorldState.executor || {};
+      const executorPose = regionToMapPose(executor.location_ref);
+      mapRobot.style.setProperty("--robot-x", executorPose.robotX);
+      mapRobot.style.setProperty("--robot-y", executorPose.robotY);
+
+      const cupState = runtimeWorldState.object_locations?.object_cup_white_mug || {};
+      const cupFacts = new Set(cupState.state_facts || []);
+      const establishedFacts = new Set(runtimeWorldState.established_facts || []);
+      const holdingCup = (executor.holding || []).includes("object_cup_white_mug") || cupState.location_type === "executor_gripper";
+
+      if (holdingCup) {
+        const heldCupPose = regionToHeldCupPose(executor.location_ref);
+        mapCupItem.style.setProperty("--cup-map-x", heldCupPose.cupX);
+        mapCupItem.style.setProperty("--cup-map-y", heldCupPose.cupY);
+        scene.style.setProperty("--cup-x", executor.location_ref === "region_water_source" ? "-150px" : "-18px");
+        setText(factValue, cupFacts.has("cup_contains_water") || establishedFacts.has("cup_contains_water") ? "cup_contains_water" : "cup_in_gripper");
+      } else {
+        const cupPose = regionToMapPose(cupState.location_ref);
+        mapCupItem.style.setProperty("--cup-map-x", cupPose.cupX);
+        mapCupItem.style.setProperty("--cup-map-y", cupPose.cupY);
+        scene.style.setProperty("--cup-x", cupState.location_ref === "region_water_source" ? "-150px" : "0px");
+        if (establishedFacts.has("cup_at_counter")) {
+          setText(factValue, "cup_at_counter");
+        }
+      }
+
+      if (cupFacts.has("cup_contains_water") || establishedFacts.has("cup_contains_water")) {
+        mapCupItem.style.setProperty("--cup-empty", "35%");
+        scene.style.setProperty("--water-level", "62%");
+        setText(levelValue, "digital fill");
+      }
+      if (establishedFacts.has("water_poured")) {
+        scene.style.setProperty("--stream-height", "70px");
+        scene.style.setProperty("--stream-opacity", "1");
+        setText(flowValue, "digital pour");
+        setText(factValue, "water_poured");
+      }
     }
 
     function readPayloadValue(summary, name) {
@@ -1852,7 +2143,7 @@ INDEX_HTML = """<!doctype html>
 
     function updateSceneFromEvent(event) {
       const summary = event.payload_summary || "";
-      if ((event.trigger_reason === "learned_step_executed" || event.trigger_reason === "causal_step_executed") && updateLearnedStepScene(event)) {
+      if ((event.trigger_reason === "learned_step_executed" || event.trigger_reason === "causal_step_executed" || event.trigger_reason === "continued_runtime_step_executed") && updateLearnedStepScene(event)) {
         return;
       }
       const distance = readPayloadValue(summary, "spout_to_cup_distance");
@@ -1939,6 +2230,11 @@ INDEX_HTML = """<!doctype html>
         rows.push(`<div class="stage-row"><strong>最近预检</strong><span>${escapeHtml(env.last_preflight.step || "-")} / ${escapeHtml(env.last_preflight.result || "-")}</span></div>`);
       }
       factsEl.innerHTML = rows.join("");
+      if (env.last_route_adjustment) {
+        applyRouteAdjustmentVisualization(env.last_route_adjustment);
+      } else {
+        clearRouteAdjustmentVisualization();
+      }
     }
 
     function formatConfidence(value) {
@@ -1972,6 +2268,28 @@ INDEX_HTML = """<!doctype html>
       return concepts.map(item => `${item.display_name || item.concept_id}(${item.concept_level || "concept"})`).join(" / ");
     }
 
+    function humanizeSemanticReason(reason) {
+      const reasonMap = {
+        deictic_object_without_shared_reference: "对象指代未落地",
+        direction_reference_not_grounded: "方向参照未落地",
+        ambiguous_action_phrase: "动作语义不够明确",
+        no_process_or_concept_match: "尚未命中本地过程链或概念",
+        teaching_step_not_parsed: "教学步骤尚未解析清楚",
+        empty_input: "输入为空",
+        empty_or_unknown_request: "输入为空或语义未知",
+        no_local_concept_match: "尚未命中本地概念",
+        intent_long_chain_delivery_unsupported: "当前长程取送任务仍需外域候选补给",
+        intent_risk_area_action_unsupported: "当前风险动作不允许直接进入执行",
+        intent_causal_process_chain_unsupported: "当前目标事实尚未补齐可执行过程链",
+        intent_process_chain_unsupported: "当前过程链尚未形成可执行闭环",
+      };
+      return reasonMap[reason] || reason || "-";
+    }
+
+    function humanizeSemanticReasonList(items) {
+      return (items || []).map(item => humanizeSemanticReason(item)).filter(Boolean);
+    }
+
     function renderSemanticSignalRows(semanticRequest, routeResult = null) {
       const rows = [];
       if (!semanticRequest && !routeResult) {
@@ -1987,7 +2305,7 @@ INDEX_HTML = """<!doctype html>
         `<div class="stage-row"><strong>意图置信度</strong><span>${escapeHtml(formatConfidence(confidence))}${semanticRequest?.clarification_needed ? " / 需澄清" : " / 可继续"}</span></div>`
       );
       if (semanticRequest?.clarification_reason) {
-        rows.push(`<div class="stage-row"><strong>澄清原因</strong><span>${escapeHtml(semanticRequest.clarification_reason)}</span></div>`);
+        rows.push(`<div class="stage-row"><strong>澄清原因</strong><span>${escapeHtml(humanizeSemanticReason(semanticRequest.clarification_reason))}</span></div>`);
       }
       if (routeResult?.clarification_prompt) {
         rows.push(`<div class="stage-row"><strong>澄清提示</strong><span>${escapeHtml(routeResult.clarification_prompt)}</span></div>`);
@@ -2002,6 +2320,115 @@ INDEX_HTML = """<!doctype html>
         rows.push(`<div class="stage-row"><strong>概念命中</strong><span>${escapeHtml(conceptSummary)}</span></div>`);
       }
       return rows;
+    }
+
+    function summarizeCloudRecallConcepts(items) {
+      return (items || []).map(item => {
+        const name = item.display_name || item.concept_id || "candidate";
+        const confidence = typeof item.confidence === "number" ? ` / ${Math.round(item.confidence * 100)}%` : "";
+        const reason = item.reason ? ` / ${item.reason}` : "";
+        return `${name}${confidence}${reason}`;
+      }).join(" || ");
+    }
+
+    function renderCloudRecallRows(cloudRecallPreview) {
+      const rows = [];
+      if (!cloudRecallPreview || !cloudRecallPreview.should_request_cloud_recall) {
+        return rows;
+      }
+      const packet = cloudRecallPreview.cloud_recall_packet || {};
+      const result = cloudRecallPreview.cloud_recall_result || {};
+      const localGap = humanizeSemanticReasonList(packet.local_concept_gap || []).join(" / ") || "-";
+      const candidateChain = (result.candidate_process_chain || []).join(" -> ") || "-";
+      const clarificationQuestions = (result.clarification_questions || []).join(" / ") || "-";
+      const candidateConcepts = summarizeCloudRecallConcepts(result.candidate_concepts || []);
+      const runtimeSummary = packet.runtime_context_summary || {};
+      const returnPolicy = packet.return_policy || {};
+      rows.push(
+        `<div class="stage-row"><strong>云脑补给</strong><span>${escapeHtml(result.availability || "simulated_cloud_brain_stub")} / ${escapeHtml(result.recall_status || "candidate_only")}</span></div>`,
+        `<div class="stage-row"><strong>触发原因</strong><span>${escapeHtml(localGap)}</span></div>`,
+        `<div class="stage-row"><strong>候选概念</strong><span>${escapeHtml(candidateConcepts || "暂无候选概念")}</span></div>`,
+        `<div class="stage-row"><strong>候选链路</strong><span>${escapeHtml(candidateChain)}</span></div>`,
+        `<div class="stage-row"><strong>需要澄清</strong><span>${escapeHtml(clarificationQuestions)}</span></div>`,
+        `<div class="stage-row"><strong>当前任务摘要</strong><span>goal=${escapeHtml(runtimeSummary.goal_fact || "-")} / stage=${escapeHtml(runtimeSummary.current_stage || "-")} / facts=${escapeHtml((runtimeSummary.current_facts || []).join(", ") || "-")}</span></div>`,
+        `<div class="stage-row"><strong>执行边界</strong><span>candidate_only=${escapeHtml(String(returnPolicy.candidate_only ?? result.recall_status === "candidate_only"))} / direct_execution_allowed=${escapeHtml(String(result.direct_execution_allowed))} / must_reenter_orchestration_layer=${escapeHtml(String(result.must_reenter_orchestration_layer))}</span></div>`
+      );
+      if ((result.candidate_process_chain || []).length) {
+        const chainPayload = encodeURIComponent(JSON.stringify(result.candidate_process_chain || []));
+        const goalPayload = encodeURIComponent(String(runtimeSummary.goal_fact || ""));
+        rows.push(
+          `<div class="stage-row"><strong>回编排层</strong><span><div class="inline-actions"><button class="secondary" data-cloud-action="prefill-chain" data-cloud-chain="${chainPayload}" data-cloud-goal="${goalPayload}">回填候选链路</button><button class="secondary" data-cloud-action="preview-chain" data-cloud-chain="${chainPayload}" data-cloud-goal="${goalPayload}">送回编排层试算</button></div></span></div>`
+        );
+      } else {
+        rows.push(`<div class="stage-row"><strong>回编排层</strong><span>当前只有候选概念或澄清问题，需先补足链路后再试算。</span></div>`);
+      }
+      return rows;
+    }
+
+    function renderOrchestrationPreview(envelope, sourceLabel = "cloud_recall_candidate") {
+      const routed = envelope?.route_result || envelope || {};
+      const semanticRequest = envelope?.semantic_request || routed.semantic_request || {};
+      const translated = routed.intent_translation || {};
+      const admission = routed.space_admission || {};
+      const rows = [
+        `<div class="stage-row"><strong>编排层试算</strong><span>${escapeHtml(sourceLabel)} / ${escapeHtml(semanticRequest.request_type || "-")}</span></div>`,
+        `<div class="stage-row"><strong>翻译结果</strong><span>${escapeHtml(translated.task_type || routed.decision || "-")} / ${escapeHtml(translated.reason || routed.reason || "-")}</span></div>`,
+        `<div class="stage-row"><strong>空间准入</strong><span>${escapeHtml(admission.decision || "-")} / ${escapeHtml(admission.reason || "-")}</span></div>`,
+        `<div class="stage-row"><strong>候选过程链</strong><span>${escapeHtml((translated.candidate_process_chain || []).join(" -> ") || "-")}</span></div>`,
+        ...renderSemanticSignalRows(semanticRequest, routed),
+        ...renderCloudRecallRows(routed.cloud_recall_preview)
+      ];
+      factsEl.innerHTML = rows.join("");
+    }
+
+    function prefillCloudRecallCandidateChain(chain, goalFact = "") {
+      const utterance = buildReadableChainUtterance(chain);
+      utteranceInput.value = utterance;
+      scenarioSelect.value = "auto";
+      appendLog("已将云脑候选链路回填到任务输入：" + utterance);
+      if (goalFact) {
+        appendLog("对应目标事实：" + goalFact);
+      }
+      setText(stateMetric, "candidate_prefilled", "ok");
+      setText(outcomeMetric, "待回编排层试算", "warn");
+      serviceState.textContent = "候选已回填";
+    }
+
+    async function previewCloudRecallCandidateChain(chain, goalFact = "") {
+      const utterance = buildReadableChainUtterance(chain);
+      utteranceInput.value = utterance;
+      scenarioSelect.value = "auto";
+      serviceState.textContent = "编排层试算中";
+      appendLog("将云脑候选链路送回编排层试算：" + (chain || []).join(" -> "));
+      try {
+        const envelope = await fetch("/agent/query", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ utterance, scenario: "auto", auto_execute: false })
+        }).then(r => r.json());
+        appendLog("云脑候选回编排层预览：" + JSON.stringify(envelope, null, 2));
+        const routed = envelope.route_result || envelope;
+        const semanticRequest = envelope.semantic_request || {};
+        setText(admitMetric, typeof semanticRequest.intent_confidence === "number" ? formatConfidence(semanticRequest.intent_confidence) : "-", confidenceClass(semanticRequest.intent_confidence));
+        setText(stateMetric, routed.intent_translation?.task_type || routed.decision || "preview");
+        setText(outcomeMetric, routed.space_admission?.decision || routed.intent_translation?.decision || "preview_only", routed.space_admission?.decision === "allowed" ? "ok" : "warn");
+        setText(taskMetric, goalFact || routed.intent_translation?.goal_fact || "-");
+        if (!routed.cloud_recall_preview) {
+          routed.cloud_recall_preview = {
+            should_request_cloud_recall: false,
+            cloud_recall_result: {
+              candidate_process_chain: chain || [],
+              direct_execution_allowed: false,
+              must_reenter_orchestration_layer: true,
+            },
+          };
+        }
+        renderOrchestrationPreview({ semantic_request: semanticRequest, route_result: routed }, "cloud_recall_candidate");
+        serviceState.textContent = "编排层已试算";
+      } catch (error) {
+        serviceState.textContent = "异常";
+        appendLog("云脑候选试算异常：" + error.message);
+      }
     }
 
     function renderRuntimeExplanationRows(explanationView, refusalSource = "") {
@@ -2044,6 +2471,7 @@ INDEX_HTML = """<!doctype html>
         `<div class="stage-row"><strong>依据</strong><span>${escapeHtml(routed.reason || "-")}</span></div>`,
         `<div class="stage-row"><strong>来源</strong><span>${escapeHtml(routed.source || "-")}</span></div>`,
         ...renderSemanticSignalRows(semanticRequest, routed),
+        ...renderCloudRecallRows(routed.cloud_recall_preview),
         ...renderRuntimeExplanationRows(routed.runtime_explanation_view, routed.refusal_source)
       ];
       const evidence = routed.evidence || {};
@@ -2076,7 +2504,8 @@ INDEX_HTML = """<!doctype html>
         `<div class="stage-row"><strong>推荐入口</strong><span>${escapeHtml(routed.recommended_next_endpoint || "-")}</span></div>`,
         `<div class="stage-row"><strong>目标事实</strong><span>${escapeHtml(routed.goal_fact || "-")}</span></div>`,
         `<div class="stage-row"><strong>解析步骤</strong><span>${escapeHtml((routed.parsed_steps || []).join(" -> ") || "-")}</span></div>`,
-        ...renderSemanticSignalRows(semanticRequest, routed)
+        ...renderSemanticSignalRows(semanticRequest, routed),
+        ...renderCloudRecallRows(routed.cloud_recall_preview)
       ];
       factsEl.innerHTML = rows.join("");
     }
@@ -2098,6 +2527,7 @@ INDEX_HTML = """<!doctype html>
       const facts = audit.fact_summary || [];
       const rows = [];
       rows.push(...renderSemanticSignalRows(result.semantic_request, result));
+      rows.push(...renderCloudRecallRows(result.cloud_recall_preview));
       rows.push(`<div class="stage-row"><strong>阶段结果</strong><span>${stages.length ? "" : "暂无阶段摘要"}</span></div>`);
       if (result.intent_translation) {
         rows.push(`<div class="stage-row"><strong>翻译层</strong><span>${result.intent_translation.task_type}: ${result.intent_translation.reason}</span></div>`);
@@ -2183,23 +2613,14 @@ INDEX_HTML = """<!doctype html>
 
     function hydrateTeachingFields(result) {
       const chain = result.teaching_hint?.candidate_process_chain || result.intent_translation?.candidate_process_chain || [];
-      const stepNames = {
-        move_to_doorway: "走到门旁边",
-        move_to_service_position: "走到服务位",
-        move_to_counter: "走向操作台",
-        pick_up_cup: "拿起杯子",
-        move_to_water_source: "到水源处",
-        fill_cup_at_water_source: "接一杯水",
-        pour_water: "倒水"
-      };
       if (!chain.length) return;
-      const readableSteps = chain.map(step => stepNames[step] || step).join("\\n");
-      const utterance = document.getElementById("utterance").value.trim();
+      const readableSteps = chain.map(step => stepDisplayNameMap[step] || step).join("\\n");
+      const utterance = utteranceInput.value.trim();
       if (result.teaching_hint?.teachable || !document.getElementById("teachingSteps").value.trim()) {
         document.getElementById("teachingSteps").value = readableSteps;
       }
       if (result.teaching_hint?.teachable || !document.getElementById("dialogueTeaching").value.trim()) {
-        document.getElementById("dialogueTeaching").value = "教你：" + (utterance || chain.map(step => stepNames[step] || step).join("，然后"));
+        document.getElementById("dialogueTeaching").value = "教你：" + (utterance || buildReadableChainUtterance(chain));
       }
       appendLog("已根据候选链路填充教学区，需教学入库后再执行。");
     }
@@ -2275,7 +2696,11 @@ INDEX_HTML = """<!doctype html>
     }
 
     async function runProcess() {
-      clearView();
+      const activeTaskId = currentTeachingSessionId || currentMigrationTaskId || taskMetric.textContent.trim();
+      clearView({ resetContext: false });
+      if (currentRuntimeWorldState && activeTaskId) {
+        applyRuntimeWorldStateToScene(currentRuntimeWorldState);
+      }
       runButton.disabled = true;
       serviceState.textContent = "运行中";
       appendLog("接收任务：" + document.getElementById("utterance").value.trim());
@@ -2285,38 +2710,56 @@ INDEX_HTML = """<!doctype html>
         const previewEnvelope = await fetch("/agent/query", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ utterance, scenario: "auto", auto_execute: false })
+          body: JSON.stringify({ utterance, scenario: "auto", auto_execute: false, task_id: activeTaskId || null })
         }).then(r => r.json());
         appendLog("语义路由结果：" + JSON.stringify(previewEnvelope, null, 2));
         const preview = previewEnvelope.route_result || previewEnvelope;
         const translated = preview.intent_translation || {};
         const admit = preview.space_admission || {};
         const semanticRequest = previewEnvelope.semantic_request || {};
+        const runtimeEventArbitration = preview.runtime_event_arbitration || null;
         if (typeof semanticRequest.intent_confidence === "number") {
           setText(admitMetric, formatConfidence(semanticRequest.intent_confidence), confidenceClass(semanticRequest.intent_confidence));
         } else {
           setText(admitMetric, admit.decision || "unknown", admit.allowed ? "ok" : "bad");
         }
-        appendLog("???????" + JSON.stringify(admit, null, 2));
-        appendLog("?????" + (previewEnvelope.semantic_request?.request_type || "unknown") + " / " + (previewEnvelope.semantic_request?.preferred_model_tier || "unknown"));
+        appendLog("空间准入预览：" + JSON.stringify(admit, null, 2));
+        appendLog("语义路由：" + (previewEnvelope.semantic_request?.request_type || "unknown") + " / " + (previewEnvelope.semantic_request?.preferred_model_tier || "unknown"));
+        if (preview.cloud_recall_preview?.should_request_cloud_recall) {
+          const localGap = (preview.cloud_recall_preview.cloud_recall_packet?.local_concept_gap || []).join(" / ");
+          const candidateConcepts = (preview.cloud_recall_preview.cloud_recall_result?.candidate_concepts || []).map(item => item.display_name || item.concept_id).join(" / ");
+          const candidateChain = (preview.cloud_recall_preview.cloud_recall_result?.candidate_process_chain || []).join(" -> ");
+          appendLog("云脑补给桥触发：" + (localGap || "unknown_gap"));
+          if (candidateConcepts) {
+            appendLog("云脑候选概念：" + candidateConcepts);
+          }
+          if (candidateChain) {
+            appendLog("云脑候选链路：" + candidateChain);
+          }
+        }
 
         if (preview.decision === "clarification_required") {
           setText(stateMetric, "clarification_required", "warn");
-          setText(outcomeMetric, "????", "warn");
+          setText(outcomeMetric, "需要澄清", "warn");
           setText(taskMetric, currentMigrationTaskId || "-");
           factsEl.innerHTML = [
-            `<div class="stage-row"><strong>????</strong><span>???????????</span></div>`,
-            ...renderSemanticSignalRows(semanticRequest, preview)
+            `<div class="stage-row"><strong>任务澄清</strong><span>当前输入还不能直接进入执行，需要先补充共享参照或动作语义。</span></div>`,
+            ...renderSemanticSignalRows(semanticRequest, preview),
+            ...renderCloudRecallRows(preview.cloud_recall_preview)
           ].join("");
-          serviceState.textContent = "????";
-          appendLog("???????????????????");
+          serviceState.textContent = "等待澄清";
+          const recallQuestions = preview.cloud_recall_preview?.cloud_recall_result?.clarification_questions || [];
+          if (recallQuestions.length) {
+            appendLog("云脑候选补给：" + recallQuestions.join(" / "));
+          }
+          appendLog("当前任务需要先澄清，暂不进入执行。");
           return;
         }
 
         if (preview.decision === "routed_to_teaching") {
           renderTeachingRoutePreview(previewEnvelope, preview);
-          serviceState.textContent = "??????";
-          appendLog("????????????????????????");
+          serviceState.textContent = "教学预览";
+          appendLog("当前输入已进入教学语义预览。");
           return;
         }
 
@@ -2334,13 +2777,23 @@ INDEX_HTML = """<!doctype html>
         const executionEnvelope = await fetch("/agent/query", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ scenario, utterance, auto_execute: true })
+          body: JSON.stringify({ scenario, utterance, auto_execute: true, task_id: activeTaskId || null })
         }).then(r => r.json());
         appendLog("统一入口执行结果：" + JSON.stringify(executionEnvelope, null, 2));
         const result = executionEnvelope.route_result || executionEnvelope;
         result.semantic_request = executionEnvelope.semantic_request || semanticRequest;
+        if (!result.cloud_recall_preview && preview.cloud_recall_preview) {
+          result.cloud_recall_preview = preview.cloud_recall_preview;
+        }
 
-        setText(taskMetric, result.task_id || "-");
+        currentMigrationTaskId = result.task_id || currentMigrationTaskId || activeTaskId || "";
+        const runtimeWorldInitial = result.execution_trace?.runtime_world_state_initial || currentRuntimeWorldState;
+        const runtimeWorldFinal = result.runtime_world_state || result.stage_runtime_state?.runtime_world_state || result.execution_trace?.runtime_world_state_final || null;
+        if (runtimeWorldInitial) {
+          applyRuntimeWorldStateToScene(runtimeWorldInitial);
+        }
+        currentRuntimeWorldState = runtimeWorldFinal || currentRuntimeWorldState;
+        setText(taskMetric, result.task_id || currentMigrationTaskId || "-");
         setText(stateMetric, result.stage_runtime_state.runtime_state);
         const outcomeClass = result.audit_summary.outcome === "completed" ? "ok" : (result.audit_summary.outcome === "cannot_do" ? "bad" : "warn");
         setText(outcomeMetric, result.audit_summary.outcome, outcomeClass);
@@ -2674,24 +3127,24 @@ INDEX_HTML = """<!doctype html>
         appendLog("状态提问结果：" + JSON.stringify(result, null, 2));
         const routed = result.route_result || result;
         if (result.error || routed.error) {
-          serviceState.textContent = "????";
-          setText(outcomeMetric, "????", "bad");
+          serviceState.textContent = "状态异常";
+          setText(outcomeMetric, "查询失败", "bad");
           return;
         }
         if (result.semantic_request?.request_type !== "state_query") {
           setText(admitMetric, formatConfidence(result.semantic_request?.intent_confidence), confidenceClass(result.semantic_request?.intent_confidence));
           setText(stateMetric, result.semantic_request?.request_type || "unexpected_route", "warn");
-          setText(outcomeMetric, "???????", "warn");
+          setText(outcomeMetric, "已转其他语义路由", "warn");
           factsEl.innerHTML = [
-            `<div class="stage-row"><strong>?????????</strong><span>${escapeHtml(question)}</span></div>`,
+            `<div class="stage-row"><strong>当前提问</strong><span>${escapeHtml(question)}</span></div>`,
             ...renderSemanticSignalRows(result.semantic_request || {}, routed)
           ].join("");
-          serviceState.textContent = "??????";
-          appendLog("??????? state_query???????????");
+          serviceState.textContent = "路由已偏转";
+          appendLog("当前输入没有命中状态查询，而是被路由到其他语义通道。");
           return;
         }
         renderStateQueryResult(result, routed, question, taskId);
-        serviceState.textContent = "?????";
+        serviceState.textContent = "状态已回答";
       } catch (error) {
         serviceState.textContent = "异常";
         appendLog("状态提问异常：" + error.message);
@@ -2804,6 +3257,17 @@ INDEX_HTML = """<!doctype html>
         setText(stateMetric, result.outcome === "readaptation_required" ? "readaptation_required" : "execution_feedback_received", outcomeClass);
         setText(outcomeMetric, result.outcome || "-", outcomeClass);
         setText(taskMetric, result.task_id || currentMigrationTaskId || "-");
+        const detourFeedback = (result.fact_feedback || []).find(item => item.route_adjustment);
+        const blockedFeedback = (result.fact_feedback || []).find(item => item.preflight_result === "blocked");
+        if (detourFeedback?.route_adjustment) {
+          applyRouteAdjustmentVisualization(detourFeedback.route_adjustment, { blocked: false });
+          appendLog("偶然层处理：保持主链，执行局部绕行 -> " + JSON.stringify(detourFeedback.route_adjustment));
+        } else if (blockedFeedback) {
+          applyRouteAdjustmentVisualization({ step: blockedFeedback.step, adjustment_type: "blocked" }, { blocked: true });
+          appendLog("偶然层处理：当前步骤被阻断，需重新适配 -> " + blockedFeedback.step);
+        } else {
+          clearRouteAdjustmentVisualization();
+        }
         renderFacts({
           audit_summary: {
             stage_summary: (result.fact_feedback || []).map(item => ({
@@ -2892,6 +3356,30 @@ INDEX_HTML = """<!doctype html>
       }
     }
 
+    factsEl.addEventListener("click", async (event) => {
+      const actionButton = event.target.closest("[data-cloud-action]");
+      if (!actionButton) {
+        return;
+      }
+      const chainPayload = actionButton.getAttribute("data-cloud-chain") || "";
+      const goalPayload = actionButton.getAttribute("data-cloud-goal") || "";
+      let chain = [];
+      try {
+        chain = JSON.parse(decodeURIComponent(chainPayload || "%5B%5D"));
+      } catch (error) {
+        appendLog("云脑候选链路解析失败：" + error.message);
+        return;
+      }
+      const goalFact = decodeURIComponent(goalPayload || "");
+      if (actionButton.dataset.cloudAction === "prefill-chain") {
+        prefillCloudRecallCandidateChain(chain, goalFact);
+        return;
+      }
+      if (actionButton.dataset.cloudAction === "preview-chain") {
+        await previewCloudRecallCandidateChain(chain, goalFact);
+      }
+    });
+
     runButton.addEventListener("click", runProcess);
     teachButton.addEventListener("click", teachExperience);
     dialogueTeachButton.addEventListener("click", teachByDialogue);
@@ -2962,9 +3450,12 @@ def translate_intent(utterance: str) -> dict[str, Any]:
             "semantic_request": semantic_request,
         }
     goal_fact = intent_frame["goal_fact"]
-    should_use_causal_solver = goal_fact == "cup_contains_water" or (
-        goal_fact is not None and (len(detected_steps) > 1 or (has_sequence_marker and detected_steps))
-    )
+    if goal_fact is None and detected_steps:
+        goal_fact = infer_goal_fact_from_detected_steps(detected_steps)
+        if goal_fact:
+            intent_frame["goal_fact"] = goal_fact
+            intent_frame["goal_fact_source"] = "explicit_process_effect_projection"
+    should_use_causal_solver = goal_fact is not None
     if should_use_causal_solver:
         causal_plan = solve_causal_process_chain(goal_fact, cognitive_model)
         if causal_plan["solved"]:
@@ -3983,6 +4474,12 @@ def confirm_concept_promotion_candidate(candidate_id: str, confirmed_by: str = "
 def teach_experience(utterance: str, steps: Any) -> dict[str, Any]:
     source_utterance = (utterance or "").strip()
     process_chain = parse_teaching_steps(steps)
+    teaching_frame = build_teaching_frame(
+        str(steps or source_utterance),
+        parse_teaching_steps_fn=parse_teaching_steps,
+        infer_goal_fact_fn=infer_goal_fact,
+        normalize_text_fn=normalize_text,
+    )
     if not source_utterance:
         return {"error": "missing_utterance", "message": "教学样本必须包含原始任务输入"}
     if not process_chain:
@@ -4017,8 +4514,9 @@ def teach_experience(utterance: str, steps: Any) -> dict[str, Any]:
                 STEP_LIBRARY[step].get("target_region") or STEP_LIBRARY[step].get("target_object", "")
                 for step in process_chain
             ],
-            "parameters": {"source": "manual_teaching"},
+            "parameters": {"source": "manual_teaching", "teaching_frame": teaching_frame},
         },
+        "teaching_contract": teaching_frame,
         "outcome": {
             "outcome_type": "candidate_created",
             "state_delta": "manual steps translated into a digital process-chain experience",
@@ -4077,6 +4575,12 @@ def start_teaching_session(utterance: str, goal_fact: str | None = None) -> dict
         return {"error": "missing_utterance", "message": "边教边动会话必须包含任务输入"}
     intent = translate_intent(source_utterance)
     cognitive_model = get_cognitive_model()
+    teaching_frame = build_teaching_frame(
+        source_utterance,
+        parse_teaching_steps_fn=parse_teaching_steps,
+        infer_goal_fact_fn=infer_goal_fact,
+        normalize_text_fn=normalize_text,
+    )
     session_id = build_teaching_session_id(source_utterance)
     target_goal_fact = goal_fact or intent.get("goal_fact") or "cup_contains_water"
     runtime_world_state = build_initial_runtime_world_state(cognitive_model, {**intent, "experience_id": session_id})
@@ -4089,6 +4593,7 @@ def start_teaching_session(utterance: str, goal_fact: str | None = None) -> dict
         "mode": "stepwise_teaching_with_digital_executor",
         "source_utterance": source_utterance,
         "intent_translation": intent,
+        "teaching_frame": teaching_frame,
         "goal_fact": target_goal_fact,
         "status": "teaching_in_progress",
         "process_chain": [],
@@ -4137,8 +4642,19 @@ def execute_teaching_session_step(session_id: str, teaching_input: Any) -> dict[
     if session.get("status") in {"experience_saved", "closed_without_save"}:
         return {"error": "teaching_session_closed", "session_id": session_id, "status": session.get("status")}
     parsed_steps = parse_teaching_steps(teaching_input)
+    step_teaching_frame = build_teaching_frame(
+        str(teaching_input or ""),
+        parse_teaching_steps_fn=parse_teaching_steps,
+        infer_goal_fact_fn=infer_goal_fact,
+        normalize_text_fn=normalize_text,
+    )
     if not parsed_steps:
-        return {"error": "missing_teaching_step", "message": "未能从本次教学中解析出可执行步骤", "session_id": session_id}
+        return {
+            "error": "missing_teaching_step",
+            "message": "未能从本次教学中解析出可执行步骤",
+            "session_id": session_id,
+            "teaching_frame": step_teaching_frame,
+        }
     state = session["runtime_world_state_snapshot"]
     feedback_items: list[dict[str, Any]] = []
     for step in parsed_steps:
@@ -4158,6 +4674,7 @@ def execute_teaching_session_step(session_id: str, teaching_input: Any) -> dict[
                 "missing_before_step": missing_before,
                 "prerequisite_hints": build_prerequisite_hint(missing_before),
                 "message": "当前前提事实未成立，数字执行主体先反馈缺口，不猜测执行",
+                "teaching_frame": step_teaching_frame,
                 "runtime_world_state_snapshot": clone_runtime_world_state(state),
             }
             feedback_items.append(feedback)
@@ -4175,6 +4692,7 @@ def execute_teaching_session_step(session_id: str, teaching_input: Any) -> dict[
             "causal_produced_facts": [transition["produces_fact"]],
             "causal_destroyed_facts": transition["destroys_facts"],
             "missing_before_step": transition["missing_before_step"],
+            "teaching_frame": step_teaching_frame,
             "before_executor_location": transition["before_executor_location"],
             "after_executor_location": transition["after_executor_location"],
             "goal_fact": session["goal_fact"],
@@ -4202,6 +4720,7 @@ def execute_teaching_session_step(session_id: str, teaching_input: Any) -> dict[
         "goal_fact": session["goal_fact"],
         "process_chain": session["process_chain"],
         "step_feedback": feedback_items,
+        "teaching_frame": session.get("teaching_frame"),
         "runtime_world_state_snapshot": state,
     }
 
@@ -4608,12 +5127,585 @@ def get_process_chain_for_intent(intent: dict[str, Any]) -> list[str]:
     return []
 
 
+def ensure_runtime_control_state(runtime_world_state: dict[str, Any]) -> dict[str, Any]:
+    control = runtime_world_state.setdefault("runtime_control", {})
+    control.setdefault("active_task_state", "active")
+    control.setdefault("active_task_reason", "runtime_task_active")
+    control.setdefault("event_history", [])
+    control.setdefault("pending_candidate_task_id", None)
+    return control
+
+
+def build_runtime_event_frame(
+    task_id: str,
+    utterance: str,
+    intent: dict[str, Any],
+    runtime_world_state: dict[str, Any],
+) -> dict[str, Any]:
+    state = STATE_STORE.get(task_id, {})
+    audit = AUDIT_STORE.get(task_id, {})
+    current_goal_fact = infer_goal_fact_from_task_state(task_id, state, audit)
+    requested_goal_fact = intent.get("goal_fact")
+    established_facts = set(runtime_world_state.get("established_facts", []))
+    process_chain = get_process_chain_for_intent(intent)
+    interrupt_requested = any(keyword in (utterance or "") for keyword in INTERRUPT_TASK_KEYWORDS)
+    potential_new_task_request = bool(
+        not interrupt_requested
+        and not requested_goal_fact
+        and not process_chain
+        and looks_like_new_task_request(utterance)
+    )
+    holding = list(runtime_world_state.get("executor", {}).get("holding", []))
+    current_runtime_state = state.get("runtime_state") or runtime_world_state.get("current_stage") or "unknown"
+    return {
+        "task_id": task_id,
+        "current_goal_fact": current_goal_fact,
+        "requested_goal_fact": requested_goal_fact,
+        "current_runtime_state": current_runtime_state,
+        "current_stage": runtime_world_state.get("current_stage"),
+        "completed_stages": list(runtime_world_state.get("completed_stages", [])),
+        "established_facts": sorted(established_facts),
+        "holding_objects": holding,
+        "process_chain": process_chain,
+        "interrupt_requested": interrupt_requested,
+        "potential_new_task_request": potential_new_task_request,
+        "requested_goal_already_satisfied": bool(requested_goal_fact and requested_goal_fact in established_facts),
+        "current_goal_already_satisfied": bool(current_goal_fact and current_goal_fact in established_facts),
+        "goal_switched": bool(requested_goal_fact and current_goal_fact and requested_goal_fact != current_goal_fact),
+        "runtime_world_state_snapshot_id": runtime_world_state.get("runtime_world_state_snapshot_id"),
+        "release_status": runtime_world_state.get("release_status"),
+    }
+
+
+def chain_is_compatible_with_current_holding(process_chain: list[str], runtime_world_state: dict[str, Any]) -> bool:
+    holding_objects = list(runtime_world_state.get("executor", {}).get("holding", []))
+    if not holding_objects or not process_chain:
+        return True
+    established_facts = set(runtime_world_state.get("established_facts", []))
+    for step in process_chain:
+        step_meta = STEP_LIBRARY.get(step, {})
+        requires_facts = set(step_meta.get("requires_facts", []))
+        if "gripper_empty" in requires_facts and "gripper_empty" not in established_facts:
+            return False
+    return True
+
+
+def arbitrate_runtime_event(
+    task_id: str,
+    utterance: str,
+    intent: dict[str, Any],
+    runtime_world_state: dict[str, Any],
+) -> dict[str, Any]:
+    frame = build_runtime_event_frame(task_id, utterance, intent, runtime_world_state)
+    chain = frame["process_chain"]
+    holding_compatible = chain_is_compatible_with_current_holding(chain, runtime_world_state)
+    if frame["interrupt_requested"] and not chain and not frame["requested_goal_fact"]:
+        decision = "pause_current_task"
+        reason = "explicit_interrupt_without_replacement_goal"
+        can_enter_execution = False
+        required_actions = ["pause_active_task", "await_next_instruction"]
+    elif frame["potential_new_task_request"]:
+        if frame["holding_objects"]:
+            decision = "request_human_confirmation"
+            reason = "new_task_requested_while_executor_holds_object_and_target_is_not_grounded"
+            can_enter_execution = False
+            required_actions = ["confirm_task_switch", "resolve_held_object_state", "request_teaching_or_object_grounding"]
+        else:
+            decision = "request_clarification"
+            reason = "new_task_requested_but_target_or_skill_is_not_grounded_in_local_concepts"
+            can_enter_execution = False
+            required_actions = ["request_object_grounding", "request_teaching_or_experience"]
+    elif frame["goal_switched"] or (frame["interrupt_requested"] and (chain or frame["requested_goal_fact"])):
+        if frame["holding_objects"] and not holding_compatible:
+            decision = "request_human_confirmation"
+            reason = "task_switch_requested_while_executor_holds_object"
+            can_enter_execution = False
+            required_actions = ["confirm_task_switch", "resolve_held_object_state", "reenter_orchestration"]
+        elif chain:
+            decision = "pause_and_switch_task"
+            reason = "new_goal_or_interrupt_requires_new_candidate_chain"
+            can_enter_execution = True
+            required_actions = ["pause_active_task", "spawn_candidate_from_current_world_state", "dispatch_new_candidate_chain"]
+        else:
+            decision = "pause_current_task"
+            reason = "new_goal_requested_but_no_supported_chain_available"
+            can_enter_execution = False
+            required_actions = ["pause_active_task", "request_clarification_or_teaching"]
+    elif frame["requested_goal_already_satisfied"]:
+        decision = "no_new_execution_required"
+        reason = "requested_goal_already_satisfied_in_current_world_state"
+        can_enter_execution = False
+        required_actions = ["report_goal_already_satisfied", "await_next_instruction"]
+    elif chain:
+        decision = "continue_current_task"
+        reason = "next_step_must_be_decided_from_current_world_state"
+        can_enter_execution = True
+        required_actions = ["project_chain_against_current_world_state", "dispatch_remaining_steps"]
+    else:
+        decision = "request_clarification"
+        reason = "current_world_state_read_but_new_event_still_lacks_executable_chain"
+        can_enter_execution = False
+        required_actions = ["request_clarification_or_teaching"]
+    arbitration_seed = "|".join(
+        [
+            task_id,
+            normalize_text(utterance),
+            frame.get("runtime_world_state_snapshot_id") or "none",
+            decision,
+        ]
+    )
+    return {
+        "schema_version": "1.0.0",
+        "arbitration_id": "arbitrate_" + hashlib.sha1(arbitration_seed.encode("utf-8")).hexdigest()[:12],
+        "decision": decision,
+        "reason": reason,
+        "can_enter_execution": can_enter_execution,
+        "required_actions": required_actions,
+        "holding_chain_compatible": holding_compatible,
+        "state_first_principle": "all new events must be judged from current runtime world state before selecting the next action",
+        "world_state_basis": {
+            "task_id": task_id,
+            "runtime_world_state_snapshot_id": frame["runtime_world_state_snapshot_id"],
+            "current_goal_fact": frame["current_goal_fact"],
+            "requested_goal_fact": frame["requested_goal_fact"],
+            "current_runtime_state": frame["current_runtime_state"],
+            "current_stage": frame["current_stage"],
+            "holding_objects": frame["holding_objects"],
+            "established_facts": frame["established_facts"],
+        },
+        "event_frame": frame,
+    }
+
+
+def apply_runtime_event_arbitration(task_id: str, arbitration: dict[str, Any]) -> dict[str, Any]:
+    current = get_runtime_world_state(task_id)
+    if "error" in current:
+        return current
+    runtime_world_state = current["runtime_world_state_snapshot"]
+    control = ensure_runtime_control_state(runtime_world_state)
+    decision = arbitration.get("decision")
+    if decision == "pause_current_task":
+        control["active_task_state"] = "paused"
+        control["active_task_reason"] = arbitration.get("reason")
+        state_runtime = "paused_by_runtime_event"
+    elif decision == "pause_and_switch_task":
+        control["active_task_state"] = "suspended"
+        control["active_task_reason"] = arbitration.get("reason")
+        state_runtime = "suspended_for_new_candidate"
+    elif decision == "request_human_confirmation":
+        control["active_task_state"] = "awaiting_human_confirmation"
+        control["active_task_reason"] = arbitration.get("reason")
+        state_runtime = "awaiting_human_confirmation"
+    else:
+        control["active_task_state"] = "active"
+        control["active_task_reason"] = arbitration.get("reason", "runtime_task_active")
+        state_runtime = STATE_STORE.get(task_id, {}).get("runtime_state") or "active"
+    control["event_history"].append(
+        {
+            "arbitration_id": arbitration.get("arbitration_id"),
+            "decision": decision,
+            "reason": arbitration.get("reason"),
+        }
+    )
+    RUNTIME_WORLD_STATE_STORE[task_id] = runtime_world_state
+    if task_id in STATE_STORE:
+        STATE_STORE[task_id]["runtime_world_state"] = runtime_world_state
+        STATE_STORE[task_id]["runtime_state"] = state_runtime
+        STATE_STORE[task_id]["runtime_event_arbitration"] = arbitration
+    return {
+        "task_id": task_id,
+        "runtime_world_state_snapshot": runtime_world_state,
+        "runtime_state": state_runtime,
+        "runtime_event_arbitration": arbitration,
+    }
+
+
+def build_runtime_task_id_from_event(source_task_id: str, utterance: str, intent: dict[str, Any]) -> str:
+    seed = "|".join(
+        [
+            source_task_id,
+            normalize_text(utterance),
+            intent.get("goal_fact") or intent.get("candidate_process") or "none",
+        ]
+    )
+    base = "runtime_task_" + hashlib.sha1(seed.encode("utf-8")).hexdigest()[:12]
+    if base not in RUNTIME_WORLD_STATE_STORE and base not in STATE_STORE:
+        return base
+    suffix = 2
+    while True:
+        candidate = f"{base}_{suffix}"
+        if candidate not in RUNTIME_WORLD_STATE_STORE and candidate not in STATE_STORE:
+            return candidate
+        suffix += 1
+
+
+def seed_runtime_task_from_snapshot(
+    source_task_id: str,
+    utterance: str,
+    intent: dict[str, Any],
+    runtime_world_state: dict[str, Any],
+) -> str:
+    new_task_id = build_runtime_task_id_from_event(source_task_id, utterance, intent)
+    cloned_state = clone_runtime_world_state(runtime_world_state)
+    cloned_state["task_ref"] = new_task_id
+    cloned_state["migration_task_id"] = new_task_id
+    cloned_state["runtime_world_state_snapshot_id"] = new_task_id + "_snapshot"
+    cloned_state["audit_record_id"] = "audit_" + new_task_id.removeprefix("runtime_task_")
+    cloned_state["current_stage"] = None
+    cloned_state["completed_stages"] = []
+    control = ensure_runtime_control_state(cloned_state)
+    control["active_task_state"] = "active"
+    control["active_task_reason"] = "state_first_switch_spawned_from_existing_runtime_world_state"
+    profile = STATE_STORE.get(source_task_id, {}).get("body_capability_profile") or build_default_body_capability_profile()
+    RUNTIME_WORLD_STATE_STORE[new_task_id] = cloned_state
+    STATE_STORE[new_task_id] = {
+        "schema_version": "1.0.0",
+        "task_id": new_task_id,
+        "source_task_id": source_task_id,
+        "current_stage_id": None,
+        "runtime_state": "spawned_from_runtime_world_state",
+        "runtime_world_state": cloned_state,
+        "goal_fact": intent.get("goal_fact"),
+        "candidate_process_chain": get_process_chain_for_intent(intent),
+        "body_capability_profile": profile,
+        "runtime_event_arbitration": {
+            "source_task_id": source_task_id,
+            "decision": "pause_and_switch_task",
+            "reason": "spawn_candidate_from_current_world_state",
+        },
+    }
+    AUDIT_STORE[new_task_id] = {
+        "schema_version": "1.0.0",
+        "task_id": new_task_id,
+        "process_instance_id": intent.get("experience_id") or new_task_id,
+        "outcome": "spawned_from_runtime_world_state",
+        "stage_summary": [],
+        "fact_summary": [],
+        "stop_reason": None,
+        "runtime_world_state_final": cloned_state,
+        "source_task_id": source_task_id,
+    }
+    TRACE_STORE[new_task_id] = {
+        "schema_version": "1.0.0",
+        "task_id": new_task_id,
+        "process_instance_id": intent.get("experience_id") or new_task_id,
+        "events": [],
+        "runtime_world_state_initial": clone_runtime_world_state(cloned_state),
+        "runtime_world_state_final": clone_runtime_world_state(cloned_state),
+        "runtime_world_state_transitions": [],
+        "runtime_world_state_policy": cloned_state.get("persistence_policy"),
+        "source_task_id": source_task_id,
+    }
+    return new_task_id
+
+
+def adapt_intent_to_runtime_world_state(
+    intent: dict[str, Any],
+    task_id: str | None = None,
+    runtime_world_state: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    snapshot = runtime_world_state or get_active_runtime_snapshot(task_id)
+    if not snapshot:
+        return intent
+    source_chain = get_process_chain_for_intent(intent)
+    if not source_chain:
+        return intent
+    projection = project_process_chain_against_runtime_world_state(source_chain, snapshot)
+    adapted_intent = dict(intent)
+    adapted_intent["candidate_process_chain"] = projection["continued_process_chain"]
+    adapted_intent["runtime_continuation"] = {
+        "continuation_task_id": task_id,
+        "source_snapshot_id": projection["source_snapshot_id"],
+        "continued_from_facts": projection["continued_from_facts"],
+        "skipped_steps": projection["skipped_steps"],
+        "projected_facts_after_chain": projection["projected_facts_after_chain"],
+    }
+    if projection["skipped_steps"]:
+        base_reason = adapted_intent.get("reason") or "runtime_continuation"
+        adapted_intent["reason"] = base_reason + "；已按当前任务期快照裁剪已成立步骤"
+    return adapted_intent
+
+
 def build_default_body_capability_profile() -> dict[str, Any]:
     profile = MockRobotAdapter(read_json(DATA / "mock_timeline_success.json"), SerialEventQueue()).report_executor_profile()
     step_capabilities = sorted({meta.get("capability") for meta in STEP_LIBRARY.values() if meta.get("capability")})
     profile["supported_actions"] = sorted(set(profile.get("supported_actions", [])) | set(step_capabilities))
     profile["profile_source"] = "stage_one_mock_executor_profile"
     return profile
+
+
+def continue_runtime_task(
+    task_id: str,
+    utterance: str,
+    intent: dict[str, Any],
+    space_admission: dict[str, Any],
+) -> dict[str, Any]:
+    current = get_runtime_world_state(task_id)
+    if "error" in current:
+        return current
+    runtime_world_state = clone_runtime_world_state(current["runtime_world_state_snapshot"])
+    if runtime_world_state.get("release_status") == "released":
+        return {
+            "error": "runtime_world_state_released",
+            "task_id": task_id,
+            "release_token": runtime_world_state.get("release_token"),
+        }
+
+    adapted_intent = adapt_intent_to_runtime_world_state(intent, task_id=task_id, runtime_world_state=runtime_world_state)
+    process_chain = get_process_chain_for_intent(adapted_intent)
+    prior_trace = TRACE_STORE.get(task_id, {})
+    prior_audit = AUDIT_STORE.get(task_id, {})
+    prior_state = STATE_STORE.get(task_id, {})
+    prior_events = list(prior_trace.get("events", []))
+    stage_summary = list(prior_audit.get("stage_summary", []))
+    fact_summary = list(prior_audit.get("fact_summary", []))
+    world_state_transitions = list(prior_trace.get("runtime_world_state_transitions", []))
+    new_events: list[dict[str, Any]] = []
+    profile = prior_state.get("body_capability_profile") or build_default_body_capability_profile()
+    stepwise_readaptation = None
+    before_state = prior_state.get("runtime_state") or runtime_world_state.get("current_stage") or "ready"
+    start_sequence = len(prior_events)
+
+    for offset, step in enumerate(process_chain, start=1):
+        meta = STEP_LIBRARY[step]
+        preflight = evaluate_runtime_step_preflight(runtime_world_state, step, meta)
+        sequence = start_sequence + offset
+        if preflight.get("result") == "blocked":
+            remaining_steps = [step] + list(process_chain[offset:])
+            stepwise_readaptation = build_stepwise_readaptation(
+                task_id,
+                adapted_intent.get("goal_fact"),
+                remaining_steps,
+                runtime_world_state,
+                profile,
+            )
+            stage_summary.append(
+                {
+                    "stage_id": step,
+                    "result": "blocked",
+                    "notes": "运行时环境变化导致当前步骤需重新适配",
+                }
+            )
+            new_events.append(
+                {
+                    "event_id": f"evt_{sequence:02d}_{step}_blocked",
+                    "consumed_sequence": sequence,
+                    "trigger_reason": "step_preflight_blocked",
+                    "before_state": before_state,
+                    "after_state": "readaptation_required",
+                    "payload_summary": f"step={step} blocked_by_runtime_environment readaptation={stepwise_readaptation['readaptation_id']}",
+                    "preflight": preflight,
+                }
+            )
+            break
+        after_state = f"{step}_completed"
+        target = meta.get("target_region") or meta.get("target_object", "unknown_target")
+        fact = meta["produces_fact"]
+        transition = apply_step_to_runtime_world_state(runtime_world_state, step, meta, sequence)
+        world_state_transitions.append(transition)
+        new_events.append(
+            {
+                "event_id": f"evt_{sequence:02d}_{step}",
+                "consumed_sequence": sequence,
+                "trigger_reason": "continued_runtime_step_executed",
+                "before_state": before_state,
+                "after_state": after_state,
+                "payload_summary": (
+                    f"step={step} display={meta['display_name']} capability={meta['capability']} "
+                    f"target={target} produced_fact={fact} planner=runtime_continuation adapter=digital_executor "
+                    f"runtime_world={transition['before_executor_location']}->{transition['after_executor_location']}"
+                ),
+                "runtime_world_transition": {
+                    "requires_facts": transition["requires_facts"],
+                    "missing_before_step": transition["missing_before_step"],
+                    "destroys_facts": transition["destroys_facts"],
+                    "produces_fact": transition["produces_fact"],
+                    "before_facts": transition["before_facts"],
+                    "after_facts": transition["after_facts"],
+                    "before_executor_location": transition["before_executor_location"],
+                    "after_executor_location": transition["after_executor_location"],
+                },
+                "preflight_result": preflight.get("result"),
+                "route_adjustment": preflight.get("route_adjustment"),
+            }
+        )
+        stage_summary.append(
+            {
+                "stage_id": step,
+                "result": "completed",
+                "notes": f"{meta['display_name']}；续接执行时世界状态 {transition['before_executor_location']} -> {transition['after_executor_location']}",
+            }
+        )
+        fact_summary.append({"fact_id": fact, "state": "established", "channel_notes": "runtime_continuation_trace"})
+        before_state = after_state
+
+    goal_fact = adapted_intent.get("goal_fact") or infer_goal_fact_from_task_state(task_id, prior_state, prior_audit)
+    updated_trace_events = prior_events + new_events
+    updated_runtime_state = "readaptation_required" if stepwise_readaptation else "completed"
+    updated_audit = {
+        "schema_version": "1.0.0",
+        "task_id": task_id,
+        "process_instance_id": prior_audit.get("process_instance_id") or adapted_intent.get("experience_id") or task_id,
+        "outcome": updated_runtime_state,
+        "stage_summary": stage_summary,
+        "fact_summary": fact_summary,
+        "stop_reason": "step_preflight_blocked" if stepwise_readaptation else None,
+        "causal_plan": adapted_intent.get("causal_plan") or prior_audit.get("causal_plan"),
+        "runtime_world_state_final": runtime_world_state,
+        "runtime_continuation": adapted_intent.get("runtime_continuation"),
+    }
+    updated_stage_state = {
+        "schema_version": "1.0.0",
+        "task_id": task_id,
+        "process_instance_id": updated_audit["process_instance_id"],
+        "current_stage_id": runtime_world_state.get("current_stage"),
+        "runtime_state": updated_runtime_state,
+        "utterance": utterance,
+        "runtime_world_state": runtime_world_state,
+        "goal_fact": goal_fact,
+        "candidate_process_chain": process_chain,
+        "execution_feasibility": stepwise_readaptation.get("execution_feasibility", {}) if stepwise_readaptation else None,
+        "body_capability_profile": profile,
+        "experience_gap_record_id": (
+            stepwise_readaptation.get("experience_gap_record", {}).get("gap_record_id") if stepwise_readaptation else None
+        ),
+        "runtime_continuation": adapted_intent.get("runtime_continuation"),
+    }
+    updated_trace = {
+        "schema_version": "1.0.0",
+        "task_id": task_id,
+        "process_instance_id": updated_audit["process_instance_id"],
+        "events": updated_trace_events,
+        "causal_plan": adapted_intent.get("causal_plan") or prior_trace.get("causal_plan"),
+        "runtime_world_state_initial": prior_trace.get("runtime_world_state_initial") or clone_runtime_world_state(runtime_world_state),
+        "runtime_world_state_final": runtime_world_state,
+        "runtime_world_state_policy": runtime_world_state.get("persistence_policy"),
+        "runtime_world_state_transitions": world_state_transitions,
+        "stepwise_readaptation": stepwise_readaptation,
+        "runtime_continuation": adapted_intent.get("runtime_continuation"),
+    }
+    AUDIT_STORE[task_id] = updated_audit
+    STATE_STORE[task_id] = updated_stage_state
+    TRACE_STORE[task_id] = updated_trace
+    RUNTIME_WORLD_STATE_STORE[task_id] = runtime_world_state
+    recovery_record = None
+    if stepwise_readaptation:
+        gap_record = stepwise_readaptation.get("experience_gap_record")
+        recovery_record = build_recovery_record_for_task(
+            task_id=task_id,
+            failed_experience_ref=updated_audit["process_instance_id"],
+            outcome="readaptation_required",
+            stop_reason="step_preflight_blocked",
+            expected_state=f"goal_fact:{goal_fact or 'unknown'}",
+            observed_state=f"blocked_step:{stepwise_readaptation.get('remaining_steps', ['unknown'])[0]}",
+            audit_record_id=task_id,
+            runtime_world_state_snapshot_id=runtime_world_state.get("runtime_world_state_snapshot_id"),
+            gap_record=gap_record,
+            readaptation_id=stepwise_readaptation.get("readaptation_id"),
+            source_refs={
+                "stepwise_readaptation_id": stepwise_readaptation.get("readaptation_id"),
+                "experience_gap_record_id": gap_record.get("gap_record_id") if gap_record else None,
+            },
+        )
+    return {
+        "task_id": task_id,
+        "scenario": "runtime_continuation",
+        "intent_translation": adapted_intent,
+        "space_admission": space_admission,
+        "admission_decision": {
+            "schema_version": "1.0.0",
+            "task_id": task_id,
+            "allowed": True,
+            "decision": "allowed",
+            "checks": space_admission.get("checks", []),
+            "missing_items": [],
+        },
+        "audit_summary": updated_audit,
+        "stage_runtime_state": updated_stage_state,
+        "execution_trace": {
+            **updated_trace,
+            "events": new_events,
+            "prior_event_count": len(prior_events),
+        },
+        "recovery_record": recovery_record,
+        "runtime_world_state": runtime_world_state,
+        "space_context": build_space_context(get_cognitive_model()),
+    }
+
+
+def start_task_from_runtime_world_state(
+    source_task_id: str,
+    utterance: str,
+    intent: dict[str, Any],
+    space_admission: dict[str, Any],
+) -> dict[str, Any]:
+    current = get_runtime_world_state(source_task_id)
+    if "error" in current:
+        return current
+    runtime_world_state = clone_runtime_world_state(current["runtime_world_state_snapshot"])
+    new_task_id = seed_runtime_task_from_snapshot(source_task_id, utterance, intent, runtime_world_state)
+    return continue_runtime_task(new_task_id, utterance, intent, space_admission)
+
+
+def build_runtime_event_arbitration_result(
+    task_id: str,
+    utterance: str,
+    intent: dict[str, Any],
+    space_admission: dict[str, Any],
+    arbitration: dict[str, Any],
+) -> dict[str, Any]:
+    current = get_runtime_world_state(task_id)
+    runtime_world_state = current.get("runtime_world_state_snapshot", {}) if "error" not in current else {}
+    runtime_state = STATE_STORE.get(task_id, {}).get("runtime_state") or arbitration.get("decision")
+    return {
+        "task_id": task_id,
+        "scenario": "runtime_event_arbitrated",
+        "intent_translation": intent,
+        "space_admission": space_admission,
+        "audit_summary": {
+            "schema_version": "1.0.0",
+            "task_id": task_id,
+            "process_instance_id": STATE_STORE.get(task_id, {}).get("process_instance_id") or task_id,
+            "outcome": arbitration.get("decision"),
+            "stage_summary": [],
+            "fact_summary": [],
+            "stop_reason": arbitration.get("reason"),
+            "runtime_world_state_final": runtime_world_state,
+        },
+        "stage_runtime_state": {
+            "schema_version": "1.0.0",
+            "task_id": task_id,
+            "process_instance_id": STATE_STORE.get(task_id, {}).get("process_instance_id") or task_id,
+            "current_stage_id": runtime_world_state.get("current_stage"),
+            "runtime_state": runtime_state,
+            "utterance": utterance,
+            "runtime_world_state": runtime_world_state,
+            "goal_fact": intent.get("goal_fact"),
+            "candidate_process_chain": get_process_chain_for_intent(intent),
+            "runtime_event_arbitration": arbitration,
+        },
+        "execution_trace": {
+            "schema_version": "1.0.0",
+            "task_id": task_id,
+            "process_instance_id": STATE_STORE.get(task_id, {}).get("process_instance_id") or task_id,
+            "events": [
+                {
+                    "event_id": arbitration.get("arbitration_id"),
+                    "consumed_sequence": 0,
+                    "trigger_reason": "runtime_event_arbitrated",
+                    "before_state": runtime_state,
+                    "after_state": runtime_state,
+                    "payload_summary": f"decision={arbitration.get('decision')} reason={arbitration.get('reason')}",
+                }
+            ],
+            "runtime_world_state_initial": runtime_world_state,
+            "runtime_world_state_final": runtime_world_state,
+            "runtime_event_arbitration": arbitration,
+        },
+        "runtime_world_state": runtime_world_state,
+        "runtime_event_arbitration": arbitration,
+        "space_context": build_space_context(get_cognitive_model()),
+    }
 
 
 def build_binding_candidates(
@@ -4977,82 +6069,12 @@ def get_runtime_world_state(task_id: str) -> dict[str, Any]:
 
 
 def parse_runtime_query(question: str) -> dict[str, Any]:
-    normalized = normalize_text(question)
-    cognitive_model = get_cognitive_model()
-    object_constraints = extract_object_constraints(question, cognitive_model)
-    object_ref = object_constraints[0]["object_ref"] if object_constraints else "object_cup_white_mug"
-
-    liquid_state_tokens = [
-        "有没有水",
-        "有水吗",
-        "空的吗",
-        "空没空",
-        "杯中",
-        "杯子里",
-        "壶里",
-    ]
-    holding_state_tokens = [
-        "拿着什么",
-        "手里有什么",
-        "握着什么",
-        "持有什么",
-    ]
-    location_tokens = [
-        "在哪",
-        "在哪里",
-        "什么位置",
-        "哪个区域",
-    ]
-    preference_tokens = [
-        "偏好",
-        "偏好约束",
-        "人类反馈",
-        "用户要求",
-    ]
-    current_action_tokens = [
-        "你现在在做什么",
-        "我现在在做什么",
-        "当前在做什么",
-        "现在在做什么",
-    ]
-    next_step_tokens = [
-        "下一步做什么",
-        "接下来做什么",
-        "下一步是什么",
-    ]
-    snapshot_tokens = [
-        "现在状态",
-        "当前状态",
-        "世界状态",
-    ]
-
-    if any(token in normalized for token in liquid_state_tokens):
-        if object_ref == "object_kettle_steel_1l":
-            return {
-                "query_type": "liquid_state",
-                "object_ref": object_ref,
-                "positive_fact": "kettle_has_water",
-                "negative_fact": None,
-            }
-        return {
-            "query_type": "liquid_state",
-            "object_ref": object_ref,
-            "positive_fact": "cup_contains_water",
-            "negative_fact": "cup_empty",
-        }
-    if any(token in normalized for token in holding_state_tokens):
-        return {"query_type": "holding_state"}
-    if any(token in normalized for token in location_tokens):
-        return {"query_type": "executor_location"}
-    if any(token in normalized for token in preference_tokens):
-        return {"query_type": "preference_summary"}
-    if any(token in normalized for token in current_action_tokens):
-        return {"query_type": "current_action"}
-    if any(token in normalized for token in next_step_tokens):
-        return {"query_type": "next_step"}
-    if any(token in normalized for token in snapshot_tokens):
-        return {"query_type": "snapshot_summary"}
-    return {"query_type": "unsupported"}
+    return resolve_runtime_state_query(
+        question,
+        normalize_text_fn=normalize_text,
+        extract_object_constraints_fn=extract_object_constraints,
+        cognitive_model=get_cognitive_model(),
+    )
 
 
 def query_runtime_world_state(
@@ -5065,132 +6087,19 @@ def query_runtime_world_state(
         return current
     state = current["runtime_world_state_snapshot"]
     if state.get("release_status") == "released":
-        return {
-            "schema_version": "1.0.0",
-            "task_id": task_id,
-            "question": question,
-            "answer": "unknown",
-            "status": "snapshot_released",
-            "reason": "任务期运行时世界状态快照已释放，不再作为当前世界状态查询依据",
-            "source": "runtime_world_state_snapshot_only",
-        }
+        return build_released_runtime_query_result(task_id, question)
 
     query = parse_runtime_query(question)
     if query["query_type"] == "unsupported":
-        return {
-            "error": "unsupported_runtime_query",
-            "task_id": task_id,
-            "question": question,
-            "supported_queries": [
-                "当前杯子有没有水",
-                "当前水壶里有没有水",
-                "我手里拿着什么",
-                "我现在在哪",
-                "当前偏好约束是什么",
-                "当前状态",
-            ],
-            "source": "runtime_world_state_snapshot_only",
-        }
+        return build_unsupported_runtime_query_result(task_id, question, query)
 
-    established_facts = set(state.get("established_facts", []))
-    if query["query_type"] == "liquid_state":
-        target_object_ref = query.get("object_ref") or object_ref
-        object_state_facts = set(state.get("object_locations", {}).get(target_object_ref, {}).get("state_facts", []))
-        positive_fact = query["positive_fact"]
-        negative_fact = query.get("negative_fact")
-        positive = positive_fact in object_state_facts or positive_fact in established_facts
-        negative = bool(negative_fact) and (negative_fact in object_state_facts or negative_fact in established_facts)
-
-        if positive and negative:
-            answer = "conflict"
-            reason = f"当前任务期运行时世界状态快照中同时存在 {positive_fact} 与 {negative_fact}"
-        elif positive:
-            answer = "true"
-            reason = f"当前任务期运行时世界状态快照中存在 {positive_fact}"
-        elif negative:
-            answer = "false"
-            reason = f"当前任务期运行时世界状态快照中存在 {negative_fact} 且不存在 {positive_fact}"
-        else:
-            answer = "unknown"
-            reason = f"当前任务期运行时世界状态快照中既无 {positive_fact}" + (f"，也无 {negative_fact}" if negative_fact else "")
-        evidence = {
-            "object_ref": target_object_ref,
-            "object_state_facts": sorted(object_state_facts),
-            "established_facts": sorted(established_facts),
-            "runtime_world_state_snapshot_id": state.get("runtime_world_state_snapshot_id"),
-        }
-    elif query["query_type"] == "holding_state":
-        holding = state.get("executor", {}).get("holding", [])
-        answer = "none" if not holding else ",".join(holding)
-        reason = "当前任务期运行时世界状态快照中的执行体 holding 列表"
-        evidence = {
-            "holding": holding,
-            "runtime_world_state_snapshot_id": state.get("runtime_world_state_snapshot_id"),
-        }
-    elif query["query_type"] == "executor_location":
-        location_ref = state.get("executor", {}).get("location_ref")
-        answer = location_ref or "unknown"
-        reason = "当前任务期运行时世界状态快照中的执行体位置"
-        evidence = {
-            "executor_location_ref": location_ref,
-            "runtime_world_state_snapshot_id": state.get("runtime_world_state_snapshot_id"),
-        }
-    elif query["query_type"] == "preference_summary":
-        active_preferences = state.get("active_preferences", [])
-        answer = "none" if not active_preferences else ",".join(item.get("preference_id", "") for item in active_preferences if item.get("preference_id"))
-        reason = "当前任务期运行时世界状态快照中的人类偏好约束"
-        evidence = {
-            "active_preferences": active_preferences,
-            "preference_context": state.get("preference_context", {}),
-            "runtime_world_state_snapshot_id": state.get("runtime_world_state_snapshot_id"),
-        }
-    elif query["query_type"] == "current_action":
-        explanation = build_runtime_explanation_view(task_id)
-        current_action = ((explanation.get("status_answers") or {}).get("current_action") or {}).get("answer", "unknown") if "error" not in explanation else "unknown"
-        action_reason = ((explanation.get("status_answers") or {}).get("current_action") or {}).get("reason", "???????????????") if "error" not in explanation else "???????????????"
-        answer = current_action
-        reason = action_reason
-        evidence = {
-            "current_stage": state.get("current_stage"),
-            "completed_stages": state.get("completed_stages", []),
-            "runtime_world_state_snapshot_id": state.get("runtime_world_state_snapshot_id"),
-        }
-    elif query["query_type"] == "next_step":
-        explanation = build_runtime_explanation_view(task_id)
-        next_step_answer = ((explanation.get("status_answers") or {}).get("next_step") or {}).get("answer", "unknown") if "error" not in explanation else "unknown"
-        next_step_reason = ((explanation.get("status_answers") or {}).get("next_step") or {}).get("reason", "当前没有足够上下文判断下一步") if "error" not in explanation else "当前没有足够上下文判断下一步"
-        if next_step_answer == "unknown" and "目标已达成" in next_step_reason:
-            next_step_answer = "none"
-        answer = next_step_answer
-        reason = next_step_reason
-        evidence = {
-            "current_stage": state.get("current_stage"),
-            "completed_stages": state.get("completed_stages", []),
-            "runtime_world_state_snapshot_id": state.get("runtime_world_state_snapshot_id"),
-        }
-    else:
-        answer = "summary"
-        reason = "当前任务期运行时世界状态快照摘要"
-        evidence = {
-            "executor": state.get("executor", {}),
-            "established_facts": sorted(established_facts),
-            "current_stage": state.get("current_stage"),
-            "completed_stages": state.get("completed_stages", []),
-            "active_preferences": state.get("active_preferences", []),
-            "runtime_world_state_snapshot_id": state.get("runtime_world_state_snapshot_id"),
-        }
-
-    return {
-        "schema_version": "1.0.0",
-        "task_id": task_id,
-        "question": question,
-        "answer": answer,
-        "status": "resolved_from_runtime_world_state",
-        "reason": reason,
-        "source": "runtime_world_state_snapshot_only",
-        "query_type": query["query_type"],
-        "evidence": evidence,
-    }
+    return build_runtime_state_query_result(
+        task_id,
+        question,
+        state,
+        query,
+        build_runtime_explanation_view_fn=build_runtime_explanation_view,
+    )
 
 
 def build_runtime_explanation_view(task_id: str) -> dict[str, Any]:
@@ -5342,9 +6251,19 @@ def build_clarification_prompt(semantic_request: dict[str, Any], concept_resolut
 def build_teaching_acknowledgement(utterance: str, parsed_steps: list[str], semantic_request: dict[str, Any]) -> str:
     if semantic_request.get("clarification_needed"):
         return build_clarification_prompt(semantic_request)
+    teaching_frame = ((semantic_request.get("teaching_plan") or {}).get("teaching_frame")) or {}
+    flexibility_mode = (teaching_frame.get("flexibility_policy") or {}).get("mode")
+    preference_constraints = teaching_frame.get("preference_constraints", [])
     if parsed_steps:
         display_steps = [STEP_LIBRARY.get(step, {}).get("display_name", step) for step in parsed_steps]
-        return "我理解你这次在教我按这个顺序做：" + " -> ".join(display_steps)
+        suffix = ""
+        if flexibility_mode == "allow_local_reorder":
+            suffix = "；你允许我在不破坏结果的前提下做局部变通"
+        elif flexibility_mode == "strict_following":
+            suffix = "；我会优先严格按这个顺序执行"
+        elif preference_constraints:
+            suffix = "；我还记录到了本轮教学中的偏好约束"
+        return "我理解你这次在教我按这个顺序做：" + " -> ".join(display_steps) + suffix
     goal_fact = semantic_request.get("intent_frame", {}).get("goal_fact")
     if goal_fact:
         return f"我理解你在教我达成目标事实 {goal_fact}，但还缺少更具体的步骤。"
@@ -5495,9 +6414,11 @@ def resolve_concepts_for_intent(utterance: str, task_id: str | None = None) -> d
         "intent_frame_summary": {
             "goal_fact": intent_frame.get("goal_fact"),
             "explicit_process_chain": intent_frame.get("explicit_process_chain", []),
+            "action_concepts": intent_frame.get("action_concepts", []),
             "spatial_constraints": intent_frame.get("spatial_constraints", []),
             "object_constraints": intent_frame.get("object_constraints", []),
         },
+        "action_concepts": intent_frame.get("action_concepts", []),
         "resolved_concepts": concept_matches,
         "runtime_context_view": runtime_context_view,
         "concept_resolution_policy": {
@@ -5509,11 +6430,94 @@ def resolve_concepts_for_intent(utterance: str, task_id: str | None = None) -> d
     }
 
 
+def build_cloud_recall_preview(
+    utterance: str,
+    task_id: str | None = None,
+    *,
+    semantic_request: dict[str, Any] | None = None,
+    concept_resolution: dict[str, Any] | None = None,
+    intent_preview: dict[str, Any] | None = None,
+    runtime_context_view: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    semantic_request = semantic_request or build_semantic_request_frame(utterance, get_cognitive_model(), task_id=task_id)
+    if concept_resolution is None and semantic_request.get("request_type") in {"task_execution", "teaching"}:
+        concept_resolution = resolve_concepts_for_intent(utterance, task_id=task_id)
+    intent_preview = intent_preview or (
+        translate_intent(utterance) if semantic_request.get("request_type") == "task_execution" else None
+    )
+    if runtime_context_view is None and task_id:
+        runtime_context_view = build_llm_context_view(task_id)
+
+    cloud_recall_packet = build_cloud_recall_packet(
+        utterance,
+        semantic_request=semantic_request,
+        concept_resolution=concept_resolution,
+        intent_preview=intent_preview,
+        task_id=task_id,
+        runtime_context_view=runtime_context_view if runtime_context_view and "error" not in runtime_context_view else None,
+        normalize_text_fn=normalize_text,
+    )
+    should_request = bool(cloud_recall_packet.get("local_concept_gap"))
+    if not should_request:
+        return {
+            "schema_version": "1.0.0",
+            "should_request_cloud_recall": False,
+            "cloud_recall_packet": cloud_recall_packet,
+            "cloud_recall_result": {
+                "schema_version": "1.0.0",
+                "availability": "local_concepts_sufficient",
+                "recall_status": "not_required",
+                "candidate_concepts": [],
+                "candidate_process_chain": [],
+                "clarification_questions": [],
+                "direct_execution_allowed": False,
+                "must_reenter_orchestration_layer": True,
+            },
+        }
+
+    return {
+        "schema_version": "1.0.0",
+        "should_request_cloud_recall": True,
+        "cloud_recall_packet": cloud_recall_packet,
+        "cloud_recall_result": request_cloud_concept_support(
+            cloud_recall_packet,
+            normalize_text_fn=normalize_text,
+        ),
+    }
+
+
+def build_task_switch_context(task_id: str, utterance: str, arbitration: dict[str, Any]) -> dict[str, Any]:
+    runtime_context_view = build_llm_context_view(task_id)
+    task_context = runtime_context_view.get("task_context", {}) if "error" not in runtime_context_view else {}
+    executor = runtime_context_view.get("executor", {}) if "error" not in runtime_context_view else {}
+    local_gap = "unknown_target_or_skill_not_grounded_in_local_concepts"
+    if arbitration.get("decision") == "request_human_confirmation":
+        local_gap = "held_object_state_must_be_resolved_before_switching_to_unknown_task"
+    return {
+        "requested_utterance": utterance,
+        "current_goal_fact": task_context.get("goal_fact"),
+        "current_stage": task_context.get("current_stage"),
+        "holding_objects": executor.get("holding", []),
+        "executor_location": executor.get("location_ref"),
+        "local_gap": local_gap,
+        "recommended_actions": arbitration.get("required_actions", []),
+        "preview_summary": "检测到新任务切换请求；当前执行体仍处于活动任务上下文中，需先结合持物状态与本地能力缺口做确认或教学。",
+    }
+
+
 def build_llm_prompt_contract(utterance: str, task_id: str | None = None) -> dict[str, Any]:
     semantic_request = build_semantic_request_frame(utterance, get_cognitive_model(), task_id=task_id)
     intent_preview = translate_intent(utterance)
     concept_resolution = resolve_concepts_for_intent(utterance, task_id=task_id)
     runtime_context_view = concept_resolution.get("runtime_context_view") if task_id else None
+    cloud_recall_preview = build_cloud_recall_preview(
+        utterance,
+        task_id=task_id,
+        semantic_request=semantic_request,
+        concept_resolution=concept_resolution,
+        intent_preview=intent_preview,
+        runtime_context_view=runtime_context_view,
+    )
     prompt_contract_id = "llm_prompt_" + hashlib.sha1(
         "|".join([normalize_text(utterance), task_id or "none"]).encode("utf-8")
     ).hexdigest()[:12]
@@ -5533,8 +6537,16 @@ def build_llm_prompt_contract(utterance: str, task_id: str | None = None) -> dic
             "concept_resolution": {
                 "resolution_id": concept_resolution.get("resolution_id"),
                 "resolved_concept_ids": [item.get("concept_id") for item in concept_resolution.get("resolved_concepts", [])],
+                "action_concept_ids": [item.get("concept_id") for item in concept_resolution.get("action_concepts", [])],
             },
             "runtime_context_view": runtime_context_view,
+            "cloud_recall_packet": cloud_recall_preview.get("cloud_recall_packet") if cloud_recall_preview.get("should_request_cloud_recall") else None,
+        },
+        "cloud_recall_policy": {
+            "enabled_on_local_gap": True,
+            "candidate_only": True,
+            "direct_execution_allowed": False,
+            "must_reenter_orchestration_layer": True,
         },
         "system_constraints": [
             "不得输出绝对坐标、关节角、轨迹、原始电机控制或其他底层控制字段",
@@ -5563,7 +6575,16 @@ def build_llm_candidate_intent(utterance: str, task_id: str | None = None) -> di
     cognitive_model = get_cognitive_model()
     semantic_request = build_semantic_request_frame(utterance, cognitive_model, task_id=task_id)
     intent_preview = translate_intent(utterance)
+    concept_resolution = resolve_concepts_for_intent(utterance, task_id=task_id)
     prompt_contract = build_llm_prompt_contract(utterance, task_id=task_id)
+    cloud_recall_preview = build_cloud_recall_preview(
+        utterance,
+        task_id=task_id,
+        semantic_request=semantic_request,
+        concept_resolution=concept_resolution,
+        intent_preview=intent_preview,
+        runtime_context_view=prompt_contract.get("input_packet", {}).get("runtime_context_view"),
+    )
     candidate_intent_id = "llm_candidate_" + hashlib.sha1(
         "|".join([normalize_text(utterance), task_id or "none"]).encode("utf-8")
     ).hexdigest()[:12]
@@ -5575,7 +6596,8 @@ def build_llm_candidate_intent(utterance: str, task_id: str | None = None) -> di
         "semantic_request": semantic_request,
         "intent_translation_preview": intent_preview,
         "runtime_context_view": prompt_contract.get("input_packet", {}).get("runtime_context_view"),
-        "concept_resolution": resolve_concepts_for_intent(utterance, task_id=task_id),
+        "concept_resolution": concept_resolution,
+        "cloud_recall_preview": cloud_recall_preview,
         "llm_prompt_contract": prompt_contract,
         "llm_input_contract": {
             "model_role": prompt_contract.get("role_definition", {}).get("model_role"),
@@ -5761,6 +6783,12 @@ def handle_agent_query(
     if request_type in {"task_execution", "teaching"}:
         concept_resolution = resolve_concepts_for_intent(utterance, task_id=task_id)
     if semantic_request.get("clarification_needed") and request_type == "task_execution" and not auto_execute:
+        cloud_recall_preview = build_cloud_recall_preview(
+            utterance,
+            task_id=task_id,
+            semantic_request=semantic_request,
+            concept_resolution=concept_resolution,
+        )
         clarification_result = {
             "schema_version": "1.0.0",
             "decision": "clarification_required",
@@ -5770,6 +6798,7 @@ def handle_agent_query(
             "intent_confidence": semantic_request.get("intent_confidence"),
             "alternative_interpretations": semantic_request.get("alternative_interpretations", []),
             "concept_resolution": concept_resolution,
+            "cloud_recall_preview": cloud_recall_preview,
         }
         return {
             "schema_version": "1.0.0",
@@ -5797,6 +6826,7 @@ def handle_agent_query(
             "parsed_steps": parsed_steps,
             "recommended_next_endpoint": semantic_request.get("teaching_plan", {}).get("recommended_endpoint"),
             "goal_fact": semantic_request.get("intent_frame", {}).get("goal_fact"),
+            "teaching_frame": semantic_request.get("teaching_plan", {}).get("teaching_frame"),
             "teaching_feedback": {
                 "acknowledgement": build_teaching_acknowledgement(utterance, parsed_steps, semantic_request),
                 "clarification_needed": semantic_request.get("clarification_needed"),
@@ -5812,14 +6842,46 @@ def handle_agent_query(
         return {"schema_version": "1.0.0", "semantic_request": semantic_request, "route_result": result}
     if request_type == "task_execution":
         if auto_execute:
-            result = run_process(scenario, utterance)
+            result = run_process_with_runtime_context(scenario, utterance, task_id=task_id)
         else:
-            intent = translate_intent(utterance)
+            intent = adapt_intent_to_runtime_world_state(translate_intent(utterance), task_id=task_id)
             result = {
                 "intent_translation": intent,
                 "space_admission": evaluate_space_admission(intent, cognitive_model),
                 "concept_resolution": concept_resolution,
             }
+            snapshot = get_active_runtime_snapshot(task_id)
+            if task_id and snapshot:
+                arbitration = arbitrate_runtime_event(task_id, utterance, intent, snapshot)
+                result["runtime_event_arbitration"] = arbitration
+                if semantic_request.get("interrupt_requested") or semantic_request.get("task_switch_candidate"):
+                    result["decision"] = arbitration.get("decision")
+                    result["space_admission"] = {
+                        "allowed": False,
+                        "decision": "runtime_event_preview",
+                        "reason": arbitration.get("reason"),
+                        "checks": [
+                            {
+                                "check_id": "runtime_event_preview",
+                                "passed": True,
+                                "notes": arbitration.get("decision"),
+                            }
+                        ],
+                    }
+                    if semantic_request.get("task_switch_candidate"):
+                        result["task_switch_context"] = build_task_switch_context(task_id, utterance, arbitration)
+            if (
+                intent.get("decision") != "executable"
+                and not semantic_request.get("interrupt_requested")
+                and not semantic_request.get("task_switch_candidate")
+            ):
+                result["cloud_recall_preview"] = build_cloud_recall_preview(
+                    utterance,
+                    task_id=task_id,
+                    semantic_request=semantic_request,
+                    concept_resolution=concept_resolution,
+                    intent_preview=intent,
+                )
         return {"schema_version": "1.0.0", "semantic_request": semantic_request, "route_result": result}
     return {
         "schema_version": "1.0.0",
@@ -6186,14 +7248,59 @@ def get_execution_dispatch(dispatch_id: str) -> dict[str, Any]:
     return record
 
 
+def run_process_with_runtime_context(
+    scenario: str = "auto",
+    utterance: str = "给客人倒一杯水",
+    task_id: str | None = None,
+) -> dict[str, Any]:
+    intent = adapt_intent_to_runtime_world_state(translate_intent(utterance), task_id=task_id)
+    snapshot = get_active_runtime_snapshot(task_id)
+    if task_id and snapshot:
+        arbitration = arbitrate_runtime_event(task_id, utterance, intent, snapshot)
+        cognitive_model = get_cognitive_model()
+        if arbitration.get("decision") in {"continue_current_task", "pause_and_switch_task"} and arbitration.get("can_enter_execution"):
+            space_admission = evaluate_space_admission(intent, cognitive_model)
+            if not space_admission["allowed"]:
+                return build_cannot_do_result(utterance, intent, space_admission)
+        else:
+            space_admission = {
+                "allowed": False,
+                "decision": "state_first_arbitrated",
+                "reason": arbitration.get("reason"),
+                "checks": [
+                    {
+                        "check_id": "state_first_runtime_event_arbitration",
+                        "passed": False,
+                        "notes": arbitration.get("decision"),
+                    }
+                ],
+            }
+        if arbitration.get("decision") == "continue_current_task" and arbitration.get("can_enter_execution") and get_process_chain_for_intent(intent):
+            return continue_runtime_task(task_id, utterance, intent, space_admission)
+        if arbitration.get("decision") == "pause_and_switch_task" and arbitration.get("can_enter_execution") and get_process_chain_for_intent(intent):
+            apply_runtime_event_arbitration(task_id, arbitration)
+            switched = start_task_from_runtime_world_state(task_id, utterance, intent, space_admission)
+            switched["source_runtime_event_arbitration"] = arbitration
+            switched["source_task_id"] = task_id
+            return switched
+        apply_runtime_event_arbitration(task_id, arbitration)
+        return build_runtime_event_arbitration_result(task_id, utterance, intent, space_admission, arbitration)
+    cognitive_model = get_cognitive_model()
+    space_admission = evaluate_space_admission(intent, cognitive_model)
+    if not space_admission["allowed"]:
+        return build_cannot_do_result(utterance, intent, space_admission)
+    return run_process(scenario, utterance)
+
+
 def run_process(scenario: str = "success", utterance: str = "给客人倒一杯水") -> dict[str, Any]:
     intent = translate_intent(utterance)
     cognitive_model = get_cognitive_model()
     space_admission = evaluate_space_admission(intent, cognitive_model)
     if not space_admission["allowed"]:
         return build_cannot_do_result(utterance, intent, space_admission)
-    if intent["task_type"] in {"learned_process_chain", "causal_process_chain"}:
-        return run_process_chain_experience(intent, utterance, space_admission)
+    if scenario in {"auto", "simulated_success"}:
+        if intent["task_type"] in {"learned_process_chain", "causal_process_chain"}:
+            return run_process_chain_experience(intent, utterance, space_admission)
     if scenario == "auto":
         scenario = intent.get("recommended_scenario", "simulated_success")
     if scenario not in SCENARIOS:
@@ -6311,7 +7418,7 @@ class RellSampleHandler(BaseHTTPRequestHandler):
             self._send_html(INDEX_HTML)
             return
         if path == "/health":
-            self._send_json({"status": "ok", "service": "rell_sample"})
+            self._send_json({"status": "ok", "service": "eorld-rell"})
             return
         if path == "/space/prior":
             self._send_json(get_space_prior())
@@ -6423,6 +7530,13 @@ class RellSampleHandler(BaseHTTPRequestHandler):
             return
         if path == "/llm/candidate-intent":
             result = build_llm_candidate_intent(
+                body.get("utterance", ""),
+                task_id=body.get("task_id") or body.get("session_id") or body.get("migration_task_id"),
+            )
+            self._send_json(result, status=400 if not body.get("utterance") else 200)
+            return
+        if path == "/concept/cloud-recall":
+            result = build_cloud_recall_preview(
                 body.get("utterance", ""),
                 task_id=body.get("task_id") or body.get("session_id") or body.get("migration_task_id"),
             )
@@ -6593,9 +7707,9 @@ class RellSampleHandler(BaseHTTPRequestHandler):
 
 def main() -> None:
     server = HTTPServer((DEFAULT_HOST, DEFAULT_PORT), RellSampleHandler)
-    print(f"RELL sample API listening on http://{DEFAULT_HOST}:{DEFAULT_PORT}")
+    print(f"EORLD-RELL sample API listening on http://{DEFAULT_HOST}:{DEFAULT_PORT}")
     print(f"Demo page: http://{DEFAULT_HOST}:{DEFAULT_PORT}/")
-    print("Endpoints: POST /semantic/route, POST /agent/query, POST /llm/context-view, POST /llm/prompt-contract, POST /llm/candidate-intent, POST /llm/candidate/validate, POST /concept/resolve, POST /concept/candidates/confirm, POST /process/admit, POST /process/run, POST /experience/migrate, POST /preference/record, POST /execution/dispatch, POST /runtime_world_state/query, POST /runtime_world_state/perturb, POST /teaching/session/start, GET /recovery/library, GET /recovery/task/{task_id}, GET /recovery/{recovery_id}, GET /preference/library, GET /concept/library, GET /concept/candidates, GET /audit/{task_id}")
+    print("Endpoints: POST /semantic/route, POST /agent/query, POST /llm/context-view, POST /llm/prompt-contract, POST /llm/candidate-intent, POST /llm/candidate/validate, POST /concept/cloud-recall, POST /concept/resolve, POST /concept/candidates/confirm, POST /process/admit, POST /process/run, POST /experience/migrate, POST /preference/record, POST /execution/dispatch, POST /runtime_world_state/query, POST /runtime_world_state/perturb, POST /teaching/session/start, GET /recovery/library, GET /recovery/task/{task_id}, GET /recovery/{recovery_id}, GET /preference/library, GET /concept/library, GET /concept/candidates, GET /audit/{task_id}")
     server.serve_forever()
 
 
