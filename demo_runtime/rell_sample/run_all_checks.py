@@ -76,7 +76,13 @@ def run_http_smoke() -> None:
     print("[check] api_server HTTP smoke")
     port = find_free_port()
     API_URL = f"http://127.0.0.1:{port}"
-    env = {**os.environ, "RELL_SAMPLE_PORT": str(port)}
+    visual_pipeline_store = ROOT.parents[1] / "output" / "rell_sample" / "runtime" / f"visual_pipeline_http_{port}.json"
+    visual_pipeline_store.unlink(missing_ok=True)
+    env = {
+        **os.environ,
+        "RELL_SAMPLE_PORT": str(port),
+        "RELL_VISUAL_PIPELINE_STORE": str(visual_pipeline_store),
+    }
     experience_library_file = ROOT / "data" / "experience_library.json"
     concept_library_file = ROOT / "data" / "concept_library.json"
     concept_candidate_library_file = ROOT / "data" / "concept_candidate_library.json"
@@ -106,6 +112,15 @@ def run_http_smoke() -> None:
         concept_library = get_json("/concept/library")
         preference_library = get_json("/preference/library")
         recovery_library_before = get_json("/recovery/library")
+        visual_request = post_json(
+            "/visual-concepts/generation/request",
+            {"concept_id": "concept_edible_apple", "sample_count": 5},
+        )
+        visual_candidate = post_json(
+            "/visual-concepts/generation/execute",
+            {"request_id": visual_request["request_id"], "provider": "deterministic_test", "endpoint": "http://untrusted.invalid"},
+        )
+        visual_pipeline = get_json("/visual-concepts/pipeline")
         p017_loop = get_json("/p017/minimal-loop")
         semantic_route = post_json("/semantic/route", {"utterance": "当前杯子有没有水"})
         agent_execution_preview = post_json("/agent/query", {"utterance": "到水源处接一杯水"})
@@ -311,6 +326,10 @@ def run_http_smoke() -> None:
             raise AssertionError(f"preference library failed: {preference_library}")
         if recovery_library_before.get("recovery_records") not in ([], None):
             raise AssertionError(f"recovery library should start empty in smoke test: {recovery_library_before}")
+        if visual_candidate.get("status") != "awaiting_real_world_calibration" or visual_candidate.get("runtime_visible"):
+            raise AssertionError(f"visual image API candidate bypassed calibration: {visual_candidate}")
+        if visual_pipeline.get("requests", [])[0].get("provider_id") != "deterministic_test_image_provider":
+            raise AssertionError(f"client-controlled provider endpoint affected adapter selection: {visual_pipeline}")
         if not p017_loop.get("evidence_index") or len(p017_loop.get("evidence_files", {})) != 8:
             raise AssertionError(f"P017 minimal loop endpoint failed: {p017_loop}")
         if semantic_route.get("request_type") != "state_query":
@@ -455,6 +474,7 @@ def run_http_smoke() -> None:
             recovery_library_file.unlink(missing_ok=True)
         else:
             restore_text_with_retry(recovery_library_file, original_recovery_library)
+        visual_pipeline_store.unlink(missing_ok=True)
     print("[ok] api_server HTTP smoke")
 
 
@@ -474,6 +494,7 @@ def main() -> None:
     run_python("validate_p019_behavior_scenarios.py")
     run_python("validate_embodied_home.py")
     run_python("validate_small_vocabulary_generalization.py")
+    run_python("validate_visual_concept_pipeline.py")
     run_physics_python("validate_minimal_physics.py")
     run_http_smoke()
     print("All RELL sample checks passed.")

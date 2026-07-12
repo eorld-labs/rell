@@ -52,6 +52,16 @@ from embodied_scene import start_embodied_teaching as start_embodied_teaching_se
 from embodied_scene import record_teaching_signal as record_embodied_teaching_signal
 from embodied_scene import step_motion_command as step_embodied_motion
 from embodied_experience_store import load_trusted_experiences
+from visual_concept_pipeline import (
+    DeterministicImageProvider,
+    HttpImageGenerationProvider,
+    add_real_world_calibration,
+    create_generation_request,
+    execute_generation_request,
+    get_pipeline_state,
+    ingest_provider_images,
+    promote_visual_candidate,
+)
 
 
 ROOT = Path(__file__).resolve().parent
@@ -8311,6 +8321,9 @@ class RellSampleHandler(BaseHTTPRequestHandler):
         if path == "/embodied/visual-concept-packs":
             self._send_json(build_visual_concept_pack_catalog())
             return
+        if path == "/visual-concepts/pipeline":
+            self._send_json(get_pipeline_state())
+            return
         if path == "/embodied/factory-state-facts":
             self._send_json(build_factory_state_fact_catalog())
             return
@@ -8576,6 +8589,52 @@ class RellSampleHandler(BaseHTTPRequestHandler):
                 body.get("executor_type", "digital_executor"),
                 body.get("executor_options", {}),
             )
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/visual-concepts/generation/request":
+            result = create_generation_request(
+                str(body.get("concept_id", "")),
+                int(body.get("sample_count", 8)),
+            )
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/visual-concepts/generation/execute":
+            provider_kind = str(body.get("provider", "deterministic_test"))
+            if provider_kind == "deterministic_test":
+                provider = DeterministicImageProvider()
+            elif provider_kind == "configured_http":
+                endpoint = os.environ.get("RELL_IMAGE_PROVIDER_ENDPOINT")
+                if not endpoint:
+                    self._send_json({"error": "image_provider_endpoint_not_configured"}, status=400)
+                    return
+                provider = HttpImageGenerationProvider(endpoint, os.environ.get("RELL_IMAGE_PROVIDER_AUTHORIZATION"))
+            else:
+                self._send_json({"error": "unsupported_image_provider", "provider": provider_kind}, status=400)
+                return
+            result = execute_generation_request(str(body.get("request_id", "")), provider)
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/visual-concepts/provider-result":
+            images = body.get("images")
+            result = ingest_provider_images(
+                str(body.get("request_id", "")),
+                str(body.get("provider_id", "external_image_provider")),
+                images if isinstance(images, list) else [],
+            )
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/visual-concepts/calibrate":
+            result = add_real_world_calibration(
+                str(body.get("candidate_id", "")),
+                observation_ref=str(body.get("observation_ref", "")),
+                source_type=str(body.get("source_type", "")),
+                matched_features=body.get("matched_features") if isinstance(body.get("matched_features"), list) else [],
+                human_confirmed=bool(body.get("human_confirmed", False)),
+            )
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/visual-concepts/promote":
+            result = promote_visual_candidate(str(body.get("candidate_id", "")))
             self._send_json(result, status=400 if "error" in result else 200)
             return
         if path == "/physics/session/start":

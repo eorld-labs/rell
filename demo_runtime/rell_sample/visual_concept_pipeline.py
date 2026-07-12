@@ -1,0 +1,238 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+from copy import deepcopy
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Protocol
+from urllib.request import Request, urlopen
+
+from concept_core.perceptual_grounding import load_object_concepts
+
+
+DEFAULT_STORE = Path(__file__).resolve().parents[1] / "output" / "rell_sample" / "runtime" / "visual_concept_pipeline.json"
+
+
+class ImageGenerationProvider(Protocol):
+    provider_id: str
+
+    def generate(self, request: dict[str, Any]) -> list[dict[str, Any]]: ...
+
+
+class DeterministicImageProvider:
+    provider_id = "deterministic_test_image_provider"
+
+    def generate(self, request: dict[str, Any]) -> list[dict[str, Any]]:
+        return [
+            {
+                "image_ref": f"mock://{request['request_id']}/{index}",
+                "mime_type": "image/png",
+                "content_digest": hashlib.sha256(f"{request['request_id']}|{index}".encode()).hexdigest(),
+                "provider_metadata": {"variant": variant},
+            }
+            for index, variant in enumerate(request["variant_specs"])
+        ]
+
+
+class HttpImageGenerationProvider:
+    provider_id = "generic_http_image_provider"
+
+    def __init__(self, endpoint: str, authorization: str | None = None) -> None:
+        self.endpoint = endpoint
+        self.authorization = authorization
+
+    def generate(self, request: dict[str, Any]) -> list[dict[str, Any]]:
+        headers = {"Content-Type": "application/json"}
+        if self.authorization:
+            headers["Authorization"] = self.authorization
+        payload = json.dumps({"request_id": request["request_id"], "prompts": request["prompt_specs"]}).encode("utf-8")
+        with urlopen(Request(self.endpoint, data=payload, headers=headers, method="POST"), timeout=30) as response:
+            result = json.loads(response.read().decode("utf-8"))
+        images = result.get("images")
+        if not isinstance(images, list):
+            raise ValueError("image_provider_response_missing_images")
+        return images
+
+
+def get_store_path() -> Path:
+    configured = os.environ.get("RELL_VISUAL_PIPELINE_STORE")
+    return Path(configured).resolve() if configured else DEFAULT_STORE
+
+
+def _load_store() -> dict[str, Any]:
+    path = get_store_path()
+    if not path.exists():
+        return {"schema_version": "1.0.0", "requests": [], "candidates": [], "promoted_adapters": []}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _save_store(store: dict[str, Any]) -> None:
+    path = get_store_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(store, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    os.replace(temporary, path)
+
+
+def _concept(concept_id: str) -> dict[str, Any] | None:
+    return next((item for item in load_object_concepts()["concepts"] if item["concept_id"] == concept_id), None)
+
+
+def create_generation_request(concept_id: str, sample_count: int = 8) -> dict[str, Any]:
+    concept = _concept(concept_id)
+    if not concept:
+        return {"error": "object_concept_not_found", "concept_id": concept_id}
+    count = max(1, min(int(sample_count), 32))
+    dimensions = [
+        {"view": "front_three_quarter", "lighting": "daylight", "background": "home"},
+        {"view": "side", "lighting": "soft_indoor", "background": "plain"},
+        {"view": "top_three_quarter", "lighting": "daylight", "background": "table"},
+        {"view": "partially_occluded", "lighting": "dim_indoor", "background": "home"},
+    ]
+    variants = [dimensions[index % len(dimensions)] for index in range(count)]
+    seed = json.dumps([concept_id, variants], ensure_ascii=False, sort_keys=True)
+    request_id = "visual_gen_" + hashlib.sha1(seed.encode("utf-8")).hexdigest()[:12]
+    subject = concept["display_name"]
+    prompts = [
+        {
+            "variant_id": f"variant_{index + 1}",
+            "prompt": f"写实生活物品照片：{subject}；视角={variant['view']}；光照={variant['lighting']}；背景={variant['background']}；无文字无水印。",
+            "intended_use": "synthetic_visual_prior_candidate_only",
+        }
+        for index, variant in enumerate(variants)
+    ]
+    request = {
+        "request_id": request_id,
+        "concept_id": concept_id,
+        "status": "provider_generation_pending",
+        "variant_specs": variants,
+        "prompt_specs": prompts,
+        "provider_contract": {
+            "expected_response": ["image_ref", "mime_type", "content_digest"],
+            "image_bytes_may_remain_in_provider_storage": True,
+            "callback_or_synchronous_adapter_supported": True,
+        },
+        "candidate_only": True,
+        "runtime_visible": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    store = _load_store()
+    store["requests"] = [item for item in store["requests"] if item["request_id"] != request_id] + [request]
+    _save_store(store)
+    return deepcopy(request)
+
+
+def execute_generation_request(request_id: str, provider: ImageGenerationProvider) -> dict[str, Any]:
+    store = _load_store()
+    request = next((item for item in store["requests"] if item["request_id"] == request_id), None)
+    if not request:
+        return {"error": "visual_generation_request_not_found", "request_id": request_id}
+    images = provider.generate(deepcopy(request))
+    return ingest_provider_images(request_id, provider.provider_id, images)
+
+
+def ingest_provider_images(request_id: str, provider_id: str, images: list[dict[str, Any]]) -> dict[str, Any]:
+    store = _load_store()
+    request = next((item for item in store["requests"] if item["request_id"] == request_id), None)
+    if not request:
+        return {"error": "visual_generation_request_not_found", "request_id": request_id}
+    normalized = []
+    seen = set()
+    for image in images:
+        digest = str(image.get("content_digest") or "")
+        image_ref = str(image.get("image_ref") or "")
+        if not digest or not image_ref or digest in seen:
+            continue
+        seen.add(digest)
+        normalized.append({
+            "image_ref": image_ref,
+            "mime_type": str(image.get("mime_type") or "image/png"),
+            "content_digest": digest,
+            "source_type": "synthetic_image_api",
+            "provider_id": provider_id,
+            "evidence_level": "S0_synthetic_prior",
+            "provider_metadata": deepcopy(image.get("provider_metadata", {})),
+        })
+    candidate_id = "visual_candidate_" + hashlib.sha1(f"{request_id}|{'|'.join(sorted(seen))}".encode()).hexdigest()[:12]
+    candidate = {
+        "candidate_id": candidate_id,
+        "concept_id": request["concept_id"],
+        "status": "awaiting_real_world_calibration",
+        "synthetic_samples": normalized,
+        "real_calibration_evidence": [],
+        "promotion_requirements": {
+            "minimum_synthetic_samples": 4,
+            "minimum_real_observations": 1,
+            "human_or_physical_confirmation_required": True,
+        },
+        "candidate_only": True,
+        "runtime_visible": False,
+        "direct_execution_allowed": False,
+    }
+    request["status"] = "provider_images_compiled_to_candidate"
+    request["provider_id"] = provider_id
+    store["candidates"] = [item for item in store["candidates"] if item["candidate_id"] != candidate_id] + [candidate]
+    _save_store(store)
+    return deepcopy(candidate)
+
+
+def add_real_world_calibration(
+    candidate_id: str,
+    *,
+    observation_ref: str,
+    source_type: str,
+    matched_features: list[str],
+    human_confirmed: bool,
+) -> dict[str, Any]:
+    if source_type not in {"user_provided_real_image", "current_robot_camera_verified_crop"}:
+        return {"error": "calibration_source_is_not_real_world_evidence", "source_type": source_type}
+    store = _load_store()
+    candidate = next((item for item in store["candidates"] if item["candidate_id"] == candidate_id), None)
+    if not candidate:
+        return {"error": "visual_candidate_not_found", "candidate_id": candidate_id}
+    evidence = {
+        "observation_ref": observation_ref,
+        "source_type": source_type,
+        "matched_features": sorted(set(matched_features)),
+        "human_confirmed": bool(human_confirmed),
+        "evidence_level": "R1_real_observation_confirmed" if human_confirmed else "R0_real_observation_candidate",
+    }
+    candidate["real_calibration_evidence"].append(evidence)
+    candidate["status"] = "eligible_for_promotion_review" if human_confirmed else "awaiting_real_world_calibration"
+    _save_store(store)
+    return deepcopy(candidate)
+
+
+def promote_visual_candidate(candidate_id: str) -> dict[str, Any]:
+    store = _load_store()
+    candidate = next((item for item in store["candidates"] if item["candidate_id"] == candidate_id), None)
+    if not candidate:
+        return {"error": "visual_candidate_not_found", "candidate_id": candidate_id}
+    requirements = candidate["promotion_requirements"]
+    confirmed = [item for item in candidate["real_calibration_evidence"] if item.get("human_confirmed")]
+    if len(candidate["synthetic_samples"]) < requirements["minimum_synthetic_samples"] or len(confirmed) < requirements["minimum_real_observations"]:
+        return {"error": "visual_candidate_promotion_requirements_not_met", "candidate": deepcopy(candidate)}
+    adapter = {
+        "adapter_version_id": "visual_adapter_" + hashlib.sha1(candidate_id.encode()).hexdigest()[:12],
+        "concept_id": candidate["concept_id"],
+        "status": "promoted_visual_adapter",
+        "synthetic_prior_digests": [item["content_digest"] for item in candidate["synthetic_samples"]],
+        "real_calibration_evidence": deepcopy(confirmed),
+        "load_policy": "on_demand",
+        "runtime_use": "candidate_generation_only",
+        "runtime_visible": False,
+        "deployment_status": "awaiting_controlled_deployment",
+        "direct_execution_allowed": False,
+        "promoted_at": datetime.now(timezone.utc).isoformat(),
+    }
+    candidate["status"] = "promoted"
+    candidate["runtime_visible"] = False
+    store["promoted_adapters"] = [item for item in store["promoted_adapters"] if item["concept_id"] != adapter["concept_id"]] + [adapter]
+    _save_store(store)
+    return deepcopy(adapter)
+
+
+def get_pipeline_state() -> dict[str, Any]:
+    return deepcopy(_load_store())
