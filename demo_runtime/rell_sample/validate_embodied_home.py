@@ -44,6 +44,8 @@ def main() -> None:
     require(coordinate_contract["screen_direction_is_not_a_body_direction"], "screen direction must not define body direction")
     require(profile["body_envelope"]["radius_m"] > 0, "body envelope must constrain clearance")
     require(profile["turning_radius_m"] > 0 and profile["arm_reach_m"] > 0, "body portrait must expose mobility and reach")
+    sofa = next(item for item in scene["objects"] if item.get("concept_id") == "concept_sofa")
+    require(sofa["fixed"] and sofa["kind"] == "large_furniture", f"sofa instance must have physical collision identity: {sofa}")
 
     factory_catalog = build_factory_concept_catalog()
     require(factory_catalog["concept_count"] >= 13, f"factory event concept skeleton is too narrow: {factory_catalog}")
@@ -62,6 +64,24 @@ def main() -> None:
     require(apple_pack["load_policy"] == "factory_resident", f"apple visual pack is not factory resident: {visual_catalog}")
     require(not apple_pack["reference_samples"] and not apple_pack["reference_sample_policy"]["single_image_can_define_concept"], f"visual sample was conflated with the apple concept: {apple_pack}")
     require(visual_catalog["boundary"]["visual_pack_is_not_action_experience"], f"visual pack entered experience layer: {visual_catalog}")
+
+    role_session = start_session()
+    role_session_id = role_session["session_id"]
+    approach_sofa = execute_command(role_session_id, "走到沙发旁边")
+    require(approach_sofa["active_role"] == "spatial_target" and approach_sofa["available"], f"sofa did not bind as navigation target: {approach_sofa}")
+    require(approach_sofa["candidate_process_chain"] == ["ground_target_instance", "plan_route_to_standoff_pose", "navigate_and_verify_near_relation"], f"navigation role used a fixed script: {approach_sofa}")
+    avoid_sofa = execute_command(role_session_id, "绕开沙发")
+    require(avoid_sofa["active_role"] == "navigation_obstacle" and avoid_sofa["available"], f"sofa did not rebind as obstacle: {avoid_sofa}")
+    sit_sofa = execute_command(role_session_id, "坐到沙发上")
+    require(not sit_sofa["available"] and any(item["condition"] == "sit_down_on_support" for item in sit_sofa["missing_conditions"]), f"wheeled body pretended it could sit: {sit_sofa}")
+    move_sofa = execute_command(role_session_id, "搬开沙发")
+    require(not move_sofa["available"] and {item["kind"] for item in move_sofa["missing_conditions"]} >= {"body_capability", "object_claim", "runtime_object_state"}, f"unknown force, mobility and fixed state became executable: {move_sofa}")
+    probe_sofa = execute_command(role_session_id, "摸一下沙发看看软不软")
+    require(not probe_sofa["available"] and {item["kind"] for item in probe_sofa["missing_conditions"]} >= {"body_capability", "sensor_capability", "governance"}, f"unverified tactile probe bypassed body and governance: {probe_sofa}")
+    require({item["object_concept_id"] for item in [approach_sofa, avoid_sofa, sit_sofa, move_sofa, probe_sofa]} == {"concept_sofa"}, "task role switching mutated sofa identity")
+    require(all(item["role_binding_scope"] == "current_task_only" and not item["base_object_identity_mutated"] for item in [approach_sofa, avoid_sofa, sit_sofa, move_sofa, probe_sofa]), "context role polluted base object concept")
+    require(all(item["candidate_only"] and not item["direct_execution_allowed"] for item in [approach_sofa, avoid_sofa, sit_sofa, move_sofa, probe_sofa]), "context affordance bypassed orchestration")
+    require(all(len(item["technical_feature_mapping"]) == 4 for item in [approach_sofa, avoid_sofa, sit_sofa, move_sofa, probe_sofa]), "context affordance omitted technical feature mapping")
 
     state_catalog = build_factory_state_fact_catalog()
     require(len(state_catalog["state_fact_concepts"]) >= 10, f"factory state fact vocabulary is too narrow: {state_catalog}")

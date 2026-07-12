@@ -11,6 +11,7 @@ from typing import Any
 
 from concept_core.factory_event_units import FACTORY_EVENT_CONCEPT_UNITS, build_factory_inability_diagnosis, find_factory_event_concepts_by_text
 from concept_core.concept_gap_dialogue import continue_concept_gap_dialogue, start_concept_gap_dialogue
+from concept_core.contextual_affordance import resolve_contextual_affordance_request
 from concept_core.functional_object_reasoning import build_functional_object_catalog, build_functional_profile, evaluate_role_compatibility
 from concept_core.factory_state_facts import build_factory_state_catalog, derive_runtime_fact_snapshot, explain_prerequisite_gaps
 from concept_core.lightweight_orchestrator import build_lightweight_causal_candidate, build_lightweight_orchestrator_catalog
@@ -1269,6 +1270,21 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
     relocation_preview = _build_observed_relocation_preview(session, text)
     if relocation_preview:
         return relocation_preview
+    contextual_affordance = resolve_contextual_affordance_request(
+        text,
+        entities=session["runtime_objects"],
+        object_concepts=load_object_concepts()["concepts"],
+        executor_profile=session["executor_profile"],
+        runtime_state=session["state"],
+        governance_overlay=session.get("protection_policy_overlay"),
+        scoped_authorization=scoped_authorization,
+    )
+    if contextual_affordance:
+        return {
+            **contextual_affordance,
+            "prompt": contextual_affordance["explanation"],
+            "session": get_session(session_id),
+        }
     active_gap_dialogue = session.get("concept_gap_dialogue") or {}
     if active_gap_dialogue.get("status") == "collecting_minimum_causal_contract":
         continued = continue_concept_gap_dialogue(

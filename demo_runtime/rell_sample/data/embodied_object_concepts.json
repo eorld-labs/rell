@@ -56,6 +56,17 @@
       "functional_affordances": ["movable", "blocks_motion"],
       "physical_properties": ["ground_supported", "rigid"],
       "expected_relations": ["inside_navigation_space"]
+    },
+    {
+      "concept_id": "concept_sofa",
+      "display_name": "沙发",
+      "aliases": ["沙发"],
+      "compatible_kinds": ["large_furniture"],
+      "perceptual_invariants": ["ground_supported_large_horizontal_furniture", "one_or_more_seating_surfaces", "back_support_structure"],
+      "variable_features": ["color", "cover_material", "seat_count", "armrest_presence", "headrest_presence", "cushions"],
+      "functional_affordances": ["support_human_sitting_candidate", "soft_or_buffered_surface_material"],
+      "physical_properties": ["ground_supported", "load_capacity_requires_physical_verification", "movable_requires_physical_verification", "force_limit_requires_physical_verification"],
+      "expected_relations": ["on_floor_candidate", "occupies_navigation_space_candidate", "near_wall_or_room_center_variable"]
     }
   ],
   "shared_grounding_policy": {
