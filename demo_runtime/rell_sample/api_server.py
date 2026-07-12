@@ -4,6 +4,7 @@ import json
 import os
 import re
 import hashlib
+import subprocess
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
@@ -1843,6 +1844,17 @@ INDEX_HTML = """<!doctype html>
           <button id="askRuntimeQuestionButton" class="secondary" title="从当前任务期运行时世界状态快照回答问题">问当前状态</button>
         </div>
         <label for="perturbationKind" style="margin-top:12px;">中途扰动 / 偶然层</label>
+        <label for="dispatchBackend" style="margin-top:8px;">执行后端</label>
+        <select id="dispatchBackend">
+          <option value="robot_sdk">逻辑执行适配器</option>
+          <option value="mujoco_physics">MuJoCo 物理验真</option>
+        </select>
+        <label for="physicsExecutorType" style="margin-top:8px;">物理主体</label>
+        <select id="physicsExecutorType">
+          <option value="mobile_manipulator">移动操作机器人</option>
+          <option value="mobile_base">移动底盘</option>
+          <option value="fixed_arm">固定机械臂</option>
+        </select>
         <label for="migrationSpace" style="margin-top:8px;">经验迁移目标空间</label>
         <select id="migrationSpace">
           <option value="home_a_kitchen">原厨房空间</option>
@@ -1938,6 +1950,8 @@ INDEX_HTML = """<!doctype html>
     const runPerturbationDispatchButton = document.getElementById("runPerturbationDispatchButton");
     const perturbationKind = document.getElementById("perturbationKind");
     const migrationSpace = document.getElementById("migrationSpace");
+    const dispatchBackend = document.getElementById("dispatchBackend");
+    const physicsExecutorType = document.getElementById("physicsExecutorType");
     const perturbationStep = document.getElementById("perturbationStep");
     const walkwayPerturbRegion = document.getElementById("walkwayPerturbRegion");
     const doorPerturbRegion = document.getElementById("doorPerturbRegion");
@@ -3361,9 +3375,20 @@ INDEX_HTML = """<!doctype html>
         const result = await fetch("/execution/dispatch", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ execution_loop_payload: currentExecutionLoopPayload, executor_type: "robot_sdk" })
+          body: JSON.stringify({
+            execution_loop_payload: currentExecutionLoopPayload,
+            executor_type: dispatchBackend.value,
+            executor_options: {
+              physics_executor_type: physicsExecutorType.value,
+              physics_obstacle: perturbationKind.value === "stool_in_walkway_detourable" ? "detourable" :
+                (perturbationKind.value === "stool_blocks_walkway" ? "wall" : "none")
+            }
+          })
         }).then(r => r.json());
         appendLog("扰动执行结果：" + JSON.stringify(result, null, 2));
+        if (result.physics_result) {
+          appendLog("MuJoCo 物理证据：" + JSON.stringify(result.physics_result, null, 2));
+        }
         if (result.error) {
           serviceState.textContent = "执行失败";
           setText(outcomeMetric, "dispatch_failed", "bad");
@@ -7650,7 +7675,38 @@ def find_task_id_by_snapshot(snapshot_id: str | None) -> str | None:
     return None
 
 
-def dispatch_execution_loop_payload(payload: dict[str, Any], executor_type: str = "digital_executor") -> dict[str, Any]:
+def run_mujoco_physics_bridge(task_id: str, options: dict[str, Any]) -> dict[str, Any]:
+    configured = os.environ.get("RELL_PHYSICS_PYTHON")
+    default = Path.home() / "AppData" / "Local" / "Programs" / "Python" / "Python310" / "python.exe"
+    executable = Path(configured) if configured else default
+    if not executable.exists():
+        return {"error": "physics_runtime_unavailable", "required_env": "RELL_PHYSICS_PYTHON"}
+    state = RUNTIME_WORLD_STATE_STORE.get(task_id, {})
+    space_id = state.get("space_id") or STATE_STORE.get(task_id, {}).get("space_id") or "home_a_kitchen"
+    request = {
+        "layout_id": "corridor_b" if space_id == "site_b_corridor" else "kitchen_a",
+        "executor_type": options.get("physics_executor_type", "mobile_manipulator"),
+        "obstacle": options.get("physics_obstacle", "none"),
+    }
+    try:
+        completed = subprocess.run(
+            [str(executable), str(ROOT / "physics_mujoco_bridge.py")],
+            input=json.dumps(request),
+            text=True,
+            capture_output=True,
+            timeout=20,
+            check=True,
+        )
+        return json.loads(completed.stdout)
+    except (subprocess.SubprocessError, json.JSONDecodeError) as exc:
+        return {"error": "physics_bridge_failed", "detail": str(exc)}
+
+
+def dispatch_execution_loop_payload(
+    payload: dict[str, Any],
+    executor_type: str = "digital_executor",
+    executor_options: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     allowed_executors = {
         "process_template_executor",
         "digital_executor",
@@ -7658,6 +7714,7 @@ def dispatch_execution_loop_payload(payload: dict[str, Any], executor_type: str 
         "ros_controller",
         "robot_sdk",
         "vla_policy",
+        "mujoco_physics",
     }
     if executor_type not in allowed_executors:
         return {"error": "unsupported_executor_type", "allowed_executor_types": sorted(allowed_executors)}
@@ -7671,11 +7728,51 @@ def dispatch_execution_loop_payload(payload: dict[str, Any], executor_type: str 
     state = current["runtime_world_state_snapshot"]
     if state.get("release_status") == "released":
         return {"error": "runtime_world_state_released", "task_id": task_id, "release_token": state.get("release_token")}
+    physics_result = None
+    if executor_type == "mujoco_physics":
+        physics_result = run_mujoco_physics_bridge(task_id, executor_options or {})
+        if physics_result.get("error"):
+            return physics_result
     dispatch_seed = "|".join([payload.get("execution_callback_id", ""), executor_type, snapshot_id or "none"])
     dispatch_id = "dispatch_" + hashlib.sha1(dispatch_seed.encode("utf-8")).hexdigest()[:12]
     feedback: list[dict[str, Any]] = []
     stepwise_readaptation = None
     profile = STATE_STORE.get(task_id, {}).get("body_capability_profile") or build_default_body_capability_profile()
+    if physics_result and physics_result.get("outcome") != "fact_established":
+        feedback.append(
+            {
+                "step": "physics_preflight",
+                "executor_type": executor_type,
+                "fact_status": physics_result.get("outcome", "fact_not_established"),
+                "reason": "physics_capability_or_route_not_satisfied",
+                "physics_route_evidence": physics_result.get("route_evidence"),
+                "missing_capabilities": physics_result.get("missing_capabilities", []),
+            }
+        )
+        outcome = physics_result.get("outcome", "fact_not_established")
+        state["last_execution_dispatch_id"] = dispatch_id
+        state["last_execution_executor_type"] = executor_type
+        state["last_execution_fact_feedback"] = feedback
+        RUNTIME_WORLD_STATE_STORE[task_id] = state
+        record = {
+            "schema_version": "1.0.0",
+            "dispatch_id": dispatch_id,
+            "task_id": task_id,
+            "execution_callback_id": payload.get("execution_callback_id"),
+            "executor_type": executor_type,
+            "accepted_interface": "open_execution_loop_fact_feedback_v1",
+            "target_causal_fact": payload.get("target_causal_fact"),
+            "outcome": outcome,
+            "fact_feedback": feedback,
+            "runtime_world_state_snapshot": state,
+            "stepwise_readaptation": None,
+            "recovery_record": None,
+            "audit_record_id": state.get("audit_record_id"),
+            "generalization_result": None,
+            "physics_result": physics_result,
+        }
+        EXECUTION_DISPATCH_STORE[dispatch_id] = record
+        return record
     payload_bindings = {
         item.get("step"): item
         for item in payload.get("binding_candidate_payload", {}).get("step_bindings", [])
@@ -7749,7 +7846,9 @@ def dispatch_execution_loop_payload(payload: dict[str, Any], executor_type: str 
         )
     target_fact = payload.get("target_causal_fact")
     established_facts = set(state.get("established_facts", []))
-    if stepwise_readaptation:
+    if physics_result and physics_result.get("outcome") != "fact_established":
+        outcome = physics_result.get("outcome", "fact_not_established")
+    elif stepwise_readaptation:
         outcome = "readaptation_required"
     else:
         outcome = "fact_established" if target_fact in established_facts else "fact_not_established"
@@ -7820,6 +7919,7 @@ def dispatch_execution_loop_payload(payload: dict[str, Any], executor_type: str 
         "recovery_record": recovery_record,
         "audit_record_id": audit_record_id,
         "generalization_result": generalization_result,
+        "physics_result": physics_result,
     }
     EXECUTION_DISPATCH_STORE[dispatch_id] = record
     return record
@@ -8246,7 +8346,11 @@ class RellSampleHandler(BaseHTTPRequestHandler):
             if not isinstance(payload, dict):
                 self._send_json({"error": "missing_execution_loop_payload"}, status=400)
                 return
-            result = dispatch_execution_loop_payload(payload, body.get("executor_type", "digital_executor"))
+            result = dispatch_execution_loop_payload(
+                payload,
+                body.get("executor_type", "digital_executor"),
+                body.get("executor_options", {}),
+            )
             self._send_json(result, status=400 if "error" in result else 200)
             return
         if path == "/experience/teach":

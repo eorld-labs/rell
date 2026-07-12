@@ -699,7 +699,7 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 }
 ```
 
-`executor_type` 当前支持 `process_template_executor`、`digital_executor`、`simulated_robot`、`ros_controller`、`robot_sdk` 和 `vla_policy`。样品阶段不会真实控制外部机器人，而是验证统一接口约束：执行器必须返回 `fact_established`、`fact_not_established`、`failure`、`conflict`、`recovered` 或 `human_confirmation` 等事实状态。响应会返回 `dispatch_id`、`fact_feedback`、更新后的 `runtime_world_state_snapshot` 和 `audit_record_id`。
+`executor_type` 当前支持 `process_template_executor`、`digital_executor`、`simulated_robot`、`ros_controller`、`robot_sdk`、`vla_policy` 和 `mujoco_physics`。`mujoco_physics` 通过隔离的 Python 3.10 进程返回接触、绕行、能力缺口和双通道终止事实；物理失败会在状态跃迁前短路，不得提交目标事实。响应的 `physics_result` 保存物理证据，但不包含经验层可复用的绝对位姿或轨迹。
 
 ## GET /execution/dispatch/{dispatch_id}
 
