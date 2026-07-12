@@ -146,6 +146,11 @@ def main() -> None:
     teaching_started = start_embodied_teaching(teaching_session["session_id"], "拿杯子")
     require(teaching_started["status"] == "teaching_control_granted", f"teaching authority not granted: {teaching_started}")
     require(not teaching_started["teaching_session"]["authority"]["safety_bypass_allowed"], f"teaching bypassed safety: {teaching_started}")
+    observation_packet = teaching_started["teaching_session"]["observation_packet"]
+    require(observation_packet["source"]["source_type"] == "live_first_person_embodied_teaching", f"teaching observation source not normalized: {observation_packet}")
+    require(observation_packet["evidence"]["level"] == "L2" and observation_packet["candidate_only"], f"teaching evidence boundary incorrect: {observation_packet}")
+    require(observation_packet["temporal_alignment"]["mode"] == "session_window_alignment", f"teaching temporal alignment not explicit: {observation_packet}")
+    require(observation_packet["temporal_alignment"]["frame_level_audio_alignment_implemented"] is False, f"teaching packet overclaimed frame alignment: {observation_packet}")
     premature_grasp = begin_teaching_control(teaching_session["session_id"], "grasp")["immediate_result"]
     require(premature_grasp["status"] == "grasp_blocked", f"out-of-reach grasp was accepted: {premature_grasp}")
     for _ in range(17):
@@ -160,6 +165,8 @@ def main() -> None:
     require("teacher_key_sequence" in contract["forbidden_storage"], f"teacher keys leaked into experience: {compiled}")
     require(not compiled["experience"]["demonstration_summary"]["raw_teleoperation_trace_persisted"], f"raw trace persisted: {compiled}")
     require(compiled["experience"]["pedagogical_signals"]["signal_types"] == ["demonstration"], f"teaching signal classification missing: {compiled}")
+    evidence_summary = compiled["experience"]["teaching_evidence_summary"]
+    require(evidence_summary["source_type"] == "live_first_person_embodied_teaching" and not evidence_summary["raw_observations_persisted"], f"teaching evidence summary not portable: {compiled}")
     negative_constraints = compiled["experience"]["applicability_constraints"]["negative_constraints"]
     require(negative_constraints and negative_constraints[0]["disposition"] == "candidate_constraint_pending_revalidation", f"failed teaching action was not compiled into scoped infeasibility evidence: {compiled}")
     require(negative_constraints[0]["scope"]["world_revision"] == teaching_session["world_revision"], f"infeasibility scope lost world revision: {compiled}")
@@ -191,6 +198,7 @@ def main() -> None:
     require(persisted["target_binding"] == {"concept_id": "concept_fillable_container", "rebind_by_concept_and_current_observation": True}, f"persistent binding is not portable: {persisted}")
     require(persisted["validation_summary"]["accepted_validation_count"] == 1, f"accepted validation summary incorrect: {persisted}")
     require(persisted["pedagogical_signals"] == {"signal_types": ["demonstration"], "interruption_occurred": False, "clarification_occurred": False, "outcome": "completed_successfully"}, f"persistent pedagogical signals were not normalized: {persisted}")
+    require(not persisted["teaching_evidence_summary"]["source_identity_persisted"], f"teaching source identity leaked into persistent evidence summary: {persisted}")
     require("source_teaching_id" not in json.dumps(persisted["pedagogical_signals"], ensure_ascii=False), f"teaching session identity leaked into pedagogical signals: {persisted}")
 
     cold_session = start_session()

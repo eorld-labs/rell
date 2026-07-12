@@ -14,6 +14,10 @@ from embodied_teaching import (
     build_teaching_authority,
     compile_demonstration_experience,
 )
+from teaching_observation import (
+    build_live_first_person_observation_packet,
+    finalize_observation_packet,
+)
 from embodied_experience_store import get_trusted_experience, load_trusted_experiences, persist_trusted_experience
 from execution_boundary import (
     build_effective_execution_envelope,
@@ -272,6 +276,14 @@ def start_embodied_teaching(session_id: str, goal_utterance: str = "拿杯子") 
     teaching_id = "embodied_teach_" + hashlib.sha1(
         f"{session_id}|{goal_utterance}|{session['world_revision']}".encode("utf-8")
     ).hexdigest()[:12]
+    pedagogical_signals = build_pedagogical_signals(signal_types=["demonstration"])
+    observation_packet = build_live_first_person_observation_packet(
+        teaching_id=teaching_id,
+        goal_utterance=goal_utterance,
+        world_revision=session["world_revision"],
+        perception=perception,
+        pedagogical_signals=pedagogical_signals,
+    )
     session["teaching_session"] = {
         "teaching_id": teaching_id,
         "status": "human_control_active",
@@ -282,7 +294,8 @@ def start_embodied_teaching(session_id: str, goal_utterance: str = "拿杯子") 
         "target_initial_object_state": deepcopy(target_object),
         "authority": build_teaching_authority(session_id, goal_utterance, session["world_revision"]),
         "demonstrated_actions": [],
-        "pedagogical_signals": build_pedagogical_signals(signal_types=["demonstration"]),
+        "pedagogical_signals": pedagogical_signals,
+        "observation_packet": observation_packet,
         "transient_trace_policy": "discard_raw_frames_after_invariant_compilation",
         "safety_and_policy_checks_remain_active": True,
     }
@@ -358,6 +371,10 @@ def finish_embodied_teaching(session_id: str) -> dict[str, Any]:
             "prompt": "当前还没有验真目标对象已在夹爪中，不能把未完成操作保存成经验。",
             "session": get_session(session_id),
         }
+    teaching["observation_packet"] = finalize_observation_packet(
+        teaching.get("observation_packet", {}),
+        pedagogical_signals={**teaching.get("pedagogical_signals", {}), "outcome": "completed_successfully"},
+    )
     experience = compile_demonstration_experience(
         teaching_id=teaching["teaching_id"],
         goal_utterance=teaching["goal_utterance"],
@@ -366,6 +383,7 @@ def finish_embodied_teaching(session_id: str) -> dict[str, Any]:
         demonstrated_actions=teaching["demonstrated_actions"],
         pedagogical_signals=teaching.get("pedagogical_signals"),
         world_revision=session["world_revision"],
+        observation_packet=teaching.get("observation_packet"),
     )
     teaching["status"] = "demonstration_compiled"
     teaching["authority"]["status"] = "consumed"

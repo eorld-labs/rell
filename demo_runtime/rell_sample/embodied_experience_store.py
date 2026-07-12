@@ -79,6 +79,7 @@ def _build_portable_record(experience: dict[str, Any]) -> dict[str, Any]:
             "clarification_occurred": bool((experience.get("pedagogical_signals") or {}).get("clarification_occurred", False)),
             "outcome": (experience.get("pedagogical_signals") or {}).get("outcome", "unknown"),
         },
+        "teaching_evidence_summary": deepcopy(experience.get("teaching_evidence_summary", {})),
         "promotion_policy": deepcopy(experience.get("promotion_policy", {})),
         "validation_summary": {
             "accepted_validation_count": len(accepted_validations),

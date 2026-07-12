@@ -4,6 +4,8 @@ import hashlib
 from copy import deepcopy
 from typing import Any
 
+from teaching_observation import build_portable_teaching_evidence_summary
+
 
 def build_pedagogical_signals(
     *,
@@ -83,6 +85,7 @@ def compile_demonstration_experience(
     demonstrated_actions: list[dict[str, Any]],
     pedagogical_signals: dict[str, Any] | None = None,
     world_revision: int | None = None,
+    observation_packet: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     successful = [item for item in demonstrated_actions if item.get("verified")]
     has_translation = any(item.get("action_class") == "body_relative_translation" for item in successful)
@@ -163,6 +166,7 @@ def compile_demonstration_experience(
             "failed_action_count": len(demonstrated_actions) - len(successful),
             "raw_teleoperation_trace_persisted": False,
         },
+        "teaching_evidence_summary": build_portable_teaching_evidence_summary(observation_packet or {}),
         "pedagogical_signals": signals,
         "promotion_policy": {
             "requires_autonomous_replay": True,
