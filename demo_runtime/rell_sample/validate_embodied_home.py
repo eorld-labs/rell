@@ -4,7 +4,7 @@ import json
 import math
 from pathlib import Path
 
-from embodied_scene import begin_motion_command, execute_command, load_scene, set_protection_policy, set_stool, start_session, step_motion_command
+from embodied_scene import begin_motion_command, confirm_pending_motion, execute_command, load_scene, set_protection_policy, set_stool, start_session, step_motion_command
 
 
 OUTPUT = Path(__file__).resolve().parents[1] / "output" / "rell_sample" / "embodied_home"
@@ -107,11 +107,34 @@ def main() -> None:
     protected_continuous = execute_command(protected_session["session_id"], "一直往前走")
     require(protected_continuous["status"] == "requires_human_confirmation", f"protected continuous motion bypassed confirmation: {protected_continuous}")
     require(protected_continuous["p2_control_decision"]["control_decision"] == "require_confirmation", f"P2 decision missing: {protected_continuous}")
+    pending = protected_continuous["pending_confirmation"]
+    require(pending["scope"] == "single_execution_of_exact_command", f"confirmation is not scoped: {pending}")
+    require(pending["policy_binding"]["declaration_id"] == protected_policy["declaration_id"], f"confirmation is not policy-bound: {pending}")
+    confirmed = confirm_pending_motion(protected_session["session_id"], pending["confirmation_id"], True)
+    require(confirmed["status"] == "motion_started", f"approved confirmation did not continue motion: {confirmed}")
+    require(confirmed["scoped_authorization"]["status"] == "consumed", f"authorization was not one-use: {confirmed}")
+    require(confirmed["scoped_authorization"]["command_hash"] == pending["command_hash"], f"authorization command binding changed: {confirmed}")
+    replayed = confirm_pending_motion(protected_session["session_id"], pending["confirmation_id"], True)
+    require(replayed["status"] == "confirmation_not_current", f"consumed authorization was reusable: {replayed}")
+
+    stale_session = start_session()
+    set_protection_policy(stale_session["session_id"], protected_policy)
+    stale_request = execute_command(stale_session["session_id"], "一直往前走")["pending_confirmation"]
+    set_stool(stale_session["session_id"], "ahead")
+    stale_confirmation = confirm_pending_motion(stale_session["session_id"], stale_request["confirmation_id"], True)
+    require(stale_confirmation["status"] == "confirmation_not_current", f"world change did not revoke old confirmation: {stale_confirmation}")
     protected_small = execute_command(protected_session["session_id"], "往前走一点")
     require(protected_small["status"] == "fact_established", f"bounded protected motion should remain executable: {protected_small}")
     require(max(frame["duration_ms"] for frame in protected_small["frames"]) > max(frame["duration_ms"] for frame in direct["frames"]), f"P6 speed limit did not slow execution frames: {protected_small}")
     require(protected_small["p6_execution_receipt"]["declaration_id"] == protected_policy["declaration_id"], f"P6 receipt missing: {protected_small}")
     require(not protected_small["p6_execution_receipt"]["intrinsic_profile_modified"], f"P6 receipt reports profile mutation: {protected_small}")
+
+    policy_change_session = start_session()
+    policy_motion = begin_motion_command(policy_change_session["session_id"], "往前走一点")
+    set_protection_policy(policy_change_session["session_id"], protected_policy)
+    policy_invalidated = step_motion_command(policy_motion["job_id"])
+    require(policy_invalidated["status"] == "path_invalidated_and_replanned", f"policy change did not invalidate active motion: {policy_invalidated}")
+    require(policy_invalidated["reason"] == "runtime_policy_revision_changed", f"policy invalidation reason missing: {policy_invalidated}")
 
     live_session = start_session()
     live_started = begin_motion_command(live_session["session_id"], "一直往前走")
@@ -137,7 +160,7 @@ def main() -> None:
     live_stool_position = live_stool["active_obstacles"][0]["position"]
     require(all(math.dist(position, live_stool_position) > combined_radius for position in committed_positions), f"live replanning committed a penetrating frame: {committed_positions}")
 
-    report = {"scene_id": scene["scene_id"], "direct": direct, "right": right, "backward": backward, "detour": detour, "blocked": blocked, "fixed_furniture_stop": furniture_blocked, "protected_policy_overlay": {"envelope": envelope, "continuous": protected_continuous, "small": protected_small}, "live_replanning": invalidated}
+    report = {"scene_id": scene["scene_id"], "direct": direct, "right": right, "backward": backward, "detour": detour, "blocked": blocked, "fixed_furniture_stop": furniture_blocked, "protected_policy_overlay": {"envelope": envelope, "continuous": protected_continuous, "confirmed": confirmed, "small": protected_small, "policy_change_invalidation": policy_invalidated}, "live_replanning": invalidated}
     OUTPUT.mkdir(parents=True, exist_ok=True)
     (OUTPUT / "embodied_home_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print("Embodied semantic home validation passed.")

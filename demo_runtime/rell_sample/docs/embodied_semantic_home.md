@@ -22,6 +22,8 @@ The intrinsic executor profile remains stable body truth. An optional P6 protect
 
 Continuous or otherwise high-risk physical controls enter a P2-style causal control decision. A policy-required confirmation blocks execution before frames are generated. When a safety stop is issued, actual stopped/non-penetrating state is compared with the expected safe state; failure would require upgraded protection. P6 execution receipts and P2 safety self-proof records are distinct outputs.
 
+A confirmation never disables the protection overlay. It creates a one-use authorization bound to the exact command hash, current world revision, declaration identity/version, and policy revision. Starting that execution consumes the authorization; command changes, world changes, policy replacement, policy removal, denial, or prior consumption make it unusable. The policy runtime separately records its application revision and active/revoked state. An active motion job is bound to both world and policy revisions, so a mid-motion policy change invalidates the old job and forces a fresh decision from the last verified pose.
+
 ## Current benchmark
 
 The first home contains connected living-room, corridor, and kitchen regions plus an operation counter, water dispenser, cup, apple, and dynamic stool. The browser scene is available at `/embodied`.

@@ -35,6 +35,7 @@ from runtime_core import (
 )
 from embodied_scene import execute_command as execute_embodied_command
 from embodied_scene import begin_motion_command as begin_embodied_motion
+from embodied_scene import confirm_pending_motion as confirm_embodied_motion
 from embodied_scene import get_session as get_embodied_session
 from embodied_scene import load_scene as load_embodied_scene
 from embodied_scene import set_stool as set_embodied_stool
@@ -8572,6 +8573,14 @@ class RellSampleHandler(BaseHTTPRequestHandler):
             return
         if path == "/embodied/motion/start":
             result = begin_embodied_motion(str(body.get("session_id", "")), str(body.get("utterance", "")))
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/embodied/motion/confirm":
+            result = confirm_embodied_motion(
+                str(body.get("session_id", "")),
+                str(body.get("confirmation_id", "")),
+                bool(body.get("approved", False)),
+            )
             self._send_json(result, status=400 if "error" in result else 200)
             return
         if path == "/embodied/motion/step":

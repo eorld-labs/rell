@@ -36,6 +36,10 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator") -> dict[
         "executor_profile_id": executor_profile_id,
         "executor_profile": scene["executor_profiles"][executor_profile_id],
         "protection_policy_overlay": None,
+        "policy_revision": 0,
+        "policy_runtime": {"status": "inactive", "applied_world_revision": None, "revocation_reason": None},
+        "pending_confirmation": None,
+        "authorization_history": [],
         "state": state,
         "active_obstacles": [],
         "world_revision": 0,
@@ -49,12 +53,77 @@ def get_session(session_id: str) -> dict[str, Any]:
     return deepcopy(SESSIONS.get(session_id) or {"error": "embodied_session_not_found", "session_id": session_id})
 
 
+def _command_hash(utterance: str) -> str:
+    return hashlib.sha256(utterance.strip().encode("utf-8")).hexdigest()[:16]
+
+
+def _policy_binding(session: dict[str, Any]) -> dict[str, Any]:
+    policy = session.get("protection_policy_overlay") or {}
+    return {
+        "declaration_id": policy.get("declaration_id"),
+        "declaration_version": policy.get("declaration_version"),
+        "policy_revision": session["policy_revision"],
+    }
+
+
+def _revoke_pending_confirmation(session: dict[str, Any], reason: str) -> None:
+    pending = session.get("pending_confirmation")
+    if not pending:
+        return
+    session["authorization_history"].append({**deepcopy(pending), "status": "revoked", "revocation_reason": reason})
+    session["pending_confirmation"] = None
+
+
+def _create_pending_confirmation(session: dict[str, Any], utterance: str) -> dict[str, Any]:
+    confirmation_id = "confirm_" + hashlib.sha1(
+        f"{session['session_id']}|{utterance}|{session['world_revision']}|{session['policy_revision']}".encode("utf-8")
+    ).hexdigest()[:12]
+    pending = {
+        "confirmation_id": confirmation_id,
+        "status": "pending",
+        "utterance": utterance,
+        "command_hash": _command_hash(utterance),
+        "scope": "single_execution_of_exact_command",
+        "authorized_world_revision": session["world_revision"],
+        "policy_binding": _policy_binding(session),
+        "revocation_conditions": ["world_revision_changed", "policy_changed", "command_changed", "authorization_consumed"],
+    }
+    session["pending_confirmation"] = pending
+    return pending
+
+
+def _authorization_is_current(session: dict[str, Any], utterance: str, authorization: dict[str, Any] | None) -> bool:
+    return bool(
+        authorization
+        and authorization.get("status") == "authorized"
+        and authorization.get("command_hash") == _command_hash(utterance)
+        and authorization.get("authorized_world_revision") == session["world_revision"]
+        and authorization.get("policy_binding") == _policy_binding(session)
+    )
+
+
 def set_protection_policy(session_id: str, policy_overlay: dict[str, Any] | None) -> dict[str, Any]:
     session = SESSIONS.get(session_id)
     if not session:
         return {"error": "embodied_session_not_found", "session_id": session_id}
-    session["protection_policy_overlay"] = deepcopy(policy_overlay) if policy_overlay else None
+    _revoke_pending_confirmation(session, "policy_changed")
+    normalized_policy = deepcopy(policy_overlay) if policy_overlay else None
+    next_world_revision = session["world_revision"] + 1
+    if normalized_policy:
+        normalized_policy.setdefault("declaration_version", 1)
+        normalized_policy.setdefault(
+            "validity_window",
+            {"starts": "on_application", "ends": "when_revoked_or_replaced", "applied_world_revision": next_world_revision},
+        )
+        normalized_policy.setdefault("revocation_conditions", ["declaration_replaced", "declaration_revoked"])
+    session["protection_policy_overlay"] = normalized_policy
+    session["policy_revision"] += 1
     session["world_revision"] += 1
+    session["policy_runtime"] = {
+        "status": "active" if normalized_policy else "revoked",
+        "applied_world_revision": next_world_revision if normalized_policy else None,
+        "revocation_reason": None if normalized_policy else "explicit_policy_removal",
+    }
     return {
         "session": get_session(session_id),
         "effective_execution_envelope": build_effective_execution_envelope(session["executor_profile"], session["protection_policy_overlay"]),
@@ -70,11 +139,12 @@ def set_stool(session_id: str, mode: str = "ahead") -> dict[str, Any]:
     distance = 0.75
     stool_position = [position[0] + math.cos(yaw) * distance, position[1] + math.sin(yaw) * distance]
     session["active_obstacles"] = [{"entity_id": "stool_dynamic", "position": stool_position, "mode": mode}]
+    _revoke_pending_confirmation(session, "world_revision_changed")
     session["world_revision"] += 1
     return get_session(session_id)
 
 
-def execute_command(session_id: str, utterance: str) -> dict[str, Any]:
+def execute_command(session_id: str, utterance: str, scoped_authorization: dict[str, Any] | None = None) -> dict[str, Any]:
     session = SESSIONS.get(session_id)
     if not session:
         return {"error": "embodied_session_not_found", "session_id": session_id}
@@ -99,12 +169,15 @@ def execute_command(session_id: str, utterance: str) -> dict[str, Any]:
         effective_envelope=effective_envelope,
         world_revision=session["world_revision"],
         expected_effect="body_relative_displacement",
+        scoped_authorization=scoped_authorization if _authorization_is_current(session, text, scoped_authorization) else None,
     )
     if p2_decision["control_decision"] == "require_confirmation":
+        pending = _create_pending_confirmation(session, text)
         result = {
             "status": "requires_human_confirmation",
             "reason": "P6_motion_policy_requires_confirmation_for_continuous_motion",
             "prompt": "当前保护策略要求持续运动前先确认，可以继续吗？",
+            "pending_confirmation": deepcopy(pending),
             "effective_execution_envelope": effective_envelope,
             "p2_control_decision": p2_decision,
             "p6_execution_receipt": build_p6_execution_receipt(session.get("protection_policy_overlay"), effective_envelope, "requires_human_confirmation"),
@@ -250,15 +323,19 @@ def execute_command(session_id: str, utterance: str) -> dict[str, Any]:
     return result
 
 
-def begin_motion_command(session_id: str, utterance: str) -> dict[str, Any]:
+def begin_motion_command(session_id: str, utterance: str, scoped_authorization: dict[str, Any] | None = None) -> dict[str, Any]:
     session = SESSIONS.get(session_id)
     if not session:
         return {"error": "embodied_session_not_found", "session_id": session_id}
     before = deepcopy(session)
-    result = execute_command(session_id, utterance)
+    result = execute_command(session_id, utterance, scoped_authorization)
+    pending_confirmation = deepcopy(SESSIONS[session_id].get("pending_confirmation"))
     SESSIONS[session_id] = before
     frames = result.get("frames", [])
     if not frames:
+        if pending_confirmation:
+            SESSIONS[session_id]["pending_confirmation"] = pending_confirmation
+            result["session"] = get_session(session_id)
         return {"status": result.get("status"), "immediate_result": result, "session": get_session(session_id)}
     job_id = "motion_" + hashlib.sha1(f"{session_id}|{len(MOTION_JOBS) + 1}".encode()).hexdigest()[:12]
     job = {
@@ -267,6 +344,7 @@ def begin_motion_command(session_id: str, utterance: str) -> dict[str, Any]:
         "utterance": utterance,
         "status": "running",
         "planned_world_revision": before["world_revision"],
+        "planned_policy_revision": before["policy_revision"],
         "frames": frames,
         "next_frame_index": 0,
         "terminal_result": result,
@@ -276,11 +354,58 @@ def begin_motion_command(session_id: str, utterance: str) -> dict[str, Any]:
         "status": "motion_started",
         "job_id": job_id,
         "planned_world_revision": job["planned_world_revision"],
+        "planned_policy_revision": job["planned_policy_revision"],
         "frame_count": len(frames),
         "body_self_judgment": result.get("body_self_judgment"),
         "route_evidence": result.get("route_evidence"),
         "session": get_session(session_id),
     }
+
+
+def confirm_pending_motion(session_id: str, confirmation_id: str, approved: bool) -> dict[str, Any]:
+    session = SESSIONS.get(session_id)
+    if not session:
+        return {"error": "embodied_session_not_found", "session_id": session_id}
+    pending = session.get("pending_confirmation")
+    if not pending or pending.get("confirmation_id") != confirmation_id:
+        return {
+            "status": "confirmation_not_current",
+            "reason": "confirmation_missing_revoked_or_replaced",
+            "session": get_session(session_id),
+        }
+    if not approved:
+        session["authorization_history"].append({**deepcopy(pending), "status": "denied"})
+        session["pending_confirmation"] = None
+        return {
+            "status": "execution_denied",
+            "reason": "human_declined_scoped_execution",
+            "prompt": "好的，本次持续运动已取消。",
+            "session": get_session(session_id),
+        }
+    if pending["authorized_world_revision"] != session["world_revision"] or pending["policy_binding"] != _policy_binding(session):
+        _revoke_pending_confirmation(session, "authorization_context_changed")
+        return {
+            "status": "confirmation_not_current",
+            "reason": "world_or_policy_context_changed_before_confirmation",
+            "prompt": "环境或保护策略已经变化，需要按当前状态重新判断。",
+            "session": get_session(session_id),
+        }
+    authorization = {
+        **deepcopy(pending),
+        "authorization_id": "auth_" + pending["confirmation_id"].removeprefix("confirm_"),
+        "status": "authorized",
+    }
+    result = begin_motion_command(session_id, pending["utterance"], authorization)
+    session = SESSIONS[session_id]
+    session["pending_confirmation"] = None
+    consumed = {**authorization, "status": "consumed", "consumed_by": result.get("job_id") or "immediate_execution_attempt"}
+    session["authorization_history"].append(consumed)
+    result["scoped_authorization"] = deepcopy(consumed)
+    result["session"] = get_session(session_id)
+    if result.get("immediate_result"):
+        result["immediate_result"]["session"] = get_session(session_id)
+        result["immediate_result"]["scoped_authorization"] = deepcopy(consumed)
+    return result
 
 
 def step_motion_command(job_id: str) -> dict[str, Any]:
@@ -290,15 +415,18 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
     if job["status"] != "running":
         return {"error": "motion_job_not_running", "status": job["status"], "job_id": job_id}
     session = SESSIONS[job["session_id"]]
-    if session["world_revision"] != job["planned_world_revision"]:
+    if session["world_revision"] != job["planned_world_revision"] or session["policy_revision"] != job["planned_policy_revision"]:
         job["status"] = "invalidated_by_world_change"
         replacement = begin_motion_command(job["session_id"], job["utterance"])
+        reason = "runtime_policy_revision_changed" if session["policy_revision"] != job["planned_policy_revision"] else "runtime_world_revision_changed"
         return {
             "status": "path_invalidated_and_replanned",
-            "reason": "runtime_world_revision_changed",
+            "reason": reason,
             "old_job_id": job_id,
             "old_revision": job["planned_world_revision"],
             "new_revision": session["world_revision"],
+            "old_policy_revision": job["planned_policy_revision"],
+            "new_policy_revision": session["policy_revision"],
             "replacement": replacement,
         }
     frame = job["frames"][job["next_frame_index"]]

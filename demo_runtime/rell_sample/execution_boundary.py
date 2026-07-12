@@ -35,6 +35,9 @@ def build_effective_execution_envelope(intrinsic_profile: dict[str, Any], policy
     return {
         "intrinsic_profile_ref": intrinsic_profile.get("executor_type"),
         "policy_declaration_ref": policy.get("declaration_id"),
+        "policy_declaration_version": policy.get("declaration_version"),
+        "policy_validity_window": deepcopy(policy.get("validity_window")),
+        "policy_revocation_conditions": deepcopy(policy.get("revocation_conditions", [])),
         "intrinsic_body_truth": intrinsic,
         "effective_constraints": effective,
         "applied_policy_constraints": applied,
@@ -43,10 +46,20 @@ def build_effective_execution_envelope(intrinsic_profile: dict[str, Any], policy
     }
 
 
-def build_p2_control_decision(*, utterance: str, continuous_motion: bool, effective_envelope: dict[str, Any], world_revision: int, expected_effect: str) -> dict[str, Any]:
+def build_p2_control_decision(
+    *,
+    utterance: str,
+    continuous_motion: bool,
+    effective_envelope: dict[str, Any],
+    world_revision: int,
+    expected_effect: str,
+    scoped_authorization: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     constraints = effective_envelope["effective_constraints"]
     risk_triggered = continuous_motion or constraints["continuous_motion_requires_confirmation"]
-    decision = "require_confirmation" if continuous_motion and constraints["continuous_motion_requires_confirmation"] else "allow_with_runtime_verification"
+    confirmation_required = continuous_motion and constraints["continuous_motion_requires_confirmation"]
+    authorization_accepted = bool(scoped_authorization and scoped_authorization.get("status") == "authorized")
+    decision = "require_confirmation" if confirmation_required and not authorization_accepted else "allow_with_runtime_verification"
     return {
         "risk_triggered": risk_triggered,
         "first_feature_sequence": {"control_semantics": utterance, "continuous_motion": continuous_motion, "expected_physical_effect": expected_effect},
@@ -54,6 +67,8 @@ def build_p2_control_decision(*, utterance: str, continuous_motion: bool, effect
         "alignment": {"time": "current_revision", "space": "body_and_scene_frames_aligned", "state": "current_session_state", "consequence": "bounded"},
         "causal_consistency": "requires_confirmation" if decision == "require_confirmation" else "consistent",
         "control_decision": decision,
+        "confirmation_requirement_satisfied_by": scoped_authorization.get("authorization_id") if authorization_accepted else None,
+        "authorization_scope": scoped_authorization.get("scope") if authorization_accepted else None,
         "decision_source": "P2_high_risk_physical_control_boundary" if risk_triggered else "normal_runtime_boundary",
     }
 
