@@ -8,7 +8,7 @@ import subprocess
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from concept_core import (
     build_cloud_recall_packet,
@@ -43,7 +43,7 @@ from embodied_scene import confirm_pending_motion as confirm_embodied_motion
 from embodied_scene import evaluate_learned_replay as evaluate_embodied_learned_replay
 from embodied_scene import finish_embodied_teaching as finish_embodied_teaching_session
 from embodied_scene import get_session as get_embodied_session
-from embodied_scene import load_scene as load_embodied_scene
+from embodied_scene import list_embodied_scenes, load_scene as load_embodied_scene
 from embodied_scene import set_stool as set_embodied_stool
 from embodied_scene import set_protection_policy as set_embodied_protection_policy
 from embodied_scene import set_perception_scenario as set_embodied_perception_scenario
@@ -8318,7 +8318,16 @@ class RellSampleHandler(BaseHTTPRequestHandler):
             self._send_javascript((ROOT / "vendor" / "three.min.js").read_text(encoding="utf-8"))
             return
         if path == "/embodied/scene":
-            self._send_json(load_embodied_scene())
+            requested_scene = parse_qs(parsed.query).get("scene_id", ["home_semantic_3d_a"])[0]
+            try:
+                scene = load_embodied_scene(requested_scene)
+            except ValueError:
+                self._send_json({"error": "embodied_scene_not_found", "scene_id": requested_scene}, status=404)
+                return
+            self._send_json(scene)
+            return
+        if path == "/embodied/scenes":
+            self._send_json({"scenes": list_embodied_scenes()})
             return
         if path == "/embodied/factory-concepts":
             self._send_json(build_factory_concept_catalog())
@@ -8738,7 +8747,10 @@ class RellSampleHandler(BaseHTTPRequestHandler):
             self._send_json(result, status=400 if "error" in result else 200)
             return
         if path == "/embodied/session/start":
-            result = start_embodied_session(str(body.get("executor_profile_id", "home_mobile_manipulator")))
+            result = start_embodied_session(
+                str(body.get("executor_profile_id", "home_mobile_manipulator")),
+                str(body.get("scene_id", "home_semantic_3d_a")),
+            )
             self._send_json(result, status=400 if "error" in result else 200)
             return
         if path == "/embodied/obstacle":

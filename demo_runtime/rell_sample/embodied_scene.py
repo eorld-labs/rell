@@ -71,17 +71,41 @@ from execution_boundary import (
 )
 
 
-SCENE_FILE = Path(__file__).resolve().parent / "data" / "embodied_home_scene.json"
+SCENE_FILES = {
+    "home_semantic_3d_a": Path(__file__).resolve().parent / "data" / "embodied_home_scene.json",
+    "home_semantic_3d_b": Path(__file__).resolve().parent / "data" / "embodied_home_scene_b.json",
+}
 SESSIONS: dict[str, dict[str, Any]] = {}
 MOTION_JOBS: dict[str, dict[str, Any]] = {}
 
 
-def load_scene() -> dict[str, Any]:
-    return json.loads(SCENE_FILE.read_text(encoding="utf-8"))
+def load_scene(scene_id: str = "home_semantic_3d_a") -> dict[str, Any]:
+    scene_file = SCENE_FILES.get(scene_id)
+    if not scene_file:
+        raise ValueError(f"unknown_embodied_scene:{scene_id}")
+    return json.loads(scene_file.read_text(encoding="utf-8"))
 
 
-def start_session(executor_profile_id: str = "home_mobile_manipulator") -> dict[str, Any]:
-    scene = load_scene()
+def list_embodied_scenes() -> list[dict[str, Any]]:
+    return [
+        {
+            "scene_id": scene_id,
+            "display_name": load_scene(scene_id)["display_name"],
+            "scene_role": "training_source" if scene_id.endswith("_a") else "unfamiliar_generalization_target",
+        }
+        for scene_id in SCENE_FILES
+    ]
+
+
+def _scene_for_session(session: dict[str, Any]) -> dict[str, Any]:
+    return load_scene(str(session.get("scene_id") or "home_semantic_3d_a"))
+
+
+def start_session(executor_profile_id: str = "home_mobile_manipulator", scene_id: str = "home_semantic_3d_a") -> dict[str, Any]:
+    try:
+        scene = load_scene(scene_id)
+    except ValueError:
+        return {"error": "embodied_scene_not_found", "scene_id": scene_id, "available_scenes": list_embodied_scenes()}
     if executor_profile_id not in scene["executor_profiles"]:
         return {"error": "executor_profile_not_found", "executor_profile_id": executor_profile_id}
     session_id = "embodied_" + hashlib.sha1(f"{scene['scene_id']}|{len(SESSIONS) + 1}".encode()).hexdigest()[:12]
@@ -375,7 +399,7 @@ def _build_observed_relocation_preview(session: dict[str, Any], text: str) -> di
         return None
     observation = session.get("open_world_observation")
     if not observation or observation.get("world_revision") != session["world_revision"]:
-        observation = build_open_world_observation(load_scene(), session)
+        observation = build_open_world_observation(_scene_for_session(session), session)
         session["open_world_observation"] = deepcopy(observation)
     apple = next(
         (item for item in observation.get("recognized_object_candidates", []) if item.get("concept_id") == "concept_edible_apple"),
@@ -558,13 +582,13 @@ def set_perception_scenario(session_id: str, mode: str) -> dict[str, Any]:
         return {"error": "embodied_session_not_found", "session_id": session_id}
     if mode not in {"normal", "multiple_cups", "occluded_cup", "relocated_cup", "relocated_apple"}:
         return {"error": "unsupported_perception_scenario", "mode": mode}
-    objects = deepcopy(load_scene()["objects"])
-    cup = next(item for item in objects if item["entity_id"] == "cup_a")
+    objects = deepcopy(_scene_for_session(session)["objects"])
+    cup = next(item for item in objects if item.get("kind") == "graspable_container")
     if mode == "multiple_cups":
         second_cup = deepcopy(cup)
         second_cup.update(
             {
-                "entity_id": "cup_b",
+                "entity_id": "cup_b" if cup["entity_id"] == "cup_a" else f"{cup['entity_id']}_perception_variant",
                 "label": "浅蓝色杯子",
                 "position": [4.08, -1.35],
                 "color": "#d6e7ef",
@@ -590,7 +614,7 @@ def set_perception_scenario(session_id: str, mode: str) -> dict[str, Any]:
     elif mode == "relocated_cup":
         cup["position"] = [4.25, -1.35]
     elif mode == "relocated_apple":
-        apple = next(item for item in objects if item["entity_id"] == "apple_a")
+        apple = next(item for item in objects if item.get("kind") == "graspable_object")
         apple["position"] = [-4.25, -1.65]
     _revoke_pending_confirmation(session, "world_revision_changed")
     _invalidate_perception_history(session, f"perception_scenario_changed_to_{mode}")
@@ -617,7 +641,7 @@ def start_embodied_teaching(session_id: str, goal_utterance: str = "拿杯子") 
             target_initial if item["entity_id"] == target_initial["entity_id"] else item
             for item in session["runtime_objects"]
         ]
-        session["state"] = deepcopy(load_scene()["initial_state"])
+        session["state"] = deepcopy(_scene_for_session(session)["initial_state"])
         session["world_revision"] += 1
     gap_dialogue = session.get("concept_gap_dialogue") or {}
     source_contract = deepcopy(gap_dialogue.get("compiled_contract"))
@@ -638,18 +662,38 @@ def start_embodied_teaching(session_id: str, goal_utterance: str = "拿杯子") 
         if source_contract
         else goal_utterance
     )
-    perception = build_task_perception_result(load_scene(), session, perception_utterance)
-    if not perception or perception["concept_grounding"]["grounding_status"] != "spatially_grounded":
-        return {
-            "status": "teaching_target_grounding_required",
-            "reason": "teaching_requires_unique_current_target_binding",
-            "prompt": perception["prompt"] if perception else "请先说明要教我操作哪个当前对象。",
-            "perception": perception,
-            "session": get_session(session_id),
-        }
-    target = next(
-        item for item in perception["concept_grounding"]["candidate_bindings"] if item["role"] == "target"
-    )
+    perception = build_task_perception_result(_scene_for_session(session), session, perception_utterance)
+    target = None
+    if perception and perception["concept_grounding"]["grounding_status"] == "spatially_grounded":
+        target = next(
+            item for item in perception["concept_grounding"]["candidate_bindings"] if item["role"] == "target"
+        )
+    if target is None:
+        target_concept_id = (perception or {}).get("task_perception_frame", {}).get("target_concept_id")
+        target_concept = next(
+            (item for item in load_object_concepts()["concepts"] if item.get("concept_id") == target_concept_id),
+            None,
+        )
+        unique_candidates = [
+            item for item in session["runtime_objects"]
+            if target_concept and item.get("kind") in target_concept.get("compatible_kinds", [])
+        ]
+        if len(unique_candidates) == 1:
+            target = {
+                "role": "target",
+                "entity_ref": unique_candidates[0]["entity_id"],
+                "concept_id": target_concept_id,
+                "binding_status": "teaching_candidate_from_unique_concept_instance",
+                "runtime_fact_committed": False,
+            }
+        else:
+            return {
+                "status": "teaching_target_grounding_required",
+                "reason": "teaching_requires_unique_current_target_binding",
+                "prompt": perception["prompt"] if perception else "请先说明要教我操作哪个当前对象。",
+                "perception": perception,
+                "session": get_session(session_id),
+            }
     target_object = next(item for item in session["runtime_objects"] if item["entity_id"] == target["entity_ref"])
     teaching_id = "embodied_teach_" + hashlib.sha1(
         f"{session_id}|{goal_utterance}|{session['world_revision']}".encode("utf-8")
@@ -669,6 +713,7 @@ def start_embodied_teaching(session_id: str, goal_utterance: str = "拿杯子") 
         "goal_fact": (source_contract or {}).get("effect_contract", {}).get("canonical_goal_fact", {}).get("fact") or "target_object_in_gripper",
         "source_concept_contract": source_contract,
         "perception_activation_source": "compiled_concept_target_role" if source_contract else "goal_utterance",
+        "target_binding_status": target.get("binding_status", "spatially_grounded"),
         "target_entity_ref": target["entity_ref"],
         "target_concept_id": target["concept_id"],
         "target_initial_object_state": deepcopy(target_object),
@@ -916,7 +961,7 @@ def begin_persisted_experience_replay(session_id: str, experience_id: str) -> di
         None,
     )
     target_aliases = (target_concept or {}).get("aliases") or ["目标对象"]
-    perception = build_task_perception_result(load_scene(), session, "拿" + str(target_aliases[0]))
+    perception = build_task_perception_result(_scene_for_session(session), session, "拿" + str(target_aliases[0]))
     if not perception or perception["concept_grounding"]["grounding_status"] != "spatially_grounded":
         return {
             "status": "persisted_experience_rebinding_required",
@@ -977,7 +1022,7 @@ def begin_learned_replay(session_id: str) -> dict[str, Any]:
         initial_target if item["entity_id"] == target_ref else item
         for item in session["runtime_objects"]
     ]
-    session["state"] = deepcopy(load_scene()["initial_state"])
+    session["state"] = deepcopy(_scene_for_session(session)["initial_state"])
     _invalidate_perception_history(session, "autonomous_replay_reset")
     session["world_revision"] += 1
     target = next(item for item in session["runtime_objects"] if item["entity_id"] == target_ref)
@@ -1008,7 +1053,7 @@ def begin_learned_replay(session_id: str) -> dict[str, Any]:
             segment_start = start
             if any(_first_collision(session, segment_start if index == 0 else waypoints[index - 1], waypoint, planning_radius) for index, waypoint in enumerate(waypoints)):
                 continue
-            if _collider_at(candidate, planning_radius, session, load_scene()):
+            if _collider_at(candidate, planning_radius, session, _scene_for_session(session)):
                 continue
             route_length = sum(math.dist(a, b) for a, b in zip([start] + waypoints[:-1], waypoints))
             candidate_plan = {
@@ -1302,7 +1347,7 @@ def _build_object_relative_motion(
     feasible: list[dict[str, Any]] = []
     rejected: list[dict[str, Any]] = []
     for candidate in side_candidates:
-        terminal_collider = _collider_at(candidate["position"], planning_radius, session, load_scene())
+        terminal_collider = _collider_at(candidate["position"], planning_radius, session, _scene_for_session(session))
         if terminal_collider:
             rejected.append({**candidate, "reason": "terminal_body_envelope_not_clear", "collider": terminal_collider})
             continue
@@ -1363,7 +1408,7 @@ def _build_object_relative_motion(
     terminal_fact = "executor_near_object" if operator == "navigate_near" else "executor_cleared_object"
     session["state"]["executor_position"] = terminal_position
     session["state"]["executor_yaw_deg"] = target_yaw if operator == "navigate_near" else current_yaw
-    session["state"]["active_region"] = _region_for(terminal_position, load_scene())
+    session["state"]["active_region"] = _region_for(terminal_position, _scene_for_session(session))
     result = {
         **contextual_affordance,
         "status": "fact_established",
@@ -1415,7 +1460,7 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
         return {"error": "embodied_session_not_found", "session_id": session_id}
     text = utterance.strip()
     if _is_open_world_observation_query(text):
-        observation = build_open_world_observation(load_scene(), session)
+        observation = build_open_world_observation(_scene_for_session(session), session)
         session["open_world_observation"] = deepcopy(observation)
         observation["session"] = get_session(session_id)
         return observation
@@ -1471,7 +1516,7 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
             },
             "session": get_session(session_id),
         }
-    perception_result = build_task_perception_result(load_scene(), session, text)
+    perception_result = build_task_perception_result(_scene_for_session(session), session, text)
     factory_matches = find_factory_event_concepts_by_text(_normalize_factory_text(text))
     if factory_matches:
         concept = factory_matches[0]
@@ -1626,7 +1671,7 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
             _apply_speed_timing(frames, effective_constraints["max_linear_speed_mps"])
             session["state"]["executor_position"] = safe_target
             session["state"]["executor_yaw_deg"] = final_yaw
-            session["state"]["active_region"] = _region_for(safe_target, load_scene())
+            session["state"]["active_region"] = _region_for(safe_target, _scene_for_session(session))
             result = {
                 "status": "stopped_by_physical_obstacle",
                 "reason": "body_envelope_contact_with_fixed_scene_geometry",
@@ -1679,7 +1724,7 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
         frames = rotation_frames + _with_yaw(_interpolate(start, target, 12), final_yaw)
     session["state"]["executor_position"] = target
     session["state"]["executor_yaw_deg"] = final_yaw
-    session["state"]["active_region"] = _region_for(target, load_scene())
+    session["state"]["active_region"] = _region_for(target, _scene_for_session(session))
     body_explanation = body_explanations[body_realization]
     if route_kind == "local_detour":
         body_explanation = "我检测到前方凳子，已按本体净空从侧面绕行，并完全越过障碍后回到原行进方向。"
@@ -1863,7 +1908,7 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
         }
     frame = job["frames"][job["next_frame_index"]]
     radius = job.get("execution_collision_radius_m", session["executor_profile"]["body_envelope"]["radius_m"])
-    collider = _collider_at(frame["position"], radius, session, load_scene())
+    collider = _collider_at(frame["position"], radius, session, _scene_for_session(session))
     if collider:
         job["status"] = "invalidated_by_contact"
         if job.get("replay_experience_id"):
@@ -1890,7 +1935,7 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
     session["state"]["executor_position"] = list(frame["position"])
     if frame.get("yaw_deg") is not None:
         session["state"]["executor_yaw_deg"] = frame["yaw_deg"]
-    session["state"]["active_region"] = _region_for(frame["position"], load_scene())
+    session["state"]["active_region"] = _region_for(frame["position"], _scene_for_session(session))
     job["next_frame_index"] += 1
     if job["next_frame_index"] < len(job["frames"]):
         return {
@@ -1979,7 +2024,7 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
 
 
 def _first_collision(session: dict[str, Any], start: list[float], target: list[float], radius: float) -> dict[str, Any] | None:
-    scene = load_scene()
+    scene = _scene_for_session(session)
     distance = math.dist(start, target)
     sample_count = max(2, int(distance / 0.04) + 1)
     previous = list(start)
@@ -2008,7 +2053,7 @@ def _plan_verified_motion(
     }
     direct_collision = _first_collision(session, start, target, radius)
     if not direct_collision:
-        safety_contract["terminal_pose_verified"] = _collider_at(target, radius, session, load_scene()) is None
+        safety_contract["terminal_pose_verified"] = _collider_at(target, radius, session, _scene_for_session(session)) is None
         return {"outcome": "verified", "route_kind": "direct", "waypoints": [target], "safety_contract": safety_contract}
     obstacle = direct_collision["obstacle"]
     if obstacle.get("obstacle_class") != "movable_obstacle" or obstacle.get("mode") == "narrow":
@@ -2028,7 +2073,7 @@ def _plan_verified_motion(
         if rejection:
             rejected.append(rejection)
             continue
-        if _collider_at(waypoints[-1], radius, session, load_scene()):
+        if _collider_at(waypoints[-1], radius, session, _scene_for_session(session)):
             rejected.append({"side": side_name, "reason": "terminal_pose_not_clear"})
             continue
         route_length = sum(math.dist(a, b) for a, b in zip([start] + waypoints[:-1], waypoints))
