@@ -14,7 +14,7 @@ from api_server import (
 )
 
 
-OUTPUT = Path(__file__).resolve().parents[1] / "output" / "rell_sample" / "p020_minimal_physics"
+OUTPUT = Path(__file__).resolve().parents[1] / "output" / "rell_sample" / "minimal_physics"
 
 
 def require(condition: bool, message: str) -> None:
@@ -105,7 +105,7 @@ def main() -> None:
 
     OUTPUT.mkdir(parents=True, exist_ok=True)
     (OUTPUT / "physics_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
-    print("P020 minimal MuJoCo physics validation passed.")
+    print("Minimal MuJoCo physics validation passed.")
     print(f"Output: {OUTPUT / 'physics_report.json'}")
 
 

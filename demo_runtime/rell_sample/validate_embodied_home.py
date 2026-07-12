@@ -6,7 +6,7 @@ from pathlib import Path
 from embodied_scene import execute_command, load_scene, set_stool, start_session
 
 
-OUTPUT = Path(__file__).resolve().parents[1] / "output" / "rell_sample" / "p021_embodied_home"
+OUTPUT = Path(__file__).resolve().parents[1] / "output" / "rell_sample" / "embodied_home"
 
 
 def require(condition: bool, message: str) -> None:
@@ -27,6 +27,22 @@ def main() -> None:
     require(direct["status"] == "fact_established", f"relative command failed: {direct}")
     require(direct["concept"]["reference_frame"] == "executor_heading", f"command must use body frame: {direct}")
     require(len(direct["frames"]) >= 8, f"continuous feedback frames missing: {direct}")
+
+    right_session = start_session()
+    right = execute_command(right_session["session_id"], "往你右边走一点")
+    require(right["status"] == "fact_established", f"right-relative command failed: {right}")
+    require(right["concept"]["relative_direction"] == "right", f"right body direction not resolved: {right}")
+    require(right["concept"]["body_realization"] == "clockwise_turn_then_forward", f"differential drive must turn then move: {right}")
+    require(not right["concept"]["lateral_translation_used"], f"differential drive must not strafe: {right}")
+    require(right["body_self_judgment"]["rejected_realization"] == "lateral_translation", f"body must explain rejected strafe: {right}")
+    require("不能横向平移" in right["body_self_judgment"]["explanation"], f"body explanation missing: {right}")
+    require(right["session"]["state"]["executor_yaw_deg"] == -90.0, f"body yaw did not turn right: {right}")
+    require(any(frame.get("yaw_deg") not in (None, 0.0) for frame in right["frames"]), f"turn animation frames missing: {right}")
+
+    backward_session = start_session()
+    backward = execute_command(backward_session["session_id"], "往后退一点")
+    require(backward["concept"]["body_realization"] == "reverse_without_turning", f"reverse body capability ignored: {backward}")
+    require(backward["session"]["state"]["executor_yaw_deg"] == 0.0, f"reverse should preserve heading: {backward}")
 
     detour_session = start_session()
     set_stool(detour_session["session_id"], "ahead")
@@ -51,10 +67,10 @@ def main() -> None:
     require(repeated["status"] == "stopped_by_physical_obstacle", f"repeated forward crossed furniture: {repeated}")
     require(repeated["session"]["state"]["executor_position"] == first_stop, f"blocked body moved on repeat: {repeated}")
 
-    report = {"scene_id": scene["scene_id"], "direct": direct, "detour": detour, "blocked": blocked, "fixed_furniture_stop": furniture_blocked}
+    report = {"scene_id": scene["scene_id"], "direct": direct, "right": right, "backward": backward, "detour": detour, "blocked": blocked, "fixed_furniture_stop": furniture_blocked}
     OUTPUT.mkdir(parents=True, exist_ok=True)
     (OUTPUT / "embodied_home_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
-    print("P021 embodied semantic home validation passed.")
+    print("Embodied semantic home validation passed.")
     print(f"Output: {OUTPUT / 'embodied_home_report.json'}")
 
 

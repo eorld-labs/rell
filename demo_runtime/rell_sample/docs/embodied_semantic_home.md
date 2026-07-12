@@ -1,6 +1,6 @@
-# P021 embodied semantic home benchmark
+# Embodied semantic home benchmark
 
-P021 grounds the existing P010 semantic topology and P008 body portrait in a visible 3D household instance. It does not replace either layer.
+This benchmark grounds the existing P010 semantic topology and P008 body portrait in a visible 3D household instance. It does not replace either layer or claim a new numbered technical-scheme identifier.
 
 ## Contract
 
@@ -8,6 +8,7 @@ P021 grounds the existing P010 semantic topology and P008 body portrait in a vis
 - Objects bind stable semantic ids to current scene instances.
 - The executor body portrait supplies collision radius, height, turning radius, arm reach, gripper span, and supported actions.
 - Relative language such as `往前走一点` is resolved in the executor heading frame, not as an absolute world coordinate.
+- Front, back, left, and right are body-frame concepts. The current differential-drive portrait realizes a side target by turning then driving and realizes backward motion by reversing; it never claims lateral translation.
 - Animation frames are transient execution feedback. They are never admitted into a reusable experience.
 - A detour is accepted only when the body envelope has clearance. Otherwise the executor explains the blocker and asks whether the movable obstacle may be removed.
 - Fixed furniture and room boundaries participate in swept body-envelope collision checks. Continuous movement terminates at the last safe pose before contact and repeated commands cannot penetrate the collider.

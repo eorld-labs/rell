@@ -56,7 +56,8 @@ def execute_command(session_id: str, utterance: str) -> dict[str, Any]:
     if not session:
         return {"error": "embodied_session_not_found", "session_id": session_id}
     text = utterance.strip()
-    if "往前" not in text and "向前" not in text:
+    direction = _relative_direction(text)
+    if not direction:
         return {
             "status": "teaching_required",
             "reason": "relative_motion_concept_not_grounded",
@@ -66,9 +67,33 @@ def execute_command(session_id: str, utterance: str) -> dict[str, Any]:
     continuous = any(token in text for token in ("一直", "持续", "不停"))
     distance = 8.0 if continuous else (0.35 if "一点" in text else 0.7)
     start = list(session["state"]["executor_position"])
-    yaw = math.radians(session["state"]["executor_yaw_deg"])
-    target = [start[0] + math.cos(yaw) * distance, start[1] + math.sin(yaw) * distance]
     profile = session["executor_profile"]
+    body_yaw = float(session["state"]["executor_yaw_deg"])
+    if direction == "right":
+        motion_yaw = body_yaw - 90.0
+        final_yaw = motion_yaw
+        body_realization = "clockwise_turn_then_forward"
+    elif direction == "left":
+        motion_yaw = body_yaw + 90.0
+        final_yaw = motion_yaw
+        body_realization = "counterclockwise_turn_then_forward"
+    elif direction == "backward":
+        motion_yaw = body_yaw + 180.0
+        final_yaw = body_yaw
+        body_realization = "reverse_without_turning"
+    else:
+        motion_yaw = body_yaw
+        final_yaw = body_yaw
+        body_realization = "forward_drive"
+    body_explanations = {
+        "clockwise_turn_then_forward": "我的底盘不能横向平移，因此会先向右转，再沿新的前方移动。",
+        "counterclockwise_turn_then_forward": "我的底盘不能横向平移，因此会先向左转，再沿新的前方移动。",
+        "reverse_without_turning": "我的底盘支持倒车，因此会保持当前朝向向后移动。",
+        "forward_drive": "我会沿自己的当前朝向向前移动。",
+    }
+    yaw = math.radians(motion_yaw)
+    target = [start[0] + math.cos(yaw) * distance, start[1] + math.sin(yaw) * distance]
+    rotation_frames = _rotation_frames(start, body_yaw, final_yaw) if final_yaw != body_yaw else []
     collision = _first_collision(session, start, target, profile["body_envelope"]["radius_m"])
     obstacle = collision["obstacle"] if collision else None
     frames: list[dict[str, Any]] = []
@@ -76,8 +101,12 @@ def execute_command(session_id: str, utterance: str) -> dict[str, Any]:
     if obstacle:
         if obstacle.get("obstacle_class") in {"fixed_furniture", "scene_boundary"}:
             safe_target = collision["safe_position"]
-            frames = _interpolate(start, safe_target, max(2, min(80, int(math.dist(start, safe_target) / 0.05) + 1)))
+            frames = rotation_frames + _with_yaw(
+                _interpolate(start, safe_target, max(2, min(80, int(math.dist(start, safe_target) / 0.05) + 1))),
+                final_yaw,
+            )
             session["state"]["executor_position"] = safe_target
+            session["state"]["executor_yaw_deg"] = final_yaw
             session["state"]["active_region"] = _region_for(safe_target, load_scene())
             result = {
                 "status": "stopped_by_physical_obstacle",
@@ -110,21 +139,33 @@ def execute_command(session_id: str, utterance: str) -> dict[str, Any]:
             session["event_history"].append({"utterance": text, "result": result["status"], "reason": result["reason"]})
             return result
         route_kind = "local_detour"
-        frames.extend(_interpolate(start, detour, 8))
-        frames.extend(_interpolate(detour, target, 8)[1:])
+        frames.extend(rotation_frames)
+        frames.extend(_with_yaw(_interpolate(start, detour, 8), final_yaw))
+        frames.extend(_with_yaw(_interpolate(detour, target, 8)[1:], final_yaw))
     else:
-        frames = _interpolate(start, target, 12)
+        frames = rotation_frames + _with_yaw(_interpolate(start, target, 12), final_yaw)
     session["state"]["executor_position"] = target
+    session["state"]["executor_yaw_deg"] = final_yaw
     session["state"]["active_region"] = _region_for(target, load_scene())
     result = {
         "status": "fact_established",
         "concept": {
-            "concept_id": "relative_forward_motion",
+            "concept_id": "body_relative_motion",
             "reference_frame": "executor_heading",
+            "relative_direction": direction,
+            "body_realization": body_realization,
+            "kinematic_model": profile.get("kinematic_model"),
+            "lateral_translation_used": False,
             "distance_class": "continuous_until_termination" if continuous else ("small_increment" if distance == 0.35 else "normal_increment"),
-            "learnable_invariant": "move_forward_relative_to_current_body_heading_until_requested_distance_or_physical_termination"
+            "learnable_invariant": "resolve_relative_direction_in_body_frame_then_select_motion_allowed_by_body_kinematics"
         },
         "route_kind": route_kind,
+        "body_self_judgment": {
+            "explanation": body_explanations[body_realization],
+            "selected_realization": body_realization,
+            "rejected_realization": "lateral_translation" if direction in {"left", "right"} else None,
+            "portrait_basis": session["executor_profile_id"],
+        },
         "frames": frames,
         "terminal_fact": "executor_relative_displacement_reached",
         "session": get_session(session_id),
@@ -185,6 +226,29 @@ def _interpolate(start: list[float], target: list[float], count: int) -> list[di
         {"progress": index / (count - 1), "position": [start[0] + (target[0] - start[0]) * index / (count - 1), start[1] + (target[1] - start[1]) * index / (count - 1)]}
         for index in range(count)
     ]
+
+
+def _with_yaw(frames: list[dict[str, Any]], yaw_deg: float) -> list[dict[str, Any]]:
+    return [{**frame, "yaw_deg": yaw_deg} for frame in frames]
+
+
+def _rotation_frames(position: list[float], start_yaw: float, target_yaw: float) -> list[dict[str, Any]]:
+    return [
+        {"progress": index / 7, "position": list(position), "yaw_deg": start_yaw + (target_yaw - start_yaw) * index / 7}
+        for index in range(1, 8)
+    ]
+
+
+def _relative_direction(text: str) -> str | None:
+    if any(token in text for token in ("右边", "右侧", "向右", "往右")):
+        return "right"
+    if any(token in text for token in ("左边", "左侧", "向左", "往左")):
+        return "left"
+    if any(token in text for token in ("后边", "后面", "向后", "往后", "后退")):
+        return "backward"
+    if any(token in text for token in ("前边", "前面", "向前", "往前", "前进")):
+        return "forward"
+    return None
 
 
 def _region_for(position: list[float], scene: dict[str, Any]) -> str:

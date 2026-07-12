@@ -1,4 +1,4 @@
-# P020 minimal physics loop
+# Minimal physics loop
 
 This phase replaces logical obstacle assertions with headless MuJoCo contact evidence while preserving the P016/P017/P019 boundaries.
 
