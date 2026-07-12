@@ -4,6 +4,7 @@ import json
 import math
 import os
 from concept_core.lightweight_orchestrator import build_lightweight_causal_candidate
+from concept_core.concept_gap_dialogue import extract_compositional_semantics
 from pathlib import Path
 
 from concept_core.perceptual_grounding import activate_task_perception, ground_task_observations
@@ -68,6 +69,15 @@ def main() -> None:
     }
     uncovered_requirements = sorted(all_factory_requirements - set(state_catalog["prerequisite_strategies"]))
     require(not uncovered_requirements, f"factory event prerequisites lack recovery strategies: {uncovered_requirements}")
+
+    composed = extract_compositional_semantics("如果水果散落，就归整苹果，让苹果和其他水果都在收纳区，看到所有水果都在收纳区就算完成")
+    require(composed["precondition_descriptions"] == ["水果散落"], f"precondition connector not parsed: {composed}")
+    require(composed["desired_postcondition"] == "苹果和其他水果都在收纳区", f"postcondition connector not parsed: {composed}")
+    require(composed["verification_condition"] == "看到所有水果都在收纳区", f"verification connector not parsed: {composed}")
+    until_composed = extract_compositional_semantics("归整苹果，直到所有水果都在收纳区为止")
+    require(until_composed["desired_postcondition"] == "所有水果都在收纳区" and until_composed["verification_condition"] == "所有水果都在收纳区", f"until boundary did not provide goal and verification: {until_composed}")
+    non_terminal_observation = extract_compositional_semantics("归整苹果，看到桌子")
+    require(non_terminal_observation["verification_condition"] is None, f"ordinary observation was overinterpreted as verification: {non_terminal_observation}")
 
     orchestrator_catalog = build_factory_orchestrator_catalog()
     require(orchestrator_catalog["boundary"]["fixed_task_script_forbidden"], f"factory orchestrator regressed to scripts: {orchestrator_catalog}")
@@ -200,6 +210,25 @@ def main() -> None:
 
     no_entity_gap = begin_motion_command(start_session()["session_id"], "跳起来")["immediate_result"]
     require(no_entity_gap["status"] == "concept_gap_clarification_required" and "哪个对象" in no_entity_gap["prompt"], f"unknown task without entity crashed or skipped target clarification: {no_entity_gap}")
+
+    one_turn_gap_session = start_session()
+    one_turn_gap = begin_motion_command(
+        one_turn_gap_session["session_id"],
+        "如果水果散落，就归整苹果，让苹果和其他水果都在收纳区，看到所有水果都在收纳区就算完成",
+    )["immediate_result"]
+    require(one_turn_gap["status"] == "temporary_effect_contract_compiled", f"explicit compositional semantics did not compile in one turn: {one_turn_gap}")
+    one_turn_contract = one_turn_gap["temporary_effect_contract"]
+    require(one_turn_contract["effect_contract"]["human_readable_postcondition"] == "苹果和其他水果都在收纳区", f"one-turn postcondition lost: {one_turn_contract}")
+    require(one_turn_contract["effect_contract"]["verification"] == ["human_described_verification:看到所有水果都在收纳区"], f"one-turn verification lost: {one_turn_contract}")
+    require("human_described_precondition:水果散落" in one_turn_contract["effect_contract"]["requires"], f"one-turn precondition lost: {one_turn_contract}")
+    require(one_turn_gap["post_action"]["teaching_available"] and not one_turn_contract["direct_execution_allowed"], f"one-turn contract bypassed safe teaching path: {one_turn_gap}")
+
+    pronoun_gap = begin_motion_command(
+        start_session()["session_id"],
+        "归整苹果，让它和其他水果在一起，视觉看到都在收纳区就算完成",
+    )["immediate_result"]
+    require(pronoun_gap["status"] == "temporary_effect_contract_compiled", f"local pronoun blocked one-turn contract: {pronoun_gap}")
+    require(pronoun_gap["temporary_effect_contract"]["effect_contract"]["human_readable_postcondition"] == "苹果和其他水果在一起", f"local pronoun was not resolved to unique target: {pronoun_gap}")
 
     perception_session = start_session()
     perception_started = begin_motion_command(perception_session["session_id"], "去桌子上拿杯子")

@@ -1161,8 +1161,9 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
             world_revision=session["world_revision"],
         )
         session["concept_gap_dialogue"] = gap_started["dialogue"]
+        compiled_contract = gap_started.get("compiled_contract")
         return {
-            "status": "concept_gap_clarification_required",
+            "status": "temporary_effect_contract_compiled" if compiled_contract else "concept_gap_clarification_required",
             "reason": "no_stable_factory_event_concept_match",
             "prompt": gap_started["prompt"],
             "concept_gap": {
@@ -1174,16 +1175,25 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
                 "known": gap_started["analysis"]["known"],
                 "missing_information": gap_started["analysis"]["unknown"],
                 "question_selection_policy": gap_started["analysis"]["question_selection_policy"],
+                "compositional_analysis": gap_started["analysis"].get("compositional_analysis", {}),
                 "analysis_ms": gap_started["analysis"]["analysis_ms"],
                 "next_actions": ["answer_minimum_causal_question", "offer_embodied_teaching_after_goal_contract"],
                 "candidate_only": True,
                 "direct_execution_allowed": False,
             },
-            "post_action": {
-                "action": "request_goal_clarification_or_offer_embodied_teaching",
-                "teaching_available": False,
-                "clarification_required": True,
+            "concept_gap_analysis": {
+                "dialogue_id": gap_started["dialogue"]["dialogue_id"],
+                "slots": deepcopy(gap_started["dialogue"]["slots"]),
+                "pending_slot": gap_started["dialogue"].get("pending_slot"),
+                "compositional_analysis": gap_started["analysis"].get("compositional_analysis", {}),
+                "analysis_ms": gap_started["analysis"]["analysis_ms"],
             },
+            "post_action": {
+                "action": "offer_embodied_teaching" if compiled_contract else "request_goal_clarification_or_offer_embodied_teaching",
+                "teaching_available": bool(compiled_contract),
+                "clarification_required": not compiled_contract,
+            },
+            "temporary_effect_contract": compiled_contract,
             "session": get_session(session_id),
         }
     rotation_only = direction in {"left", "right"} and "转" in text and not any(token in text for token in ("走", "移动", "前进", "后退"))

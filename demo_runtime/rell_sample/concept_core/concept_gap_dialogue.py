@@ -1,12 +1,74 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from copy import deepcopy
 from time import perf_counter_ns
 from typing import Any
 
 
 SLOT_PRIORITY = ["target_entity", "desired_postcondition", "verification_condition"]
+
+
+def extract_compositional_semantics(text: str) -> dict[str, Any]:
+    normalized = text.strip(" ，。！？,.!?；;：:")
+    preconditions: list[str] = []
+    precondition_match = re.search(r"(?:如果|当|需要)(.+?)(?:时|，|,|就|则)", normalized)
+    if precondition_match:
+        preconditions.append(precondition_match.group(1).strip())
+
+    verification = None
+    verification_patterns = [
+        r"((?:看到|观察到|检测到|确认到?).+?)(?:就算|才算|算作|视为)(?:完成|成功|成立)",
+        r"(?:直到)(.+?)(?:为止|才停止|才算完成)",
+        r"(?:以)(.+?)(?:为验真条件|为成功标准|为准)",
+    ]
+    for pattern in verification_patterns:
+        match = re.search(pattern, normalized)
+        if match:
+            verification = match.group(1).strip(" ，,；;")
+            break
+
+    postcondition = None
+    postcondition_match = re.search(
+        r"(?:让|使|使得|变成|变为)(.+?)(?=，|,|；|;|直到|看到|观察到|检测到|确认|$)",
+        normalized,
+    )
+    if postcondition_match:
+        postcondition = postcondition_match.group(1).strip()
+    elif re.search(r"(?:完成后|结果是|目标是)(.+?)(?=，|,|；|;|看到|观察到|检测到|确认|$)", normalized):
+        postcondition = re.search(
+            r"(?:完成后|结果是|目标是)(.+?)(?=，|,|；|;|看到|观察到|检测到|确认|$)",
+            normalized,
+        ).group(1).strip()
+    if not postcondition and verification and ("直到" in normalized or re.search(r"以.+?(?:为成功标准|为准)", normalized)):
+        postcondition = verification
+
+    relation_markers = []
+    for marker, relation in [
+        ("在", "spatial_membership_or_support"),
+        ("里面", "containment"),
+        ("上面", "support"),
+        ("一起", "co_location"),
+        ("同一个", "shared_region_or_group"),
+        ("达到", "threshold_or_target_state"),
+    ]:
+        if marker in normalized:
+            relation_markers.append(relation)
+    return {
+        "precondition_descriptions": preconditions,
+        "desired_postcondition": postcondition,
+        "verification_condition": verification,
+        "relation_candidates": list(dict.fromkeys(relation_markers)),
+        "parser_policy": "explicit_connectors_only_candidate_semantics",
+    }
+
+
+def _resolve_local_pronouns(value: str | None, target: dict[str, Any] | None) -> str | None:
+    if not value or not target:
+        return value
+    label = target["label"]
+    return re.sub(r"(?<!其)(它|这个对象|该对象)", label, value)
 
 
 def _known_entity_mentions(
@@ -26,7 +88,8 @@ def _known_entity_mentions(
 
 
 def _extract_unknown_action_surface(text: str, entity_mentions: list[dict[str, Any]]) -> str:
-    residual = text
+    action_clause = re.split(r"[，,；;。]|让|使得?|变成|变为|直到|看到|观察到|检测到|确认", text, maxsplit=1)[0]
+    residual = action_clause
     for mention in sorted(entity_mentions, key=lambda item: len(item["surface_form"]), reverse=True):
         residual = residual.replace(mention["surface_form"], "")
     for token in ["请", "你", "帮我", "把", "将", "一下", "给我", "去", "这个", "那个"]:
@@ -59,6 +122,9 @@ def start_concept_gap_dialogue(
     started_ns = perf_counter_ns()
     mentions = _known_entity_mentions(utterance, runtime_objects, object_concepts)
     target = mentions[0] if len(mentions) == 1 else None
+    composition = extract_compositional_semantics(utterance)
+    composition["desired_postcondition"] = _resolve_local_pronouns(composition["desired_postcondition"], target)
+    composition["verification_condition"] = _resolve_local_pronouns(composition["verification_condition"], target)
     dialogue_id = "gap_dialogue_" + hashlib.sha1(f"{utterance}|{world_revision}".encode("utf-8")).hexdigest()[:12]
     dialogue = {
         "dialogue_id": dialogue_id,
@@ -67,16 +133,35 @@ def start_concept_gap_dialogue(
         "unknown_action_surface": _extract_unknown_action_surface(utterance, mentions),
         "slots": {
             "target_entity": deepcopy(target),
-            "desired_postcondition": None,
-            "verification_condition": None,
+            "desired_postcondition": composition["desired_postcondition"],
+            "verification_condition": composition["verification_condition"],
+            "precondition_descriptions": composition["precondition_descriptions"],
         },
         "candidate_entities": deepcopy(mentions),
         "turns": [{"speaker": "human", "text": utterance, "slot": "source_utterance"}],
         "world_revision_at_start": world_revision,
         "candidate_only": True,
         "direct_execution_allowed": False,
+        "compositional_analysis": composition,
     }
     missing_slot = _next_missing_slot(dialogue["slots"])
+    if missing_slot is None:
+        dialogue["pending_slot"] = None
+        compiled = _compile_temporary_contract(dialogue, world_revision)
+        return {
+            "dialogue": compiled["dialogue"],
+            "prompt": compiled["prompt"],
+            "compiled_contract": compiled["compiled_contract"],
+            "analysis": {
+                "recognized_entities": deepcopy(mentions),
+                "unknown_action_surface": dialogue["unknown_action_surface"],
+                "known": SLOT_PRIORITY,
+                "unknown": [],
+                "compositional_analysis": composition,
+                "question_selection_policy": "no_question_all_minimum_causal_slots_explicit",
+                "analysis_ms": round((perf_counter_ns() - started_ns) / 1_000_000, 4),
+            },
+        }
     question = _question_for(missing_slot, dialogue)
     dialogue["pending_slot"] = missing_slot
     dialogue["turns"].append({"speaker": "robot", "text": question, "slot": missing_slot})
@@ -89,6 +174,7 @@ def start_concept_gap_dialogue(
             "unknown_action_surface": dialogue["unknown_action_surface"],
             "known": ["target_entity"] if target else [],
             "unknown": [slot for slot in SLOT_PRIORITY if not dialogue["slots"].get(slot)],
+            "compositional_analysis": composition,
             "question_selection_policy": "ask_highest_priority_missing_causal_slot",
             "analysis_ms": elapsed_ms,
         },
@@ -111,6 +197,8 @@ def continue_concept_gap_dialogue(
         mentions = _known_entity_mentions(answer, runtime_objects, object_concepts)
         if len(mentions) == 1:
             updated["slots"]["target_entity"] = mentions[0]
+            updated["slots"]["desired_postcondition"] = _resolve_local_pronouns(updated["slots"].get("desired_postcondition"), mentions[0])
+            updated["slots"]["verification_condition"] = _resolve_local_pronouns(updated["slots"].get("verification_condition"), mentions[0])
         else:
             question = "这条回答仍未唯一对应当前空间中的一个对象。请直接说对象名称，例如苹果、杯子或操作台。"
             updated["turns"].append({"speaker": "robot", "text": question, "slot": pending_slot})
@@ -120,7 +208,20 @@ def continue_concept_gap_dialogue(
         if not normalized:
             question = _question_for(pending_slot, updated)
             return {"dialogue": updated, "prompt": question, "compiled_contract": None}
-        updated["slots"][pending_slot] = normalized
+        composition = extract_compositional_semantics(normalized)
+        if pending_slot == "desired_postcondition":
+            target = updated["slots"].get("target_entity")
+            updated["slots"]["desired_postcondition"] = _resolve_local_pronouns(composition["desired_postcondition"] or normalized, target)
+            if composition["verification_condition"]:
+                updated["slots"]["verification_condition"] = _resolve_local_pronouns(composition["verification_condition"], target)
+            updated["slots"]["precondition_descriptions"] = list(dict.fromkeys(
+                updated["slots"].get("precondition_descriptions", []) + composition["precondition_descriptions"]
+            ))
+        else:
+            updated["slots"][pending_slot] = _resolve_local_pronouns(
+                composition["verification_condition"] or normalized,
+                updated["slots"].get("target_entity"),
+            )
 
     next_slot = _next_missing_slot(updated["slots"])
     if next_slot:
@@ -134,6 +235,13 @@ def continue_concept_gap_dialogue(
             "analysis_ms": round((perf_counter_ns() - started_ns) / 1_000_000, 4),
         }
 
+    compiled = _compile_temporary_contract(updated, current_world_revision)
+    compiled["analysis_ms"] = round((perf_counter_ns() - started_ns) / 1_000_000, 4)
+    return compiled
+
+
+def _compile_temporary_contract(dialogue: dict[str, Any], current_world_revision: int) -> dict[str, Any]:
+    updated = deepcopy(dialogue)
     target = updated["slots"]["target_entity"]
     fact_digest = hashlib.sha1(updated["slots"]["desired_postcondition"].encode("utf-8")).hexdigest()[:10]
     operator_digest = hashlib.sha1(updated["unknown_action_surface"].encode("utf-8")).hexdigest()[:10]
@@ -151,7 +259,10 @@ def continue_concept_gap_dialogue(
             },
         },
         "effect_contract": {
-            "requires": ["target_grounded"],
+            "requires": ["target_grounded"] + [
+                "human_described_precondition:" + item
+                for item in updated["slots"].get("precondition_descriptions", [])
+            ],
             "produces": ["temporary_goal_fact_" + fact_digest],
             "destroys": [],
             "verification": ["human_described_verification:" + updated["slots"]["verification_condition"]],
@@ -182,5 +293,4 @@ def continue_concept_gap_dialogue(
         "dialogue": updated,
         "prompt": prompt,
         "compiled_contract": contract,
-        "analysis_ms": round((perf_counter_ns() - started_ns) / 1_000_000, 4),
     }
