@@ -56,6 +56,7 @@ from visual_concept_pipeline import (
     DeterministicImageProvider,
     HttpImageGenerationProvider,
     add_real_world_calibration,
+    assess_concept_kernel_observation,
     compile_concept_kernel_candidate,
     create_production_batch,
     create_generation_request,
@@ -8649,6 +8650,16 @@ class RellSampleHandler(BaseHTTPRequestHandler):
                 review_notes=str(body.get("review_notes", "")),
                 functional_role_confirmed=bool(body.get("functional_role_confirmed", False)),
                 physical_boundaries_confirmed=bool(body.get("physical_boundaries_confirmed", False)),
+            )
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/visual-concepts/kernels/assess-observation":
+            result = assess_concept_kernel_observation(
+                str(body.get("kernel_candidate_id", "")),
+                observation_ref=str(body.get("observation_ref", "")),
+                source_type=str(body.get("source_type", "")),
+                identity_confirmed=bool(body.get("identity_confirmed", False)),
+                assessments=body.get("assessments") if isinstance(body.get("assessments"), list) else [],
             )
             self._send_json(result, status=400 if "error" in result else 200)
             return

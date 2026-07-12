@@ -150,6 +150,20 @@ def run_http_smoke() -> None:
                 },
             },
         )
+        bowl_assessment = post_json(
+            "/visual-concepts/kernels/assess-observation",
+            {
+                "kernel_candidate_id": bowl_kernel["kernel_candidate_id"],
+                "observation_ref": "user_image://http_smoke/bowl",
+                "source_type": "user_provided_real_image",
+                "identity_confirmed": True,
+                "assessments": [
+                    {"invariant": "open_top", "status": "observed", "visual_basis": "rim_visible", "image_region": "center"},
+                    {"invariant": "bounded_inner_volume", "status": "observed", "visual_basis": "cavity_visible", "image_region": "center"},
+                    {"invariant": "stable_base", "status": "uncertain_occluded", "visual_basis": "base_hidden", "image_region": "lower"},
+                ],
+            },
+        )
         try:
             post_json(
                 "/visual-concepts/kernels/propose-qwen",
@@ -388,6 +402,8 @@ def run_http_smoke() -> None:
             raise AssertionError(f"visual batch blurred concept gaps or runtime boundary: {visual_batch_result}")
         if bowl_kernel.get("status") != "awaiting_human_kernel_review" or bowl_kernel.get("image_generation_allowed"):
             raise AssertionError(f"external concept kernel proposal bypassed human review: {bowl_kernel}")
+        if bowl_assessment.get("next_evidence_request", {}).get("target_claims") != ["stable_base"] or bowl_assessment.get("runtime_visible"):
+            raise AssertionError(f"claim assessment did not expose bounded next evidence: {bowl_assessment}")
         if bowl_kernel_review.get("status") != "approved_for_visual_generation" or bowl_kernel_review.get("runtime_visible"):
             raise AssertionError(f"concept kernel review crossed runtime boundary: {bowl_kernel_review}")
         if bowl_generation.get("status") != "provider_generation_pending" or bowl_generation.get("runtime_visible"):

@@ -10,6 +10,7 @@ from typing import Any, Protocol
 from urllib.request import Request, urlopen
 
 from concept_core.perceptual_grounding import load_object_concepts
+from concept_claim_state import apply_real_observation_to_claims, build_claim_evidence_states, compile_observation_assessment, summarize_claim_readiness
 from concept_kernel_contract import validate_concept_kernel_proposal, validate_external_visual_claims
 
 
@@ -129,6 +130,7 @@ def compile_concept_kernel_candidate(
         "variable_features": sorted(set(str(item) for item in proposal.get("variable_features", []) if item)),
         "expected_relations": sorted(set(str(item) for item in proposal.get("expected_relations", []) if item)),
         "runtime_verification_policy": deepcopy(proposal["runtime_verification_policy"]),
+        "claim_evidence_states": build_claim_evidence_states(proposal),
         "source_type": source_type,
         "status": "awaiting_human_kernel_review",
         "candidate_only": True,
@@ -177,6 +179,49 @@ def review_concept_kernel_candidate(
     return deepcopy(candidate)
 
 
+def assess_concept_kernel_observation(
+    kernel_candidate_id: str,
+    *,
+    observation_ref: str,
+    source_type: str,
+    identity_confirmed: bool,
+    assessments: list[dict[str, Any]],
+) -> dict[str, Any]:
+    if source_type not in {"user_provided_real_image", "current_robot_camera_verified_crop"}:
+        return {"error": "assessment_source_is_not_real_world_evidence", "source_type": source_type}
+    store = _load_store()
+    candidate = next((item for item in store["concept_kernel_candidates"] if item["kernel_candidate_id"] == kernel_candidate_id), None)
+    if not candidate:
+        return {"error": "concept_kernel_candidate_not_found", "kernel_candidate_id": kernel_candidate_id}
+    compiled = compile_observation_assessment(
+        candidate.get("claim_evidence_states", []),
+        assessments,
+        evidence_ref=observation_ref,
+        identity_confirmed=identity_confirmed,
+    )
+    candidate["claim_evidence_states"] = compiled["claim_evidence_states"]
+    candidate["claim_readiness"] = compiled["claim_readiness"]
+    candidate.setdefault("observation_assessments", []).append({
+        "observation_ref": observation_ref,
+        "source_type": source_type,
+        "identity_confirmed": bool(identity_confirmed),
+        "assessment_evidence": compiled["assessment_evidence"],
+        "rejected_assessments": compiled["rejected_assessments"],
+    })
+    _save_store(store)
+    return {
+        "kernel_candidate_id": kernel_candidate_id,
+        "concept_id": candidate["concept_id"],
+        "status": "claim_evidence_updated",
+        "claim_readiness": deepcopy(compiled["claim_readiness"]),
+        "next_evidence_request": deepcopy(compiled["next_evidence_request"]),
+        "rejected_assessments": deepcopy(compiled["rejected_assessments"]),
+        "candidate_only": True,
+        "runtime_visible": False,
+        "direct_execution_allowed": False,
+    }
+
+
 def promote_concept_kernel_candidate(kernel_candidate_id: str) -> dict[str, Any]:
     store = _load_store()
     candidate = next((item for item in store["concept_kernel_candidates"] if item["kernel_candidate_id"] == kernel_candidate_id), None)
@@ -198,6 +243,13 @@ def promote_concept_kernel_candidate(kernel_candidate_id: str) -> dict[str, Any]
     ]
     if not confirmed_evidence:
         return {"error": "concept_kernel_real_world_calibration_required", "kernel_candidate_id": kernel_candidate_id}
+    claim_readiness = summarize_claim_readiness(candidate.get("claim_evidence_states", []))
+    if not claim_readiness["identity_confirmed"] or not claim_readiness["perceptual_invariants_observed"]:
+        return {
+            "error": "concept_kernel_claim_evidence_incomplete",
+            "kernel_candidate_id": kernel_candidate_id,
+            "claim_readiness": claim_readiness,
+        }
     promoted = {
         "object_kernel_version_id": "object_kernel_" + hashlib.sha1(kernel_candidate_id.encode()).hexdigest()[:12],
         "kernel_candidate_id": kernel_candidate_id,
@@ -209,6 +261,8 @@ def promote_concept_kernel_candidate(kernel_candidate_id: str) -> dict[str, Any]
         "runtime_verification_policy": deepcopy(candidate["runtime_verification_policy"]),
         "human_review": deepcopy(review),
         "real_world_calibration_evidence": deepcopy(confirmed_evidence),
+        "claim_evidence_states": deepcopy(candidate["claim_evidence_states"]),
+        "claim_readiness": claim_readiness,
         "status": "promoted_object_concept_kernel",
         "deployment_status": "awaiting_controlled_deployment",
         "runtime_visible": False,
@@ -470,6 +524,8 @@ def add_real_world_calibration(
     candidate = next((item for item in store["candidates"] if item["candidate_id"] == candidate_id), None)
     if not candidate:
         return {"error": "visual_candidate_not_found", "candidate_id": candidate_id}
+    if functional_facts_confirmed:
+        return {"error": "functional_facts_require_independent_physical_evidence"}
     identity_confirmation = bool(human_confirmed) if identity_confirmed is None else bool(identity_confirmed)
     visual_confirmation = bool(human_confirmed) if visual_invariants_confirmed is None else bool(visual_invariants_confirmed)
     calibration_confirmed = identity_confirmation and visual_confirmation
@@ -489,6 +545,21 @@ def add_real_world_calibration(
     }
     candidate["real_calibration_evidence"].append(evidence)
     candidate["status"] = "eligible_for_promotion_review" if calibration_confirmed else "awaiting_real_world_calibration"
+    kernel_candidate_id = candidate.get("kernel_candidate_id")
+    if kernel_candidate_id:
+        kernel_candidate = next(
+            (item for item in store["concept_kernel_candidates"] if item["kernel_candidate_id"] == kernel_candidate_id),
+            None,
+        )
+        if kernel_candidate:
+            kernel_candidate["claim_evidence_states"] = apply_real_observation_to_claims(
+                kernel_candidate.get("claim_evidence_states", []),
+                evidence_ref=observation_ref,
+                identity_confirmed=identity_confirmation,
+                matched_features=matched_features,
+                uncertain_features=uncertain_features or [],
+            )
+            kernel_candidate["claim_readiness"] = summarize_claim_readiness(kernel_candidate["claim_evidence_states"])
     _save_store(store)
     return deepcopy(candidate)
 

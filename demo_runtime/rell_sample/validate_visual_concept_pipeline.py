@@ -8,6 +8,7 @@ from embodied_scene import build_visual_concept_pack_catalog, execute_command, s
 from visual_concept_pipeline import (
     DeterministicImageProvider,
     add_real_world_calibration,
+    assess_concept_kernel_observation,
     compile_concept_kernel_candidate,
     create_production_batch,
     create_generation_request,
@@ -156,6 +157,22 @@ def main() -> None:
         source_type="external_model_candidate",
     )
     require(bowl_kernel["status"] == "awaiting_human_kernel_review" and not bowl_kernel["image_generation_allowed"], f"external model self-approved a concept: {bowl_kernel}")
+    require(len(bowl_kernel["claim_evidence_states"]) >= 8, f"concept kernel did not compile per-claim evidence states: {bowl_kernel}")
+    observation_assessment = assess_concept_kernel_observation(
+        bowl_kernel["kernel_candidate_id"],
+        observation_ref="user_image://bowl_cluttered_scene",
+        source_type="user_provided_real_image",
+        identity_confirmed=True,
+        assessments=[
+            {"invariant": "open_top", "status": "observed", "visual_basis": "rim_visible", "image_region": "center"},
+            {"invariant": "bounded_inner_volume", "status": "observed", "visual_basis": "inner_cavity_visible", "image_region": "center"},
+            {"invariant": "stable_base", "status": "uncertain_occluded", "visual_basis": "base_hidden", "image_region": "lower_center"},
+            {"invariant": "invented_feature", "status": "observed"},
+        ],
+    )
+    require(observation_assessment["claim_readiness"]["identity_confirmed"], f"identity assessment was not recorded: {observation_assessment}")
+    require(observation_assessment["next_evidence_request"]["target_claims"] == ["stable_base"], f"minimum next evidence was not exposed: {observation_assessment}")
+    require(observation_assessment["rejected_assessments"] == [{"invariant": "invented_feature", "reason": "unknown_invariant_or_status"}], f"unknown assessment polluted claims: {observation_assessment}")
     blocked_release = release_kernel_candidate_generation(bowl_kernel["kernel_candidate_id"], sample_count=4)
     require(blocked_release.get("error") == "concept_kernel_human_review_required", f"unreviewed kernel released image generation: {blocked_release}")
     reviewed_kernel = review_concept_kernel_candidate(
@@ -174,21 +191,46 @@ def main() -> None:
         bowl_visual_candidate["candidate_id"],
         observation_ref="user_image://verified/bowl_1",
         source_type="user_provided_real_image",
-        matched_features=["open_top", "bounded_inner_volume", "stable_base"],
+        matched_features=["open_top", "bounded_inner_volume"],
         human_confirmed=False,
         identity_confirmed=True,
         visual_invariants_confirmed=True,
         functional_facts_confirmed=False,
-        uncertain_features=["liquid_retention_without_leakage"],
+        uncertain_features=["stable_base", "liquid_retention_without_leakage"],
     )
     require(calibrated_bowl["status"] == "eligible_for_promotion_review", f"real bowl evidence did not calibrate visual candidate: {calibrated_bowl}")
     bowl_evidence = calibrated_bowl["real_calibration_evidence"][-1]
     require(bowl_evidence["confirmation_scope"] == {"object_identity": True, "visual_invariants": True, "functional_facts": False}, f"scoped calibration conflated identity and function: {bowl_evidence}")
-    require(bowl_evidence["uncertain_features"] == ["liquid_retention_without_leakage"], f"uncertain visual feature was discarded: {bowl_evidence}")
+    require(bowl_evidence["uncertain_features"] == ["liquid_retention_without_leakage", "stable_base"], f"uncertain visual feature was discarded: {bowl_evidence}")
+    visual_function_overclaim = add_real_world_calibration(
+        bowl_visual_candidate["candidate_id"],
+        observation_ref="user_image://cannot_prove_function",
+        source_type="user_provided_real_image",
+        matched_features=["open_top"],
+        human_confirmed=False,
+        identity_confirmed=True,
+        visual_invariants_confirmed=True,
+        functional_facts_confirmed=True,
+    )
+    require(visual_function_overclaim.get("error") == "functional_facts_require_independent_physical_evidence", f"real image directly proved functional facts: {visual_function_overclaim}")
     blocked_visual_promotion = promote_visual_candidate(bowl_visual_candidate["candidate_id"])
     require(blocked_visual_promotion.get("error") == "object_concept_kernel_promotion_required", f"visual adapter outran its object concept kernel: {blocked_visual_promotion}")
+    incomplete_claim_promotion = promote_concept_kernel_candidate(bowl_kernel["kernel_candidate_id"])
+    require(incomplete_claim_promotion.get("error") == "concept_kernel_claim_evidence_incomplete", f"uncertain invariant did not hold concept kernel: {incomplete_claim_promotion}")
+    completed_bowl = add_real_world_calibration(
+        bowl_visual_candidate["candidate_id"],
+        observation_ref="robot_camera://verified/bowl_stable_base",
+        source_type="current_robot_camera_verified_crop",
+        matched_features=["stable_base"],
+        human_confirmed=False,
+        identity_confirmed=True,
+        visual_invariants_confirmed=True,
+    )
+    require(completed_bowl["status"] == "eligible_for_promotion_review", f"second observation did not complete invariant evidence: {completed_bowl}")
     promoted_kernel = promote_concept_kernel_candidate(bowl_kernel["kernel_candidate_id"])
     require(promoted_kernel["status"] == "promoted_object_concept_kernel" and not promoted_kernel["runtime_visible"], f"object kernel promotion crossed deployment boundary: {promoted_kernel}")
+    require(promoted_kernel["claim_readiness"]["perceptual_invariants_observed"], f"promoted kernel retained unresolved invariants: {promoted_kernel}")
+    require(not promoted_kernel["claim_readiness"]["functional_claims_physically_verified"], f"visual calibration over-proved functions: {promoted_kernel}")
     promoted_bowl_visual = promote_visual_candidate(bowl_visual_candidate["candidate_id"])
     require(promoted_bowl_visual["status"] == "promoted_visual_adapter" and not promoted_bowl_visual["runtime_visible"], f"visual adapter did not follow promoted object kernel: {promoted_bowl_visual}")
 
