@@ -61,26 +61,75 @@ class MujocoEmbodiedAdapter:
         return sorted(EXECUTOR_CAPABILITIES[self.executor_type])
 
     def execute_fill_task(self) -> dict[str, Any]:
-        required = {"navigate_to_region", "grasp_object", "fill_container"}
-        missing = sorted(required - EXECUTOR_CAPABILITIES[self.executor_type])
-        if missing:
-            return self._result("capability_gap", missing_capabilities=missing)
+        return self.execute_steps(["move_to_counter", "pick_up_cup", "move_to_water_source", "fill_cup_at_water_source"])
 
-        first = self._navigate(self.layout["start"], self.layout["operation_region"])
-        if first.outcome == "blocked":
-            return self._result("fact_not_established", route=first)
-        second = self._navigate(self.layout["operation_region"], self.layout["water_source_region"])
-        if second.outcome == "blocked":
-            return self._result("fact_not_established", route=second)
-
+    def execute_steps(self, steps: list[str]) -> dict[str, Any]:
+        location = "start"
+        holding_cup = False
+        stage_results: list[dict[str, Any]] = []
+        last_route = None
+        for step in steps:
+            before = {"location": location, "holding_cup": holding_cup}
+            required = {
+                "move_to_counter": "navigate_to_region",
+                "pick_up_cup": "grasp_object",
+                "move_to_water_source": "navigate_to_region",
+                "fill_cup_at_water_source": "fill_container",
+            }.get(step)
+            if required and required not in EXECUTOR_CAPABILITIES[self.executor_type]:
+                stage_results.append(self._stage(step, "capability_gap", before, before, missing_capabilities=[required]))
+                return self._result("capability_gap", stage_results=stage_results, missing_capabilities=[required])
+            route = None
+            observations: list[dict[str, Any]] = []
+            if step == "move_to_counter":
+                route = self._navigate(self.layout["start"], self.layout["operation_region"])
+                last_route = route
+                if route.outcome == "blocked":
+                    stage_results.append(self._stage(step, "fact_not_established", before, before, route=route))
+                    return self._result("fact_not_established", route=route, stage_results=stage_results)
+                location = "operation_region"
+            elif step == "pick_up_cup":
+                if location != "operation_region":
+                    stage_results.append(self._stage(step, "fact_not_established", before, before, reason="executor_not_at_cup"))
+                    return self._result("fact_not_established", stage_results=stage_results)
+                holding_cup = True
+            elif step == "move_to_water_source":
+                start = self.layout["operation_region"] if location == "operation_region" else self.layout["start"]
+                route = self._navigate(start, self.layout["water_source_region"])
+                last_route = route
+                if route.outcome == "blocked":
+                    stage_results.append(self._stage(step, "fact_not_established", before, before, route=route))
+                    return self._result("fact_not_established", route=route, stage_results=stage_results)
+                location = "water_source_region"
+            elif step == "fill_cup_at_water_source":
+                if location != "water_source_region" or not holding_cup:
+                    stage_results.append(self._stage(step, "fact_not_established", before, before, reason="fill_prerequisites_missing"))
+                    return self._result("fact_not_established", stage_results=stage_results)
+                observations = [
+                    {"fact_id": "cup_contains_water", "channel_id": "physical_liquid_level", "state": "established"},
+                    {"fact_id": "cup_contains_water", "channel_id": "digital_flow_integral", "state": "established"},
+                ]
+            after = {"location": location, "holding_cup": holding_cup}
+            stage_results.append(self._stage(step, "fact_established", before, after, route=route, observations=observations))
         return self._result(
             "fact_established",
-            route=second,
-            observations=[
-                {"fact_id": "cup_contains_water", "channel_id": "physical_liquid_level", "state": "established"},
-                {"fact_id": "cup_contains_water", "channel_id": "digital_flow_integral", "state": "established"},
-            ],
+            route=last_route,
+            stage_results=stage_results,
+            observations=stage_results[-1].get("observations", []) if stage_results else [],
         )
+
+    @staticmethod
+    def _stage(step: str, outcome: str, before: dict[str, Any], after: dict[str, Any], **extra: Any) -> dict[str, Any]:
+        route = extra.pop("route", None)
+        return {
+            "step": step,
+            "outcome": outcome,
+            "before_state": before,
+            "after_state": after,
+            "route_evidence": route.__dict__ if route else None,
+            "observations": extra.pop("observations", []),
+            **extra,
+        }
 
     def _navigate(self, start: tuple[float, float], target: tuple[float, float]) -> RouteResult:
         direct_contact, direct_samples = self._path_contacts([start, target])

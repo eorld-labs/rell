@@ -7,6 +7,7 @@ This phase replaces logical obstacle assertions with headless MuJoCo contact evi
 - MuJoCo poses, geometry dimensions, and route samples remain private to `MujocoEmbodiedAdapter`.
 - Experience writeback contains topology, required capabilities, route outcome, and terminal facts only.
 - A successful fill task requires both `physical_liquid_level` and `digital_flow_integral` to establish `cup_contains_water`.
+- Physics execution is stagewise: navigation, grasp, second navigation, and fill each return before/after symbolic state and their own evidence. P016 commits each transition only after the matching stage succeeds.
 - Contact with the floor is support state, not obstacle evidence. Only contact with the named obstacle geometry can block or detour navigation.
 - Capability admission happens before physics execution. A mobile base cannot grasp or fill; a fixed arm cannot navigate.
 

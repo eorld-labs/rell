@@ -8,11 +8,13 @@ from physics_mujoco_adapter import MujocoEmbodiedAdapter
 
 def main() -> None:
     request = json.loads(sys.stdin.read())
-    result = MujocoEmbodiedAdapter(
+    adapter = MujocoEmbodiedAdapter(
         request.get("layout_id", "kitchen_a"),
         request.get("executor_type", "mobile_manipulator"),
         request.get("obstacle", "none"),
-    ).execute_fill_task()
+    )
+    steps = request.get("steps")
+    result = adapter.execute_steps(steps) if steps else adapter.execute_fill_task()
     sys.stdout.write(json.dumps(result, ensure_ascii=False))
 
 

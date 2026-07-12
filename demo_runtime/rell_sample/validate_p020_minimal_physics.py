@@ -21,6 +21,11 @@ def main() -> None:
         result = MujocoEmbodiedAdapter(layout, "mobile_manipulator").execute_fill_task()
         require(result["outcome"] == "fact_established", f"cross-layout task failed: {result}")
         require(len(result["observations"]) == 2, f"P016 dual-channel verification missing: {result}")
+        stages = {item["step"]: item for item in result["stage_results"]}
+        require(stages["move_to_counter"]["after_state"]["location"] == "operation_region", f"counter stage not verified: {result}")
+        require(stages["pick_up_cup"]["after_state"]["holding_cup"], f"grasp stage not verified: {result}")
+        require(stages["move_to_water_source"]["after_state"]["location"] == "water_source_region", f"source stage not verified: {result}")
+        require(len(stages["fill_cup_at_water_source"]["observations"]) == 2, f"fill stage channels missing: {result}")
         report["scenarios"][f"{layout}_success"] = result
 
     detour = MujocoEmbodiedAdapter("kitchen_a", "mobile_manipulator", "detourable").execute_fill_task()
@@ -46,6 +51,10 @@ def main() -> None:
     )
     require(dispatch["outcome"] == "fact_established", f"API physics dispatch failed: {dispatch}")
     require(dispatch["physics_result"]["engine"] == "mujoco", f"physical evidence missing: {dispatch}")
+    require(
+        all(item.get("physics_stage") for item in dispatch["fact_feedback"]),
+        f"each API feedback item must carry stage physics evidence: {dispatch}",
+    )
     report["scenarios"]["api_dispatch_success"] = dispatch["physics_result"]
 
     blocked_migration = migrate_experience("到水源处接一杯水", space_id="site_b_corridor")

@@ -7687,6 +7687,7 @@ def run_mujoco_physics_bridge(task_id: str, options: dict[str, Any]) -> dict[str
         "layout_id": "corridor_b" if space_id == "site_b_corridor" else "kitchen_a",
         "executor_type": options.get("physics_executor_type", "mobile_manipulator"),
         "obstacle": options.get("physics_obstacle", "none"),
+        "steps": options.get("physics_steps", []),
     }
     try:
         completed = subprocess.run(
@@ -7730,7 +7731,11 @@ def dispatch_execution_loop_payload(
         return {"error": "runtime_world_state_released", "task_id": task_id, "release_token": state.get("release_token")}
     physics_result = None
     if executor_type == "mujoco_physics":
-        physics_result = run_mujoco_physics_bridge(task_id, executor_options or {})
+        physics_options = dict(executor_options or {})
+        physics_options["physics_steps"] = [
+            item.get("step") for item in payload.get("execution_step_payload", []) if item.get("step")
+        ]
+        physics_result = run_mujoco_physics_bridge(task_id, physics_options)
         if physics_result.get("error"):
             return physics_result
     dispatch_seed = "|".join([payload.get("execution_callback_id", ""), executor_type, snapshot_id or "none"])
@@ -7776,6 +7781,9 @@ def dispatch_execution_loop_payload(
     payload_bindings = {
         item.get("step"): item
         for item in payload.get("binding_candidate_payload", {}).get("step_bindings", [])
+    }
+    physics_stages = {
+        item.get("step"): item for item in (physics_result or {}).get("stage_results", [])
     }
     for index, item in enumerate(payload.get("execution_step_payload", []), start=1):
         step = item.get("step")
@@ -7842,6 +7850,7 @@ def dispatch_execution_loop_payload(
                 "after_executor_location": transition["after_executor_location"],
                 "preflight_result": preflight.get("result"),
                 "route_adjustment": preflight.get("route_adjustment"),
+                "physics_stage": physics_stages.get(step),
             }
         )
     target_fact = payload.get("target_causal_fact")
