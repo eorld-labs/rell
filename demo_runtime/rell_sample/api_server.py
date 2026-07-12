@@ -637,6 +637,7 @@ def build_intent_frame(text: str, cognitive_model: dict[str, Any]) -> dict[str, 
         object_constraints=object_constraints,
         spatial_constraints=spatial_constraints,
         current_facts=sorted(build_world_state_facts(cognitive_model)),
+        runtime_context_view=None,
     )
     concept_matches = build_concept_matches(text, goal_fact, spatial_constraints, object_constraints, detected_steps)
     return {
@@ -6430,6 +6431,53 @@ def collect_concept_evidence_packets(
     return packets
 
 
+def attach_missing_fact_experience_candidates(action_concepts: list[dict[str, Any]]) -> None:
+    registry = build_process_registry()
+    experiences = load_experience_library().get("experiences", [])
+    for concept in action_concepts:
+        package = concept.get("concept_package", {})
+        missing = package.get("fact_alignment", {}).get("missing_requirements", [])
+        candidates: list[dict[str, Any]] = []
+        for fact in missing:
+            for step_id, meta in registry.items():
+                if meta.get("produces_fact") != fact:
+                    continue
+                candidates.append({
+                    "candidate_type": "process_producer",
+                    "candidate_id": step_id,
+                    "covers_missing_facts": [fact],
+                    "process_chain": meta.get("expands_to") or [step_id],
+                    "source": meta.get("source", "step_library"),
+                })
+            for experience in experiences:
+                reasoning = experience.get("causal_signature", {}).get("reasoning", [])
+                covered = [item.get("produces_fact") for item in reasoning if item.get("produces_fact") == fact]
+                if not covered:
+                    continue
+                candidates.append({
+                    "candidate_type": "experience_chain",
+                    "candidate_id": experience.get("experience_id"),
+                    "covers_missing_facts": covered,
+                    "process_chain": experience.get("process_chain", []),
+                    "source": "experience_library",
+                })
+        deduplicated: dict[tuple[str, str], dict[str, Any]] = {}
+        for candidate in candidates:
+            key = (candidate["candidate_type"], str(candidate["candidate_id"]))
+            existing = deduplicated.get(key)
+            if existing:
+                existing["covers_missing_facts"] = sorted(set(existing["covers_missing_facts"] + candidate["covers_missing_facts"]))
+            else:
+                deduplicated[key] = candidate
+        ranked = sorted(
+            deduplicated.values(),
+            key=lambda item: (-len(item["covers_missing_facts"]), 0 if item["source"] == "experience_library" else 1, str(item["candidate_id"])),
+        )
+        package.setdefault("experience_lookup", {})["candidates"] = ranked
+        package["experience_lookup"]["selection_basis"] = "missing_fact_producer_coverage"
+        package["experience_lookup"]["whole_utterance_match_used"] = False
+
+
 def build_concept_evidence_summary(evidence_packets: list[dict[str, Any]]) -> dict[str, Any]:
     direct_execution_allowed = any(
         packet.get("fallback_policy", {}).get("direct_execution_allowed")
@@ -6467,7 +6515,9 @@ def resolve_concepts_for_intent(utterance: str, task_id: str | None = None) -> d
         object_constraints=intent_frame.get("object_constraints", []),
         spatial_constraints=intent_frame.get("spatial_constraints", []),
         current_facts=runtime_facts,
+        runtime_context_view=runtime_context_view if runtime_context_view and "error" not in runtime_context_view else None,
     )
+    attach_missing_fact_experience_candidates(intent_frame["action_concepts"])
     concept_matches = build_concept_matches(
         utterance,
         intent_frame.get("goal_fact"),

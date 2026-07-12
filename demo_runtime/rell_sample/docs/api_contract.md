@@ -358,6 +358,8 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 - `concept_package.concept_kernel.semantic_roles`：分别声明 `mention_status` 与 `grounding_status`，避免把语言明确提及误当成现实对象已经唯一绑定；
 - `concept_package.concept_kernel.effect_contract`：声明 `requires`、`produces`、`destroys` 和 `verification`，其中事实变化在 P016 验真前仅为投影；
 - `concept_package.fact_alignment`：基于当前可用事实输出已满足前提、缺失前提和目标是否已成立；
+- 当携带有效 `task_id` 时，隐含对象可依据当前快照中的唯一手持兼容对象形成 `implicit + inferred` 绑定；隐含空间角色可依据执行体当前位置形成有依据的推定。无快照、多候选或条件不唯一时继续保持 `unresolved` 并要求确认；
+- `concept_package.experience_lookup.candidates`：按缺失前提事实检索能够生产该事实的步骤或经验链，并按缺口覆盖数排序；该检索明确不使用整句输入到经验的直接匹配；
 - `concept_lifecycle`：本次概念首次形成或重复复用事件，以及对应的形成数、复用数；
 - `resolved_concepts`：概念层候选，每个候选带有 `activation_reason`、`effect_contract`、`runtime_binding_status` 和 `experience_link_policy`；
 - `concept_evidence_packets`：端侧概念命中的证据包，说明命中依据、置信度、运行时快照绑定和失败回退策略；

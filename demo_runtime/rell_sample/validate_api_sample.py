@@ -538,10 +538,30 @@ def main() -> None:
         implicit_fill = resolve_concepts_for_intent("现在接一杯水", migration["migration_task_id"])
         implicit_fill_concept = next(item for item in implicit_fill.get("action_concepts", []) if item.get("concept_id") == "action_concept_fill_cup")
         implicit_container = implicit_fill_concept.get("concept_package", {}).get("concept_kernel", {}).get("semantic_roles", {}).get("container", {})
-        if implicit_container.get("mention_status") != "implicit" or implicit_container.get("fallback") != "require_confirmation_if_not_unique":
-            raise AssertionError(f"implicit containers must carry confirmation policy instead of fabricated grounding: {implicit_fill_concept}")
+        if implicit_container.get("mention_status") != "implicit" or implicit_container.get("grounding_status") != "inferred":
+            raise AssertionError(f"a single held compatible container must support auditable implicit grounding: {implicit_fill_concept}")
+        if implicit_container.get("binding_basis") != "single_compatible_object_in_executor_holding":
+            raise AssertionError(f"implicit grounding must name its runtime-state basis: {implicit_fill_concept}")
+        if not implicit_fill_concept.get("concept_evidence", {}).get("runtime_binding", {}).get("runtime_snapshot_attached"):
+            raise AssertionError(f"action concept evidence must bind the same runtime snapshot used for role grounding: {implicit_fill_concept}")
         if implicit_fill.get("intent_frame_summary", {}).get("activation_constraint", {}).get("mode") != "immediate":
             raise AssertionError(f"现在 must map to P018 task activation rather than a physical action: {implicit_fill}")
+        ungrounded_fill = resolve_concepts_for_intent("接一杯水")
+        ungrounded_fill_concept = next(item for item in ungrounded_fill.get("action_concepts", []) if item.get("concept_id") == "action_concept_fill_cup")
+        ungrounded_package = ungrounded_fill_concept.get("concept_package", {})
+        ungrounded_container = ungrounded_package.get("concept_kernel", {}).get("semantic_roles", {}).get("container", {})
+        if ungrounded_container.get("grounding_status") != "unresolved" or ungrounded_container.get("fallback") != "require_confirmation_if_not_unique":
+            raise AssertionError(f"implicit containers without a runtime snapshot must remain unresolved: {ungrounded_fill_concept}")
+        experience_lookup = ungrounded_package.get("experience_lookup", {})
+        if experience_lookup.get("whole_utterance_match_used") or not experience_lookup.get("candidates"):
+            raise AssertionError(f"missing prerequisites must drive producer lookup without whole-utterance matching: {ungrounded_fill_concept}")
+        covered_missing = {
+            fact
+            for candidate in experience_lookup.get("candidates", [])
+            for fact in candidate.get("covers_missing_facts", [])
+        }
+        if not set(ungrounded_package.get("fact_alignment", {}).get("missing_requirements", [])) & covered_missing:
+            raise AssertionError(f"experience candidates must cover current missing facts: {ungrounded_fill_concept}")
         lifecycle_events = concept_resolution.get("concept_lifecycle", {}).get("events", [])
         if not lifecycle_events or not all(item.get("event_type") in {"concept_formed", "concept_reused"} for item in lifecycle_events):
             raise AssertionError(f"concept resolution must record formation or reuse events: {concept_resolution}")

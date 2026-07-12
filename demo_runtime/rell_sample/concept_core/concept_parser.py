@@ -13,12 +13,21 @@ def _role_binding(
     text: str,
     object_constraints: list[dict[str, Any]],
     spatial_constraints: list[dict[str, Any]],
+    runtime_context_view: dict[str, Any] | None,
 ) -> dict[str, Any]:
     binding = {"role": role_template.get("role"), "entity_type": role_template.get("entity_type")}
     explicit_object = object_constraints[0] if object_constraints and role_name in {"container", "object"} else None
     if role_name == "container" and "一杯水" in text and not any(marker in text for marker in ["杯子", "水杯", "这个杯", "那个杯"]):
         explicit_object = None
     explicit_region = spatial_constraints[-1] if spatial_constraints and role_name in {"source", "destination"} else None
+    executor = (runtime_context_view or {}).get("executor", {})
+    held_objects = executor.get("holding", [])
+    inferred_held_object = held_objects[0] if len(held_objects) == 1 and role_name in {"container", "object"} else None
+    inferred_region = (
+        executor.get("location_ref")
+        if role_name in {"source", "destination"} and executor.get("location_ref")
+        else None
+    )
     if explicit_object:
         binding.update({
             "mention_status": "explicit",
@@ -36,6 +45,24 @@ def _role_binding(
             "surface_form": explicit_region.get("source_text"),
             "binding_confidence": 0.94,
             "fallback": "none",
+        })
+    elif inferred_held_object:
+        binding.update({
+            "mention_status": "implicit",
+            "grounding_status": "inferred",
+            "entity_ref": inferred_held_object,
+            "binding_confidence": 0.86,
+            "binding_basis": "single_compatible_object_in_executor_holding",
+            "fallback": "confirm_if_runtime_state_changes",
+        })
+    elif inferred_region and inferred_region == role_template.get("default_entity_ref"):
+        binding.update({
+            "mention_status": "implicit",
+            "grounding_status": "inferred",
+            "entity_ref": inferred_region,
+            "binding_confidence": 0.84,
+            "binding_basis": "executor_current_location_matches_role_default",
+            "fallback": "confirm_if_runtime_state_changes",
         })
     elif role_name == "material" and role_template.get("value") and role_template["value"] in {"water"}:
         binding.update({
@@ -64,6 +91,7 @@ def _build_concept_package(
     object_constraints: list[dict[str, Any]],
     spatial_constraints: list[dict[str, Any]],
     current_facts: list[str],
+    runtime_context_view: dict[str, Any] | None,
 ) -> dict[str, Any]:
     kernel = concept.get("concept_kernel", {})
     contract = kernel.get("effect_contract", {})
@@ -84,6 +112,7 @@ def _build_concept_package(
                     text=text,
                     object_constraints=object_constraints,
                     spatial_constraints=spatial_constraints,
+                    runtime_context_view=runtime_context_view,
                 )
                 for name, template in kernel.get("semantic_roles", {}).items()
             },
@@ -126,6 +155,7 @@ def _build_action_concept_view(
     object_constraints: list[dict[str, Any]],
     spatial_constraints: list[dict[str, Any]],
     current_facts: list[str],
+    runtime_context_view: dict[str, Any] | None,
 ) -> dict[str, Any]:
     match_basis = ["explicit_process_chain_step"] if step_detected_explicitly else ["local_action_alias_match"]
     confidence = 0.92 if step_detected_explicitly else 0.78
@@ -144,6 +174,7 @@ def _build_action_concept_view(
             object_constraints=object_constraints,
             spatial_constraints=spatial_constraints,
             current_facts=current_facts,
+            runtime_context_view=runtime_context_view,
         ),
         "direct_execution_allowed": False,
         "must_reenter_orchestration_layer": True,
@@ -153,6 +184,7 @@ def _build_action_concept_view(
             activation_reason=activation_reason,
             match_basis=match_basis,
             confidence=confidence,
+            runtime_context_view=runtime_context_view,
         ),
     }
 
@@ -165,6 +197,7 @@ def resolve_action_concepts(
     object_constraints: list[dict[str, Any]] | None = None,
     spatial_constraints: list[dict[str, Any]] | None = None,
     current_facts: list[str] | None = None,
+    runtime_context_view: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     normalized = normalize_text_fn(text)
     resolved: list[dict[str, Any]] = []
@@ -186,6 +219,7 @@ def resolve_action_concepts(
                 object_constraints=object_constraints,
                 spatial_constraints=spatial_constraints,
                 current_facts=current_facts,
+                runtime_context_view=runtime_context_view,
             )
         )
         seen.add(concept["concept_id"])
@@ -202,6 +236,7 @@ def resolve_action_concepts(
                 object_constraints=object_constraints,
                 spatial_constraints=spatial_constraints,
                 current_facts=current_facts,
+                runtime_context_view=runtime_context_view,
             )
         )
         seen.add(concept["concept_id"])
