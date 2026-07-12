@@ -40,6 +40,7 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = int(os.environ.get("RELL_SAMPLE_PORT", "8876"))
 SPACE_PRIOR_FILE = DATA / "digital_kitchen_semantic_prior.json"
 COGNITIVE_MODEL_FILE = DATA / "digital_kitchen_cognitive_model.json"
+CORRIDOR_COGNITIVE_MODEL_FILE = DATA / "digital_corridor_cognitive_model.json"
 EXPERIENCE_LIBRARY_FILE = DATA / "experience_library.json"
 CONCEPT_LIBRARY_FILE = DATA / "concept_library.json"
 CONCEPT_CANDIDATE_LIBRARY_FILE = DATA / "concept_candidate_library.json"
@@ -828,11 +829,15 @@ def build_semantic_request_frame(
 def build_world_state_facts(cognitive_model: dict[str, Any]) -> set[str]:
     regions = {item["region_id"] for item in cognitive_model.get("space_region_table", [])}
     objects = cognitive_model.get("object_region_index", {})
+    bindings = cognitive_model.get("binding_candidates", {})
     facts = {"executor_at_floor_walkway", "gripper_empty"}
-    if "region_water_source" in regions:
+    water_source_region = bindings.get("TARGET_LIQUID_SOURCE_REGION") or "region_water_source"
+    if water_source_region in regions:
         facts.add("water_source_available")
-    cup = objects.get("object_cup_white_mug", {})
-    if cup.get("region_ref") in {"region_cup_station", "region_counter_operation"}:
+    cup_ref = bindings.get("TARGET_GRASPABLE_CONTAINER") or "object_cup_white_mug"
+    operation_region = bindings.get("TARGET_OPERATION_REGION") or "region_counter_operation"
+    cup = objects.get(cup_ref, {})
+    if cup.get("region_ref") in {"region_cup_station", operation_region}:
         facts.add("cup_at_counter")
     if "cup_empty" in cup.get("state_facts", []):
         facts.add("cup_empty")
@@ -865,7 +870,7 @@ def build_initial_runtime_world_state(cognitive_model: dict[str, Any], intent: d
         "task_ref": intent.get("experience_id") or intent.get("candidate_process"),
         "executor": {
             "location_type": "region",
-            "location_ref": "region_floor_walkway",
+            "location_ref": cognitive_model.get("binding_candidates", {}).get("INITIAL_EXECUTOR_REGION", "region_floor_walkway"),
             "holding": [],
         },
         "object_locations": object_locations,
@@ -1096,7 +1101,9 @@ def inject_runtime_perturbation(
     }
 
 
-def apply_step_to_runtime_world_state(state: dict[str, Any], step: str, meta: dict[str, Any], sequence: int) -> dict[str, Any]:
+def apply_step_to_runtime_world_state(
+    state: dict[str, Any], step: str, meta: dict[str, Any], sequence: int, binding: dict[str, Any] | None = None
+) -> dict[str, Any]:
     before = clone_runtime_world_state(state)
     facts = set(state.get("established_facts", []))
     missing_before = [fact for fact in meta.get("requires_facts", []) if fact not in facts]
@@ -1105,24 +1112,26 @@ def apply_step_to_runtime_world_state(state: dict[str, Any], step: str, meta: di
         facts.discard(fact)
     facts.add(meta["produces_fact"])
 
-    if meta.get("capability") == "navigate_to_region" and meta.get("target_region"):
+    bound_region = (binding or {}).get("space_binding", {}).get("target_ref") or meta.get("target_region")
+    bound_object = (binding or {}).get("object_binding", {}).get("target_ref") or meta.get("target_object")
+    if meta.get("capability") == "navigate_to_region" and bound_region:
         state["executor"]["location_type"] = "region"
-        state["executor"]["location_ref"] = meta["target_region"]
+        state["executor"]["location_ref"] = bound_region
     elif step == "pick_up_cup":
-        object_id = meta.get("target_object", "object_cup_white_mug")
+        object_id = bound_object or "object_cup_white_mug"
         if object_id not in state["executor"]["holding"]:
             state["executor"]["holding"].append(object_id)
         state["object_locations"].setdefault(object_id, {})
         state["object_locations"][object_id].update({"location_type": "executor_gripper", "location_ref": "gripper"})
     elif step == "fill_cup_at_water_source":
-        object_id = "object_cup_white_mug"
+        object_id = next(iter(state.get("executor", {}).get("holding", [])), bound_object or "object_cup_white_mug")
         state["object_locations"].setdefault(object_id, {})
         object_facts = set(state["object_locations"][object_id].get("state_facts", []))
         object_facts.discard("cup_empty")
         object_facts.add("cup_contains_water")
         state["object_locations"][object_id]["state_facts"] = sorted(object_facts)
     elif step == "pour_water":
-        object_id = "object_cup_white_mug"
+        object_id = next(iter(state.get("executor", {}).get("holding", [])), bound_object or "object_cup_white_mug")
         state["object_locations"].setdefault(object_id, {})
         object_facts = set(state["object_locations"][object_id].get("state_facts", []))
         object_facts.discard("cup_contains_water")
@@ -1833,6 +1842,11 @@ INDEX_HTML = """<!doctype html>
           <button id="askRuntimeQuestionButton" class="secondary" title="从当前任务期运行时世界状态快照回答问题">问当前状态</button>
         </div>
         <label for="perturbationKind" style="margin-top:12px;">中途扰动 / 偶然层</label>
+        <label for="migrationSpace" style="margin-top:8px;">经验迁移目标空间</label>
+        <select id="migrationSpace">
+          <option value="home_a_kitchen">原厨房空间</option>
+          <option value="site_b_corridor">走廊饮水区（跨空间）</option>
+        </select>
         <select id="perturbationKind">
           <option value="stool_in_walkway_detourable">过道放凳子（可绕开）</option>
           <option value="stool_blocks_walkway">过道凳子完全堵路</option>
@@ -1922,6 +1936,7 @@ INDEX_HTML = """<!doctype html>
     const injectPerturbationButton = document.getElementById("injectPerturbationButton");
     const runPerturbationDispatchButton = document.getElementById("runPerturbationDispatchButton");
     const perturbationKind = document.getElementById("perturbationKind");
+    const migrationSpace = document.getElementById("migrationSpace");
     const perturbationStep = document.getElementById("perturbationStep");
     const walkwayPerturbRegion = document.getElementById("walkwayPerturbRegion");
     const doorPerturbRegion = document.getElementById("doorPerturbRegion");
@@ -2463,6 +2478,15 @@ INDEX_HTML = """<!doctype html>
         ...renderSemanticSignalRows(semanticRequest, routed),
         ...renderCloudRecallRows(routed.cloud_recall_preview)
       ];
+      const bindings = payload.binding_candidate?.step_bindings || [];
+      if (bindings.length) {
+        rows.push(`<div class="stage-row"><strong>迁移空间</strong><span>${escapeHtml(payload.current_space_semantic_data?.space_id || "-")}</span></div>`);
+        for (const binding of bindings) {
+          const slot = binding.contract_slot?.slot_id || "-";
+          const target = binding.space_binding?.target_ref || binding.object_binding?.target_ref || "未绑定";
+          rows.push(`<div class="stage-row"><strong>${escapeHtml(binding.step)}</strong><span>${escapeHtml(slot)} → ${escapeHtml(target)} / ${escapeHtml(binding.capability || "-")}</span></div>`);
+        }
+      }
       factsEl.innerHTML = rows.join("");
     }
 
@@ -3085,7 +3109,7 @@ INDEX_HTML = """<!doctype html>
         const result = await fetch("/teaching/session/start", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ utterance })
+          body: JSON.stringify({ utterance, space_id: migrationSpace.value })
         }).then(r => r.json());
         appendLog("边教边动会话：" + JSON.stringify(result, null, 2));
         if (result.error) {
@@ -5960,6 +5984,7 @@ def build_binding_candidates(
     cognitive_model: dict[str, Any],
     runtime_world_state: dict[str, Any],
     body_capability_profile: dict[str, Any],
+    invariant_contract: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     regions = {item["region_id"]: item for item in cognitive_model.get("space_region_table", [])}
     objects = cognitive_model.get("object_region_index", {})
@@ -5967,37 +5992,45 @@ def build_binding_candidates(
     candidate_id = "binding_" + hashlib.sha1(("|".join(chain) or intent.get("task_type", "unknown")).encode("utf-8")).hexdigest()[:10]
     step_bindings: list[dict[str, Any]] = []
     missing_targets: list[dict[str, Any]] = []
+    contract = invariant_contract or build_invariant_contract(chain)
+    slot_specs = {item.get("slot_id"): item for item in contract.get("binding_slots", [])}
+    current_space_slots = cognitive_model.get("binding_candidates", {})
     for step in chain:
         meta = STEP_LIBRARY.get(step, {})
-        target_region = meta.get("target_region")
-        target_object = meta.get("target_object")
+        portable_slot = build_portable_binding_slot(step, meta)
+        slot_id = portable_slot["slot_id"]
+        slot_spec = slot_specs.get(slot_id, portable_slot)
+        bound_target = current_space_slots.get(slot_id)
         binding: dict[str, Any] = {
             "step": step,
+            "contract_slot": slot_spec,
             "capability": meta.get("capability"),
             "requires_facts": meta.get("requires_facts", []),
             "produces_fact": meta.get("produces_fact"),
             "destroys_facts": meta.get("destroys_facts", []),
         }
-        if target_region:
-            if target_region in regions:
+        if slot_spec.get("entity_kind") == "semantic_region":
+            if bound_target in regions:
                 binding["space_binding"] = {
                     "binding_type": "semantic_region",
-                    "target_ref": target_region,
-                    "region_type": regions[target_region].get("region_type"),
-                    "mapping_method": "topology_invariant_to_current_space_semantics",
+                    "slot_id": slot_id,
+                    "target_ref": bound_target,
+                    "region_type": regions[bound_target].get("region_type"),
+                    "mapping_method": "typed_invariant_slot_to_current_space_semantics",
                 }
             else:
-                missing_targets.append({"step": step, "target_type": "semantic_region", "target_ref": target_region})
-        if target_object:
-            if target_object in objects:
+                missing_targets.append({"step": step, "target_type": "semantic_region", "target_slot": slot_id})
+        elif slot_spec.get("entity_kind") == "interactive_object":
+            if bound_target in objects:
                 binding["object_binding"] = {
                     "binding_type": "interactive_object",
-                    "target_ref": target_object,
-                    "region_ref": objects[target_object].get("region_ref"),
-                    "mapping_method": "object_affordance_to_current_space_semantics",
+                    "slot_id": slot_id,
+                    "target_ref": bound_target,
+                    "region_ref": objects[bound_target].get("region_ref"),
+                    "mapping_method": "typed_invariant_slot_to_object_affordance",
                 }
             else:
-                missing_targets.append({"step": step, "target_type": "object", "target_ref": target_object})
+                missing_targets.append({"step": step, "target_type": "object", "target_slot": slot_id})
         if meta.get("capability"):
             binding["capability_binding"] = {
                 "required_capability": meta["capability"],
@@ -6020,6 +6053,11 @@ def build_binding_candidates(
         ],
         "step_bindings": step_bindings,
         "missing_targets": missing_targets,
+        "invariant_contract_ref": {
+            "storage_policy": contract.get("storage_policy"),
+            "binding_slot_ids": [item.get("slot_id") for item in contract.get("binding_slots", [])],
+            "source_bindings_used_as_normative": False,
+        },
         "runtime_world_state_snapshot_id": runtime_world_state.get("runtime_world_state_snapshot_id"),
     }
 
@@ -6244,16 +6282,26 @@ def build_stepwise_readaptation(
     return record
 
 
-def migrate_experience(utterance: str = "到水源处接一杯水", body_capability_profile: dict[str, Any] | None = None) -> dict[str, Any]:
+def migrate_experience(
+    utterance: str = "到水源处接一杯水",
+    body_capability_profile: dict[str, Any] | None = None,
+    space_id: str | None = None,
+) -> dict[str, Any]:
     intent = translate_intent(utterance)
-    cognitive_model = get_cognitive_model()
+    cognitive_model = get_cognitive_model(space_id)
     migration_task_id = build_migration_task_id(utterance, intent)
     runtime_world_state = build_initial_runtime_world_state(cognitive_model, {**intent, "experience_id": migration_task_id})
     runtime_world_state["migration_task_id"] = migration_task_id
     runtime_world_state["runtime_world_state_snapshot_id"] = migration_task_id + "_snapshot"
     runtime_world_state["audit_record_id"] = "audit_" + migration_task_id.removeprefix("migration_")
     profile = body_capability_profile or build_default_body_capability_profile()
-    binding_candidate = build_binding_candidates(intent, cognitive_model, runtime_world_state, profile)
+    chain = get_process_chain_for_intent(intent)
+    matching_experience = next(
+        (item for item in load_experience_library().get("experiences", []) if item.get("experience_id") == intent.get("experience_id")),
+        None,
+    )
+    invariant_contract = (matching_experience or {}).get("invariant_contract") or build_invariant_contract(chain)
+    binding_candidate = build_binding_candidates(intent, cognitive_model, runtime_world_state, profile, invariant_contract)
     feasibility = build_execution_feasibility(intent, binding_candidate, runtime_world_state, profile)
     execution_payload = build_execution_loop_payload(migration_task_id, intent, binding_candidate, feasibility)
     gap_record = build_experience_gap_record(migration_task_id, intent, binding_candidate, feasibility)
@@ -6288,6 +6336,7 @@ def migrate_experience(utterance: str = "到水源处接一杯水", body_capabil
         "migration_task_id": migration_task_id,
         "intent_translation": intent,
         "current_space_semantic_data": build_space_context(cognitive_model),
+        "experience_invariant_contract": invariant_contract,
         "body_capability_profile": profile,
         "runtime_world_state_snapshot": runtime_world_state,
         "binding_candidate": binding_candidate,
@@ -7542,6 +7591,10 @@ def dispatch_execution_loop_payload(payload: dict[str, Any], executor_type: str 
     feedback: list[dict[str, Any]] = []
     stepwise_readaptation = None
     profile = STATE_STORE.get(task_id, {}).get("body_capability_profile") or build_default_body_capability_profile()
+    payload_bindings = {
+        item.get("step"): item
+        for item in payload.get("binding_candidate_payload", {}).get("step_bindings", [])
+    }
     for index, item in enumerate(payload.get("execution_step_payload", []), start=1):
         step = item.get("step")
         meta = STEP_LIBRARY.get(step)
@@ -7592,7 +7645,7 @@ def dispatch_execution_loop_payload(payload: dict[str, Any], executor_type: str 
                 STATE_STORE[task_id]["experience_gap_record_id"] = gap_record.get("gap_record_id") if gap_record else None
                 STATE_STORE[task_id]["last_readaptation_id"] = stepwise_readaptation.get("readaptation_id")
             break
-        transition = apply_step_to_runtime_world_state(state, step, meta, index)
+        transition = apply_step_to_runtime_world_state(state, step, meta, index, payload_bindings.get(step))
         fact_status = "fact_established" if not transition["missing_before_step"] else "fact_not_established"
         feedback.append(
             {
@@ -7792,7 +7845,9 @@ def get_space_prior() -> dict[str, Any]:
     return read_json(SPACE_PRIOR_FILE)
 
 
-def get_cognitive_model() -> dict[str, Any]:
+def get_cognitive_model(space_id: str | None = None) -> dict[str, Any]:
+    if space_id == "site_b_corridor":
+        return read_json(CORRIDOR_COGNITIVE_MODEL_FILE)
     return read_json(COGNITIVE_MODEL_FILE)
 
 
@@ -7824,8 +7879,10 @@ def get_p017_minimal_loop_evidence() -> dict[str, Any]:
         "02_migration_context.json",
         "03_runtime_world_state_snapshot.json",
         "04_binding_and_feasibility.json",
+        "04b_alternate_space_binding.json",
         "05_execution_fact_feedback.json",
         "06_release_and_audit.json",
+        "07_portability_compilation.json",
     ]
     missing = [name for name in required_files if not (P017_MINIMAL_LOOP_OUTPUT / name).exists()]
     if missing:
@@ -8016,7 +8073,11 @@ class RellSampleHandler(BaseHTTPRequestHandler):
             return
         if path == "/experience/migrate":
             profile = body.get("body_capability_profile")
-            result = migrate_experience(body.get("utterance", "到水源处接一杯水"), profile if isinstance(profile, dict) else None)
+            result = migrate_experience(
+                body.get("utterance", "到水源处接一杯水"),
+                profile if isinstance(profile, dict) else None,
+                str(body.get("space_id")) if body.get("space_id") else None,
+            )
             self._send_json(result)
             return
         if path == "/preference/record":

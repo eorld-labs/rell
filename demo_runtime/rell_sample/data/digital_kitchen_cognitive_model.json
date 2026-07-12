@@ -552,7 +552,13 @@
     "KETTLE_OBJECT": "object_kettle_steel_1l",
     "CAMERA_SENSOR": "sensor_depth_front",
     "POUR_OPERATION_REGION": "region_counter_operation",
-    "WALKABLE_REGION": "region_floor_walkway"
+    "WALKABLE_REGION": "region_floor_walkway",
+    "INITIAL_EXECUTOR_REGION": "region_floor_walkway",
+    "TARGET_OPERATION_REGION": "region_counter_operation",
+    "TARGET_GRASPABLE_CONTAINER": "object_cup_white_mug",
+    "TARGET_LIQUID_SOURCE_REGION": "region_water_source",
+    "SOURCE_LIQUID_RESOURCE_REGION": "region_water_source",
+    "TARGET_POUR_DESTINATION_REGION": "region_counter_operation"
   },
   "local_environment_summary": {
     "space_id": "home_a_kitchen",

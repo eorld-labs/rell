@@ -740,3 +740,9 @@ demo_runtime/output/rell_sample/p017_minimal_loop/
 ```powershell
 python .\demo_runtime\rell_sample\run_all_checks.py
 ```
+请求可携带 `space_id`。当前样品支持：
+
+- `home_a_kitchen`：原厨房空间；
+- `site_b_corridor`：走廊饮水区，用于验证同一经验契约绑定到不同操作台、容器和水源区域。
+
+迁移响应中的 `experience_invariant_contract` 为规范契约，`binding_candidate.step_bindings[].contract_slot` 为各步骤使用的类型化槽位，`space_binding/object_binding.target_ref` 为当前空间解析得到的实体。执行载荷携带同一绑定候选，运行时状态跃迁按当前实体更新，不回退到来源空间实体。

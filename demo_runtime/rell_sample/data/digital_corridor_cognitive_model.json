@@ -1,0 +1,59 @@
+{
+  "schema_version": "1.0.0",
+  "cognitive_model_id": "site_b_corridor_service_model_v1",
+  "prior_ref": "semantic_prior_site_b_corridor_v1",
+  "subject_type": "mobile_manipulator",
+  "space_region_table": [
+    {
+      "region_id": "site_b_corridor_walkway",
+      "region_type": "walkable_area",
+      "function_attributes": ["traversable", "staying"],
+      "permission": "public_runtime",
+      "confidence": 0.93
+    },
+    {
+      "region_id": "site_b_preparation_surface",
+      "region_type": "operation_surface",
+      "function_attributes": ["interactive", "object_target", "task_execution"],
+      "permission": "task_allowed",
+      "confidence": 0.91
+    },
+    {
+      "region_id": "site_b_corridor_dispenser_zone",
+      "region_type": "resource_zone",
+      "function_attributes": ["interactive", "target_object_location", "water_resource"],
+      "permission": "task_allowed",
+      "confidence": 0.94
+    }
+  ],
+  "object_region_index": {
+    "site_b_reusable_tumbler": {
+      "object_type": "tumbler",
+      "region_ref": "site_b_preparation_surface",
+      "affordances": ["receive_liquid", "graspable", "placeable"],
+      "state_facts": ["cup_empty"]
+    },
+    "site_b_water_dispenser": {
+      "object_type": "water_dispenser",
+      "region_ref": "site_b_corridor_dispenser_zone",
+      "affordances": ["provides_water", "interactive"],
+      "state_facts": ["water_source_available"]
+    }
+  },
+  "binding_candidates": {
+    "INITIAL_EXECUTOR_REGION": "site_b_corridor_walkway",
+    "TARGET_OPERATION_REGION": "site_b_preparation_surface",
+    "TARGET_GRASPABLE_CONTAINER": "site_b_reusable_tumbler",
+    "TARGET_LIQUID_SOURCE_REGION": "site_b_corridor_dispenser_zone",
+    "SOURCE_LIQUID_RESOURCE_REGION": "site_b_corridor_dispenser_zone",
+    "TARGET_POUR_DESTINATION_REGION": "site_b_preparation_surface"
+  },
+  "local_environment_summary": {
+    "space_id": "site_b_corridor",
+    "region_count": 3,
+    "relation_count": 4,
+    "object_count": 2,
+    "conversion_rule": "bind portable invariant slots to corridor semantic regions and affordance-bearing objects",
+    "runtime_use": "cross-space experience migration and execution adaptation"
+  }
+}

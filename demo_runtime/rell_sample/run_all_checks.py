@@ -88,6 +88,21 @@ def run_http_smoke() -> None:
         agent_execution_preview = post_json("/agent/query", {"utterance": "到水源处接一杯水"})
         admit = post_json("/process/admit", {})
         migration = post_json("/experience/migrate", {"utterance": "到水源处接一杯水"})
+        corridor_migration = post_json(
+            "/experience/migrate",
+            {
+                "utterance": "到水源处接一杯水",
+                "space_id": "site_b_corridor",
+                "body_capability_profile": {
+                    "executor_id": "http_site_b_mobile_manipulator",
+                    "supported_actions": ["navigate_to_region", "grasp_object", "fill_container", "pour_container"],
+                },
+            },
+        )
+        corridor_dispatch = post_json(
+            "/execution/dispatch",
+            {"execution_loop_payload": corridor_migration["execution_loop_payload"], "executor_type": "robot_sdk"},
+        )
         migration_state = get_json(f"/runtime_world_state/{migration['migration_task_id']}")
         llm_context_view = post_json("/llm/context-view", {"task_id": migration["migration_task_id"]})
         llm_prompt_contract = post_json(
@@ -273,7 +288,7 @@ def run_http_smoke() -> None:
             raise AssertionError(f"preference library failed: {preference_library}")
         if recovery_library_before.get("recovery_records") not in ([], None):
             raise AssertionError(f"recovery library should start empty in smoke test: {recovery_library_before}")
-        if not p017_loop.get("evidence_index") or len(p017_loop.get("evidence_files", {})) != 6:
+        if not p017_loop.get("evidence_index") or len(p017_loop.get("evidence_files", {})) != 8:
             raise AssertionError(f"P017 minimal loop endpoint failed: {p017_loop}")
         if semantic_route.get("request_type") != "state_query":
             raise AssertionError(f"semantic route failed: {semantic_route}")
@@ -285,6 +300,16 @@ def run_http_smoke() -> None:
             raise AssertionError(f"admit failed: {admit}")
         if migration.get("execution_feasibility", {}).get("result") != "executable":
             raise AssertionError(f"migration failed: {migration}")
+        if corridor_migration.get("current_space_semantic_data", {}).get("space_id") != "site_b_corridor":
+            raise AssertionError(f"alternate-space migration failed: {corridor_migration}")
+        corridor_refs = {
+            item.get("space_binding", {}).get("target_ref") or item.get("object_binding", {}).get("target_ref")
+            for item in corridor_migration.get("binding_candidate", {}).get("step_bindings", [])
+        }
+        if "site_b_reusable_tumbler" not in corridor_refs or "site_b_corridor_dispenser_zone" not in corridor_refs:
+            raise AssertionError(f"alternate-space migration did not rebind contract slots: {corridor_migration}")
+        if corridor_dispatch.get("outcome") != "fact_established":
+            raise AssertionError(f"alternate-space dispatch failed: {corridor_dispatch}")
         if migration_state.get("release_status") != "not_released":
             raise AssertionError(f"runtime world state query failed: {migration_state}")
         if not llm_context_view.get("usable_as_current_world_state"):

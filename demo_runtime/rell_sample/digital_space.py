@@ -67,6 +67,16 @@ def build_subject_cognitive_model(prior: dict[str, Any], subject_type: str = "si
         for region in regions
         if region["confidence"] < 0.85 or _has_any(region, {"risk", "target_object_location"})
     ]
+    source_bindings = prior.get("binding_candidates", {})
+    portable_bindings = {
+        **source_bindings,
+        "INITIAL_EXECUTOR_REGION": source_bindings.get("WALKABLE_REGION"),
+        "TARGET_OPERATION_REGION": source_bindings.get("POUR_OPERATION_REGION"),
+        "TARGET_GRASPABLE_CONTAINER": source_bindings.get("CUP_OBJECT"),
+        "TARGET_LIQUID_SOURCE_REGION": "region_water_source",
+        "SOURCE_LIQUID_RESOURCE_REGION": "region_water_source",
+        "TARGET_POUR_DESTINATION_REGION": source_bindings.get("POUR_OPERATION_REGION"),
+    }
 
     return {
         "schema_version": "1.0.0",
@@ -103,7 +113,7 @@ def build_subject_cognitive_model(prior: dict[str, Any], subject_type: str = "si
             if _has_any(region, {"interactive", "target_object_location", "task_execution"})
         ],
         "object_region_index": object_region_index,
-        "binding_candidates": prior.get("binding_candidates", {}),
+        "binding_candidates": portable_bindings,
         "local_environment_summary": {
             "space_id": prior["target_space"]["space_id"],
             "region_count": len(regions),

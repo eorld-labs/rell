@@ -94,6 +94,23 @@ EVIDENCE_INDEX = [
         "examination_use": "用于说明本方案不是直接规划求解动作，而是对既有经验步骤进行跨空间、跨本体的绑定和准入判断。",
     },
     {
+        "file": "04b_alternate_space_binding.json",
+        "technical_feature": "同一规范经验契约在第二空间和不同执行体上重新绑定并完成执行",
+        "claim_1_step": "对经验步骤进行跨空间跨本体适配",
+        "key_fields": [
+            "alternate_space_semantic_data.space_id",
+            "alternate_binding_candidate.step_bindings",
+            "alternate_execution_feasibility.result",
+            "alternate_execution_dispatch.runtime_world_state_snapshot.executor",
+        ],
+        "code_sources": [
+            "api_server.py::migrate_experience",
+            "api_server.py::build_binding_candidates",
+            "api_server.py::dispatch_execution_loop_payload",
+        ],
+        "examination_use": "用于直接证明规范契约不依赖来源厨房实体，可绑定走廊饮水区中的不同容器、水源和执行主体。",
+    },
+    {
         "file": "05_execution_fact_feedback.json",
         "technical_feature": "开放执行闭环返回因果产出事实和因果销毁事实并回写任务期快照",
         "claim_1_step": "在可执行情况下调用执行闭环并依据事实回传更新快照",
@@ -165,6 +182,13 @@ def main() -> None:
     OUTPUT.mkdir(parents=True, exist_ok=True)
 
     migration = migrate_experience(UTTERANCE)
+    alternate_profile = {
+        "executor_id": "site_b_mobile_manipulator",
+        "executor_type": "simulated_robot",
+        "body_profile": "wheeled_arm",
+        "supported_actions": ["navigate_to_region", "grasp_object", "fill_container", "pour_container"],
+    }
+    alternate_migration = migrate_experience(UTTERANCE, alternate_profile, "site_b_corridor")
     intent = migration["intent_translation"]
     process_chain = get_process_chain_for_intent(intent)
     causal_signature = build_causal_signature(process_chain)
@@ -222,6 +246,22 @@ def main() -> None:
         },
     )
     write_json(OUTPUT / "04_binding_and_feasibility.json", binding_and_feasibility)
+    alternate_dispatch = dispatch_execution_loop_payload(alternate_migration["execution_loop_payload"], "robot_sdk")
+    write_json(
+        OUTPUT / "04b_alternate_space_binding.json",
+        evidence(
+            "同一经验不变量契约在第二数字空间和另一执行体上生成新的实体绑定与执行可行性结果",
+            "对经验步骤进行跨空间跨本体适配",
+            {
+                "source_space_binding": migration["binding_candidate"],
+                "alternate_space_semantic_data": alternate_migration["current_space_semantic_data"],
+                "alternate_executor_profile": alternate_migration["body_capability_profile"],
+                "alternate_binding_candidate": alternate_migration["binding_candidate"],
+                "alternate_execution_feasibility": alternate_migration["execution_feasibility"],
+                "alternate_execution_dispatch": alternate_dispatch,
+            },
+        ),
+    )
 
     dispatch = dispatch_execution_loop_payload(migration["execution_loop_payload"], "robot_sdk")
     execution_fact_feedback = evidence(
@@ -301,6 +341,18 @@ def main() -> None:
         assert_true(source_ref not in normative_text, f"normative contract must not depend on source entity {source_ref}")
     assert_true(runtime_snapshot_before["release_status"] == "not_released", "runtime world snapshot must be active before release")
     assert_true(migration["binding_candidate"]["step_bindings"], "binding candidate must contain step bindings")
+    assert_true(alternate_migration["execution_feasibility"]["result"] == "executable", "same experience must migrate into site_b corridor")
+    alternate_bound_refs = {
+        binding.get("space_binding", {}).get("target_ref") or binding.get("object_binding", {}).get("target_ref")
+        for binding in alternate_migration["binding_candidate"].get("step_bindings", [])
+    }
+    assert_true("site_b_reusable_tumbler" in alternate_bound_refs, "alternate migration must bind the site_b container")
+    assert_true("site_b_corridor_dispenser_zone" in alternate_bound_refs, "alternate migration must bind the site_b water source")
+    assert_true(not alternate_migration["binding_candidate"].get("missing_targets"), "alternate migration must resolve all typed slots")
+    assert_true(alternate_dispatch.get("outcome") == "fact_established", "alternate-space execution must establish the same target fact")
+    alternate_final_state = alternate_dispatch.get("runtime_world_state_snapshot", {})
+    assert_true("site_b_reusable_tumbler" in alternate_final_state.get("executor", {}).get("holding", []), "alternate execution must hold the rebound container")
+    assert_true(alternate_final_state.get("executor", {}).get("location_ref") == "site_b_corridor_dispenser_zone", "alternate execution must end at the rebound water source")
     assert_true(migration["execution_feasibility"]["result"] == "executable", "minimal loop must be executable")
     assert_true(dispatch["outcome"] == "fact_established", "dispatch must establish target fact")
     assert_true(
@@ -322,6 +374,7 @@ def main() -> None:
             "02_migration_context.json",
             "03_runtime_world_state_snapshot.json",
             "04_binding_and_feasibility.json",
+            "04b_alternate_space_binding.json",
             "05_execution_fact_feedback.json",
             "06_release_and_audit.json",
             "07_portability_compilation.json",
