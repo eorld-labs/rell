@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from embodied_scene import begin_motion_command, execute_command, start_session
+from embodied_scene import begin_motion_command, execute_command, start_session, step_motion_command
 
 
 def require(condition: bool, message: str) -> None:
@@ -31,6 +31,17 @@ def main() -> None:
     accepted = begin_motion_command(contextual["session_id"], "对")
     require(accepted.get("status") == "observation_candidate_confirmed", f"contextual confirmation not applied: {accepted}")
     require(accepted["immediate_result"]["confirmed_visual_binding"]["verification_receipt"]["physical_observation_consistent"], f"confirmation lacked physical verification: {accepted}")
+    grasp_plan = begin_motion_command(contextual["session_id"], "去拿起那个杯子")
+    require(grasp_plan["status"] == "requires_human_confirmation", f"grasp request did not produce candidate execution plan: {grasp_plan}")
+    require(grasp_plan["immediate_result"]["candidate_execution_plan"]["missing_precondition"] == "executor_within_grasp_reach", f"causal precondition was not back-chained: {grasp_plan}")
+    approved_plan = begin_motion_command(contextual["session_id"], "是的，你可以直接去拿")
+    require(approved_plan["status"] == "motion_started", f"contextual route approval did not start motion: {approved_plan}")
+    completed = None
+    for _ in range(200):
+        completed = step_motion_command(approved_plan["job_id"])
+        if completed.get("status") == "motion_completed":
+            break
+    require(completed and completed.get("result", {}).get("terminal_fact") == "target_object_in_gripper", f"causal grasp chain did not verify grasp: {completed}")
     print("Body profile and directed observation validation passed.")
 
 

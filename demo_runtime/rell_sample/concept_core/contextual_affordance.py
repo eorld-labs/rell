@@ -13,6 +13,14 @@ TASK_OPERATORS = {
         "governance": "ordinary_navigation",
         "candidate_chain": ("ground_target_instance", "plan_route_to_standoff_pose", "navigate_and_verify_near_relation"),
     },
+    "grasp_object": {
+        "tokens": ("拿起", "拿上", "抓取", "拾起", "拿住"),
+        "role": "grasp_target",
+        "required_body_actions": ("grasp_object",),
+        "required_object_claims": ("graspable",),
+        "governance": "ordinary_manipulation",
+        "candidate_chain": ("bind_confirmed_target", "plan_route_to_reach_pose", "grasp_and_verify_target_in_gripper"),
+    },
     "avoid": {
         "tokens": ("绕开", "避开", "绕过去"),
         "role": "navigation_obstacle",
@@ -67,6 +75,14 @@ def resolve_contextual_affordance_request(
         ),
         None,
     )
+    if not entity and any(token in utterance for token in ("拿起", "抓取", "拾起", "拿住")):
+        for concept in object_concepts:
+            if any(alias and alias in utterance for alias in concept.get("aliases", [])):
+                entity = next((item for item in entities if item.get("concept_id") == concept["concept_id"]), None)
+                if not entity and concept["concept_id"] == "concept_fillable_container":
+                    entity = next((item for item in entities if item.get("kind") == "graspable_container"), None)
+                if entity:
+                    break
     if not entity:
         return None
     operator = _operator(utterance)
@@ -77,6 +93,8 @@ def resolve_contextual_affordance_request(
         (item for item in object_concepts if item["concept_id"] == entity.get("concept_id")),
         None,
     )
+    if not concept and entity.get("kind") == "graspable_container":
+        concept = next((item for item in object_concepts if item["concept_id"] == "concept_fillable_container"), None)
     if not concept:
         return None
     supported_actions = set(executor_profile.get("supported_actions", []))
@@ -151,8 +169,12 @@ def resolve_contextual_affordance_request(
 
 
 def _operator(utterance: str) -> str | None:
-    ranked = sorted(TASK_OPERATORS.items(), key=lambda item: max(map(len, item[1]["tokens"])), reverse=True)
-    return next((name for name, contract in ranked if any(token in utterance for token in contract["tokens"])), None)
+    matches = []
+    for order, (name, contract) in enumerate(TASK_OPERATORS.items()):
+        matched = [token for token in contract["tokens"] if token in utterance]
+        if matched:
+            matches.append((max(map(len, matched)), -order, name))
+    return max(matches)[2] if matches else None
 
 
 def _explanation(label: str, operator: str, available: bool, missing: list[dict[str, str]]) -> str:

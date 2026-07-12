@@ -1410,6 +1410,12 @@ def _build_object_relative_motion(
         if item["entity_id"] == contextual_affordance["entity_ref"]
     )
     operator = contextual_affordance["operator_candidate"]
+    planning_entity = entity
+    if operator == "grasp_object" and entity.get("support_ref"):
+        planning_entity = next(
+            (item for item in session["runtime_objects"] if item.get("entity_id") == entity.get("support_ref")),
+            entity,
+        )
     start = list(session["state"]["executor_position"])
     envelope = build_effective_execution_envelope(
         session["executor_profile"], session.get("protection_policy_overlay")
@@ -1417,8 +1423,8 @@ def _build_object_relative_motion(
     constraints = envelope["effective_constraints"]
     planning_radius = constraints["body_radius_m"] + constraints["minimum_avoidance_distance_m"]
     clearance = planning_radius + 0.05
-    center_x, center_y = map(float, entity["position"])
-    half_x, half_y = float(entity["size"][0]) / 2, float(entity["size"][1]) / 2
+    center_x, center_y = map(float, planning_entity["position"])
+    half_x, half_y = float(planning_entity["size"][0]) / 2, float(planning_entity["size"][1]) / 2
     projected_x = min(max(start[0], center_x - half_x), center_x + half_x)
     projected_y = min(max(start[1], center_y - half_y), center_y + half_y)
     side_candidates = [
@@ -1535,6 +1541,26 @@ def _build_object_relative_motion(
         },
         "session": get_session(session["session_id"]),
     }
+    if operator == "grasp_object":
+        result["post_completion"] = {"action": "grasp", "target_entity_ref": entity["entity_id"], "mode": "direct_task"}
+        if not contextual_affordance.get("scoped_authorization_present"):
+            pending = _create_pending_confirmation(session, contextual_affordance["task_context"])
+            result.update({
+                "status": "requires_human_confirmation",
+                "reason": "candidate_route_requires_human_confirmation_before_motion_and_grasp",
+                "prompt": f"我已确认{entity['label']}的空间候选，并规划了到达其可抓取范围的无碰撞路径。可以先直接移动到杯子前再拿起吗？",
+                "pending_confirmation": deepcopy(pending),
+                "frames": [],
+                "candidate_execution_plan": {
+                    "goal_fact": "target_object_in_gripper",
+                    "missing_precondition": "executor_within_grasp_reach",
+                    "route_kind": selected["plan"]["route_kind"],
+                    "route_length_m": selected["route_length_m"],
+                    "world_revision": session["world_revision"],
+                    "candidate_only": True,
+                    "direct_execution_allowed": False,
+                },
+            })
     session["event_history"].append({
         "utterance": contextual_affordance["task_context"],
         "result": result["status"],
@@ -1568,7 +1594,7 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
         scoped_authorization=scoped_authorization,
     )
     if contextual_affordance:
-        if contextual_affordance["available"] and contextual_affordance["operator_candidate"] in {"navigate_near", "avoid"}:
+        if contextual_affordance["available"] and contextual_affordance["operator_candidate"] in {"navigate_near", "avoid", "grasp_object"}:
             return _build_object_relative_motion(session, contextual_affordance, decision_started_ns)
         return {
             **contextual_affordance,
@@ -1862,6 +1888,10 @@ def _context_confirmation_value(utterance: str) -> bool | None:
     normalized = re.sub(r"[\s，。！？、,.!?]+", "", utterance.strip().lower())
     if normalized in {"是的", "对", "对的", "可以", "好的", "好", "正确", "ok", "okay", "没错", "就是", "确认", "行", "嗯", "恩", "是"}:
         return True
+    if (normalized.startswith("是") or normalized.startswith("对")) and "可以" in normalized:
+        return True
+    if "可以" in normalized and any(token in normalized for token in ("直接", "去拿", "执行", "继续")):
+        return True
     if normalized in {"不是", "不对", "不可以", "不要", "取消", "否", "不", "错了", "不正确", "no", "不是这个"}:
         return False
     return None
@@ -1916,6 +1946,7 @@ def begin_motion_command(session_id: str, utterance: str, scoped_authorization: 
         "frames": frames,
         "next_frame_index": 0,
         "terminal_result": result,
+        "post_completion": deepcopy(result.get("post_completion")),
         "execution_collision_radius_m": (
             result.get("effective_execution_envelope", {}).get("effective_constraints", {}).get("body_radius_m", 0.0)
             + result.get("effective_execution_envelope", {}).get("effective_constraints", {}).get("minimum_avoidance_distance_m", 0.0)
@@ -2116,7 +2147,15 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
             })
     if job.get("teaching_action"):
         _record_completed_teaching_motion(session, job, result)
-    if job.get("post_completion", {}).get("action") == "grasp":
+    if (job.get("post_completion") or {}).get("action") == "grasp" and (job.get("post_completion") or {}).get("mode") == "direct_task":
+        grasp = _apply_verified_grasp(session, job["post_completion"]["target_entity_ref"], "human_confirmed_candidate_task")
+        if grasp.get("status") == "fact_established":
+            result.update(grasp)
+            result["status"] = "fact_established"
+            result["execution_chain"] = ["confirmed_target_binding", "route_replanned_from_current_state", "executor_within_grasp_reach", "grasp_physically_verified"]
+        else:
+            result = grasp
+    elif (job.get("post_completion") or {}).get("action") == "grasp":
         result = _apply_verified_grasp(
             session,
             job["post_completion"]["target_entity_ref"],
