@@ -14,12 +14,12 @@
     {"region_id": "kitchen", "label": "厨房", "center": [3.0, 0.0], "size": [4.0, 4.5], "color": "#d8e2ec", "affordances": ["navigate", "prepare", "fill_container"]}
   ],
   "objects": [
-    {"entity_id": "counter_b", "label": "岛台", "kind": "operation_surface", "region_id": "kitchen", "position": [3.35, 1.35], "size": [1.7, 0.75, 0.95], "color": "#7d695d", "fixed": true},
+    {"entity_id": "counter_b", "label": "岛台", "kind": "operation_surface", "region_id": "kitchen", "position": [3.35, 1.35], "size": [1.7, 0.75, 0.95], "color": "#7d695d", "visual_observation_signature": {"features": ["stable_horizontal_surface", "ground_supported_structure"], "color_family": "wood"}, "fixed": true},
     {"entity_id": "dispenser_b", "label": "水龙头", "kind": "water_source", "region_id": "kitchen", "position": [4.15, -1.25], "size": [0.55, 0.5, 1.2], "color": "#b8c8cf", "fixed": true},
     {"entity_id": "cup_b", "label": "蓝色陶瓷杯", "kind": "graspable_container", "region_id": "kitchen", "position": [3.0, 1.35], "elevation_m": 0.95, "support_ref": "counter_b", "size": [0.22, 0.22, 0.3], "color": "#5e91b7", "perceptual_attributes": {"color": "blue", "material": "ceramic"}, "visual_observation_signature": {"features": ["open_top", "bounded_inner_volume", "graspable_body"], "color_family": "blue"}, "fixed": false},
     {"entity_id": "apple_b", "label": "青苹果", "kind": "graspable_object", "region_id": "living_room", "position": [-2.1, -1.55], "size": [0.28, 0.28, 0.28], "color": "#83a84d", "fixed": false, "visual_observation_signature": {"features": ["compact_round_body", "fruit_surface"], "color_family": "green"}},
     {"entity_id": "sofa_b", "label": "布艺沙发", "kind": "large_furniture", "concept_id": "concept_sofa", "region_id": "living_room", "position": [-4.0, 0.85], "size": [0.9, 1.8, 0.9], "color": "#667f82", "fixed": true},
-    {"entity_id": "dining_table_b", "label": "餐桌", "kind": "operation_surface", "region_id": "living_room", "position": [-2.65, 0.35], "size": [0.95, 1.25, 0.8], "color": "#9a7353", "fixed": true},
+    {"entity_id": "dining_table_b", "label": "餐桌", "kind": "operation_surface", "region_id": "living_room", "position": [-2.65, 0.35], "size": [0.95, 1.25, 0.8], "color": "#9a7353", "visual_observation_signature": {"features": ["stable_horizontal_surface", "ground_supported_structure"], "color_family": "wood"}, "fixed": true},
     {"entity_id": "chair_b", "label": "餐椅", "kind": "movable_obstacle", "region_id": "living_room", "position": [-1.65, 0.35], "size": [0.55, 0.55, 0.85], "color": "#8c6045", "fixed": false, "active": true},
     {"entity_id": "stool_dynamic", "label": "凳子", "kind": "movable_obstacle", "region_id": "corridor", "position": [0.0, 0.0], "size": [0.7, 0.7, 0.55], "color": "#a46f42", "fixed": false, "active": false}
   ],

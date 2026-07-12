@@ -13,7 +13,7 @@
     {"region_id": "kitchen", "label": "厨房", "center": [3.0, 0.0], "size": [4.0, 4.5], "color": "#dce4ee", "affordances": ["navigate", "prepare", "fill_container"]}
   ],
   "objects": [
-    {"entity_id": "counter_a", "label": "操作台", "kind": "operation_surface", "region_id": "kitchen", "position": [3.8, -1.5], "size": [1.5, 0.65, 0.9], "color": "#66717e", "fixed": true},
+    {"entity_id": "counter_a", "label": "操作台", "kind": "operation_surface", "region_id": "kitchen", "position": [3.8, -1.5], "size": [1.5, 0.65, 0.9], "color": "#66717e", "visual_observation_signature": {"features": ["stable_horizontal_surface", "ground_supported_structure"], "color_family": "gray"}, "fixed": true},
     {"entity_id": "dispenser_a", "label": "饮水机", "kind": "water_source", "region_id": "kitchen", "position": [4.2, 1.45], "size": [0.7, 0.55, 1.45], "color": "#e9f3f7", "fixed": true},
     {"entity_id": "cup_a", "label": "白色杯子", "kind": "graspable_container", "region_id": "kitchen", "position": [3.55, -1.35], "elevation_m": 0.9, "support_ref": "counter_a", "size": [0.18, 0.18, 0.25], "color": "#f6f6f2", "perceptual_attributes": {"color": "white"}, "visual_observation_signature": {"features": ["open_top", "bounded_inner_volume", "graspable_body"], "color_family": "white"}, "fixed": false},
     {"entity_id": "apple_a", "label": "苹果", "kind": "graspable_object", "region_id": "living_room", "position": [-3.6, 1.2], "size": [0.22, 0.22, 0.22], "color": "#c83f3f", "fixed": false, "visual_observation_signature": {"features": ["compact_round_body", "fruit_surface"], "color_family": "red"}},
