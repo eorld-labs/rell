@@ -1,0 +1,52 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from embodied_scene import execute_command, load_scene, set_stool, start_session
+
+
+OUTPUT = Path(__file__).resolve().parents[1] / "output" / "rell_sample" / "p021_embodied_home"
+
+
+def require(condition: bool, message: str) -> None:
+    if not condition:
+        raise AssertionError(message)
+
+
+def main() -> None:
+    scene = load_scene()
+    require(len(scene["semantic_regions"]) >= 3, "home scene needs connected semantic regions")
+    require(all(region.get("center") and region.get("size") for region in scene["semantic_regions"]), "semantic regions need 3D volume bindings")
+    profile = scene["executor_profiles"]["home_mobile_manipulator"]
+    require(profile["body_envelope"]["radius_m"] > 0, "body envelope must constrain clearance")
+    require(profile["turning_radius_m"] > 0 and profile["arm_reach_m"] > 0, "body portrait must expose mobility and reach")
+
+    direct_session = start_session()
+    direct = execute_command(direct_session["session_id"], "往前走一点")
+    require(direct["status"] == "fact_established", f"relative command failed: {direct}")
+    require(direct["concept"]["reference_frame"] == "executor_heading", f"command must use body frame: {direct}")
+    require(len(direct["frames"]) >= 8, f"continuous feedback frames missing: {direct}")
+
+    detour_session = start_session()
+    set_stool(detour_session["session_id"], "ahead")
+    detour = execute_command(detour_session["session_id"], "往前走一点")
+    require(detour["route_kind"] == "local_detour", f"stool must trigger detour: {detour}")
+    require(len(detour["frames"]) > len(direct["frames"]), f"detour must have a distinct continuous route: {detour}")
+
+    blocked_session = start_session()
+    set_stool(blocked_session["session_id"], "narrow")
+    blocked = execute_command(blocked_session["session_id"], "往前走一点")
+    require(blocked["status"] == "requires_human_confirmation", f"narrow obstacle must ask: {blocked}")
+    require("搬走" in blocked["prompt"], f"blocked route must ask permission to move stool: {blocked}")
+    require(not blocked["frames"], f"blocked command must not animate through obstacle: {blocked}")
+
+    report = {"scene_id": scene["scene_id"], "direct": direct, "detour": detour, "blocked": blocked}
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    (OUTPUT / "embodied_home_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    print("P021 embodied semantic home validation passed.")
+    print(f"Output: {OUTPUT / 'embodied_home_report.json'}")
+
+
+if __name__ == "__main__":
+    main()

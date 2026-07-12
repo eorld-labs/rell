@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>RELL 具身家庭实验场</title>
+  <style>
+    *{box-sizing:border-box} body{margin:0;font-family:Segoe UI,"Microsoft YaHei",sans-serif;background:#101316;color:#e9edf0;overflow:hidden}
+    #scene{position:fixed;inset:0} .panel{position:fixed;z-index:2;top:16px;left:16px;width:min(390px,calc(100vw - 32px));background:rgba(20,24,27,.94);border:1px solid #3a4247;border-radius:6px;padding:14px;box-shadow:0 12px 32px rgba(0,0,0,.35)}
+    h1{font-size:18px;margin:0 0 4px;letter-spacing:0}.sub{font-size:12px;color:#aeb8bf;margin-bottom:12px}.row{display:flex;gap:8px}.row>*{min-width:0}.row input{flex:1;width:auto}.row #send{flex:0 0 70px}input,select,button{height:38px;border-radius:4px;border:1px solid #4a555d;background:#20262a;color:#f4f6f7;padding:0 10px;font:inherit}button{cursor:pointer;background:#d7e8dd;color:#14201a;border-color:#d7e8dd;font-weight:600}button.secondary{background:#293136;color:#e6ebee;border-color:#4a555d}.row button{flex:1}.status{margin-top:10px;padding-top:10px;border-top:1px solid #343c41;font-size:13px;line-height:1.55}.status strong{color:#a9d8bd}.log{margin-top:8px;max-height:150px;overflow:auto;background:#0d1012;border:1px solid #30373b;padding:8px;font:12px/1.5 Consolas,monospace;white-space:pre-wrap}.legend{position:fixed;z-index:2;right:16px;bottom:16px;background:rgba(20,24,27,.9);border:1px solid #3a4247;border-radius:6px;padding:10px;font-size:12px;color:#c9d0d4}.dot{display:inline-block;width:9px;height:9px;margin-right:5px;border-radius:2px}.feedback{position:fixed;z-index:3;left:50%;bottom:20px;transform:translateX(-50%);background:#edf4ef;color:#17221b;border-radius:4px;padding:9px 14px;font-size:13px;opacity:0;transition:opacity .2s}.feedback.show{opacity:1}@media(max-width:680px){.legend{display:none}.panel{top:8px;left:8px;width:calc(100vw - 16px)}.log{max-height:92px}}
+  </style>
+</head>
+<body>
+  <div id="scene"></div>
+  <section class="panel">
+    <h1>具身家庭实验场 A</h1>
+    <div class="sub">空间语义 × 本体画像 × 连续运动反馈</div>
+    <div class="row"><input id="command" value="往前走一点" aria-label="教学或动作指令"><button id="send">发送</button></div>
+    <div class="row" style="margin-top:8px"><select id="stoolMode"><option value="ahead">前方可绕位置</option><option value="narrow">狭窄门口不可绕</option></select><button id="stool" class="secondary">放置凳子</button><button id="reset" class="secondary">重置</button></div>
+    <div class="status">主体：<strong id="body">-</strong><br>区域：<strong id="region">-</strong>　状态：<strong id="state">准备中</strong></div>
+    <div id="log" class="log"></div>
+  </section>
+  <div class="legend"><div><span class="dot" style="background:#d8e8df"></span>客厅</div><div><span class="dot" style="background:#e8e4d8"></span>走廊</div><div><span class="dot" style="background:#dce4ee"></span>厨房</div></div>
+  <div id="feedback" class="feedback"></div>
+  <script src="/vendor/three.min.js"></script>
+  <script>
+  (async function(){
+    const sceneData=await fetch('/embodied/scene').then(r=>r.json());
+    const session=await fetch('/embodied/session/start',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(r=>r.json());
+    let sessionId=session.session_id, robot, stoolMesh;
+    const scene=new THREE.Scene(); scene.background=new THREE.Color(0x151a1d); scene.fog=new THREE.Fog(0x151a1d,10,22);
+    const camera=new THREE.PerspectiveCamera(48,innerWidth/innerHeight,.1,100); camera.position.set(7,8,8); camera.lookAt(0,0,0);
+    const renderer=new THREE.WebGLRenderer({antialias:true}); renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.setSize(innerWidth,innerHeight); renderer.shadowMap.enabled=true; document.querySelector('#scene').appendChild(renderer.domElement);
+    scene.add(new THREE.HemisphereLight(0xe9f4ff,0x3b4246,2.2)); const sun=new THREE.DirectionalLight(0xffffff,2.4); sun.position.set(4,7,5); sun.castShadow=true; scene.add(sun);
+    const mat=c=>new THREE.MeshStandardMaterial({color:c,roughness:.72,metalness:.04});
+    for(const r of sceneData.semantic_regions){const g=new THREE.BoxGeometry(r.size[0],.08,r.size[1]);const m=new THREE.Mesh(g,mat(r.color));m.position.set(r.center[0],.02,r.center[1]);m.receiveShadow=true;scene.add(m);}
+    const wallMat=mat(0x596168); for(const x of [-5,5]){const w=new THREE.Mesh(new THREE.BoxGeometry(.12,1.1,4.7),wallMat);w.position.set(x,.55,0);scene.add(w)} for(const z of [-2.3,2.3]){const w=new THREE.Mesh(new THREE.BoxGeometry(10.1,1.1,.12),wallMat);w.position.set(0,.55,z);scene.add(w)}
+    const meshes={}; for(const o of sceneData.objects){const g=o.kind==='graspable_object'?new THREE.SphereGeometry(o.size[0]/2,20,14):new THREE.BoxGeometry(...o.size);const m=new THREE.Mesh(g,mat(o.color));m.position.set(o.position[0],o.size[2]/2,o.position[1]);m.castShadow=true;m.receiveShadow=true;m.userData=o;meshes[o.entity_id]=m;if(o.active!==false)scene.add(m)} stoolMesh=meshes.stool_dynamic;
+    robot=new THREE.Group(); const base=new THREE.Mesh(new THREE.CylinderGeometry(.32,.32,.32,24),mat(0x2d7373));base.position.y=.18;base.castShadow=true;robot.add(base);const torso=new THREE.Mesh(new THREE.BoxGeometry(.46,.72,.36),mat(0xe2e8e6));torso.position.y=.7;torso.castShadow=true;robot.add(torso);const head=new THREE.Mesh(new THREE.BoxGeometry(.32,.25,.28),mat(0x202b31));head.position.y=1.18;robot.add(head);const arrow=new THREE.Mesh(new THREE.ConeGeometry(.09,.28,12),mat(0xe4b647));arrow.rotation.z=-Math.PI/2;arrow.position.set(.42,.34,0);robot.add(arrow);scene.add(robot);
+    function setRobot(p){robot.position.set(p[0],0,p[1])} setRobot(session.state.executor_position);
+    const log=t=>{const e=document.querySelector('#log');e.textContent=t+'\n'+e.textContent}; const update=s=>{document.querySelector('#body').textContent=s.executor_profile.body_profile;document.querySelector('#region').textContent=s.state.active_region}; update(session);
+    async function animateFrames(frames){for(const f of frames){setRobot(f.position);await new Promise(r=>setTimeout(r,45))}}
+    async function send(){const utterance=document.querySelector('#command').value.trim();document.querySelector('#state').textContent='执行中';const r=await fetch('/embodied/command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:sessionId,utterance})}).then(x=>x.json());await animateFrames(r.frames||[]);if(r.session)update(r.session);document.querySelector('#state').textContent=r.status;log(`${utterance}\n${r.reason||r.route_kind||r.prompt||r.status}`);const f=document.querySelector('#feedback');f.textContent=r.prompt||`已完成：${r.terminal_fact}`;f.classList.add('show');setTimeout(()=>f.classList.remove('show'),2600)}
+    async function placeStool(){const mode=document.querySelector('#stoolMode').value;const r=await fetch('/embodied/obstacle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:sessionId,mode})}).then(x=>x.json());const o=r.active_obstacles[0];if(stoolMesh.parent)scene.remove(stoolMesh);stoolMesh.position.set(o.position[0],.275,o.position[1]);scene.add(stoolMesh);log(`凳子已放置：${mode}`)}
+    document.querySelector('#send').onclick=send;document.querySelector('#stool').onclick=placeStool;document.querySelector('#reset').onclick=()=>location.reload();document.querySelector('#command').onkeydown=e=>{if(e.key==='Enter')send()};
+    addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});(function loop(){requestAnimationFrame(loop);renderer.render(scene,camera)})(); update(session);document.querySelector('#state').textContent='等待指令';log('场景与本体画像已加载');
+  })().catch(error=>{document.querySelector('#state').textContent='场景加载失败';document.querySelector('#log').textContent=error.stack||error.message});
+  </script>
+</body>
+</html>

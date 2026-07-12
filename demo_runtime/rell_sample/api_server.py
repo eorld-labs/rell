@@ -33,6 +33,11 @@ from runtime_core import (
     run_runtime_sample,
     run_simulated_runtime_sample,
 )
+from embodied_scene import execute_command as execute_embodied_command
+from embodied_scene import get_session as get_embodied_session
+from embodied_scene import load_scene as load_embodied_scene
+from embodied_scene import set_stool as set_embodied_stool
+from embodied_scene import start_session as start_embodied_session
 
 
 ROOT = Path(__file__).resolve().parent
@@ -1790,6 +1795,7 @@ INDEX_HTML = """<!doctype html>
   <main>
     <header>
       <h1>EORLD-RELL 真实世界经验引擎样品</h1>
+      <a href="/embodied" target="_blank" style="color:#17352a;background:#d7e8dd;padding:8px 12px;border-radius:4px;text-decoration:none;font-size:13px;font-weight:700">进入三维家庭实验场</a>
       <div id="serviceState" class="status-pill">待运行</div>
     </header>
     <div class="grid">
@@ -8273,6 +8279,15 @@ class RellSampleHandler(BaseHTTPRequestHandler):
         if path == "/":
             self._send_html(INDEX_HTML)
             return
+        if path == "/embodied":
+            self._send_html((ROOT / "embodied_home.html").read_text(encoding="utf-8"))
+            return
+        if path == "/vendor/three.min.js":
+            self._send_javascript((ROOT / "vendor" / "three.min.js").read_text(encoding="utf-8"))
+            return
+        if path == "/embodied/scene":
+            self._send_json(load_embodied_scene())
+            return
         if path == "/health":
             self._send_json({"status": "ok", "service": "eorld-rell"})
             return
@@ -8340,6 +8355,11 @@ class RellSampleHandler(BaseHTTPRequestHandler):
         if path.startswith("/physics/session/"):
             session_id = path.removeprefix("/physics/session/")
             result = get_physics_session(session_id)
+            self._send_json(result, status=404 if "error" in result else 200)
+            return
+        if path.startswith("/embodied/session/"):
+            session_id = path.removeprefix("/embodied/session/")
+            result = get_embodied_session(session_id)
             self._send_json(result, status=404 if "error" in result else 200)
             return
         if path.startswith("/teaching/session/"):
@@ -8530,6 +8550,18 @@ class RellSampleHandler(BaseHTTPRequestHandler):
             result = start_physics_session(body.get("execution_loop_payload", {}), body.get("executor_options", {}))
             self._send_json(result, status=400 if "error" in result else 200)
             return
+        if path == "/embodied/session/start":
+            result = start_embodied_session(str(body.get("executor_profile_id", "home_mobile_manipulator")))
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/embodied/obstacle":
+            result = set_embodied_stool(str(body.get("session_id", "")), str(body.get("mode", "ahead")))
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/embodied/command":
+            result = execute_embodied_command(str(body.get("session_id", "")), str(body.get("utterance", "")))
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
         if path == "/physics/session/step":
             result = step_physics_session(str(body.get("session_id", "")))
             self._send_json(result, status=400 if "error" in result else 200)
@@ -8588,6 +8620,14 @@ class RellSampleHandler(BaseHTTPRequestHandler):
         encoded = html.encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.end_headers()
+        self.wfile.write(encoded)
+
+    def _send_javascript(self, source: str, status: int = 200) -> None:
+        encoded = source.encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "text/javascript; charset=utf-8")
         self.send_header("Content-Length", str(len(encoded)))
         self.end_headers()
         self.wfile.write(encoded)

@@ -459,6 +459,7 @@ def main() -> None:
     run_python("validate_p017_minimal_loop.py")
     run_python("validate_p017_generalization_pressure.py")
     run_python("validate_p019_behavior_scenarios.py")
+    run_python("validate_p021_embodied_home.py")
     run_physics_python("validate_p020_minimal_physics.py")
     run_http_smoke()
     print("All RELL sample checks passed.")
