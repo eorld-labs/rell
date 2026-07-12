@@ -459,6 +459,10 @@ def add_real_world_calibration(
     source_type: str,
     matched_features: list[str],
     human_confirmed: bool,
+    identity_confirmed: bool | None = None,
+    visual_invariants_confirmed: bool | None = None,
+    functional_facts_confirmed: bool = False,
+    uncertain_features: list[str] | None = None,
 ) -> dict[str, Any]:
     if source_type not in {"user_provided_real_image", "current_robot_camera_verified_crop"}:
         return {"error": "calibration_source_is_not_real_world_evidence", "source_type": source_type}
@@ -466,15 +470,25 @@ def add_real_world_calibration(
     candidate = next((item for item in store["candidates"] if item["candidate_id"] == candidate_id), None)
     if not candidate:
         return {"error": "visual_candidate_not_found", "candidate_id": candidate_id}
+    identity_confirmation = bool(human_confirmed) if identity_confirmed is None else bool(identity_confirmed)
+    visual_confirmation = bool(human_confirmed) if visual_invariants_confirmed is None else bool(visual_invariants_confirmed)
+    calibration_confirmed = identity_confirmation and visual_confirmation
     evidence = {
         "observation_ref": observation_ref,
         "source_type": source_type,
         "matched_features": sorted(set(matched_features)),
-        "human_confirmed": bool(human_confirmed),
-        "evidence_level": "R1_real_observation_confirmed" if human_confirmed else "R0_real_observation_candidate",
+        "uncertain_features": sorted(set(uncertain_features or [])),
+        "human_confirmed": calibration_confirmed,
+        "confirmation_scope": {
+            "object_identity": identity_confirmation,
+            "visual_invariants": visual_confirmation,
+            "functional_facts": bool(functional_facts_confirmed),
+        },
+        "functional_facts_require_independent_physical_verification": not bool(functional_facts_confirmed),
+        "evidence_level": "R1_identity_and_visual_invariants_confirmed" if calibration_confirmed else "R0_real_observation_candidate",
     }
     candidate["real_calibration_evidence"].append(evidence)
-    candidate["status"] = "eligible_for_promotion_review" if human_confirmed else "awaiting_real_world_calibration"
+    candidate["status"] = "eligible_for_promotion_review" if calibration_confirmed else "awaiting_real_world_calibration"
     _save_store(store)
     return deepcopy(candidate)
 

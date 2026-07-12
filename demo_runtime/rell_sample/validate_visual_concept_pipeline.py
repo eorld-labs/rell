@@ -69,6 +69,8 @@ def main() -> None:
         human_confirmed=True,
     )
     require(calibrated["status"] == "eligible_for_promotion_review", f"real calibration did not unlock review: {calibrated}")
+    legacy_scope = calibrated["real_calibration_evidence"][-1]["confirmation_scope"]
+    require(legacy_scope == {"object_identity": True, "visual_invariants": True, "functional_facts": False}, f"legacy confirmation over-proved functional facts: {calibrated}")
     promoted = promote_visual_candidate(candidate["candidate_id"])
     require(promoted["status"] == "promoted_visual_adapter", f"calibrated candidate was not promoted: {promoted}")
     require(promoted["load_policy"] == "on_demand" and not promoted["runtime_visible"] and not promoted["direct_execution_allowed"], f"promoted adapter hot-mutated runtime or gained execution authority: {promoted}")
@@ -173,9 +175,16 @@ def main() -> None:
         observation_ref="user_image://verified/bowl_1",
         source_type="user_provided_real_image",
         matched_features=["open_top", "bounded_inner_volume", "stable_base"],
-        human_confirmed=True,
+        human_confirmed=False,
+        identity_confirmed=True,
+        visual_invariants_confirmed=True,
+        functional_facts_confirmed=False,
+        uncertain_features=["liquid_retention_without_leakage"],
     )
     require(calibrated_bowl["status"] == "eligible_for_promotion_review", f"real bowl evidence did not calibrate visual candidate: {calibrated_bowl}")
+    bowl_evidence = calibrated_bowl["real_calibration_evidence"][-1]
+    require(bowl_evidence["confirmation_scope"] == {"object_identity": True, "visual_invariants": True, "functional_facts": False}, f"scoped calibration conflated identity and function: {bowl_evidence}")
+    require(bowl_evidence["uncertain_features"] == ["liquid_retention_without_leakage"], f"uncertain visual feature was discarded: {bowl_evidence}")
     blocked_visual_promotion = promote_visual_candidate(bowl_visual_candidate["candidate_id"])
     require(blocked_visual_promotion.get("error") == "object_concept_kernel_promotion_required", f"visual adapter outran its object concept kernel: {blocked_visual_promotion}")
     promoted_kernel = promote_concept_kernel_candidate(bowl_kernel["kernel_candidate_id"])

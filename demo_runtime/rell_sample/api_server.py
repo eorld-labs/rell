@@ -8711,6 +8711,10 @@ class RellSampleHandler(BaseHTTPRequestHandler):
                 source_type=str(body.get("source_type", "")),
                 matched_features=body.get("matched_features") if isinstance(body.get("matched_features"), list) else [],
                 human_confirmed=bool(body.get("human_confirmed", False)),
+                identity_confirmed=body.get("identity_confirmed") if isinstance(body.get("identity_confirmed"), bool) else None,
+                visual_invariants_confirmed=body.get("visual_invariants_confirmed") if isinstance(body.get("visual_invariants_confirmed"), bool) else None,
+                functional_facts_confirmed=bool(body.get("functional_facts_confirmed", False)),
+                uncertain_features=body.get("uncertain_features") if isinstance(body.get("uncertain_features"), list) else [],
             )
             self._send_json(result, status=400 if "error" in result else 200)
             return
