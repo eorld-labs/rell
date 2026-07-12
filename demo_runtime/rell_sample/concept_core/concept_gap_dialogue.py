@@ -10,6 +10,18 @@ from typing import Any
 SLOT_PRIORITY = ["target_entity", "desired_postcondition", "verification_condition"]
 
 
+def _action_focus_text(text: str) -> str:
+    focused = text.strip()
+    conditional_prefix = re.match(r"^(?:如果|当).+?(?:时[，,]?|[，,](?:就|则)?|就|则)", focused)
+    if conditional_prefix:
+        focused = focused[conditional_prefix.end():]
+    return re.split(
+        r"[，,；;。]|让|使得?|变成|变为|直到|看到|观察到|检测到|确认|完成后|结果是|目标是|以.+?(?:为验真条件|为成功标准|为准)",
+        focused,
+        maxsplit=1,
+    )[0]
+
+
 def extract_compositional_semantics(text: str) -> dict[str, Any]:
     normalized = text.strip(" ，。！？,.!?；;：:")
     preconditions: list[str] = []
@@ -88,7 +100,7 @@ def _known_entity_mentions(
 
 
 def _extract_unknown_action_surface(text: str, entity_mentions: list[dict[str, Any]]) -> str:
-    action_clause = re.split(r"[，,；;。]|让|使得?|变成|变为|直到|看到|观察到|检测到|确认", text, maxsplit=1)[0]
+    action_clause = _action_focus_text(text)
     residual = action_clause
     for mention in sorted(entity_mentions, key=lambda item: len(item["surface_form"]), reverse=True):
         residual = residual.replace(mention["surface_form"], "")
@@ -121,7 +133,8 @@ def start_concept_gap_dialogue(
 ) -> dict[str, Any]:
     started_ns = perf_counter_ns()
     mentions = _known_entity_mentions(utterance, runtime_objects, object_concepts)
-    target = mentions[0] if len(mentions) == 1 else None
+    action_mentions = _known_entity_mentions(_action_focus_text(utterance), runtime_objects, object_concepts)
+    target = action_mentions[0] if len(action_mentions) == 1 else None
     composition = extract_compositional_semantics(utterance)
     composition["desired_postcondition"] = _resolve_local_pronouns(composition["desired_postcondition"], target)
     composition["verification_condition"] = _resolve_local_pronouns(composition["verification_condition"], target)
@@ -138,6 +151,7 @@ def start_concept_gap_dialogue(
             "precondition_descriptions": composition["precondition_descriptions"],
         },
         "candidate_entities": deepcopy(mentions),
+        "action_target_candidates": deepcopy(action_mentions),
         "turns": [{"speaker": "human", "text": utterance, "slot": "source_utterance"}],
         "world_revision_at_start": world_revision,
         "candidate_only": True,
