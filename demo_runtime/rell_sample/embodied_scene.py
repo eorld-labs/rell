@@ -395,6 +395,37 @@ def build_visual_concept_pack_catalog() -> dict[str, Any]:
     return build_visual_pack_catalog()
 
 
+def _is_holding_state_query(text: str) -> bool:
+    return any(pattern in text for pattern in ("拿着什么", "手里有什么", "手上有什么", "手上拿着什么", "握着什么", "持有什么"))
+
+
+def _answer_holding_state_query(session: dict[str, Any]) -> dict[str, Any]:
+    holding_ref = session.get("state", {}).get("holding")
+    entity = next((item for item in session.get("runtime_objects", []) if item.get("entity_id") == holding_ref), None)
+    if entity:
+        prompt = f"我当前拿着{entity.get('label', holding_ref)}。这个回答来自刚刚通过抓取验真建立的当前持有事实。"
+        fact = "object_in_gripper"
+    else:
+        prompt = "我当前没有拿着东西。这个回答来自当前执行体的持有状态。"
+        fact = "gripper_empty"
+    return {
+        "status": "runtime_holding_state_answered",
+        "query_type": "holding_state",
+        "prompt": prompt,
+        "runtime_fact": fact,
+        "holding_entity_ref": holding_ref,
+        "holding_entity": deepcopy(entity),
+        "state_evidence": {
+            "source": "current_executor_holding_state",
+            "world_revision": session["world_revision"],
+            "physical_verification_required_before_state_write": True,
+        },
+        "candidate_only": False,
+        "direct_execution_allowed": False,
+        "session": get_session(session["session_id"]),
+    }
+
+
 def _is_open_world_observation_query(text: str) -> bool:
     broad = any(pattern in text for pattern in ("看到什么", "看到了什么", "有什么东西", "有哪些东西", "周围有什么"))
     directed = any(pattern in text for pattern in ("看得到", "看的到", "能看到", "能看见", "看得见", "有没有看到", "看到吗", "看见吗"))
@@ -1576,6 +1607,8 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
     if not session:
         return {"error": "embodied_session_not_found", "session_id": session_id}
     text = utterance.strip()
+    if _is_holding_state_query(text):
+        return _answer_holding_state_query(session)
     if _is_open_world_observation_query(text):
         observation = _answer_observation_query(session, text)
         session["open_world_observation"] = deepcopy(observation)

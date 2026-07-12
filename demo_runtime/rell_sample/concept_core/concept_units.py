@@ -25,7 +25,7 @@ STATE_CONCEPT_UNITS: list[dict[str, Any]] = [
         "concept_id": "state_concept_holding_state",
         "display_name": "持有状态查询概念",
         "query_type": "holding_state",
-        "aliases": ["拿着什么", "手里有什么", "握着什么", "持有什么"],
+        "aliases": ["拿着什么", "手里有什么", "手上有什么", "手上拿着什么", "握着什么", "持有什么"],
         "source_slots": ["executor.holding"],
         "source_policy": "runtime_world_state_snapshot_only",
     },

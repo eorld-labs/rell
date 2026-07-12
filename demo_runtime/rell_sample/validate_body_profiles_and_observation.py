@@ -44,6 +44,9 @@ def main() -> None:
         if completed.get("status") == "motion_completed":
             break
     require(completed and completed.get("result", {}).get("terminal_fact") == "target_object_in_gripper", f"causal grasp chain did not verify grasp: {completed}")
+    holding_query = execute_command(contextual["session_id"], "现在手上拿着什么")
+    require(holding_query["status"] == "runtime_holding_state_answered", f"holding state query did not use runtime state: {holding_query}")
+    require(holding_query["runtime_fact"] == "object_in_gripper", f"holding fact was not derived from verified grasp: {holding_query}")
     print("Body profile and directed observation validation passed.")
 
 
