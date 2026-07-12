@@ -68,6 +68,7 @@ from visual_concept_pipeline import (
     release_kernel_candidate_generation,
     review_concept_kernel_candidate,
 )
+from qwen_visual_adapter import QwenVisualConceptAdapter
 
 
 ROOT = Path(__file__).resolve().parent
@@ -8614,6 +8615,30 @@ class RellSampleHandler(BaseHTTPRequestHandler):
                 body.get("proposal", {}),
                 source_type=str(body.get("source_type", "external_model_candidate")),
             )
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/visual-concepts/kernels/propose-qwen":
+            base_url = os.environ.get("RELL_QWEN_COMPATIBLE_BASE_URL", "")
+            api_key = os.environ.get("RELL_QWEN_API_KEY", "")
+            model = os.environ.get("RELL_QWEN_VISUAL_MODEL", "")
+            if not base_url or not api_key or not model:
+                self._send_json({"error": "qwen_visual_provider_not_configured"}, status=400)
+                return
+            pipeline = get_pipeline_state()
+            gap_id = str(body.get("gap_id", ""))
+            gap = next((item for item in pipeline["concept_gap_candidates"] if item["gap_id"] == gap_id), None)
+            if not gap:
+                self._send_json({"error": "visual_concept_gap_not_found", "gap_id": gap_id}, status=400)
+                return
+            try:
+                adapter = QwenVisualConceptAdapter(base_url=base_url, api_key=api_key, model=model)
+                result = adapter.propose_kernel(
+                    gap,
+                    [str(item) for item in body.get("image_refs", [])],
+                    language_context=str(body.get("language_context", "")),
+                )
+            except Exception as error:
+                result = {"error": "qwen_visual_candidate_request_failed", "error_type": type(error).__name__}
             self._send_json(result, status=400 if "error" in result else 200)
             return
         if path == "/visual-concepts/kernels/review":

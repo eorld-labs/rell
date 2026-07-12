@@ -148,6 +148,15 @@ def run_http_smoke() -> None:
                 },
             },
         )
+        try:
+            post_json(
+                "/visual-concepts/kernels/propose-qwen",
+                {"gap_id": bowl_gap["gap_id"], "image_refs": ["https://example.invalid/bowl.jpg"]},
+            )
+            raise AssertionError("unconfigured Qwen provider unexpectedly accepted request")
+        except Exception as error:
+            if "HTTP Error 400" not in str(error):
+                raise
         bowl_kernel_review = post_json(
             "/visual-concepts/kernels/review",
             {
@@ -546,6 +555,7 @@ def main() -> None:
     run_python("validate_embodied_home.py")
     run_python("validate_small_vocabulary_generalization.py")
     run_python("validate_visual_concept_pipeline.py")
+    run_python("validate_qwen_visual_adapter.py")
     run_physics_python("validate_minimal_physics.py")
     run_http_smoke()
     print("All RELL sample checks passed.")
