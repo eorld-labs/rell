@@ -164,10 +164,42 @@ def main() -> None:
     require(role_gap["factory_concept"]["reason_code"] == "required_semantic_roles_not_grounded", f"unknown object was not distinguished from skill absence: {role_gap}")
     require(role_gap["post_action"]["clarification_required"], f"role gap did not ask for grounding: {role_gap}")
 
-    unknown_gap = execute_command(zero_id, "跳起来")
-    require(unknown_gap["status"] == "factory_concept_gap", f"unknown event did not expose concept gap: {unknown_gap}")
+    unknown_session = start_session()
+    unknown_id = unknown_session["session_id"]
+    unknown_gap = execute_command(unknown_id, "归整苹果")
+    require(unknown_gap["status"] == "concept_gap_clarification_required", f"unknown event did not expose concept gap: {unknown_gap}")
     require(unknown_gap["concept_gap"]["understanding_status"] == "operator_and_goal_fact_unknown", f"unknown concept overclaimed understanding: {unknown_gap}")
-    require(unknown_gap["post_action"]["teaching_available"] and unknown_gap["post_action"]["clarification_required"], f"unknown concept did not enter recoverable post-processing: {unknown_gap}")
+    require(unknown_gap["concept_gap"]["recognized_entities"][0]["entity_ref"] == "apple_a", f"unknown event failed to reuse known object concepts: {unknown_gap}")
+    require(unknown_gap["concept_gap"]["unknown_action_surface"] == "归整", f"unknown action surface was not isolated: {unknown_gap}")
+    require(not unknown_gap["post_action"]["teaching_available"] and unknown_gap["post_action"]["clarification_required"], f"teaching was offered before goal semantics were understood: {unknown_gap}")
+    require(unknown_gap["session"]["concept_gap_dialogue"]["pending_slot"] == "desired_postcondition", f"minimum causal question order incorrect: {unknown_gap}")
+
+    postcondition_answer = execute_command(unknown_id, "苹果和其他水果放在同一个收纳区域")
+    require(postcondition_answer["status"] == "concept_gap_clarification_required", f"postcondition answer prematurely compiled contract: {postcondition_answer}")
+    require(postcondition_answer["concept_gap_analysis"]["pending_slot"] == "verification_condition", f"verification was not requested next: {postcondition_answer}")
+    require(postcondition_answer["concept_gap_analysis"]["slots"]["desired_postcondition"] == "苹果和其他水果放在同一个收纳区域", f"postcondition was not retained: {postcondition_answer}")
+
+    verification_answer = execute_command(unknown_id, "视觉看到所有水果都位于水果收纳区内")
+    require(verification_answer["status"] == "temporary_effect_contract_compiled", f"minimum causal slots did not compile temporary contract: {verification_answer}")
+    temporary = verification_answer["temporary_effect_contract"]
+    require(temporary["language_trigger"] == "归整" and temporary["semantic_roles"]["target"]["entity_ref"] == "apple_a", f"temporary concept lost language or object binding: {temporary}")
+    require(temporary["effect_contract"]["human_readable_postcondition"] == "苹果和其他水果放在同一个收纳区域", f"temporary goal fact lost human semantics: {temporary}")
+    require(temporary["knowledge_boundary"]["goal_and_verification_understood"] and not temporary["knowledge_boundary"]["operator_mechanism_known"], f"goal understanding was conflated with knowing how: {temporary}")
+    require(temporary["knowledge_boundary"]["requires_embodied_teaching"] and temporary["knowledge_boundary"]["not_promoted_to_factory_library"], f"temporary contract bypassed teaching promotion: {temporary}")
+    require(verification_answer["post_action"]["teaching_available"] and not temporary["direct_execution_allowed"], f"compiled gap contract did not enter safe teaching path: {verification_answer}")
+
+    motion_gap_session = start_session()
+    motion_gap_id = motion_gap_session["session_id"]
+    motion_gap_first = begin_motion_command(motion_gap_id, "归整苹果")["immediate_result"]
+    require(motion_gap_first["status"] == "concept_gap_clarification_required", f"motion entry did not start gap dialogue: {motion_gap_first}")
+    require(SESSIONS[motion_gap_id]["concept_gap_dialogue"]["pending_slot"] == "desired_postcondition", f"motion transaction rolled back cognitive dialogue: {SESSIONS[motion_gap_id]}")
+    motion_gap_second = begin_motion_command(motion_gap_id, "苹果和其他水果放在同一个收纳区域")["immediate_result"]
+    require(motion_gap_second["concept_gap_analysis"]["pending_slot"] == "verification_condition", f"motion entry rerouted clarification answer as a new task: {motion_gap_second}")
+    motion_gap_third = begin_motion_command(motion_gap_id, "视觉看到所有水果都位于水果收纳区内")["immediate_result"]
+    require(motion_gap_third["status"] == "temporary_effect_contract_compiled", f"motion entry failed multi-turn contract compilation: {motion_gap_third}")
+
+    no_entity_gap = begin_motion_command(start_session()["session_id"], "跳起来")["immediate_result"]
+    require(no_entity_gap["status"] == "concept_gap_clarification_required" and "哪个对象" in no_entity_gap["prompt"], f"unknown task without entity crashed or skipped target clarification: {no_entity_gap}")
 
     perception_session = start_session()
     perception_started = begin_motion_command(perception_session["session_id"], "去桌子上拿杯子")

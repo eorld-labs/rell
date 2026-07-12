@@ -12,6 +12,7 @@ from .concept_bridge import (
 from .concept_evidence import build_concept_evidence_packet, build_gap_evidence_packet
 from .concept_lifecycle import build_concept_lifecycle_view, record_concept_fallback, record_concept_reuse
 from .concept_parser import resolve_action_concepts
+from .concept_gap_dialogue import continue_concept_gap_dialogue, start_concept_gap_dialogue
 from .factory_event_units import (
     FACTORY_EVENT_CONCEPT_UNITS,
     build_factory_inability_diagnosis,
@@ -86,6 +87,8 @@ __all__ = [
     "infer_local_concept_gap",
     "request_cloud_concept_support",
     "resolve_action_concepts",
+    "start_concept_gap_dialogue",
+    "continue_concept_gap_dialogue",
     "resolve_runtime_state_query",
     "activate_task_perception",
     "build_task_perception_result",

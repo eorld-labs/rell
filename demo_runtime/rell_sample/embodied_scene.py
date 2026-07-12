@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from concept_core.factory_event_units import FACTORY_EVENT_CONCEPT_UNITS, build_factory_inability_diagnosis, find_factory_event_concepts_by_text
+from concept_core.concept_gap_dialogue import continue_concept_gap_dialogue, start_concept_gap_dialogue
 from concept_core.functional_object_reasoning import build_functional_object_catalog, build_functional_profile, evaluate_role_compatibility
 from concept_core.factory_state_facts import build_factory_state_catalog, derive_runtime_fact_snapshot, explain_prerequisite_gaps
 from concept_core.lightweight_orchestrator import build_lightweight_causal_candidate, build_lightweight_orchestrator_catalog
@@ -102,6 +103,7 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator") -> dict[
         "active_obstacles": [],
         "world_revision": 0,
         "event_history": [],
+        "concept_gap_dialogue": None,
     }
     SESSIONS[session_id] = session
     return deepcopy(session)
@@ -1088,6 +1090,34 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
     if not session:
         return {"error": "embodied_session_not_found", "session_id": session_id}
     text = utterance.strip()
+    active_gap_dialogue = session.get("concept_gap_dialogue") or {}
+    if active_gap_dialogue.get("status") == "collecting_minimum_causal_contract":
+        continued = continue_concept_gap_dialogue(
+            active_gap_dialogue,
+            answer=text,
+            runtime_objects=session["runtime_objects"],
+            object_concepts=load_object_concepts()["concepts"],
+            current_world_revision=session["world_revision"],
+        )
+        session["concept_gap_dialogue"] = continued["dialogue"]
+        return {
+            "status": "temporary_effect_contract_compiled" if continued.get("compiled_contract") else "concept_gap_clarification_required",
+            "reason": "unknown_event_multi_turn_causal_analysis",
+            "prompt": continued["prompt"],
+            "concept_gap_analysis": {
+                "dialogue_id": continued["dialogue"]["dialogue_id"],
+                "slots": deepcopy(continued["dialogue"]["slots"]),
+                "pending_slot": continued["dialogue"].get("pending_slot"),
+                "analysis_ms": continued.get("analysis_ms"),
+            },
+            "temporary_effect_contract": continued.get("compiled_contract"),
+            "post_action": {
+                "action": "offer_embodied_teaching" if continued.get("compiled_contract") else "await_clarification_answer",
+                "teaching_available": bool(continued.get("compiled_contract")),
+                "clarification_required": not continued.get("compiled_contract"),
+            },
+            "session": get_session(session_id),
+        }
     perception_result = build_task_perception_result(load_scene(), session, text)
     factory_matches = find_factory_event_concepts_by_text(_normalize_factory_text(text))
     if factory_matches:
@@ -1124,22 +1154,34 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
         return perception_result
     direction = _relative_direction(text)
     if not direction:
+        gap_started = start_concept_gap_dialogue(
+            utterance=text,
+            runtime_objects=session["runtime_objects"],
+            object_concepts=load_object_concepts()["concepts"],
+            world_revision=session["world_revision"],
+        )
+        session["concept_gap_dialogue"] = gap_started["dialogue"]
         return {
-            "status": "factory_concept_gap",
+            "status": "concept_gap_clarification_required",
             "reason": "no_stable_factory_event_concept_match",
-            "prompt": "我还不能把这句话稳定映射到一个客观状态跃迁，因此不知道成功后世界应发生什么变化。请说明要改变哪个对象的什么状态，或进入真人教学示范一次。",
+            "prompt": gap_started["prompt"],
             "concept_gap": {
                 "utterance": text,
                 "understanding_status": "operator_and_goal_fact_unknown",
                 "known_state_transition": None,
-                "missing_information": ["target_entity_or_activity", "expected_postcondition", "verification_condition"],
-                "next_actions": ["request_goal_clarification", "offer_embodied_teaching"],
+                "unknown_action_surface": gap_started["analysis"]["unknown_action_surface"],
+                "recognized_entities": gap_started["analysis"]["recognized_entities"],
+                "known": gap_started["analysis"]["known"],
+                "missing_information": gap_started["analysis"]["unknown"],
+                "question_selection_policy": gap_started["analysis"]["question_selection_policy"],
+                "analysis_ms": gap_started["analysis"]["analysis_ms"],
+                "next_actions": ["answer_minimum_causal_question", "offer_embodied_teaching_after_goal_contract"],
                 "candidate_only": True,
                 "direct_execution_allowed": False,
             },
             "post_action": {
                 "action": "request_goal_clarification_or_offer_embodied_teaching",
-                "teaching_available": True,
+                "teaching_available": False,
                 "clarification_required": True,
             },
             "session": get_session(session_id),
@@ -1321,6 +1363,7 @@ def begin_motion_command(session_id: str, utterance: str, scoped_authorization: 
     result = execute_command(session_id, utterance, scoped_authorization)
     pending_confirmation = deepcopy(SESSIONS[session_id].get("pending_confirmation"))
     perception_history = deepcopy(SESSIONS[session_id].get("perception_history", []))
+    concept_gap_dialogue = deepcopy(SESSIONS[session_id].get("concept_gap_dialogue"))
     SESSIONS[session_id] = before
     frames = result.get("frames", [])
     if not frames:
@@ -1328,6 +1371,8 @@ def begin_motion_command(session_id: str, utterance: str, scoped_authorization: 
             SESSIONS[session_id]["pending_confirmation"] = pending_confirmation
         if result.get("task_perception_frame"):
             SESSIONS[session_id]["perception_history"] = perception_history
+        if concept_gap_dialogue:
+            SESSIONS[session_id]["concept_gap_dialogue"] = concept_gap_dialogue
         result["session"] = get_session(session_id)
         return {"status": result.get("status"), "immediate_result": result, "session": get_session(session_id)}
     job_id = "motion_" + hashlib.sha1(f"{session_id}|{len(MOTION_JOBS) + 1}".encode()).hexdigest()[:12]
