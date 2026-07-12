@@ -55,7 +55,7 @@ FACTORY_EVENT_CONCEPT_UNITS: list[dict[str, Any]] = [
         "factory_event_observe",
         "观察对象事件概念",
         "observe_entity",
-        ["看看", "看一下", "观察", "找找", "找到"],
+        ["看看", "看一下", "观察", "找找", "找到", "看得到", "看的到", "能看到", "能看见"],
         "active_perception",
         {"object": {"role": "target", "entity_type": "perceivable_entity"}},
         ["sensor_available"],

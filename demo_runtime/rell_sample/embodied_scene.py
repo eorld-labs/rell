@@ -397,7 +397,7 @@ def build_visual_concept_pack_catalog() -> dict[str, Any]:
 
 def _is_open_world_observation_query(text: str) -> bool:
     broad = any(pattern in text for pattern in ("看到什么", "看到了什么", "有什么东西", "有哪些东西", "周围有什么"))
-    directed = any(pattern in text for pattern in ("看得到", "能看到", "能看见", "看得见", "有没有看到"))
+    directed = any(pattern in text for pattern in ("看得到", "看的到", "能看到", "能看见", "看得见", "有没有看到", "看到吗", "看见吗"))
     # Natural confirmations such as “看到杯子没有” omit the usual question
     # prefix. Keep them on the observation path when a known object concept is
     # present, instead of sending them into task/event parsing.
