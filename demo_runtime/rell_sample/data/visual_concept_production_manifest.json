@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0.0",
+  "manifest_id": "daily_life_objects_seed_v1",
+  "items": [
+    {"item_id": "cup", "display_name": "杯子", "concept_id": "concept_fillable_container", "priority": "resident"},
+    {"item_id": "table", "display_name": "桌子", "concept_id": "concept_support_surface", "priority": "resident"},
+    {"item_id": "apple", "display_name": "苹果", "concept_id": "concept_edible_apple", "priority": "resident"},
+    {"item_id": "water_dispenser", "display_name": "饮水机", "concept_id": "concept_water_source_asset", "priority": "resident"},
+    {"item_id": "stool", "display_name": "凳子", "concept_id": "concept_movable_stool_obstacle", "priority": "resident"},
+    {"item_id": "bowl", "display_name": "碗", "concept_id": null, "priority": "on_demand", "proposed_roles": ["container", "supportable_object"]},
+    {"item_id": "bottle", "display_name": "瓶子", "concept_id": null, "priority": "on_demand", "proposed_roles": ["container", "liquid_source_or_destination"]},
+    {"item_id": "door", "display_name": "门", "concept_id": null, "priority": "on_demand", "proposed_roles": ["openable_object", "spatial_transition"]},
+    {"item_id": "trash_bin", "display_name": "垃圾桶", "concept_id": null, "priority": "on_demand", "proposed_roles": ["container", "waste_destination"]},
+    {"item_id": "refrigerator", "display_name": "冰箱", "concept_id": null, "priority": "on_demand", "proposed_roles": ["openable_object", "storage_appliance"]}
+  ],
+  "boundary": {
+    "image_generation_cannot_create_object_concept_kernel": true,
+    "missing_concept_items_become_concept_gap_candidates": true,
+    "batch_failure_does_not_affect_runtime": true,
+    "direct_execution_allowed": false
+  }
+}

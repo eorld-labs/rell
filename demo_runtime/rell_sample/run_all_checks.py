@@ -121,6 +121,14 @@ def run_http_smoke() -> None:
             {"request_id": visual_request["request_id"], "provider": "deterministic_test", "endpoint": "http://untrusted.invalid"},
         )
         visual_pipeline = get_json("/visual-concepts/pipeline")
+        visual_batch = post_json(
+            "/visual-concepts/batches/create",
+            {"sample_count_per_concept": 4},
+        )
+        visual_batch_result = post_json(
+            "/visual-concepts/batches/execute",
+            {"batch_id": visual_batch["batch_id"], "provider": "deterministic_test"},
+        )
         p017_loop = get_json("/p017/minimal-loop")
         semantic_route = post_json("/semantic/route", {"utterance": "当前杯子有没有水"})
         agent_execution_preview = post_json("/agent/query", {"utterance": "到水源处接一杯水"})
@@ -330,6 +338,10 @@ def run_http_smoke() -> None:
             raise AssertionError(f"visual image API candidate bypassed calibration: {visual_candidate}")
         if visual_pipeline.get("requests", [])[0].get("provider_id") != "deterministic_test_image_provider":
             raise AssertionError(f"client-controlled provider endpoint affected adapter selection: {visual_pipeline}")
+        if visual_batch_result.get("status") != "candidates_compiled" or visual_batch_result.get("generation_request_count") != 5:
+            raise AssertionError(f"visual batch endpoint failed: {visual_batch_result}")
+        if visual_batch_result.get("concept_gap_count") != 5 or visual_batch_result.get("runtime_visible"):
+            raise AssertionError(f"visual batch blurred concept gaps or runtime boundary: {visual_batch_result}")
         if not p017_loop.get("evidence_index") or len(p017_loop.get("evidence_files", {})) != 8:
             raise AssertionError(f"P017 minimal loop endpoint failed: {p017_loop}")
         if semantic_route.get("request_type") != "state_query":

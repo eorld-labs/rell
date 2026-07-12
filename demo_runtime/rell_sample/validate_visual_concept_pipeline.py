@@ -8,7 +8,9 @@ from embodied_scene import build_visual_concept_pack_catalog, execute_command, s
 from visual_concept_pipeline import (
     DeterministicImageProvider,
     add_real_world_calibration,
+    create_production_batch,
     create_generation_request,
+    execute_production_batch,
     execute_generation_request,
     get_pipeline_state,
     promote_visual_candidate,
@@ -78,7 +80,33 @@ def main() -> None:
     )
     state = get_pipeline_state()
     require(len(state["requests"]) == 1 and len(state["candidates"]) == 1 and len(state["promoted_adapters"]) == 1, f"pipeline audit state incomplete: {state}")
-    (OUTPUT / "pipeline_report.json").write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    batch = create_production_batch(sample_count_per_concept=4)
+    require(batch["item_count"] == 10, f"daily-life manifest size changed unexpectedly: {batch}")
+    require(batch["generation_request_count"] == 5 and batch["concept_gap_count"] == 5, f"known concepts and concept gaps were conflated: {batch}")
+    state_before_batch_execution = get_pipeline_state()
+    cup_request = next(item for item in state_before_batch_execution["requests"] if item.get("subject_profile", {}).get("item_id") == "cup")
+    require(cup_request["subject_profile"]["concrete_label"] == "杯子" and cup_request["subject_profile"]["parent_functional_concept"] == "可盛装容器", f"concrete item and parent concept were conflated: {cup_request}")
+    require("杯子" in cup_request["prompt_specs"][0]["prompt"], f"batch provider prompt used only abstract concept name: {cup_request}")
+    gaps = state_before_batch_execution["concept_gap_candidates"]
+    require({item["display_name"] for item in gaps} == {"碗", "瓶子", "门", "垃圾桶", "冰箱"}, f"concept gap queue incorrect: {gaps}")
+    require(all(not item["image_generation_allowed"] for item in gaps), f"images were generated before concept kernels existed: {gaps}")
+
+    class OneRequestFailureProvider(DeterministicImageProvider):
+        provider_id = "one_request_failure_test_provider"
+
+        def generate(self, request: dict) -> list[dict]:
+            if request["concept_id"] == "concept_support_surface":
+                raise RuntimeError("simulated_provider_failure")
+            return super().generate(request)
+
+    completed_batch = execute_production_batch(batch["batch_id"], OneRequestFailureProvider())
+    require(completed_batch["status"] == "completed_with_failures", f"partial failure was hidden: {completed_batch}")
+    require(sum(item["status"] == "provider_failed" for item in completed_batch["results"]) == 1, f"failure isolation count incorrect: {completed_batch}")
+    require(sum(item["status"] == "candidate_compiled" for item in completed_batch["results"]) == 4, f"one failure aborted successful concepts: {completed_batch}")
+    require(completed_batch["runtime_visible"] is False, f"batch became runtime-visible: {completed_batch}")
+    final_state = get_pipeline_state()
+    (OUTPUT / "pipeline_report.json").write_text(json.dumps(final_state, ensure_ascii=False, indent=2), encoding="utf-8")
     print("Visual concept side-pipeline validation passed.")
     print(f"Output: {OUTPUT / 'pipeline_report.json'}")
 

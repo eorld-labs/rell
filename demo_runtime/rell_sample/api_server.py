@@ -56,7 +56,9 @@ from visual_concept_pipeline import (
     DeterministicImageProvider,
     HttpImageGenerationProvider,
     add_real_world_calibration,
+    create_production_batch,
     create_generation_request,
+    execute_production_batch,
     execute_generation_request,
     get_pipeline_state,
     ingest_provider_images,
@@ -8596,6 +8598,26 @@ class RellSampleHandler(BaseHTTPRequestHandler):
                 str(body.get("concept_id", "")),
                 int(body.get("sample_count", 8)),
             )
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/visual-concepts/batches/create":
+            result = create_production_batch(sample_count_per_concept=int(body.get("sample_count_per_concept", 8)))
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/visual-concepts/batches/execute":
+            provider_kind = str(body.get("provider", "deterministic_test"))
+            if provider_kind == "deterministic_test":
+                provider = DeterministicImageProvider()
+            elif provider_kind == "configured_http":
+                endpoint = os.environ.get("RELL_IMAGE_PROVIDER_ENDPOINT")
+                if not endpoint:
+                    self._send_json({"error": "image_provider_endpoint_not_configured"}, status=400)
+                    return
+                provider = HttpImageGenerationProvider(endpoint, os.environ.get("RELL_IMAGE_PROVIDER_AUTHORIZATION"))
+            else:
+                self._send_json({"error": "unsupported_image_provider", "provider": provider_kind}, status=400)
+                return
+            result = execute_production_batch(str(body.get("batch_id", "")), provider)
             self._send_json(result, status=400 if "error" in result else 200)
             return
         if path == "/visual-concepts/generation/execute":

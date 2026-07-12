@@ -13,6 +13,7 @@ from concept_core.perceptual_grounding import load_object_concepts
 
 
 DEFAULT_STORE = Path(__file__).resolve().parents[1] / "output" / "rell_sample" / "runtime" / "visual_concept_pipeline.json"
+MANIFEST_FILE = Path(__file__).resolve().parent / "data" / "visual_concept_production_manifest.json"
 
 
 class ImageGenerationProvider(Protocol):
@@ -64,8 +65,11 @@ def get_store_path() -> Path:
 def _load_store() -> dict[str, Any]:
     path = get_store_path()
     if not path.exists():
-        return {"schema_version": "1.0.0", "requests": [], "candidates": [], "promoted_adapters": []}
-    return json.loads(path.read_text(encoding="utf-8"))
+        return {"schema_version": "1.0.0", "batches": [], "requests": [], "candidates": [], "concept_gap_candidates": [], "promoted_adapters": []}
+    store = json.loads(path.read_text(encoding="utf-8"))
+    for key in ("batches", "requests", "candidates", "concept_gap_candidates", "promoted_adapters"):
+        store.setdefault(key, [])
+    return store
 
 
 def _save_store(store: dict[str, Any]) -> None:
@@ -80,7 +84,96 @@ def _concept(concept_id: str) -> dict[str, Any] | None:
     return next((item for item in load_object_concepts()["concepts"] if item["concept_id"] == concept_id), None)
 
 
-def create_generation_request(concept_id: str, sample_count: int = 8) -> dict[str, Any]:
+def load_production_manifest() -> dict[str, Any]:
+    return json.loads(MANIFEST_FILE.read_text(encoding="utf-8"))
+
+
+def create_production_batch(*, sample_count_per_concept: int = 8) -> dict[str, Any]:
+    manifest = load_production_manifest()
+    request_ids = []
+    concept_gaps = []
+    for item in manifest["items"]:
+        concept_id = item.get("concept_id")
+        if concept_id and _concept(concept_id):
+            request = create_generation_request(
+                concept_id,
+                sample_count_per_concept,
+                subject_label=item["display_name"],
+                item_id=item["item_id"],
+            )
+            request_ids.append(request["request_id"])
+            continue
+        gap_seed = json.dumps([manifest["manifest_id"], item["item_id"]], ensure_ascii=False)
+        concept_gaps.append({
+            "gap_id": "visual_concept_gap_" + hashlib.sha1(gap_seed.encode("utf-8")).hexdigest()[:12],
+            "item_id": item["item_id"],
+            "display_name": item["display_name"],
+            "status": "object_concept_kernel_required",
+            "proposed_roles": deepcopy(item.get("proposed_roles", [])),
+            "required_before_image_generation": [
+                "functional_role_contract",
+                "physical_properties_and_boundaries",
+                "perceptual_invariants",
+                "runtime_verification_policy",
+            ],
+            "candidate_only": True,
+            "image_generation_allowed": False,
+            "direct_execution_allowed": False,
+        })
+    batch_seed = json.dumps([manifest["manifest_id"], request_ids, [item["gap_id"] for item in concept_gaps]], sort_keys=True)
+    batch = {
+        "batch_id": "visual_batch_" + hashlib.sha1(batch_seed.encode()).hexdigest()[:12],
+        "manifest_id": manifest["manifest_id"],
+        "status": "generation_pending",
+        "request_ids": request_ids,
+        "concept_gap_candidate_ids": [item["gap_id"] for item in concept_gaps],
+        "item_count": len(manifest["items"]),
+        "generation_request_count": len(request_ids),
+        "concept_gap_count": len(concept_gaps),
+        "results": [],
+        "failure_isolation": "per_concept_request",
+        "runtime_visible": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    store = _load_store()
+    store["batches"] = [item for item in store["batches"] if item["batch_id"] != batch["batch_id"]] + [batch]
+    gap_index = {item["gap_id"]: item for item in store["concept_gap_candidates"]}
+    gap_index.update({item["gap_id"]: item for item in concept_gaps})
+    store["concept_gap_candidates"] = list(gap_index.values())
+    _save_store(store)
+    return deepcopy(batch)
+
+
+def execute_production_batch(batch_id: str, provider: ImageGenerationProvider) -> dict[str, Any]:
+    store = _load_store()
+    batch = next((item for item in store["batches"] if item["batch_id"] == batch_id), None)
+    if not batch:
+        return {"error": "visual_production_batch_not_found", "batch_id": batch_id}
+    results = []
+    for request_id in batch["request_ids"]:
+        try:
+            candidate = execute_generation_request(request_id, provider)
+            if "error" in candidate:
+                raise ValueError(candidate["error"])
+            results.append({"request_id": request_id, "status": "candidate_compiled", "candidate_id": candidate["candidate_id"]})
+        except Exception as error:
+            results.append({"request_id": request_id, "status": "provider_failed", "error_type": type(error).__name__})
+    store = _load_store()
+    batch = next(item for item in store["batches"] if item["batch_id"] == batch_id)
+    batch["results"] = results
+    batch["status"] = "completed_with_failures" if any(item["status"] == "provider_failed" for item in results) else "candidates_compiled"
+    batch["completed_at"] = datetime.now(timezone.utc).isoformat()
+    _save_store(store)
+    return deepcopy(batch)
+
+
+def create_generation_request(
+    concept_id: str,
+    sample_count: int = 8,
+    *,
+    subject_label: str | None = None,
+    item_id: str | None = None,
+) -> dict[str, Any]:
     concept = _concept(concept_id)
     if not concept:
         return {"error": "object_concept_not_found", "concept_id": concept_id}
@@ -92,9 +185,9 @@ def create_generation_request(concept_id: str, sample_count: int = 8) -> dict[st
         {"view": "partially_occluded", "lighting": "dim_indoor", "background": "home"},
     ]
     variants = [dimensions[index % len(dimensions)] for index in range(count)]
-    seed = json.dumps([concept_id, variants], ensure_ascii=False, sort_keys=True)
+    subject = subject_label or concept["display_name"]
+    seed = json.dumps([concept_id, item_id, subject, variants], ensure_ascii=False, sort_keys=True)
     request_id = "visual_gen_" + hashlib.sha1(seed.encode("utf-8")).hexdigest()[:12]
-    subject = concept["display_name"]
     prompts = [
         {
             "variant_id": f"variant_{index + 1}",
@@ -106,6 +199,11 @@ def create_generation_request(concept_id: str, sample_count: int = 8) -> dict[st
     request = {
         "request_id": request_id,
         "concept_id": concept_id,
+        "subject_profile": {
+            "item_id": item_id,
+            "concrete_label": subject,
+            "parent_functional_concept": concept["display_name"],
+        },
         "status": "provider_generation_pending",
         "variant_specs": variants,
         "prompt_specs": prompts,
