@@ -16,7 +16,7 @@
   "objects": [
     {"entity_id": "counter_b", "label": "岛台", "kind": "operation_surface", "region_id": "kitchen", "position": [3.35, 1.35], "size": [1.7, 0.75, 0.95], "color": "#7d695d", "fixed": true},
     {"entity_id": "dispenser_b", "label": "水龙头", "kind": "water_source", "region_id": "kitchen", "position": [4.15, -1.25], "size": [0.55, 0.5, 1.2], "color": "#b8c8cf", "fixed": true},
-    {"entity_id": "cup_b", "label": "蓝色陶瓷杯", "kind": "graspable_container", "region_id": "kitchen", "position": [3.0, 1.35], "elevation_m": 0.95, "support_ref": "counter_b", "size": [0.22, 0.22, 0.3], "color": "#5e91b7", "perceptual_attributes": {"color": "blue", "material": "ceramic"}, "fixed": false},
+    {"entity_id": "cup_b", "label": "蓝色陶瓷杯", "kind": "graspable_container", "region_id": "kitchen", "position": [3.0, 1.35], "elevation_m": 0.95, "support_ref": "counter_b", "size": [0.22, 0.22, 0.3], "color": "#5e91b7", "perceptual_attributes": {"color": "blue", "material": "ceramic"}, "visual_observation_signature": {"features": ["open_top", "bounded_inner_volume", "graspable_body"], "color_family": "blue"}, "fixed": false},
     {"entity_id": "apple_b", "label": "青苹果", "kind": "graspable_object", "region_id": "living_room", "position": [-2.1, -1.55], "size": [0.28, 0.28, 0.28], "color": "#83a84d", "fixed": false, "visual_observation_signature": {"features": ["compact_round_body", "fruit_surface"], "color_family": "green"}},
     {"entity_id": "sofa_b", "label": "布艺沙发", "kind": "large_furniture", "concept_id": "concept_sofa", "region_id": "living_room", "position": [-4.0, 0.85], "size": [0.9, 1.8, 0.9], "color": "#667f82", "fixed": true},
     {"entity_id": "dining_table_b", "label": "餐桌", "kind": "operation_surface", "region_id": "living_room", "position": [-2.65, 0.35], "size": [0.95, 1.25, 0.8], "color": "#9a7353", "fixed": true},
@@ -43,6 +43,23 @@
       "sensor_capabilities": ["rgbd", "visual_tracking"],
       "arm_reach_m": 0.72,
       "gripper_span_m": 0.11,
+      "supported_actions": ["relative_move", "navigate_to_region", "local_obstacle_avoidance", "grasp_object", "place_object", "fill_container", "request_human_confirmation"]
+    },
+    "home_humanoid": {
+      "executor_type": "humanoid_robot",
+      "body_profile": "humanoid_biped",
+      "body_envelope": {"radius_m": 0.28, "height_m": 1.7},
+      "turning_radius_m": 0.2,
+      "max_linear_speed_mps": 0.8,
+      "max_contact_force_n": 45.0,
+      "kinematic_model": "bipedal_walk",
+      "can_translate_laterally": false,
+      "can_reverse_without_turning": true,
+      "body_reference_frame": {"forward_axis": "+x", "left_axis": "+y", "yaw_positive": "counterclockwise"},
+      "sensor_frames": {"head_rgbd": {"pan_range_deg": [-70, 70], "active_scan_viewpoints": [{"viewpoint_id": "head_left_scan", "yaw_offset_deg": 32.0}, {"viewpoint_id": "head_right_scan", "yaw_offset_deg": -32.0}]}},
+      "sensor_capabilities": ["rgbd", "visual_tracking"],
+      "arm_reach_m": 0.78,
+      "gripper_span_m": 0.12,
       "supported_actions": ["relative_move", "navigate_to_region", "local_obstacle_avoidance", "grasp_object", "place_object", "fill_container", "request_human_confirmation"]
     }
   },

@@ -390,7 +390,56 @@ def build_visual_concept_pack_catalog() -> dict[str, Any]:
 
 
 def _is_open_world_observation_query(text: str) -> bool:
-    return any(pattern in text for pattern in ("看到什么", "看到了什么", "有什么东西", "有哪些东西", "周围有什么"))
+    broad = any(pattern in text for pattern in ("看到什么", "看到了什么", "有什么东西", "有哪些东西", "周围有什么"))
+    directed = any(pattern in text for pattern in ("看得到", "能看到", "能看见", "看得见", "有没有看到"))
+    return broad or directed
+
+
+def _directed_observation_concept(text: str) -> dict[str, Any] | None:
+    concepts = load_object_concepts()["concepts"]
+    matches = [
+        (len(alias), concept, alias)
+        for concept in concepts
+        for alias in concept.get("aliases", [])
+        if alias and alias in text
+    ]
+    if not matches:
+        return None
+    _, concept, alias = max(matches, key=lambda item: item[0])
+    return {"concept_id": concept["concept_id"], "display_name": concept["display_name"], "matched_alias": alias}
+
+
+def _answer_observation_query(session: dict[str, Any], text: str) -> dict[str, Any]:
+    observation = build_open_world_observation(_scene_for_session(session), session)
+    directed = _directed_observation_concept(text)
+    observation["observation_action"] = {
+        "operator": "scan_current_space_before_answering",
+        "sensor_frame": "head_rgbd",
+        "viewpoints": deepcopy(observation.get("scan_viewpoints", [])),
+        "scene_truth_read_directly": False,
+    }
+    observation["active_perception_trace"] = [
+        {"viewpoint": deepcopy(viewpoint), "status": "observation_candidate_collected"}
+        for viewpoint in observation.get("scan_viewpoints", [])
+    ]
+    if directed:
+        matches = [
+            item for item in observation.get("recognized_object_candidates", [])
+            if item.get("concept_id") == directed["concept_id"]
+        ]
+        observation.update({
+            "status": "directed_object_observation_completed",
+            "directed_query": directed,
+            "directed_matches": deepcopy(matches),
+            "prompt": (
+                f"我先转动视觉观察了当前空间，识别到{len(matches)}个{directed['display_name']}候选。"
+                "这是当前视觉候选，还不是经过交互验真的功能事实。"
+                if matches else
+                f"我先转动视觉观察了当前空间，但没有识别到{directed['display_name']}候选。"
+                "这表示当前视角和已加载视觉概念没有形成匹配，不等于空间里一定没有。"
+            ),
+        })
+    return observation
 
 
 def _build_observed_relocation_preview(session: dict[str, Any], text: str) -> dict[str, Any] | None:
@@ -1460,7 +1509,7 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
         return {"error": "embodied_session_not_found", "session_id": session_id}
     text = utterance.strip()
     if _is_open_world_observation_query(text):
-        observation = build_open_world_observation(_scene_for_session(session), session)
+        observation = _answer_observation_query(session, text)
         session["open_world_observation"] = deepcopy(observation)
         observation["session"] = get_session(session_id)
         return observation

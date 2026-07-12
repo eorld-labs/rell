@@ -5,7 +5,7 @@ import os
 import re
 import hashlib
 import subprocess
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -8899,7 +8899,8 @@ class RellSampleHandler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
-    server = HTTPServer((DEFAULT_HOST, DEFAULT_PORT), RellSampleHandler)
+    server = ThreadingHTTPServer((DEFAULT_HOST, DEFAULT_PORT), RellSampleHandler)
+    server.daemon_threads = True
     print(f"EORLD-RELL sample API listening on http://{DEFAULT_HOST}:{DEFAULT_PORT}")
     print(f"Demo page: http://{DEFAULT_HOST}:{DEFAULT_PORT}/")
     print("Endpoints: POST /semantic/route, POST /agent/query, POST /llm/context-view, POST /llm/prompt-contract, POST /llm/candidate-intent, POST /llm/candidate/validate, POST /concept/cloud-recall, POST /concept/resolve, POST /concept/candidates/confirm, POST /process/admit, POST /process/run, POST /experience/migrate, POST /preference/record, POST /execution/dispatch, POST /runtime_world_state/query, POST /runtime_world_state/perturb, POST /teaching/session/start, GET /recovery/library, GET /recovery/task/{task_id}, GET /recovery/{recovery_id}, GET /preference/library, GET /concept/library, GET /concept/candidates, GET /audit/{task_id}")
