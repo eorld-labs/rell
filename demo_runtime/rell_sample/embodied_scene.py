@@ -1256,6 +1256,158 @@ def _record_completed_teaching_motion(session: dict[str, Any], job: dict[str, An
     )
 
 
+def _distance_to_object_footprint(position: list[float], entity: dict[str, Any]) -> float:
+    half_x = float(entity["size"][0]) / 2
+    half_y = float(entity["size"][1]) / 2
+    dx = max(abs(position[0] - float(entity["position"][0])) - half_x, 0.0)
+    dy = max(abs(position[1] - float(entity["position"][1])) - half_y, 0.0)
+    return math.hypot(dx, dy)
+
+
+def _build_object_relative_motion(
+    session: dict[str, Any],
+    contextual_affordance: dict[str, Any],
+    decision_started_ns: int,
+) -> dict[str, Any]:
+    entity = next(
+        item for item in session["runtime_objects"]
+        if item["entity_id"] == contextual_affordance["entity_ref"]
+    )
+    operator = contextual_affordance["operator_candidate"]
+    start = list(session["state"]["executor_position"])
+    envelope = build_effective_execution_envelope(
+        session["executor_profile"], session.get("protection_policy_overlay")
+    )
+    constraints = envelope["effective_constraints"]
+    planning_radius = constraints["body_radius_m"] + constraints["minimum_avoidance_distance_m"]
+    clearance = planning_radius + 0.05
+    center_x, center_y = map(float, entity["position"])
+    half_x, half_y = float(entity["size"][0]) / 2, float(entity["size"][1]) / 2
+    projected_x = min(max(start[0], center_x - half_x), center_x + half_x)
+    projected_y = min(max(start[1], center_y - half_y), center_y + half_y)
+    side_candidates = [
+        {"side": "left", "position": [center_x - half_x - clearance, projected_y]},
+        {"side": "right", "position": [center_x + half_x + clearance, projected_y]},
+        {"side": "bottom", "position": [projected_x, center_y - half_y - clearance]},
+        {"side": "top", "position": [projected_x, center_y + half_y + clearance]},
+    ]
+    if operator == "avoid":
+        # Without a downstream destination, "cleared" means leaving the obstacle's
+        # longitudinal projection while retaining a collision-free body envelope.
+        if abs(start[0] - center_x) >= abs(start[1] - center_y):
+            side_candidates = [item for item in side_candidates if item["side"] in {"bottom", "top"}]
+        else:
+            side_candidates = [item for item in side_candidates if item["side"] in {"left", "right"}]
+
+    feasible: list[dict[str, Any]] = []
+    rejected: list[dict[str, Any]] = []
+    for candidate in side_candidates:
+        terminal_collider = _collider_at(candidate["position"], planning_radius, session, load_scene())
+        if terminal_collider:
+            rejected.append({**candidate, "reason": "terminal_body_envelope_not_clear", "collider": terminal_collider})
+            continue
+        plan = _plan_verified_motion(session, start, candidate["position"], planning_radius)
+        if plan.get("outcome") != "verified":
+            rejected.append({**candidate, "reason": "swept_volume_route_not_clear", "plan": plan})
+            continue
+        route_length = sum(
+            math.dist(a, b) for a, b in zip([start] + plan["waypoints"][:-1], plan["waypoints"])
+        )
+        feasible.append({**candidate, "plan": plan, "route_length_m": route_length})
+
+    feature_mapping = [
+        "基于任务期对象角色选择待建立的对象相对空间事实",
+        "基于对象当前几何与本体安全包络生成多个任务期终止位姿候选",
+        "对终止位姿及其完整运动路径的本体扫掠体积进行当前世界版本验证",
+        "仅将通过编排与治理边界的候选转换为逐帧运动并在末帧验真对象相对事实",
+        "未获得安全终止位姿或非空间角色条件不满足时不进入运动控制",
+    ]
+    if not feasible:
+        return {
+            **contextual_affordance,
+            "status": "contextual_spatial_motion_blocked",
+            "reason": "no_collision_free_object_relative_terminal_pose",
+            "prompt": f"我认识{entity['label']}在当前任务中的空间角色，但按本体净空找不到可验真的安全终止位置，因此不能执行。",
+            "frames": [],
+            "object_relative_motion": {
+                "planning_radius_m": planning_radius,
+                "candidate_count": len(side_candidates),
+                "rejected_candidates": rejected,
+                "world_revision": session["world_revision"],
+            },
+            "technical_feature_mapping": feature_mapping,
+            "decision_latency": {
+                "input_to_spatial_candidate_decision_ms": round((perf_counter_ns() - decision_started_ns) / 1_000_000, 4),
+                "clock": "perf_counter_ns_monotonic",
+            },
+            "session": get_session(session["session_id"]),
+        }
+
+    selected = min(feasible, key=lambda item: item["route_length_m"])
+    frames: list[dict[str, Any]] = []
+    segment_start = start
+    current_yaw = float(session["state"]["executor_yaw_deg"])
+    for waypoint in selected["plan"]["waypoints"]:
+        segment_yaw = math.degrees(math.atan2(waypoint[1] - segment_start[1], waypoint[0] - segment_start[0]))
+        if math.dist(segment_start, waypoint) > 0.001 and abs(segment_yaw - current_yaw) > 0.1:
+            frames.extend(_rotation_frames(segment_start, current_yaw, segment_yaw))
+        count = max(3, int(math.dist(segment_start, waypoint) / 0.05) + 1)
+        frames.extend(_with_yaw(_interpolate(segment_start, waypoint, count)[1:], segment_yaw))
+        segment_start = waypoint
+        current_yaw = segment_yaw
+    target_yaw = math.degrees(math.atan2(center_y - segment_start[1], center_x - segment_start[0]))
+    if operator == "navigate_near" and abs(target_yaw - current_yaw) > 0.1:
+        frames.extend(_rotation_frames(segment_start, current_yaw, target_yaw))
+    _apply_speed_timing(frames, constraints["max_linear_speed_mps"])
+    terminal_position = list(selected["position"])
+    terminal_fact = "executor_near_object" if operator == "navigate_near" else "executor_cleared_object"
+    session["state"]["executor_position"] = terminal_position
+    session["state"]["executor_yaw_deg"] = target_yaw if operator == "navigate_near" else current_yaw
+    session["state"]["active_region"] = _region_for(terminal_position, load_scene())
+    result = {
+        **contextual_affordance,
+        "status": "fact_established",
+        "reason": "object_relative_spatial_fact_physically_verified",
+        "prompt": f"已按{entity['label']}当前几何和我的本体净空完成运动，并验真空间关系。",
+        "frames": frames,
+        "terminal_fact": terminal_fact,
+        "terminal_fact_binding": {"entity_ref": entity["entity_id"], "relation": terminal_fact},
+        "terminal_verification": {
+            "kind": "object_footprint_clearance",
+            "entity_ref": entity["entity_id"],
+            "expected_relation": terminal_fact,
+            "maximum_near_distance_m": clearance + 0.02,
+            "must_be_outside_longitudinal_projection": operator == "avoid",
+        },
+        "object_relative_motion": {
+            "selected_side": selected["side"],
+            "selected_terminal_position": terminal_position,
+            "route_kind": selected["plan"]["route_kind"],
+            "route_length_m": selected["route_length_m"],
+            "planning_radius_m": planning_radius,
+            "candidate_count": len(side_candidates),
+            "rejected_candidates": rejected,
+            "motion_safety_contract": selected["plan"]["safety_contract"],
+            "world_revision": session["world_revision"],
+        },
+        "effective_execution_envelope": envelope,
+        "orchestration_gate_passed": True,
+        "technical_feature_mapping": feature_mapping,
+        "decision_latency": {
+            "input_to_spatial_candidate_decision_ms": round((perf_counter_ns() - decision_started_ns) / 1_000_000, 4),
+            "clock": "perf_counter_ns_monotonic",
+        },
+        "session": get_session(session["session_id"]),
+    }
+    session["event_history"].append({
+        "utterance": contextual_affordance["task_context"],
+        "result": result["status"],
+        "terminal_fact": terminal_fact,
+        "entity_ref": entity["entity_id"],
+    })
+    return result
+
+
 def execute_command(session_id: str, utterance: str, scoped_authorization: dict[str, Any] | None = None) -> dict[str, Any]:
     decision_started_ns = perf_counter_ns()
     session = SESSIONS.get(session_id)
@@ -1280,6 +1432,8 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
         scoped_authorization=scoped_authorization,
     )
     if contextual_affordance:
+        if contextual_affordance["available"] and contextual_affordance["operator_candidate"] in {"navigate_near", "avoid"}:
+            return _build_object_relative_motion(session, contextual_affordance, decision_started_ns)
         return {
             **contextual_affordance,
             "prompt": contextual_affordance["explanation"],
@@ -1610,6 +1764,10 @@ def begin_motion_command(session_id: str, utterance: str, scoped_authorization: 
         "frames": frames,
         "next_frame_index": 0,
         "terminal_result": result,
+        "execution_collision_radius_m": (
+            result.get("effective_execution_envelope", {}).get("effective_constraints", {}).get("body_radius_m", 0.0)
+            + result.get("effective_execution_envelope", {}).get("effective_constraints", {}).get("minimum_avoidance_distance_m", 0.0)
+        ) or before["executor_profile"]["body_envelope"]["radius_m"],
     }
     MOTION_JOBS[job_id] = job
     return {
@@ -1704,7 +1862,7 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
             "replacement": replacement,
         }
     frame = job["frames"][job["next_frame_index"]]
-    radius = session["executor_profile"]["body_envelope"]["radius_m"]
+    radius = job.get("execution_collision_radius_m", session["executor_profile"]["body_envelope"]["radius_m"])
     collider = _collider_at(frame["position"], radius, session, load_scene())
     if collider:
         job["status"] = "invalidated_by_contact"
@@ -1745,6 +1903,33 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
         }
     job["status"] = "completed"
     result = deepcopy(job["terminal_result"])
+    terminal_verification = result.get("terminal_verification")
+    if terminal_verification:
+        entity = next(
+            (item for item in session["runtime_objects"] if item["entity_id"] == terminal_verification["entity_ref"]),
+            None,
+        )
+        terminal_distance = _distance_to_object_footprint(session["state"]["executor_position"], entity) if entity else math.inf
+        relation_verified = bool(entity) and terminal_distance <= terminal_verification["maximum_near_distance_m"]
+        if terminal_verification.get("must_be_outside_longitudinal_projection") and entity:
+            dx = abs(session["state"]["executor_position"][0] - entity["position"][0])
+            dy = abs(session["state"]["executor_position"][1] - entity["position"][1])
+            relation_verified = relation_verified and (
+                dx > float(entity["size"][0]) / 2 or dy > float(entity["size"][1]) / 2
+            )
+        result["terminal_verification_evidence"] = {
+            "entity_ref": terminal_verification["entity_ref"],
+            "object_footprint_distance_m": round(terminal_distance, 4) if math.isfinite(terminal_distance) else None,
+            "relation_verified": relation_verified,
+            "world_revision": session["world_revision"],
+        }
+        if not relation_verified:
+            result.update({
+                "status": "terminal_fact_verification_failed",
+                "reason": "object_relative_relation_not_established_at_final_frame",
+                "terminal_fact": None,
+                "prompt": "运动已经停止，但目标空间关系没有通过末帧验真，不能把它记为事实。",
+            })
     if job.get("teaching_action"):
         _record_completed_teaching_motion(session, job, result)
     if job.get("post_completion", {}).get("action") == "grasp":
