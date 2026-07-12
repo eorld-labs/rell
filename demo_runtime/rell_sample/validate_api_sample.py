@@ -521,6 +521,12 @@ def main() -> None:
             raise AssertionError(f"concept evidence packets must not grant direct execution: {concept_resolution}")
         if not concept_resolution.get("concept_evidence_summary", {}).get("all_candidate_only"):
             raise AssertionError(f"concept evidence summary must keep local concepts candidate-only: {concept_resolution}")
+        lifecycle_events = concept_resolution.get("concept_lifecycle", {}).get("events", [])
+        if not lifecycle_events or not all(item.get("event_type") in {"concept_formed", "concept_reused"} for item in lifecycle_events):
+            raise AssertionError(f"concept resolution must record formation or reuse events: {concept_resolution}")
+        repeated_resolution = resolve_concepts_for_intent("走到门旁边，再去操作台拿杯子，到水源处接一杯水", migration["migration_task_id"])
+        if not repeated_resolution.get("concept_lifecycle", {}).get("reused_count"):
+            raise AssertionError(f"repeated concept resolution must produce auditable reuse events: {repeated_resolution}")
 
         llm_prompt_contract = build_llm_prompt_contract("到水源处接一杯水", migration["migration_task_id"])
         if llm_prompt_contract.get("handoff_contract", {}).get("validator_endpoint") != "/llm/candidate/validate":
@@ -546,6 +552,11 @@ def main() -> None:
             raise AssertionError(f"ambiguous task must request cloud recall preview: {cloud_recall_ambiguous}")
         if cloud_recall_ambiguous.get("concept_gap_evidence", {}).get("fallback_policy", {}).get("direct_execution_allowed"):
             raise AssertionError(f"concept gap evidence must forbid direct execution: {cloud_recall_ambiguous}")
+        fallback_event = cloud_recall_ambiguous.get("concept_fallback_event", {})
+        if fallback_event.get("event_type") != "local_concept_reuse_failed" or not fallback_event.get("cloud_recall_requested"):
+            raise AssertionError(f"concept gaps must produce an auditable reuse failure and fallback event: {cloud_recall_ambiguous}")
+        if fallback_event.get("direct_execution_allowed"):
+            raise AssertionError(f"concept fallback events must not grant direct execution: {cloud_recall_ambiguous}")
         if not cloud_recall_ambiguous.get("cloud_recall_result", {}).get("clarification_questions"):
             raise AssertionError(f"ambiguous task must produce clarification questions from cloud recall: {cloud_recall_ambiguous}")
         if cloud_recall_ambiguous.get("cloud_recall_result", {}).get("direct_execution_allowed"):

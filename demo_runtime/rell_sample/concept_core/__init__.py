@@ -10,6 +10,7 @@ from .concept_bridge import (
     build_unsupported_runtime_query_result,
 )
 from .concept_evidence import build_concept_evidence_packet, build_gap_evidence_packet
+from .concept_lifecycle import build_concept_lifecycle_view, record_concept_fallback, record_concept_reuse
 from .concept_parser import resolve_action_concepts
 from .concept_units import (
     STATE_CONCEPT_UNITS,

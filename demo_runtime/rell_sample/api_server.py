@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 from concept_core import (
     build_cloud_recall_packet,
     build_concept_evidence_packet,
+    build_concept_lifecycle_view,
     build_gap_evidence_packet,
     build_teaching_frame,
     resolve_action_concepts,
@@ -19,6 +20,8 @@ from concept_core import (
     build_runtime_state_query_result,
     build_unsupported_runtime_query_result,
     request_cloud_concept_support,
+    record_concept_fallback,
+    record_concept_reuse,
     resolve_runtime_state_query,
 )
 from runtime_core import (
@@ -244,6 +247,8 @@ EXPERIENCE_GAP_STORE: dict[str, dict[str, Any]] = {}
 READAPTATION_STORE: dict[str, dict[str, Any]] = {}
 EXECUTION_DISPATCH_STORE: dict[str, dict[str, Any]] = {}
 TEACHING_SESSION_STORE: dict[str, dict[str, Any]] = {}
+CONCEPT_LIFECYCLE_STORE: dict[str, dict[str, Any]] = {}
+CONCEPT_FALLBACK_STORE: dict[str, dict[str, Any]] = {}
 
 
 STEP_LIBRARY = {
@@ -6449,6 +6454,12 @@ def resolve_concepts_for_intent(utterance: str, task_id: str | None = None) -> d
     ).hexdigest()[:12]
     action_concepts = intent_frame.get("action_concepts", [])
     evidence_packets = collect_concept_evidence_packets(concept_matches, action_concepts)
+    lifecycle = record_concept_reuse(
+        CONCEPT_LIFECYCLE_STORE,
+        evidence_packets,
+        resolution_id=resolution_id,
+        task_id=task_id,
+    )
     return {
         "schema_version": "1.0.0",
         "resolution_id": resolution_id,
@@ -6466,6 +6477,7 @@ def resolve_concepts_for_intent(utterance: str, task_id: str | None = None) -> d
         "resolved_concepts": concept_matches,
         "concept_evidence_packets": evidence_packets,
         "concept_evidence_summary": build_concept_evidence_summary(evidence_packets),
+        "concept_lifecycle": lifecycle,
         "runtime_context_view": runtime_context_view,
         "concept_resolution_policy": {
             "concept_layer_role": "提供可复用语义单元，不直接替代经验层、因果层或执行层",
@@ -6509,12 +6521,19 @@ def build_cloud_recall_preview(
         gaps=cloud_recall_packet.get("local_concept_gap", []),
         runtime_context_view=runtime_context_view if runtime_context_view and "error" not in runtime_context_view else None,
     )
+    fallback_event = record_concept_fallback(
+        CONCEPT_FALLBACK_STORE,
+        gap_evidence,
+        packet_id=cloud_recall_packet.get("packet_id", "unknown"),
+        cloud_recall_requested=should_request,
+    )
     if not should_request:
         return {
             "schema_version": "1.0.0",
             "should_request_cloud_recall": False,
             "cloud_recall_packet": cloud_recall_packet,
             "concept_gap_evidence": gap_evidence,
+            "concept_fallback_event": fallback_event,
             "cloud_recall_result": {
                 "schema_version": "1.0.0",
                 "availability": "local_concepts_sufficient",
@@ -6532,6 +6551,7 @@ def build_cloud_recall_preview(
         "should_request_cloud_recall": True,
         "cloud_recall_packet": cloud_recall_packet,
         "concept_gap_evidence": gap_evidence,
+        "concept_fallback_event": fallback_event,
         "cloud_recall_result": request_cloud_concept_support(
             cloud_recall_packet,
             normalize_text_fn=normalize_text,
@@ -7594,6 +7614,9 @@ class RellSampleHandler(BaseHTTPRequestHandler):
                 task_id=body.get("task_id") or body.get("session_id") or body.get("migration_task_id"),
             )
             self._send_json(result, status=400 if not body.get("utterance") else 200)
+            return
+        if path == "/concept/lifecycle":
+            self._send_json(build_concept_lifecycle_view(CONCEPT_LIFECYCLE_STORE, CONCEPT_FALLBACK_STORE))
             return
         if path == "/concept/resolve":
             result = resolve_concepts_for_intent(

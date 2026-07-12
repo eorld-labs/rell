@@ -18,6 +18,8 @@
 | 语义概念绑定运行时上下文 | `api_server.py::build_concept_unit_view` | 概念候选可附着当前任务期快照，但不能代替快照完成事实裁剪或执行控制 |
 | 本地概念缺口形成回退证据 | `build_cloud_recall_preview` 输出 `concept_gap_evidence` | 云脑补给仅是候选或澄清，不得直接写入快照或触发执行 |
 | 统一证据摘要 | `resolve_concepts_for_intent` 输出 `concept_evidence_summary` | 为后续页面、审计、专利证据链提供可复核边界 |
+| 概念形成与复用留痕 | `concept_core/concept_lifecycle.py`、`concept_lifecycle` | 同一概念首次命中记为形成，后续命中记为复用，并保留次数、证据和快照绑定 |
+| 复用失败进入回退 | `concept_fallback_event` | 本地概念不足时形成失败事件，再进入云脑候选或人工澄清，不静默越权执行 |
 
 ## 三、证据包字段
 
@@ -47,6 +49,8 @@
 3. `concept_evidence_summary.all_candidate_only` 必须为真；
 4. 模糊任务的 `cloud_recall_preview` 必须返回 `concept_gap_evidence`；
 5. 状态查询命中的状态概念必须带有只读快照证据包。
+6. 同一输入重复解析时，概念生命周期必须由 `concept_formed` 进入 `concept_reused`；
+7. 模糊输入必须生成 `local_concept_reuse_failed` 回退事件，并继续禁止直接执行。
 
 这些断言保证端侧概念内化不会退化为“概念命中后直接动作”，而是继续服从 P018 的状态优先仲裁主链。
 

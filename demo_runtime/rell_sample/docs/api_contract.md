@@ -321,6 +321,7 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 - `cloud_recall_packet.local_concept_gap`：端侧识别到的缺口类型；
 - `cloud_recall_packet.runtime_context_summary`：发送给云脑的当前任务摘要；
 - `concept_gap_evidence`：本地概念缺口证据，说明为什么需要追问或请求云端候选，并固定 `direct_execution_allowed=false`；
+- `concept_fallback_event`：本地概念复用失败事件，记录缺口、回退目标及是否请求云脑候选；
 - `cloud_recall_result.candidate_concepts`：云脑返回的候选概念；
 - `cloud_recall_result.candidate_process_chain`：云脑返回的候选过程链；
 - `cloud_recall_result.clarification_questions`：仍需向人追问的澄清问题；
@@ -353,6 +354,7 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 - `semantic_request`：统一语义路由结果；
 - `intent_frame_summary`：目标事实、显式过程链、空间约束和对象约束摘要；
 - `action_concepts`：端侧动作概念候选，说明这次输入在本地动作语义层命中了哪些可复用动作单元；
+- `concept_lifecycle`：本次概念首次形成或重复复用事件，以及对应的形成数、复用数；
 - `resolved_concepts`：概念层候选，每个候选带有 `activation_reason`、`effect_contract`、`runtime_binding_status` 和 `experience_link_policy`；
 - `concept_evidence_packets`：端侧概念命中的证据包，说明命中依据、置信度、运行时快照绑定和失败回退策略；
 - `concept_evidence_summary`：证据包摘要，固定声明本地概念为候选层，`direct_execution_allowed=false`，且必须回到编排层；
