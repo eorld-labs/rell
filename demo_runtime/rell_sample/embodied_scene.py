@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 from time import perf_counter_ns
 from copy import deepcopy
 from pathlib import Path
@@ -13,7 +14,8 @@ from concept_core.concept_gap_dialogue import continue_concept_gap_dialogue, sta
 from concept_core.functional_object_reasoning import build_functional_object_catalog, build_functional_profile, evaluate_role_compatibility
 from concept_core.factory_state_facts import build_factory_state_catalog, derive_runtime_fact_snapshot, explain_prerequisite_gaps
 from concept_core.lightweight_orchestrator import build_lightweight_causal_candidate, build_lightweight_orchestrator_catalog
-from concept_core.perceptual_grounding import build_task_perception_result, load_object_concepts
+from concept_core.perceptual_grounding import build_open_world_observation, build_task_perception_result, load_object_concepts
+from concept_core.visual_concept_packs import build_visual_pack_catalog
 from embodied_teaching import (
     append_validation_result,
     build_pedagogical_signals,
@@ -104,6 +106,7 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator") -> dict[
         "world_revision": 0,
         "event_history": [],
         "concept_gap_dialogue": None,
+        "open_world_observation": None,
     }
     SESSIONS[session_id] = session
     return deepcopy(session)
@@ -357,6 +360,80 @@ def build_factory_object_catalog() -> dict[str, Any]:
     return build_functional_object_catalog(load_object_concepts()["concepts"])
 
 
+def build_visual_concept_pack_catalog() -> dict[str, Any]:
+    return build_visual_pack_catalog()
+
+
+def _is_open_world_observation_query(text: str) -> bool:
+    return any(pattern in text for pattern in ("看到什么", "看到了什么", "有什么东西", "有哪些东西", "周围有什么"))
+
+
+def _build_observed_relocation_preview(session: dict[str, Any], text: str) -> dict[str, Any] | None:
+    relocation_match = re.search(r"(?:把|将)?苹果(?:从.+?)?(?:放到|放在|摆到|摆在)(?:桌子|桌面|操作台|台面)(?:上|上面)?", text)
+    if not relocation_match:
+        return None
+    observation = session.get("open_world_observation")
+    if not observation or observation.get("world_revision") != session["world_revision"]:
+        observation = build_open_world_observation(load_scene(), session)
+        session["open_world_observation"] = deepcopy(observation)
+    apple = next(
+        (item for item in observation.get("recognized_object_candidates", []) if item.get("concept_id") == "concept_edible_apple"),
+        None,
+    )
+    support = next((item for item in session["runtime_objects"] if item.get("kind") == "operation_surface"), None)
+    if not apple or not support:
+        return None
+    fact_snapshot = {
+        "world_revision": session["world_revision"],
+        "established_facts": ["object_grounded", "destination_grounded", "gripper_empty", "gripper_available", "route_feasible"],
+        "negated_facts": ["object_in_gripper"],
+    }
+    place_concept = next(item for item in FACTORY_EVENT_CONCEPT_UNITS if item["concept_id"] == "factory_event_place")
+    goal = {
+        "operator": place_concept["concept_kernel"]["operator"],
+        "recognized_goal_fact": "object_at_destination",
+        "required_capability": place_concept["capability"],
+        "effect_contract": deepcopy(place_concept["concept_kernel"]["effect_contract"]),
+    }
+    supported_capabilities = list(session["executor_profile"].get("supported_actions", [])) + ["active_perception"]
+    causal_candidate = build_lightweight_causal_candidate(
+        goal_concept=goal,
+        fact_snapshot=fact_snapshot,
+        supported_capabilities=supported_capabilities,
+        available_experience_capabilities=_available_experience_capabilities(session),
+        event_concepts=FACTORY_EVENT_CONCEPT_UNITS,
+        experience_contracts=_causal_experience_contracts(session),
+    )
+    return {
+        "status": "observed_goal_causal_preview",
+        "reason": "current_visual_candidate_plus_spatial_goal_backward_chaining",
+        "prompt": "我当前把目标理解为：苹果从地面关系变为由桌面稳定支撑。候选链是先让苹果进入夹爪，再使本体与桌面形成可放置关系，最后放置并验真稳定支撑；缺少的本体能力或经验仍会阻止执行。",
+        "observed_target": deepcopy(apple),
+        "destination_binding": {
+            "entity_ref": support["entity_id"],
+            "label": support["label"],
+            "binding_source": "current_space_model_candidate",
+            "candidate_only": True,
+        },
+        "goal_contract": {
+            "requires": ["object_grounded", "destination_grounded"],
+            "produces": ["object_at_destination", "object_supported_at_destination"],
+            "destroys": ["object_on_ground", "object_in_gripper"],
+            "verification": ["contact_stable", "projection_inside_support_boundary", "gripper_clear_of_object"],
+        },
+        "causal_candidate": causal_candidate,
+        "candidate_only": True,
+        "direct_execution_allowed": False,
+        "runtime_fact_committed": False,
+        "post_action": {
+            "action": "reenter_orchestration_after_capability_and_experience_resolution",
+            "teaching_available": False,
+            "clarification_required": False,
+        },
+        "session": get_session(session["session_id"]),
+    }
+
+
 def build_factory_state_fact_catalog() -> dict[str, Any]:
     return build_factory_state_catalog()
 
@@ -478,7 +555,7 @@ def set_perception_scenario(session_id: str, mode: str) -> dict[str, Any]:
     session = SESSIONS.get(session_id)
     if not session:
         return {"error": "embodied_session_not_found", "session_id": session_id}
-    if mode not in {"normal", "multiple_cups", "occluded_cup", "relocated_cup"}:
+    if mode not in {"normal", "multiple_cups", "occluded_cup", "relocated_cup", "relocated_apple"}:
         return {"error": "unsupported_perception_scenario", "mode": mode}
     objects = deepcopy(load_scene()["objects"])
     cup = next(item for item in objects if item["entity_id"] == "cup_a")
@@ -1184,6 +1261,14 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
     if not session:
         return {"error": "embodied_session_not_found", "session_id": session_id}
     text = utterance.strip()
+    if _is_open_world_observation_query(text):
+        observation = build_open_world_observation(load_scene(), session)
+        session["open_world_observation"] = deepcopy(observation)
+        observation["session"] = get_session(session_id)
+        return observation
+    relocation_preview = _build_observed_relocation_preview(session, text)
+    if relocation_preview:
+        return relocation_preview
     active_gap_dialogue = session.get("concept_gap_dialogue") or {}
     if active_gap_dialogue.get("status") == "collecting_minimum_causal_contract":
         continued = continue_concept_gap_dialogue(

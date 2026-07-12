@@ -32,7 +32,8 @@
       "variable_features": ["color", "size", "ripeness"],
       "functional_affordances": ["graspable", "movable"],
       "physical_properties": ["portable", "deformable_below_damage_threshold"],
-      "expected_relations": ["on_top_of_support", "held_by_executor"]
+      "expected_relations": ["on_top_of_support", "held_by_executor"],
+      "perception_adapter_refs": ["visual_pack_edible_apple_factory_v1"]
     },
     {
       "concept_id": "concept_water_source_asset",

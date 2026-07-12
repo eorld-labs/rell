@@ -7,6 +7,8 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+from concept_core.visual_concept_packs import load_visual_concept_packs, match_visual_concept_candidates
+
 
 CONCEPT_FILE = Path(__file__).resolve().parents[1] / "data" / "embodied_object_concepts.json"
 COLOR_ALIASES = {
@@ -334,6 +336,95 @@ def build_task_perception_result(scene: dict[str, Any], session: dict[str, Any],
             "planning_is_established_fact": False,
         },
         "frames": [],
+    }
+
+
+def build_open_world_observation(scene: dict[str, Any], session: dict[str, Any]) -> dict[str, Any]:
+    executor_position = session["state"]["executor_position"]
+    base_yaw = float(session["state"]["executor_yaw_deg"])
+    sensor_range_m = 8.5
+    viewpoints = [
+        {"viewpoint_id": "open_scan_center", "yaw_offset_deg": 0.0},
+        {"viewpoint_id": "open_scan_left", "yaw_offset_deg": 55.0},
+        {"viewpoint_id": "open_scan_right", "yaw_offset_deg": -55.0},
+    ]
+    observed: dict[str, dict[str, Any]] = {}
+    for viewpoint in viewpoints:
+        yaw = math.radians(base_yaw + viewpoint["yaw_offset_deg"])
+        for entity in session.get("runtime_objects", scene["objects"]):
+            if entity.get("active") is False:
+                continue
+            dx = entity["position"][0] - executor_position[0]
+            dy = entity["position"][1] - executor_position[1]
+            distance = math.hypot(dx, dy)
+            angle = abs(math.atan2(math.sin(math.atan2(dy, dx) - yaw), math.cos(math.atan2(dy, dx) - yaw)))
+            if distance > sensor_range_m or angle > math.radians(70.0):
+                continue
+            signature = entity.get("visual_observation_signature", {})
+            observed.setdefault(entity["entity_id"], {
+                "track_id": _track_id(entity["entity_id"]),
+                "spatial_entity_candidate_ref": entity["entity_id"],
+                "estimated_position": deepcopy(entity["position"]),
+                "estimated_base_elevation_m": float(entity.get("elevation_m", 0.0)),
+                "estimated_size": deepcopy(entity["size"]),
+                "observed_visual_features": deepcopy(signature.get("features", [])),
+                "observed_color_family": signature.get("color_family"),
+                "viewpoint_ids": [],
+                "observation_source": "simulated_rgbd_adapter_without_semantic_label_access",
+            })["viewpoint_ids"].append(viewpoint["viewpoint_id"])
+
+    packs = load_visual_concept_packs()
+    object_concepts = {item["concept_id"]: item for item in load_object_concepts()["concepts"]}
+    recognized = []
+    unknown = []
+    for track in observed.values():
+        matches = match_visual_concept_candidates(track, packs)
+        if not matches:
+            unknown.append({**deepcopy(track), "recognition_status": "unknown_object_candidate"})
+            continue
+        match = matches[0]
+        concept = object_concepts[match["concept_id"]]
+        relation = "on_ground_candidate" if track["estimated_base_elevation_m"] <= 0.05 else "elevated_or_supported_candidate"
+        recognized.append({
+            **deepcopy(track),
+            "recognition_status": "visual_concept_candidate",
+            "concept_id": match["concept_id"],
+            "concept_label": concept["display_name"],
+            "confidence": match["confidence"],
+            "visual_pack_id": match["visual_pack_id"],
+            "spatial_relation_candidate": relation,
+            "functional_role_proven": False,
+            "candidate_only": True,
+        })
+    observation_id = "open_obs_" + hashlib.sha1(
+        f"{session['session_id']}|{session['world_revision']}|{sorted(observed)}".encode("utf-8")
+    ).hexdigest()[:12]
+    labels = [item["concept_label"] for item in recognized]
+    answer = "我当前识别到" + "、".join(labels) if labels else "我当前没有识别出已加载的对象概念"
+    if unknown:
+        answer += f"；另外看到{len(unknown)}个尚未识别的对象候选"
+    return {
+        "status": "open_world_observation_completed",
+        "observation_id": observation_id,
+        "world_revision": session["world_revision"],
+        "prompt": answer + "。这些是当前观测候选，不等于已验真的功能事实。",
+        "recognized_object_candidates": recognized,
+        "unknown_object_candidates": unknown,
+        "scan_viewpoints": viewpoints,
+        "visual_pack_ids": [item["pack_id"] for item in packs],
+        "runtime_fact_candidates": [
+            {
+                "fact": f"{item['concept_id']}:{item['spatial_relation_candidate']}",
+                "entity_ref": item["spatial_entity_candidate_ref"],
+                "evidence_ref": observation_id,
+                "world_revision": session["world_revision"],
+                "candidate_only": True,
+            }
+            for item in recognized
+        ],
+        "candidate_only": True,
+        "direct_execution_allowed": False,
+        "runtime_fact_committed": False,
     }
 
 

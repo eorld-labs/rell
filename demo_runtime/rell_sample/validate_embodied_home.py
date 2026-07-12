@@ -8,7 +8,7 @@ from concept_core.concept_gap_dialogue import extract_compositional_semantics
 from pathlib import Path
 
 from concept_core.perceptual_grounding import activate_task_perception, ground_task_observations
-from embodied_scene import SESSIONS, begin_learned_replay, begin_motion_command, begin_persisted_experience_replay, begin_teaching_control, build_factory_concept_catalog, build_factory_object_catalog, build_factory_orchestrator_catalog, build_factory_state_fact_catalog, confirm_pending_motion, evaluate_learned_replay, execute_command, finish_embodied_teaching, load_scene, record_teaching_signal, set_perception_scenario, set_protection_policy, set_stool, start_embodied_teaching, start_session, step_motion_command
+from embodied_scene import SESSIONS, begin_learned_replay, begin_motion_command, begin_persisted_experience_replay, begin_teaching_control, build_factory_concept_catalog, build_factory_object_catalog, build_factory_orchestrator_catalog, build_factory_state_fact_catalog, build_visual_concept_pack_catalog, confirm_pending_motion, evaluate_learned_replay, execute_command, finish_embodied_teaching, load_scene, record_teaching_signal, set_perception_scenario, set_protection_policy, set_stool, start_embodied_teaching, start_session, step_motion_command
 
 
 OUTPUT = Path(__file__).resolve().parents[1] / "output" / "rell_sample" / "embodied_home"
@@ -57,6 +57,11 @@ def main() -> None:
     require(len(object_catalog["relation_concepts"]) >= 7, f"factory relation skeleton is too narrow: {object_catalog}")
     require(object_catalog["shared_boundary"]["appearance_is_not_role_proof"], f"appearance incorrectly proves functional role: {object_catalog}")
     require(object_catalog["shared_boundary"]["runtime_relation_requires_current_observation_or_physical_verification"], f"possible relation was treated as current fact: {object_catalog}")
+    visual_catalog = build_visual_concept_pack_catalog()
+    apple_pack = next(item for item in visual_catalog["packs"] if item["concept_id"] == "concept_edible_apple")
+    require(apple_pack["load_policy"] == "factory_resident", f"apple visual pack is not factory resident: {visual_catalog}")
+    require(not apple_pack["reference_samples"] and not apple_pack["reference_sample_policy"]["single_image_can_define_concept"], f"visual sample was conflated with the apple concept: {apple_pack}")
+    require(visual_catalog["boundary"]["visual_pack_is_not_action_experience"], f"visual pack entered experience layer: {visual_catalog}")
 
     state_catalog = build_factory_state_fact_catalog()
     require(len(state_catalog["state_fact_concepts"]) >= 10, f"factory state fact vocabulary is too narrow: {state_catalog}")
@@ -69,6 +74,22 @@ def main() -> None:
     }
     uncovered_requirements = sorted(all_factory_requirements - set(state_catalog["prerequisite_strategies"]))
     require(not uncovered_requirements, f"factory event prerequisites lack recovery strategies: {uncovered_requirements}")
+
+    observation_session = start_session()
+    open_observation = execute_command(observation_session["session_id"], "你现在看到了什么")
+    apple_observation = next(item for item in open_observation["recognized_object_candidates"] if item["concept_id"] == "concept_edible_apple")
+    require(apple_observation["spatial_relation_candidate"] == "on_ground_candidate", f"apple ground relation was not observed: {open_observation}")
+    require(apple_observation["observation_source"] == "simulated_rgbd_adapter_without_semantic_label_access", f"recognizer read semantic scene truth: {open_observation}")
+    require(open_observation["unknown_object_candidates"], f"open-world observation forced every object into a known class: {open_observation}")
+    require(not open_observation["runtime_fact_committed"] and not open_observation["direct_execution_allowed"], f"visual candidate became executable fact: {open_observation}")
+    relocation_preview = execute_command(observation_session["session_id"], "把苹果从地上放到桌子上")
+    require(relocation_preview["status"] == "observed_goal_causal_preview", f"observed object did not enter causal preview: {relocation_preview}")
+    require(relocation_preview["goal_contract"]["destroys"] == ["object_on_ground", "object_in_gripper"], f"relocation goal omitted destroyed facts: {relocation_preview}")
+    require(relocation_preview["causal_candidate"]["candidate_process_chain"][-1] == "place_object", f"placement was not the goal operator: {relocation_preview}")
+    require("grasp_object" in relocation_preview["causal_candidate"]["candidate_process_chain"], f"solver did not backfill grasp prerequisite: {relocation_preview}")
+    place_node = next(item for item in relocation_preview["causal_candidate"]["nodes"] if item["operator"] == "place_object")
+    require(place_node["capability_available"] and place_node["gate"] == "blocked_by_missing_experience", f"body capability and placement experience gap were conflated: {relocation_preview}")
+    require(not relocation_preview["direct_execution_allowed"], f"visual causal preview executed directly: {relocation_preview}")
 
     composed = extract_compositional_semantics("如果水果散落，就归整苹果，让苹果和其他水果都在收纳区，看到所有水果都在收纳区就算完成")
     require(composed["precondition_descriptions"] == ["水果散落"], f"precondition connector not parsed: {composed}")
