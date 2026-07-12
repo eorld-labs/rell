@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 from concept_core.perceptual_grounding import activate_task_perception, ground_task_observations
-from embodied_scene import begin_learned_replay, begin_motion_command, begin_persisted_experience_replay, begin_teaching_control, confirm_pending_motion, evaluate_learned_replay, execute_command, finish_embodied_teaching, load_scene, set_perception_scenario, set_protection_policy, set_stool, start_embodied_teaching, start_session, step_motion_command
+from embodied_scene import SESSIONS, begin_learned_replay, begin_motion_command, begin_persisted_experience_replay, begin_teaching_control, confirm_pending_motion, evaluate_learned_replay, execute_command, finish_embodied_teaching, load_scene, record_teaching_signal, set_perception_scenario, set_protection_policy, set_stool, start_embodied_teaching, start_session, step_motion_command
 
 
 OUTPUT = Path(__file__).resolve().parents[1] / "output" / "rell_sample" / "embodied_home"
@@ -142,6 +142,24 @@ def main() -> None:
     require(rotate["session"]["state"]["executor_position"] == rotate_session["state"]["executor_position"], f"pure rotation translated body: {rotate}")
     require(rotate["terminal_fact"] == "executor_heading_changed", f"pure rotation terminal fact incorrect: {rotate}")
 
+    signal_session = start_session()
+    signal_started = start_embodied_teaching(signal_session["session_id"], "拿杯子")
+    initial_events = signal_started["teaching_session"]["teaching_events"]
+    require([item["event_type"] for item in initial_events] == ["observation_candidate_created", "pedagogical_signal_recorded", "teaching_authority_granted"], f"teaching timeline did not expose initial gates: {signal_started}")
+    failed_signal_grasp = begin_teaching_control(signal_session["session_id"], "grasp")["immediate_result"]
+    require(failed_signal_grasp["status"] == "grasp_blocked", f"signal test needs failed physical evidence: {failed_signal_grasp}")
+    action_count = len(failed_signal_grasp["teaching_session"]["demonstrated_actions"])
+    negative_signal = record_teaching_signal(signal_session["session_id"], "negative_example", "目标尚未进入本体可达范围")
+    boundary_signal = record_teaching_signal(signal_session["session_id"], "boundary_indication", "不得越过当前抓取可达边界")
+    correction_signal = record_teaching_signal(signal_session["session_id"], "correction")
+    confirmation_signal = record_teaching_signal(signal_session["session_id"], "confirmation")
+    require(len(confirmation_signal["teaching_session"]["demonstrated_actions"]) == action_count, f"teaching signals polluted positive action chain: {confirmation_signal}")
+    constraints = confirmation_signal["teaching_session"]["scoped_constraint_candidates"]
+    require(len(constraints) == 2 and all(not item["positive_process_chain_eligible"] for item in constraints), f"negative or boundary evidence entered positive chain: {constraints}")
+    require(all(item["scope"]["world_revision"] == signal_session["world_revision"] for item in constraints), f"constraint scope lost world revision: {constraints}")
+    require(correction_signal["signal"]["evidence"]["target_experience_ref"] is None, f"correction invented an experience target: {correction_signal}")
+    require(confirmation_signal["signal"]["candidate_only"], f"teacher confirmation bypassed verification gates: {confirmation_signal}")
+
     teaching_session = start_session()
     teaching_started = start_embodied_teaching(teaching_session["session_id"], "拿杯子")
     require(teaching_started["status"] == "teaching_control_granted", f"teaching authority not granted: {teaching_started}")
@@ -191,6 +209,13 @@ def main() -> None:
     require(learned["experience"]["status"] == "trusted_local_experience", f"experience trust state incorrect: {learned}")
     require(learned["persistence"]["durable"] and learned["persistence"]["reload_on_new_session"], f"trusted experience was not durably persisted: {learned}")
     require(test_store.exists(), f"trusted experience store was not created: {learned}")
+    final_events = learned["session"]["teaching_session"]["teaching_events"]
+    final_event_types = [item["event_type"] for item in final_events]
+    for required_event in ["causal_contract_compiled", "demonstration_trace_discarded", "autonomous_replay_started", "physical_verification_passed", "human_acceptance_recorded", "trusted_experience_promoted"]:
+        require(required_event in final_event_types, f"teaching timeline missing {required_event}: {final_events}")
+    require(final_event_types.index("causal_contract_compiled") < final_event_types.index("autonomous_replay_started") < final_event_types.index("physical_verification_passed") < final_event_types.index("trusted_experience_promoted"), f"teaching promotion gates are out of order: {final_events}")
+    promoted_event = next(item for item in final_events if item["event_type"] == "trusted_experience_promoted")
+    require(not promoted_event["candidate_only"], f"trusted promotion remained candidate-only: {promoted_event}")
     persisted = learned["persisted_experience"]
     persisted_text = json.dumps(persisted, ensure_ascii=False)
     require("demonstration_entity_ref" not in persisted_text, f"demonstration instance leaked into persistent contract: {persisted}")
@@ -200,6 +225,19 @@ def main() -> None:
     require(persisted["pedagogical_signals"] == {"signal_types": ["demonstration"], "interruption_occurred": False, "clarification_occurred": False, "outcome": "completed_successfully"}, f"persistent pedagogical signals were not normalized: {persisted}")
     require(not persisted["teaching_evidence_summary"]["source_identity_persisted"], f"teaching source identity leaked into persistent evidence summary: {persisted}")
     require("source_teaching_id" not in json.dumps(persisted["pedagogical_signals"], ensure_ascii=False), f"teaching session identity leaked into pedagogical signals: {persisted}")
+
+    correction_session = start_session()
+    correction_started = start_embodied_teaching(correction_session["session_id"], "拿杯子")
+    correction_session_id = correction_session["session_id"]
+    # A loaded trusted experience is the correction target, but recording the signal must not overwrite it.
+    SESSIONS[correction_session_id]["learned_experience"] = json.loads(json.dumps(persisted, ensure_ascii=False))
+    trusted_before_correction = json.dumps(SESSIONS[correction_session_id]["learned_experience"], ensure_ascii=False, sort_keys=True)
+    targeted_correction = record_teaching_signal(correction_session_id, "correction", "调整接近方向")
+    require(targeted_correction["signal"]["evidence"]["target_experience_ref"] == persisted["experience_id"], f"correction did not reference existing experience: {targeted_correction}")
+    require(json.dumps(SESSIONS[correction_session_id]["learned_experience"], ensure_ascii=False, sort_keys=True) == trusted_before_correction, f"correction signal overwrote trusted experience: {targeted_correction}")
+
+    html = (Path(__file__).with_name("embodied_home.html")).read_text(encoding="utf-8")
+    require('id="teachingTimeline"' in html and html.count("data-signal=") == 5, "3D page does not expose five teaching signals and timeline")
 
     cold_session = start_session()
     require(cold_session["available_local_experiences"][0]["experience_id"] == persisted["experience_id"], f"new session did not discover trusted experience: {cold_session}")

@@ -48,6 +48,7 @@ from embodied_scene import set_protection_policy as set_embodied_protection_poli
 from embodied_scene import set_perception_scenario as set_embodied_perception_scenario
 from embodied_scene import start_session as start_embodied_session
 from embodied_scene import start_embodied_teaching as start_embodied_teaching_session
+from embodied_scene import record_teaching_signal as record_embodied_teaching_signal
 from embodied_scene import step_motion_command as step_embodied_motion
 from embodied_experience_store import load_trusted_experiences
 
@@ -8611,6 +8612,14 @@ class RellSampleHandler(BaseHTTPRequestHandler):
             return
         if path == "/embodied/teaching/control":
             result = begin_embodied_teaching_control(str(body.get("session_id", "")), str(body.get("control", "")))
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/embodied/teaching/signal":
+            result = record_embodied_teaching_signal(
+                str(body.get("session_id", "")),
+                str(body.get("signal_type", "")),
+                str(body.get("note", "")) or None,
+            )
             self._send_json(result, status=400 if "error" in result else 200)
             return
         if path == "/embodied/teaching/finish":

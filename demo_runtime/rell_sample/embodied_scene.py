@@ -18,6 +18,41 @@ from teaching_observation import (
     build_live_first_person_observation_packet,
     finalize_observation_packet,
 )
+
+TEACHING_SIGNAL_TYPES = {
+    "demonstration",
+    "correction",
+    "boundary_indication",
+    "negative_example",
+    "confirmation",
+}
+
+
+def _append_teaching_event(
+    teaching: dict[str, Any],
+    event_type: str,
+    detail: str,
+    *,
+    stage: str,
+    status: str = "recorded",
+    world_revision: int | None = None,
+    evidence: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    events = teaching.setdefault("teaching_events", [])
+    event = {
+        "sequence": len(events) + 1,
+        "event_type": event_type,
+        "stage": stage,
+        "detail": detail,
+        "status": status,
+        "candidate_only": status not in {"physical_fact_verified", "trusted_experience_promoted"},
+        "runtime_fact_committed": status == "physical_fact_verified",
+        "world_revision": world_revision,
+    }
+    if evidence:
+        event["evidence"] = deepcopy(evidence)
+    events.append(event)
+    return event
 from embodied_experience_store import get_trusted_experience, load_trusted_experiences, persist_trusted_experience
 from execution_boundary import (
     build_effective_execution_envelope,
@@ -294,15 +329,110 @@ def start_embodied_teaching(session_id: str, goal_utterance: str = "拿杯子") 
         "target_initial_object_state": deepcopy(target_object),
         "authority": build_teaching_authority(session_id, goal_utterance, session["world_revision"]),
         "demonstrated_actions": [],
+        "teaching_events": [],
+        "scoped_constraint_candidates": [],
         "pedagogical_signals": pedagogical_signals,
         "observation_packet": observation_packet,
         "transient_trace_policy": "discard_raw_frames_after_invariant_compilation",
         "safety_and_policy_checks_remain_active": True,
     }
+    teaching = session["teaching_session"]
+    _append_teaching_event(
+        teaching,
+        "observation_candidate_created",
+        "第一视角观测已适配为 L2 候选，不直接提交运行时事实",
+        stage="observation",
+        world_revision=session["world_revision"],
+    )
+    _append_teaching_event(
+        teaching,
+        "pedagogical_signal_recorded",
+        "已记录正例示范信令",
+        stage="teaching",
+        world_revision=session["world_revision"],
+        evidence={"signal_type": "demonstration"},
+    )
+    _append_teaching_event(
+        teaching,
+        "teaching_authority_granted",
+        "真人临时接管教学控制；本体、安全和策略边界仍然有效",
+        stage="teaching",
+        world_revision=session["world_revision"],
+    )
     return {
         "status": "teaching_control_granted",
         "prompt": "真人教学控制权已临时交给你。我会使用自己的本体和安全边界执行你的控制，并记录验真后的状态跃迁。",
         "teaching_session": deepcopy(session["teaching_session"]),
+        "session": get_session(session_id),
+    }
+
+
+def record_teaching_signal(session_id: str, signal_type: str, note: str | None = None) -> dict[str, Any]:
+    session = SESSIONS.get(session_id)
+    if not session:
+        return {"error": "embodied_session_not_found", "session_id": session_id}
+    teaching = session.get("teaching_session") or {}
+    if teaching.get("status") != "human_control_active":
+        return {"error": "teaching_session_not_active", "session": get_session(session_id)}
+    if signal_type not in TEACHING_SIGNAL_TYPES:
+        return {"error": "unsupported_teaching_signal", "signal_type": signal_type}
+
+    signals = teaching.setdefault("pedagogical_signals", build_pedagogical_signals())
+    signal_types = signals.setdefault("signal_types", [])
+    if signal_type not in signal_types:
+        signal_types.append(signal_type)
+    target_experience = (session.get("learned_experience") or {}).get("experience_id")
+    if signal_type == "correction" and target_experience:
+        signals["target_experience_ref"] = target_experience
+
+    evidence: dict[str, Any] = {
+        "signal_type": signal_type,
+        "note": (note or "").strip() or None,
+        "action_index": len(teaching.get("demonstrated_actions", [])) - 1,
+        "target_experience_ref": target_experience if signal_type == "correction" else None,
+    }
+    status = "recorded"
+    detail_by_type = {
+        "demonstration": "已标记当前片段为正例示范",
+        "correction": "已标记当前片段为纠正候选；既有经验不会被直接覆盖",
+        "boundary_indication": "已标记当前情境为边界候选；仅在当前世界版本内生效",
+        "negative_example": "已标记当前情境为负例候选；不会进入正向过程链",
+        "confirmation": "已记录教师确认信令；该信令不能替代自主复做和物理验真",
+    }
+    if signal_type in {"boundary_indication", "negative_example"}:
+        actions = teaching.get("demonstrated_actions", [])
+        last_action = actions[-1] if actions else None
+        candidate = {
+            "constraint_type": signal_type,
+            "negative_constraint": evidence["note"] or (last_action or {}).get("failure_reason") or "teacher_indicated_boundary",
+            "action_class": (last_action or {}).get("action_class"),
+            "scope": {
+                "teaching_id": teaching.get("teaching_id"),
+                "world_revision": session["world_revision"],
+                "executor_profile": session.get("executor_profile", {}).get("body_profile"),
+            },
+            "disposition": "candidate_constraint_pending_revalidation",
+            "positive_process_chain_eligible": False,
+        }
+        teaching.setdefault("scoped_constraint_candidates", []).append(candidate)
+        evidence["constraint_candidate"] = candidate
+        if signal_type == "negative_example" and (not last_action or last_action.get("verified")):
+            status = "pending_failed_evidence"
+            detail_by_type[signal_type] = "负例信令已记录，但尚无失败动作证据；不会写入正向过程链"
+
+    event = _append_teaching_event(
+        teaching,
+        "pedagogical_signal_recorded",
+        detail_by_type[signal_type],
+        stage="teaching",
+        status=status,
+        world_revision=session["world_revision"],
+        evidence=evidence,
+    )
+    return {
+        "status": "teaching_signal_recorded",
+        "signal": deepcopy(event),
+        "teaching_session": deepcopy(teaching),
         "session": get_session(session_id),
     }
 
@@ -326,6 +456,15 @@ def begin_teaching_control(session_id: str, control: str) -> dict[str, Any]:
                 "verification": deepcopy(result.get("verification_evidence", {})),
                 "failure_reason": result.get("reason"),
             }
+        )
+        _append_teaching_event(
+            teaching,
+            "teaching_action_verified" if result.get("status") == "fact_established" else "teaching_action_failed",
+            "抓取动作已由当前本体执行并验真" if result.get("status") == "fact_established" else "抓取动作未通过当前物理前提",
+            stage="teaching",
+            status="physical_fact_verified" if result.get("status") == "fact_established" else "candidate_failure_evidence",
+            world_revision=session["world_revision"],
+            evidence={"action_class": "grasp_target", "terminal_fact": result.get("terminal_fact"), "reason": result.get("reason")},
         )
         result["teaching_session"] = deepcopy(teaching)
         result["session"] = get_session(session_id)
@@ -385,10 +524,29 @@ def finish_embodied_teaching(session_id: str) -> dict[str, Any]:
         world_revision=session["world_revision"],
         observation_packet=teaching.get("observation_packet"),
     )
+    signal_constraints = deepcopy(teaching.get("scoped_constraint_candidates", []))
+    experience["applicability_constraints"]["negative_constraints"].extend(signal_constraints)
     teaching["status"] = "demonstration_compiled"
     teaching["authority"]["status"] = "consumed"
     teaching["authority"]["revocation_reason"] = "teaching_finished"
     session["learned_experience"] = experience
+    _append_teaching_event(
+        teaching,
+        "causal_contract_compiled",
+        "已生成 requires / produces / destroys / verification 因果契约候选",
+        stage="compilation",
+        status="candidate_contract_compiled",
+        world_revision=session["world_revision"],
+        evidence={"effect_contract": experience["effect_contract"]},
+    )
+    _append_teaching_event(
+        teaching,
+        "demonstration_trace_discarded",
+        "绝对坐标、按键、固定时长和单一本体轨迹未进入经验",
+        stage="compilation",
+        status="transient_trace_discarded",
+        world_revision=session["world_revision"],
+    )
     return {
         "status": "demonstration_compiled",
         "prompt": "示教已编译为经验不变量，原始按键和逐帧轨迹不会进入经验。现在可以让我从初始状态自主试做。",
@@ -510,6 +668,15 @@ def begin_learned_replay(session_id: str) -> dict[str, Any]:
         f"{session_id}|{experience['experience_id']}|{session['world_revision']}".encode("utf-8")
     ).hexdigest()[:12]
     experience["status"] = "trusted_experience_replay_running" if trusted_replay else "autonomous_replay_running"
+    _append_teaching_event(
+        teaching,
+        "autonomous_replay_started",
+        "教师控制权已撤销，机器人按不变量重新绑定当前对象并自主试做",
+        stage="replay",
+        status="verification_pending",
+        world_revision=session["world_revision"],
+        evidence={"trajectory_reused": False, "experience_id": experience["experience_id"]},
+    )
     MOTION_JOBS[job_id] = {
         "job_id": job_id,
         "session_id": session_id,
@@ -560,11 +727,35 @@ def evaluate_learned_replay(session_id: str, accepted: bool) -> dict[str, Any]:
         session["available_local_experiences"] = _experience_catalog()
         prompt = "这次自主复做通过了物理验真和你的确认，经验已晋升为本地可信经验。"
         status = "experience_learned"
+        _append_teaching_event(
+            teaching,
+            "human_acceptance_recorded",
+            "教师确认自主复做符合教学目标",
+            stage="promotion",
+            status="accepted",
+            world_revision=session["world_revision"],
+        )
+        _append_teaching_event(
+            teaching,
+            "trusted_experience_promoted",
+            "候选经验已通过自主复做、物理验真和人工验收，晋升为本地可信经验",
+            stage="promotion",
+            status="trusted_experience_promoted",
+            world_revision=session["world_revision"],
+        )
     else:
         persisted = None
         session["learned_experience"]["status"] = "needs_correction"
         prompt = "这次结果没有通过完整确认，经验保持候选状态，需要重新教学或纠正。"
         status = "teaching_correction_required"
+        _append_teaching_event(
+            teaching,
+            "human_correction_requested",
+            "本次复做未获完整验收，既有候选保留并进入纠正流程",
+            stage="promotion",
+            status="correction_required",
+            world_revision=session["world_revision"],
+        )
     return {
         "status": status,
         "prompt": prompt,
@@ -650,6 +841,15 @@ def _record_completed_teaching_motion(session: dict[str, Any], job: dict[str, An
             },
             "failure_reason": result.get("reason") if result.get("status") != "fact_established" else None,
         }
+    )
+    _append_teaching_event(
+        teaching,
+        "teaching_action_verified" if result.get("status") == "fact_established" else "teaching_action_failed",
+        "教学动作已由当前本体执行并验真" if result.get("status") == "fact_established" else "教学动作未通过当前物理或策略边界",
+        stage="teaching",
+        status="physical_fact_verified" if result.get("status") == "fact_established" else "candidate_failure_evidence",
+        world_revision=session["world_revision"],
+        evidence={"action_class": action_class, "terminal_fact": result.get("terminal_fact"), "reason": result.get("reason")},
     )
 
 
@@ -1034,6 +1234,15 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
             "loaded_from_persistent_store": bool(job.get("loaded_trusted_experience_replay")),
         }
         session["learned_experience"] = append_validation_result(experience, replay_validation)
+        _append_teaching_event(
+            session.get("teaching_session") or {},
+            "physical_verification_passed" if result.get("status") == "fact_established" else "physical_verification_failed",
+            "P016 已验真目标物体进入夹爪" if result.get("status") == "fact_established" else "自主复做未建立目标物理事实",
+            stage="verification",
+            status="physical_fact_verified" if result.get("status") == "fact_established" else "correction_required",
+            world_revision=session["world_revision"],
+            evidence={"terminal_fact": result.get("terminal_fact"), "verification": result.get("verification_evidence")},
+        )
         if result.get("status") == "fact_established" and not job.get("human_acceptance_required", True):
             session["learned_experience"]["status"] = "trusted_local_experience"
         else:
