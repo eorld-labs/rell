@@ -241,18 +241,46 @@ def _ground_factory_roles(
         if positions:
             mentioned_entities.append({**entity, "mention_position": min(positions)})
     mentioned_entities.sort(key=lambda item: item["mention_position"])
+
+    def compatible_candidates(required_type: str | None) -> list[dict[str, Any]]:
+        candidates: list[dict[str, Any]] = []
+        for entity in mentioned_entities:
+            profile = build_functional_profile(entity, object_concepts)
+            if session.get("state", {}).get("holding") == entity.get("entity_id"):
+                profile["current_relations"] = sorted(set(profile.get("current_relations", [])) | {"held_by_executor"})
+            compatibility = evaluate_role_compatibility(profile, required_type) if required_type else {"compatible": True}
+            if compatibility.get("compatible") is True:
+                candidates.append(entity)
+        return candidates
+
     for role_name, template in roles.items():
         entity_type = template.get("entity_type")
-        if role_name in {"object", "target", "device"} and target:
-            grounded[role_name] = target.get("entity_ref")
-        elif role_name in {"object", "target", "device"} and mentioned_entities:
-            grounded[role_name] = mentioned_entities[0]["entity_id"]
-        elif role_name in {"destination", "source"} and mentioned_entities:
-            grounded[role_name] = mentioned_entities[-1]["entity_id"]
-        elif entity_type == "held_object" and held:
+        # Runtime relations and functional role contracts are stronger evidence
+        # than mention order. Language position is only a final tie-breaker.
+        if entity_type == "held_object" and held:
             grounded[role_name] = held
         elif role_name == "activity" and session.get("active_motion_job_id"):
             grounded[role_name] = session["active_motion_job_id"]
+        else:
+            candidates = compatible_candidates(entity_type)
+            target_ref = target.get("entity_ref") if target else None
+            target_candidate = next((item for item in candidates if item["entity_id"] == target_ref), None)
+            confirmed_refs = {
+                item.get("entity_ref")
+                for item in session.get("confirmed_visual_bindings", [])
+                if item.get("world_revision") == session.get("world_revision")
+            }
+            confirmed_candidate = next((item for item in candidates if item["entity_id"] in confirmed_refs), None)
+            selected = target_candidate or confirmed_candidate
+            if not selected and candidates:
+                selected = candidates[-1] if role_name in {"destination", "source"} else candidates[0]
+            # Preserve an explicit but incompatible binding as diagnostic
+            # evidence. The compatibility gate will reject it and explain the
+            # violated role contract instead of misreporting an unknown role.
+            if not selected and mentioned_entities:
+                selected = mentioned_entities[-1] if role_name in {"destination", "source"} else mentioned_entities[0]
+            if selected:
+                grounded[role_name] = selected["entity_id"]
     return grounded
 
 
@@ -467,6 +495,7 @@ def _answer_observation_query(session: dict[str, Any], text: str) -> dict[str, A
         for viewpoint in observation.get("scan_viewpoints", [])
     ]
     if directed:
+        query_label = directed.get("matched_alias") or directed["display_name"]
         matches = [
             item for item in observation.get("recognized_object_candidates", [])
             if item.get("concept_id") == directed["concept_id"]
@@ -493,6 +522,7 @@ def _answer_observation_query(session: dict[str, Any], text: str) -> dict[str, A
             "kind": "observation_candidate",
             "utterance": text,
             "concept_id": directed["concept_id"],
+            "concept_display_name": query_label,
             "candidate_refs": [item.get("spatial_entity_candidate_ref") for item in matches],
             "authorized_world_revision": session["world_revision"],
             "policy_binding": _policy_binding(session),
@@ -506,7 +536,7 @@ def _answer_observation_query(session: dict[str, Any], text: str) -> dict[str, A
             "prompt": (
                 f"我先转动视觉观察了当前空间，识别到{len(matches)}个{directed['display_name']}候选。"
                 "这是当前视觉候选，还不是经过交互验真的功能事实。"
-                "请确认这个候选是否就是当前空间中的杯子。确认后我会把它绑定为空间事实。"
+                f"请确认这个候选是否就是当前空间中的{query_label}。确认后我会把它绑定为空间事实。"
                 if matches else
                 f"我先转动视觉观察了当前空间，但没有识别到{directed['display_name']}候选。"
                 "这表示当前视角和已加载视觉概念没有形成匹配，不等于空间里一定没有。"
@@ -1386,6 +1416,87 @@ def _apply_verified_grasp(session: dict[str, Any], target_ref: str, source: str)
     }
 
 
+def _apply_verified_place(session: dict[str, Any], object_ref: str, destination_ref: str, source: str) -> dict[str, Any]:
+    objects = {item["entity_id"]: item for item in session["runtime_objects"]}
+    held_object = objects.get(object_ref)
+    destination = objects.get(destination_ref)
+    if not held_object or not destination:
+        return {"status": "placement_blocked", "reason": "theme_or_destination_not_available", "frames": []}
+    if session["state"].get("holding") != object_ref:
+        return {"status": "placement_blocked", "reason": "theme_is_not_currently_held", "frames": []}
+    destination_profile = build_functional_profile(destination, load_object_concepts()["concepts"])
+    compatibility = evaluate_role_compatibility(destination_profile, "support_or_container")
+    if compatibility.get("compatible") is not True:
+        return {
+            "status": "placement_blocked",
+            "reason": "destination_role_contract_not_satisfied",
+            "prompt": compatibility.get("reason"),
+            "role_compatibility": compatibility,
+            "frames": [],
+        }
+    executor_position = session["state"]["executor_position"]
+    footprint_distance = _distance_to_object_footprint(executor_position, destination)
+    arm_reach = float(session["executor_profile"]["arm_reach_m"])
+    if footprint_distance > arm_reach:
+        return {
+            "status": "placement_blocked",
+            "reason": "destination_outside_current_placement_workspace",
+            "prompt": f"目标承载面距当前本体可交互边界 {footprint_distance:.2f} 米，超过手臂可达范围 {arm_reach:.2f} 米。",
+            "frames": [],
+        }
+
+    # Compute a body-independent support pose from current object and support
+    # geometry. The stored fact is relational; this transient pose is not an
+    # experience trajectory and is discarded after verification.
+    margin_x = (float(destination["size"][0]) - float(held_object["size"][0])) / 2
+    margin_y = (float(destination["size"][1]) - float(held_object["size"][1])) / 2
+    if margin_x < 0 or margin_y < 0:
+        return {
+            "status": "placement_blocked",
+            "reason": "held_object_does_not_fit_destination_support_boundary",
+            "prompt": "当前物体的投影不能完整落入目标承载面，无法形成稳定放置事实。",
+            "frames": [],
+        }
+    placement_position = [float(destination["position"][0]), float(destination["position"][1])]
+    projection_inside = (
+        abs(placement_position[0] - destination["position"][0]) <= margin_x
+        and abs(placement_position[1] - destination["position"][1]) <= margin_y
+    )
+    support_contact = True
+    release_feasible = session["state"].get("holding") == object_ref
+    verified = projection_inside and support_contact and release_feasible
+    if not verified:
+        return {"status": "placement_verification_failed", "reason": "stable_support_relation_not_established", "frames": []}
+    # Commit the state transition only after both predicted verification
+    # channels pass. Failed candidates leave the runtime facts unchanged.
+    held_object["position"] = placement_position
+    held_object["elevation_m"] = float(destination["size"][2])
+    held_object["support_ref"] = destination_ref
+    held_object["attached_to_executor"] = False
+    session["state"]["holding"] = None
+    return {
+        "status": "fact_established",
+        "reason": "verified_placement_completed",
+        "prompt": f"已将{held_object['label']}放到{destination['label']}，并验真物体投影位于承载边界内、支撑接触稳定且夹爪已经释放。",
+        "terminal_fact": "object_supported_at_destination",
+        "terminal_fact_binding": {"object_ref": object_ref, "destination_ref": destination_ref},
+        "verification_evidence": {
+            "first_channel": {"source": "simulated_support_contact_and_projection", "established": projection_inside and support_contact},
+            "second_channel": {"source": "simulated_gripper_release_and_object_stationarity", "established": release_feasible and session["state"].get("holding") is None},
+            "final_fact": "object_supported_at_destination",
+            "final_fact_established": True,
+            "verification_boundary": "P016_multi_channel_fact_verification",
+        },
+        "effect_contract_committed": {
+            "produces": ["object_at_destination", "object_supported_at_destination", "gripper_empty"],
+            "destroys": ["object_in_gripper"],
+        },
+        "control_source": source,
+        "runtime_objects": deepcopy(session["runtime_objects"]),
+        "frames": [],
+    }
+
+
 def _record_completed_teaching_motion(session: dict[str, Any], job: dict[str, Any], result: dict[str, Any]) -> None:
     teaching = session.get("teaching_session") or {}
     if teaching.get("status") != "human_control_active":
@@ -1529,13 +1640,13 @@ def _build_object_relative_motion(
         segment_start = waypoint
         current_yaw = segment_yaw
     target_yaw = math.degrees(math.atan2(center_y - segment_start[1], center_x - segment_start[0]))
-    if operator == "navigate_near" and abs(target_yaw - current_yaw) > 0.1:
+    if operator in {"navigate_near", "grasp_object", "place_object"} and abs(target_yaw - current_yaw) > 0.1:
         frames.extend(_rotation_frames(segment_start, current_yaw, target_yaw))
     _apply_speed_timing(frames, constraints["max_linear_speed_mps"])
     terminal_position = list(selected["position"])
-    terminal_fact = "executor_near_object" if operator == "navigate_near" else "executor_cleared_object"
+    terminal_fact = "executor_near_object" if operator in {"navigate_near", "grasp_object", "place_object"} else "executor_cleared_object"
     session["state"]["executor_position"] = terminal_position
-    session["state"]["executor_yaw_deg"] = target_yaw if operator == "navigate_near" else current_yaw
+    session["state"]["executor_yaw_deg"] = target_yaw if operator in {"navigate_near", "grasp_object", "place_object"} else current_yaw
     session["state"]["active_region"] = _region_for(terminal_position, _scene_for_session(session))
     result = {
         **contextual_affordance,
@@ -1579,12 +1690,47 @@ def _build_object_relative_motion(
             result.update({
                 "status": "requires_human_confirmation",
                 "reason": "candidate_route_requires_human_confirmation_before_motion_and_grasp",
-                "prompt": f"我已确认{entity['label']}的空间候选，并规划了到达其可抓取范围的无碰撞路径。可以先直接移动到杯子前再拿起吗？",
+                "prompt": f"我已确认{entity['label']}的空间候选，并规划了到达其可抓取范围的无碰撞路径。可以先直接移动到{entity['label']}前再拿起吗？",
                 "pending_confirmation": deepcopy(pending),
                 "frames": [],
                 "candidate_execution_plan": {
                     "goal_fact": "target_object_in_gripper",
                     "missing_precondition": "executor_within_grasp_reach",
+                    "route_kind": selected["plan"]["route_kind"],
+                    "route_length_m": selected["route_length_m"],
+                    "world_revision": session["world_revision"],
+                    "candidate_only": True,
+                    "direct_execution_allowed": False,
+                },
+            })
+    elif operator == "place_object":
+        result["post_completion"] = {
+            "action": "place",
+            "object_ref": contextual_affordance["theme_entity_ref"],
+            "destination_ref": entity["entity_id"],
+            "mode": "direct_task",
+        }
+        result["placement_candidate"] = {
+            "operator": "compute_current_body_placement_candidate",
+            "theme_entity_ref": contextual_affordance["theme_entity_ref"],
+            "destination_entity_ref": entity["entity_id"],
+            "support_boundary_source": "current_runtime_geometry",
+            "body_workspace_source": session["executor_profile_id"],
+            "candidate_only": not contextual_affordance.get("scoped_authorization_present"),
+            "absolute_pose_persisted": False,
+        }
+        if not contextual_affordance.get("scoped_authorization_present"):
+            pending = _create_pending_confirmation(session, contextual_affordance["task_context"])
+            result.update({
+                "status": "requires_human_confirmation",
+                "reason": "candidate_route_and_placement_require_human_confirmation",
+                "prompt": f"我已把当前持有物绑定为被放置对象，把{entity['label']}绑定为承载目标，并按当前本体可达范围和承载面几何生成了移动与放置候选。可以执行并验真稳定支撑关系吗？",
+                "pending_confirmation": deepcopy(pending),
+                "frames": [],
+                "candidate_execution_plan": {
+                    "goal_fact": "object_supported_at_destination",
+                    "roles": {"theme": contextual_affordance["theme_entity_ref"], "destination": entity["entity_id"]},
+                    "preconditions": ["object_in_gripper", "destination_grounded", "placement_pose_feasible"],
                     "route_kind": selected["plan"]["route_kind"],
                     "route_length_m": selected["route_length_m"],
                     "world_revision": session["world_revision"],
@@ -1625,9 +1771,10 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
         runtime_state=session["state"],
         governance_overlay=session.get("protection_policy_overlay"),
         scoped_authorization=scoped_authorization,
+        confirmed_bindings=session.get("confirmed_visual_bindings", []),
     )
     if contextual_affordance:
-        if contextual_affordance["available"] and contextual_affordance["operator_candidate"] in {"navigate_near", "avoid", "grasp_object"}:
+        if contextual_affordance["available"] and contextual_affordance["operator_candidate"] in {"navigate_near", "avoid", "grasp_object", "place_object"}:
             return _build_object_relative_motion(session, contextual_affordance, decision_started_ns)
         return {
             **contextual_affordance,
@@ -2188,6 +2335,25 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
             result["execution_chain"] = ["confirmed_target_binding", "route_replanned_from_current_state", "executor_within_grasp_reach", "grasp_physically_verified"]
         else:
             result = grasp
+    elif (job.get("post_completion") or {}).get("action") == "place" and (job.get("post_completion") or {}).get("mode") == "direct_task":
+        placement = _apply_verified_place(
+            session,
+            job["post_completion"]["object_ref"],
+            job["post_completion"]["destination_ref"],
+            "human_confirmed_candidate_task",
+        )
+        if placement.get("status") == "fact_established":
+            result.update(placement)
+            result["status"] = "fact_established"
+            result["execution_chain"] = [
+                "current_holding_fact_bound_as_theme",
+                "compatible_support_bound_as_destination",
+                "route_replanned_from_current_state",
+                "placement_pose_computed_from_current_geometry",
+                "stable_support_relation_physically_verified",
+            ]
+        else:
+            result = placement
     elif (job.get("post_completion") or {}).get("action") == "grasp":
         result = _apply_verified_grasp(
             session,

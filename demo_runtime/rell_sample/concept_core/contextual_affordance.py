@@ -21,6 +21,14 @@ TASK_OPERATORS = {
         "governance": "ordinary_manipulation",
         "candidate_chain": ("bind_confirmed_target", "plan_route_to_reach_pose", "grasp_and_verify_target_in_gripper"),
     },
+    "place_object": {
+        "tokens": ("放到", "放在", "摆到", "摆在", "搁到", "搁在"),
+        "role": "placement_destination",
+        "required_body_actions": ("place_object",),
+        "required_object_claims": ("support_object",),
+        "governance": "ordinary_manipulation",
+        "candidate_chain": ("bind_currently_held_theme", "bind_compatible_destination", "compute_current_body_placement_candidate", "place_and_verify_support_relation"),
+    },
     "avoid": {
         "tokens": ("绕开", "避开", "绕过去"),
         "role": "navigation_obstacle",
@@ -66,7 +74,9 @@ def resolve_contextual_affordance_request(
     runtime_state: dict[str, Any],
     governance_overlay: dict[str, Any] | None,
     scoped_authorization: dict[str, Any] | None,
+    confirmed_bindings: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
+    confirmed_refs = {item.get("entity_ref") for item in (confirmed_bindings or [])}
     entity = next(
         (
             item
@@ -75,10 +85,13 @@ def resolve_contextual_affordance_request(
         ),
         None,
     )
-    if not entity and any(token in utterance for token in ("拿起", "抓取", "拾起", "拿住")):
+    if not entity and any(token in utterance for token in ("拿起", "抓取", "拾起", "拿住", "放到", "放在", "摆到", "摆在", "搁到", "搁在")):
         for concept in object_concepts:
             if any(alias and alias in utterance for alias in concept.get("aliases", [])):
-                entity = next((item for item in entities if item.get("concept_id") == concept["concept_id"]), None)
+                compatible = [item for item in entities if item.get("kind") in concept.get("compatible_kinds", [])]
+                entity = next((item for item in compatible if item.get("entity_id") in confirmed_refs), None)
+                entity = entity or next((item for item in compatible if item.get("concept_id") == concept["concept_id"]), None)
+                entity = entity or (compatible[0] if len(compatible) == 1 else None)
                 if not entity and concept["concept_id"] == "concept_fillable_container":
                     entity = next((item for item in entities if item.get("kind") == "graspable_container"), None)
                 if entity:
@@ -93,6 +106,8 @@ def resolve_contextual_affordance_request(
         (item for item in object_concepts if item["concept_id"] == entity.get("concept_id")),
         None,
     )
+    if not concept and entity.get("entity_id") in confirmed_refs:
+        concept = next((item for item in object_concepts if entity.get("kind") in item.get("compatible_kinds", [])), None)
     if not concept and entity.get("kind") == "graspable_container":
         concept = next((item for item in object_concepts if item["concept_id"] == "concept_fillable_container"), None)
     if not concept:
@@ -115,6 +130,9 @@ def resolve_contextual_affordance_request(
             missing.append({"kind": "object_claim", "condition": claim, "reason": "object_claim_not_physically_verified"})
     if operator == "relocate" and entity.get("fixed"):
         missing.append({"kind": "runtime_object_state", "condition": "current_instance_fixed", "reason": "current_instance_is_bound_as_fixed_furniture"})
+    held_ref = runtime_state.get("holding")
+    if operator == "place_object" and not held_ref:
+        missing.append({"kind": "runtime_object_state", "condition": "no_object_currently_held", "reason": "place_requires_currently_held_theme"})
     governance_gate = contract["governance"]
     if "requires_confirmation" in governance_gate and not scoped_authorization:
         missing.append({"kind": "governance", "condition": governance_gate, "reason": "scoped_authorization_not_present"})
@@ -122,6 +140,7 @@ def resolve_contextual_affordance_request(
     return {
         "status": "contextual_affordance_available" if available else "contextual_affordance_blocked",
         "entity_ref": entity["entity_id"],
+        "theme_entity_ref": held_ref if operator == "place_object" else entity["entity_id"],
         "object_concept_id": concept["concept_id"],
         "operator_candidate": operator,
         "active_role": contract["role"],

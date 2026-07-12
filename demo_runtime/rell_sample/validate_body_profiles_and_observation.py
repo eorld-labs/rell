@@ -47,6 +47,29 @@ def main() -> None:
     holding_query = execute_command(contextual["session_id"], "现在手上拿着什么")
     require(holding_query["status"] == "runtime_holding_state_answered", f"holding state query did not use runtime state: {holding_query}")
     require(holding_query["runtime_fact"] == "object_in_gripper", f"holding fact was not derived from verified grasp: {holding_query}")
+    table_observation = begin_motion_command(contextual["session_id"], "你看得到桌子吗")["immediate_result"]
+    require(table_observation["status"] == "observation_candidate_confirmation_required", f"support observation did not request confirmation: {table_observation}")
+    require(table_observation["pending_confirmation"]["concept_display_name"] == "桌子", f"support confirmation reused a cup label: {table_observation}")
+    require("杯子" not in table_observation["prompt"], f"support prompt was hard-coded to cup: {table_observation}")
+    table_accepted = begin_motion_command(contextual["session_id"], "对")
+    require(table_accepted.get("status") == "observation_candidate_confirmed", f"support observation was not committed after confirmation: {table_accepted}")
+    placement_plan = begin_motion_command(contextual["session_id"], "再放在桌子上")
+    require(placement_plan["status"] == "requires_human_confirmation", f"placement did not produce a candidate plan: {placement_plan}")
+    roles = placement_plan["immediate_result"]["candidate_execution_plan"]["roles"]
+    require(roles == {"theme": "cup_b", "destination": "counter_b"}, f"role contracts did not bind current holding and support destination: {placement_plan}")
+    require(placement_plan["immediate_result"]["placement_candidate"]["absolute_pose_persisted"] is False, f"transient placement pose leaked into experience: {placement_plan}")
+    placement_started = begin_motion_command(contextual["session_id"], "可以")
+    require(placement_started["status"] == "motion_started", f"confirmed placement did not start: {placement_started}")
+    placement_completed = None
+    for _ in range(200):
+        placement_completed = step_motion_command(placement_started["job_id"])
+        if placement_completed.get("status") == "motion_completed":
+            break
+    placement_result = (placement_completed or {}).get("result", {})
+    require(placement_result.get("terminal_fact") == "object_supported_at_destination", f"placement support fact was not verified: {placement_completed}")
+    require(placement_completed["session"]["state"]["holding"] is None, f"verified placement did not destroy holding fact: {placement_completed}")
+    placed_cup = next(item for item in placement_completed["session"]["runtime_objects"] if item["entity_id"] == "cup_b")
+    require(placed_cup.get("support_ref") == "counter_b", f"placed object was not rebound to destination support: {placement_completed}")
     print("Body profile and directed observation validation passed.")
 
 
