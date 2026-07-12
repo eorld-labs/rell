@@ -362,6 +362,7 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 - `concept_package.experience_lookup.candidates`：按缺失前提事实检索能够生产该事实的步骤或经验链，并按缺口覆盖数排序；该检索明确不使用整句输入到经验的直接匹配；
 - `concept_package.grounding_summary`：汇总必需角色是否已落地、未落地角色和确认问题；
 - 统一 `/agent/query` 入口在必需角色未落地时返回 `decision=concept_grounding_required`。该门控同时作用于预览和 `auto_execute=true`，防止第二次执行请求绕过澄清；
+- 当对象或场景可以识别、但没有本地动作概念或可执行经验时，响应附带 `learning_followup`：明确不会的原因、需要向人询问的问题，以及对话教学和边教边动入口。对象概念命中不再被视为任务能力充分；
 - `concept_lifecycle`：本次概念首次形成或重复复用事件，以及对应的形成数、复用数；
 - `resolved_concepts`：概念层候选，每个候选带有 `activation_reason`、`effect_contract`、`runtime_binding_status` 和 `experience_link_policy`；
 - `concept_evidence_packets`：端侧概念命中的证据包，说明命中依据、置信度、运行时快照绑定和失败回退策略；

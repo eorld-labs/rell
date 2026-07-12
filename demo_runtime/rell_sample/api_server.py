@@ -395,6 +395,13 @@ def looks_like_new_task_request(utterance: str) -> bool:
     return any(keyword in text for keyword in TASK_SWITCH_SIGNAL_KEYWORDS)
 
 
+def extract_replacement_task_text(utterance: str) -> str:
+    text = (utterance or "").strip()
+    for keyword in INTERRUPT_TASK_KEYWORDS:
+        text = text.replace(keyword, " ")
+    return re.sub(r"^[，,。；;\s]+|[，,。；;\s]+$", "", text)
+
+
 def infer_goal_fact_from_detected_steps(detected_steps: list[str]) -> str | None:
     if not detected_steps:
         return None
@@ -2346,6 +2353,7 @@ INDEX_HTML = """<!doctype html>
         empty_input: "输入为空",
         empty_or_unknown_request: "输入为空或语义未知",
         no_local_concept_match: "尚未命中本地概念",
+        no_local_action_concept_or_experience_match: "已识别对象或场景，但尚无可复用动作概念或任务经验",
         intent_long_chain_delivery_unsupported: "当前长程取送任务仍需外域候选补给",
         intent_risk_area_action_unsupported: "当前风险动作不允许直接进入执行",
         intent_causal_process_chain_unsupported: "当前目标事实尚未补齐可执行过程链",
@@ -2388,6 +2396,14 @@ INDEX_HTML = """<!doctype html>
         rows.push(`<div class="stage-row"><strong>概念命中</strong><span>${escapeHtml(conceptSummary)}</span></div>`);
       }
       rows.push(...renderConceptGroundingRows(conceptResolution, routeResult?.concept_grounding_gate));
+      const followup = routeResult?.learning_followup;
+      if (followup) {
+        rows.push(
+          `<div class="stage-row"><strong>不会原因</strong><span>${escapeHtml(followup.unable_reason || "-")}</span></div>`,
+          `<div class="stage-row"><strong>询问人类</strong><span>${escapeHtml((followup.questions_for_human || []).join(" / ") || "-")}</span></div>`,
+          `<div class="stage-row"><strong>后置处理</strong><span>${escapeHtml((followup.recommended_next_actions || []).map(item => item.action).join(" / ") || "-")}</span></div>`
+        );
+      }
       return rows;
     }
 
@@ -5218,6 +5234,8 @@ def build_runtime_event_frame(
     established_facts = set(runtime_world_state.get("established_facts", []))
     process_chain = get_process_chain_for_intent(intent)
     interrupt_requested = any(keyword in (utterance or "") for keyword in INTERRUPT_TASK_KEYWORDS)
+    replacement_task_text = extract_replacement_task_text(utterance) if interrupt_requested else ""
+    replacement_task_candidate = bool(replacement_task_text and looks_like_new_task_request(replacement_task_text))
     potential_new_task_request = bool(
         not interrupt_requested
         and not requested_goal_fact
@@ -5237,6 +5255,8 @@ def build_runtime_event_frame(
         "holding_objects": holding,
         "process_chain": process_chain,
         "interrupt_requested": interrupt_requested,
+        "replacement_task_text": replacement_task_text,
+        "replacement_task_candidate": replacement_task_candidate,
         "potential_new_task_request": potential_new_task_request,
         "requested_goal_already_satisfied": bool(requested_goal_fact and requested_goal_fact in established_facts),
         "current_goal_already_satisfied": bool(current_goal_fact and current_goal_fact in established_facts),
@@ -5268,11 +5288,22 @@ def arbitrate_runtime_event(
     frame = build_runtime_event_frame(task_id, utterance, intent, runtime_world_state)
     chain = frame["process_chain"]
     holding_compatible = chain_is_compatible_with_current_holding(chain, runtime_world_state)
-    if frame["interrupt_requested"] and not chain and not frame["requested_goal_fact"]:
+    if frame["interrupt_requested"] and not frame["replacement_task_candidate"] and not chain and not frame["requested_goal_fact"]:
         decision = "pause_current_task"
         reason = "explicit_interrupt_without_replacement_goal"
         can_enter_execution = False
         required_actions = ["pause_active_task", "await_next_instruction"]
+    elif frame["replacement_task_candidate"] and not chain and not frame["requested_goal_fact"]:
+        if frame["holding_objects"]:
+            decision = "request_human_confirmation"
+            reason = "interrupt_with_unknown_replacement_while_executor_holds_object"
+            can_enter_execution = False
+            required_actions = ["pause_active_task", "confirm_task_switch", "resolve_held_object_state", "request_teaching_or_object_grounding"]
+        else:
+            decision = "pause_current_task"
+            reason = "interrupt_with_unknown_replacement_requires_clarification"
+            can_enter_execution = False
+            required_actions = ["pause_active_task", "request_object_grounding", "request_teaching_or_experience"]
     elif frame["potential_new_task_request"]:
         if frame["holding_objects"]:
             decision = "request_human_confirmation"
@@ -6723,6 +6754,25 @@ def build_task_switch_context(task_id: str, utterance: str, arbitration: dict[st
     }
 
 
+def build_learning_followup(utterance: str, intent: dict[str, Any], cloud_recall_preview: dict[str, Any] | None) -> dict[str, Any]:
+    clarification_questions = (cloud_recall_preview or {}).get("cloud_recall_result", {}).get("clarification_questions", [])
+    if not clarification_questions:
+        clarification_questions = ["请告诉我完成这件事需要依次做哪些关键步骤，以及最终什么状态表示任务完成。"]
+    return {
+        "status": "unable_but_teachable",
+        "utterance": utterance,
+        "unable_reason": intent.get("reason") or "当前端侧没有能够达成该目标的动作概念或经验",
+        "gap_type": "local_action_concept_or_experience_missing",
+        "questions_for_human": clarification_questions,
+        "recommended_next_actions": [
+            {"action": "dialogue_teaching", "endpoint": "/experience/dialogue-teach"},
+            {"action": "stepwise_teaching", "endpoint": "/teaching/session/start"},
+        ],
+        "experience_after_teaching": True,
+        "direct_execution_allowed": False,
+    }
+
+
 def build_llm_prompt_contract(utterance: str, task_id: str | None = None) -> dict[str, Any]:
     semantic_request = build_semantic_request_frame(utterance, get_cognitive_model(), task_id=task_id)
     intent_preview = translate_intent(utterance)
@@ -7120,6 +7170,7 @@ def handle_agent_query(
                     concept_resolution=concept_resolution,
                     intent_preview=intent,
                 )
+                result["learning_followup"] = build_learning_followup(utterance, intent, result["cloud_recall_preview"])
         return {"schema_version": "1.0.0", "semantic_request": semantic_request, "route_result": result}
     return {
         "schema_version": "1.0.0",

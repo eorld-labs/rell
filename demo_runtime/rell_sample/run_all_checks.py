@@ -422,6 +422,7 @@ def main() -> None:
     run_python("validate_p014_execution_recovery.py")
     run_python("validate_p015_preference_alignment.py")
     run_python("validate_p017_minimal_loop.py")
+    run_python("validate_p019_behavior_scenarios.py")
     run_http_smoke()
     print("All RELL sample checks passed.")
 

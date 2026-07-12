@@ -27,6 +27,8 @@
 | 隐含角色状态落地 | `concept_parser.py::_role_binding` | 当前手中唯一兼容对象、当前位置或空间模型中唯一可用资源可形成带依据的 `implicit + inferred` 绑定，条件不唯一时保持未解析 |
 | 缺失前提驱动经验检索 | `attach_missing_fact_experience_candidates` | 以当前缺失事实检索步骤或经验生产者并按覆盖率排序，不按整句输入绑定固定经验 |
 | 必需角色执行前门控 | `build_concept_grounding_gate`、`handle_agent_query` | 必需角色未落地时预览和自动执行统一返回澄清态，禁止绕过确认进入执行 |
+| 不会到教学后置闭环 | `build_learning_followup`、`no_local_action_concept_or_experience_match` | 已识别对象但无动作/经验时说明原因、询问人类并进入教学入口，教学后形成经验供再次执行 |
+| P019 行为场景回归 | `validate_p019_behavior_scenarios.py` | 独立验证不会-教学-复用、阶段目标反向补前提、组合中断任务切换和可绕障碍 |
 
 ## 三、证据包字段
 

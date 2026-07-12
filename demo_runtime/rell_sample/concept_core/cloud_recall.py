@@ -30,6 +30,8 @@ def infer_local_concept_gap(
         action_concepts = (concept_resolution or {}).get("action_concepts", [])
         if not resolved_concepts and not action_concepts:
             gaps.append("no_local_concept_match")
+        elif not action_concepts and intent_preview and intent_preview.get("decision") == "unsupported":
+            gaps.append("no_local_action_concept_or_experience_match")
     if (
         intent_preview
         and intent_preview.get("decision") == "unsupported"
