@@ -8,6 +8,11 @@ from typing import Any
 
 
 SLOT_PRIORITY = ["target_entity", "desired_postcondition", "verification_condition"]
+SLOT_NAMES = {
+    "target_entity": "要改变的对象",
+    "desired_postcondition": "完成后的目标状态",
+    "verification_condition": "判断完成的验真条件",
+}
 
 
 def _action_focus_text(text: str) -> str:
@@ -124,6 +129,52 @@ def _question_for(slot: str, session: dict[str, Any]) -> str:
     return f"目标结果暂记为“{slots['desired_postcondition']}”。我还需要知道：看到或测到什么，才算这个结果真的成立？"
 
 
+def _build_knowledge_self_report(dialogue: dict[str, Any], question: str | None = None) -> dict[str, Any]:
+    slots = dialogue["slots"]
+    target = slots.get("target_entity")
+    known = []
+    if target:
+        known.append({"kind": "grounded_target", "value": target["label"], "evidence": target["surface_form"]})
+    if slots.get("desired_postcondition"):
+        known.append({"kind": "desired_postcondition", "value": slots["desired_postcondition"], "evidence": "human_language"})
+    if slots.get("verification_condition"):
+        known.append({"kind": "verification_condition", "value": slots["verification_condition"], "evidence": "human_language"})
+    for precondition in slots.get("precondition_descriptions", []):
+        known.append({"kind": "precondition_description", "value": precondition, "evidence": "human_language"})
+
+    missing_slots = [slot for slot in SLOT_PRIORITY if not slots.get(slot)]
+    unknown = [{"kind": slot, "description": SLOT_NAMES[slot]} for slot in missing_slots]
+    if not missing_slots:
+        unknown.extend([
+            {"kind": "operator_mechanism", "description": "实现该状态跃迁的物理机制"},
+            {"kind": "embodied_process", "description": "当前本体可复用的执行过程"},
+        ])
+    if missing_slots:
+        cannot_do_because = "最小因果契约尚不完整，当前无法判断动作完成意味着哪个可验真的世界状态变化"
+        next_safe_route = "request_minimum_causal_information"
+    else:
+        cannot_do_because = "目标和验真边界已理解，但缺少实现该跃迁的物理机制与当前本体经验"
+        next_safe_route = "offer_embodied_teaching"
+
+    known_text = "；".join(item["value"] for item in known) if known else "还没有可唯一落地的任务事实"
+    unknown_text = "、".join(item["description"] for item in unknown)
+    spoken_summary = f"我目前知道：{known_text}。我还不知道：{unknown_text}。因此我现在不能直接执行，因为{cannot_do_because}。"
+    if question:
+        spoken_summary += question
+    elif next_safe_route == "offer_embodied_teaching":
+        spoken_summary += "你可以进入真人教学，让我观察并验真一次。"
+    return {
+        "known": known,
+        "unknown": unknown,
+        "cannot_do_because": cannot_do_because,
+        "requested_human_input": question,
+        "next_safe_route": next_safe_route,
+        "candidate_only": True,
+        "direct_execution_allowed": False,
+        "spoken_summary": spoken_summary,
+    }
+
+
 def start_concept_gap_dialogue(
     *,
     utterance: str,
@@ -166,6 +217,7 @@ def start_concept_gap_dialogue(
             "dialogue": compiled["dialogue"],
             "prompt": compiled["prompt"],
             "compiled_contract": compiled["compiled_contract"],
+            "knowledge_self_report": compiled["knowledge_self_report"],
             "analysis": {
                 "recognized_entities": deepcopy(mentions),
                 "unknown_action_surface": dialogue["unknown_action_surface"],
@@ -183,6 +235,7 @@ def start_concept_gap_dialogue(
     return {
         "dialogue": dialogue,
         "prompt": question,
+        "knowledge_self_report": _build_knowledge_self_report(dialogue, question),
         "analysis": {
             "recognized_entities": deepcopy(mentions),
             "unknown_action_surface": dialogue["unknown_action_surface"],
@@ -216,7 +269,13 @@ def continue_concept_gap_dialogue(
         else:
             question = "这条回答仍未唯一对应当前空间中的一个对象。请直接说对象名称，例如苹果、杯子或操作台。"
             updated["turns"].append({"speaker": "robot", "text": question, "slot": pending_slot})
-            return {"dialogue": updated, "prompt": question, "compiled_contract": None}
+            return {
+                "dialogue": updated,
+                "prompt": question,
+                "compiled_contract": None,
+                "knowledge_self_report": _build_knowledge_self_report(updated, question),
+                "analysis_ms": round((perf_counter_ns() - started_ns) / 1_000_000, 4),
+            }
     elif pending_slot in {"desired_postcondition", "verification_condition"}:
         normalized = answer.strip(" ，。！？,.!?；;：:")
         if not normalized:
@@ -246,6 +305,7 @@ def continue_concept_gap_dialogue(
             "dialogue": updated,
             "prompt": question,
             "compiled_contract": None,
+            "knowledge_self_report": _build_knowledge_self_report(updated, question),
             "analysis_ms": round((perf_counter_ns() - started_ns) / 1_000_000, 4),
         }
 
@@ -307,4 +367,5 @@ def _compile_temporary_contract(dialogue: dict[str, Any], current_world_revision
         "dialogue": updated,
         "prompt": prompt,
         "compiled_contract": contract,
+        "knowledge_self_report": _build_knowledge_self_report(updated),
     }

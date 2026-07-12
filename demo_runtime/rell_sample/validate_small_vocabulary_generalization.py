@@ -120,6 +120,10 @@ def main() -> None:
         result = start("请归整苹果")
         require(result["dialogue"]["pending_slot"] == "desired_postcondition", f"wrong first missing slot: {result}")
         require(result["analysis"]["unknown"] == ["desired_postcondition", "verification_condition"], f"unknown slots incorrect: {result}")
+        report = result["knowledge_self_report"]
+        require(report["known"][0]["value"] == "苹果", f"self-report lost known target: {report}")
+        require([item["kind"] for item in report["unknown"]] == ["desired_postcondition", "verification_condition"], f"self-report unknown boundary incorrect: {report}")
+        require(report["requested_human_input"] == result["prompt"] and not report["direct_execution_allowed"], f"self-report did not request minimum input safely: {report}")
 
     record("missing_result_asks_result", missing_result)
 
@@ -173,6 +177,9 @@ def main() -> None:
         )
         contract = assert_safe_contract(third)
         require(contract["effect_contract"]["human_readable_postcondition"] == "苹果和其他水果在一起", f"pronoun answer lost target: {contract}")
+        report = third["knowledge_self_report"]
+        require([item["kind"] for item in report["unknown"]] == ["operator_mechanism", "embodied_process"], f"compiled self-report overclaimed knowing how: {report}")
+        require(report["next_safe_route"] == "offer_embodied_teaching", f"compiled self-report did not route to teaching: {report}")
 
     record("two_clarifications_compile_contract", dialogue_compiles_with_minimum_turns)
 

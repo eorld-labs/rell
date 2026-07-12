@@ -181,6 +181,8 @@ def main() -> None:
     require(unknown_gap["concept_gap"]["understanding_status"] == "operator_and_goal_fact_unknown", f"unknown concept overclaimed understanding: {unknown_gap}")
     require(unknown_gap["concept_gap"]["recognized_entities"][0]["entity_ref"] == "apple_a", f"unknown event failed to reuse known object concepts: {unknown_gap}")
     require(unknown_gap["concept_gap"]["unknown_action_surface"] == "归整", f"unknown action surface was not isolated: {unknown_gap}")
+    require(unknown_gap["knowledge_self_report"]["known"][0]["value"] == "苹果", f"unknown task did not expose known boundary: {unknown_gap}")
+    require(unknown_gap["knowledge_self_report"]["requested_human_input"] == unknown_gap["prompt"], f"unknown task self-report did not request minimum feedback: {unknown_gap}")
     require(not unknown_gap["post_action"]["teaching_available"] and unknown_gap["post_action"]["clarification_required"], f"teaching was offered before goal semantics were understood: {unknown_gap}")
     require(unknown_gap["session"]["concept_gap_dialogue"]["pending_slot"] == "desired_postcondition", f"minimum causal question order incorrect: {unknown_gap}")
 
@@ -197,6 +199,7 @@ def main() -> None:
     require(temporary["knowledge_boundary"]["goal_and_verification_understood"] and not temporary["knowledge_boundary"]["operator_mechanism_known"], f"goal understanding was conflated with knowing how: {temporary}")
     require(temporary["knowledge_boundary"]["requires_embodied_teaching"] and temporary["knowledge_boundary"]["not_promoted_to_factory_library"], f"temporary contract bypassed teaching promotion: {temporary}")
     require(verification_answer["post_action"]["teaching_available"] and not temporary["direct_execution_allowed"], f"compiled gap contract did not enter safe teaching path: {verification_answer}")
+    require(verification_answer["knowledge_self_report"]["next_safe_route"] == "offer_embodied_teaching", f"completed causal understanding did not expose teaching route: {verification_answer}")
 
     motion_gap_session = start_session()
     motion_gap_id = motion_gap_session["session_id"]

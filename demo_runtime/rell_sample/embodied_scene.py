@@ -1104,6 +1104,7 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
             "status": "temporary_effect_contract_compiled" if continued.get("compiled_contract") else "concept_gap_clarification_required",
             "reason": "unknown_event_multi_turn_causal_analysis",
             "prompt": continued["prompt"],
+            "knowledge_self_report": continued.get("knowledge_self_report"),
             "concept_gap_analysis": {
                 "dialogue_id": continued["dialogue"]["dialogue_id"],
                 "slots": deepcopy(continued["dialogue"]["slots"]),
@@ -1166,6 +1167,7 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
             "status": "temporary_effect_contract_compiled" if compiled_contract else "concept_gap_clarification_required",
             "reason": "no_stable_factory_event_concept_match",
             "prompt": gap_started["prompt"],
+            "knowledge_self_report": gap_started.get("knowledge_self_report"),
             "concept_gap": {
                 "utterance": text,
                 "understanding_status": "operator_and_goal_fact_unknown",
