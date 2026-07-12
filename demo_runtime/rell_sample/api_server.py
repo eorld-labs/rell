@@ -4194,24 +4194,49 @@ def build_causal_signature(process_chain: list[str]) -> dict[str, Any]:
     }
 
 
+def build_portable_binding_slot(step: str, meta: dict[str, Any]) -> dict[str, Any]:
+    slot_specs = {
+        "move_to_doorway": ("TARGET_TRANSITION_REGION", "semantic_region", ["traversable", "transition_area"]),
+        "move_to_service_position": ("TARGET_SERVICE_REGION", "semantic_region", ["human_service_zone", "interaction_reachable"]),
+        "move_to_counter": ("TARGET_OPERATION_REGION", "semantic_region", ["operation_surface", "task_execution"]),
+        "pick_up_cup": ("TARGET_GRASPABLE_CONTAINER", "interactive_object", ["graspable", "receive_liquid"]),
+        "move_to_water_source": ("TARGET_LIQUID_SOURCE_REGION", "semantic_region", ["resource_zone", "water_resource"]),
+        "fill_cup_at_water_source": ("SOURCE_LIQUID_RESOURCE_REGION", "semantic_region", ["water_resource", "interactive"]),
+        "pour_water": ("TARGET_POUR_DESTINATION_REGION", "semantic_region", ["operation_surface", "pour_destination"]),
+    }
+    slot_id, entity_kind, semantic_requirements = slot_specs.get(
+        step,
+        (f"TARGET_{meta.get('capability', 'CAPABILITY').upper()}", "semantic_entity", [meta.get("capability")]),
+    )
+    return {
+        "slot_id": slot_id,
+        "entity_kind": entity_kind,
+        "semantic_requirements": [item for item in semantic_requirements if item],
+        "required_capability": meta.get("capability"),
+    }
+
+
 def build_invariant_contract(process_chain: list[str]) -> dict[str, Any]:
     topology_invariants: list[dict[str, Any]] = []
     action_constraints: list[dict[str, Any]] = []
     termination_conditions: list[dict[str, Any]] = []
-    binding_slots: list[str] = []
+    binding_slots: list[dict[str, Any]] = []
+    source_binding_evidence: list[dict[str, Any]] = []
 
     for step in process_chain:
         meta = STEP_LIBRARY[step]
         target = meta.get("target_region") or meta.get("target_object")
-        if target and target not in binding_slots:
-            binding_slots.append(target)
+        slot = build_portable_binding_slot(step, meta)
+        if not any(item.get("slot_id") == slot["slot_id"] for item in binding_slots):
+            binding_slots.append(slot)
+        source_binding_evidence.append({"step": step, "slot_id": slot["slot_id"], "source_entity_ref": target})
 
         if meta["capability"] == "navigate_to_region":
             topology_invariants.append(
                 {
                     "step": step,
                     "relation": "executor_reaches_semantic_region",
-                    "target_ref": target,
+                    "target_slot": slot["slot_id"],
                     "stored_as": "semantic_region_relation_not_absolute_coordinates",
                 }
             )
@@ -4228,7 +4253,7 @@ def build_invariant_contract(process_chain: list[str]) -> dict[str, Any]:
                 {
                     "step": step,
                     "relation": "end_effector_reaches_graspable_object",
-                    "target_ref": target,
+                    "target_slot": slot["slot_id"],
                     "stored_as": "object_affordance_and_relative_reach_relation",
                 }
             )
@@ -4245,7 +4270,7 @@ def build_invariant_contract(process_chain: list[str]) -> dict[str, Any]:
                 {
                     "step": step,
                     "relation": "container_opening_aligned_with_water_resource",
-                    "target_ref": target,
+                    "target_slot": slot["slot_id"],
                     "stored_as": "resource_zone_and_container_topology_not_absolute_pose",
                 }
             )
@@ -4262,7 +4287,7 @@ def build_invariant_contract(process_chain: list[str]) -> dict[str, Any]:
                 {
                     "step": step,
                     "relation": "container_spout_or_opening_aligned_with_target_container",
-                    "target_ref": target,
+                    "target_slot": slot["slot_id"],
                     "stored_as": "liquid_transfer_topology_not_robot_specific_pose",
                 }
             )
@@ -4302,6 +4327,7 @@ def build_invariant_contract(process_chain: list[str]) -> dict[str, Any]:
         "action_constraints": action_constraints,
         "termination_conditions": termination_conditions,
         "binding_slots": binding_slots,
+        "source_binding_evidence": source_binding_evidence,
         "runtime_binding": {
             "space_source": "P010 subject cognitive model",
             "concept_source": "P012 concept match",
@@ -4595,10 +4621,7 @@ def teach_experience(utterance: str, steps: Any) -> dict[str, Any]:
         },
         "action": {
             "action_type": "process_chain",
-            "target_refs": [
-                STEP_LIBRARY[step].get("target_region") or STEP_LIBRARY[step].get("target_object", "")
-                for step in process_chain
-            ],
+            "target_slots": [build_portable_binding_slot(step, STEP_LIBRARY[step])["slot_id"] for step in process_chain],
             "parameters": {"source": "manual_teaching", "teaching_frame": teaching_frame},
         },
         "teaching_contract": teaching_frame,
@@ -4610,6 +4633,14 @@ def teach_experience(utterance: str, steps: Any) -> dict[str, Any]:
         "governance_ref": {"audit_ref": "teaching_session"},
         "created_at": created_at,
     }
+    portability_validation = validate_experience_portability(experience)
+    experience["portable_contract_validation"] = portability_validation
+    if not portability_validation["accepted_for_public_experience_library"]:
+        return {
+            "error": "nonportable_experience_rejected",
+            "message": "经验包含不可迁移执行细节或不变量契约不完整，未进入公共经验库",
+            "portability_validation": portability_validation,
+        }
     library = load_experience_library()
     library["experiences"] = [
         item for item in library.get("experiences", []) if item.get("experience_id") != experience_id
@@ -4807,6 +4838,122 @@ def execute_teaching_session_step(session_id: str, teaching_input: Any) -> dict[
         "step_feedback": feedback_items,
         "teaching_frame": session.get("teaching_frame"),
         "runtime_world_state_snapshot": state,
+    }
+
+
+PORTABILITY_FORBIDDEN_KEY_FRAGMENTS = {
+    "absolute_coordinate",
+    "coordinate_sequence",
+    "joint_angle",
+    "joint_position",
+    "trajectory",
+    "fixed_duration",
+    "fixed_execution_time",
+    "motor_command",
+    "raw_control_signal",
+}
+
+
+def find_nonportable_fields(value: Any, path: str = "experience") -> list[str]:
+    violations: list[str] = []
+    if isinstance(value, dict):
+        for key, item in value.items():
+            normalized_key = str(key).lower()
+            if any(fragment in normalized_key for fragment in PORTABILITY_FORBIDDEN_KEY_FRAGMENTS):
+                violations.append(f"{path}.{key}")
+            violations.extend(find_nonportable_fields(item, f"{path}.{key}"))
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            violations.extend(find_nonportable_fields(item, f"{path}[{index}]"))
+    return violations
+
+
+def find_concrete_normative_entity_refs(value: Any, concrete_refs: set[str], path: str = "experience") -> list[str]:
+    violations: list[str] = []
+    if isinstance(value, dict):
+        for key, item in value.items():
+            violations.extend(find_concrete_normative_entity_refs(item, concrete_refs, f"{path}.{key}"))
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            violations.extend(find_concrete_normative_entity_refs(item, concrete_refs, f"{path}[{index}]"))
+    elif isinstance(value, str) and value in concrete_refs:
+        violations.append(f"{path}={value}")
+    return violations
+
+
+def validate_experience_portability(experience: dict[str, Any]) -> dict[str, Any]:
+    contract = experience.get("invariant_contract", {})
+    normative_contract = {key: value for key, value in contract.items() if key != "source_binding_evidence"}
+    normative_payload = {
+        "action": experience.get("action", {}),
+        "causal_signature": experience.get("causal_signature", {}),
+        "invariant_contract": normative_contract,
+    }
+    violations = find_nonportable_fields(normative_payload)
+    source_entity_refs = {
+        str(item.get("source_entity_ref"))
+        for item in contract.get("source_binding_evidence", [])
+        if item.get("source_entity_ref")
+    }
+    concrete_normative_refs = find_concrete_normative_entity_refs(normative_payload, source_entity_refs)
+    if concrete_normative_refs:
+        violations.append("normative_contract_contains_source_environment_entity_refs")
+    required_dimensions = {
+        "topology_relation",
+        "exploratory_direction_and_physical_constraint",
+        "fact_based_termination_condition",
+    }
+    dimensions = set(contract.get("invariant_dimensions", []))
+    if not required_dimensions.issubset(dimensions):
+        violations.append("invariant_dimensions_incomplete")
+    process_chain = experience.get("process_chain", [])
+    if len(contract.get("termination_conditions", [])) != len(process_chain):
+        violations.append("fact_termination_conditions_incomplete")
+    if not contract.get("binding_slots"):
+        violations.append("typed_binding_slots_missing")
+    return {
+        "status": "portable_contract_valid" if not violations else "rejected_nonportable_experience",
+        "accepted_for_public_experience_library": not violations,
+        "violations": sorted(set(violations)),
+        "concrete_normative_entity_refs": concrete_normative_refs,
+        "validated_dimensions": sorted(required_dimensions & dimensions),
+        "source_bindings_are_non_normative": True,
+    }
+
+
+def bind_portable_invariant_contract(
+    contract: dict[str, Any],
+    space_bindings: dict[str, str],
+    executor_profile: dict[str, Any],
+) -> dict[str, Any]:
+    supported_actions = set(executor_profile.get("supported_actions", []))
+    bound_slots: list[dict[str, Any]] = []
+    missing_slots: list[str] = []
+    unsupported_capabilities: list[str] = []
+    for slot in contract.get("binding_slots", []):
+        slot_id = slot.get("slot_id")
+        entity_ref = space_bindings.get(slot_id)
+        if not entity_ref:
+            missing_slots.append(slot_id)
+        required_capability = slot.get("required_capability")
+        if required_capability and required_capability not in supported_actions:
+            unsupported_capabilities.append(required_capability)
+        bound_slots.append({
+            "slot_id": slot_id,
+            "entity_ref": entity_ref,
+            "entity_kind": slot.get("entity_kind"),
+            "semantic_requirements": slot.get("semantic_requirements", []),
+            "required_capability": required_capability,
+        })
+    accepted = not missing_slots and not unsupported_capabilities
+    return {
+        "status": "portable_contract_bound" if accepted else "portable_contract_binding_failed",
+        "accepted": accepted,
+        "executor_id": executor_profile.get("executor_id"),
+        "bound_slots": bound_slots,
+        "missing_slots": sorted(set(missing_slots)),
+        "unsupported_capabilities": sorted(set(unsupported_capabilities)),
+        "binding_policy": "typed_slots_are_rebound_per_space_and_executor_without_rewriting_normative_contract",
     }
 
 

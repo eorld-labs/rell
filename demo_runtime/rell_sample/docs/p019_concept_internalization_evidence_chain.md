@@ -29,6 +29,7 @@
 | 必需角色执行前门控 | `build_concept_grounding_gate`、`handle_agent_query` | 必需角色未落地时预览和自动执行统一返回澄清态，禁止绕过确认进入执行 |
 | 不会到教学后置闭环 | `build_learning_followup`、`no_local_action_concept_or_experience_match` | 已识别对象但无动作/经验时说明原因、询问人类并进入教学入口，教学后形成经验供再次执行 |
 | P019 行为场景回归 | `validate_p019_behavior_scenarios.py` | 独立验证不会-教学-复用、阶段目标反向补前提、组合中断任务切换和可绕障碍 |
+| 经验进入概念前的可迁移准入 | `validate_experience_portability` | 只有通过类型化槽位编译和不可迁移字段净化的经验，才可进入公共经验库并继续作为概念晋升来源 |
 
 ## 三、证据包字段
 

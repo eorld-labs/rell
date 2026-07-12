@@ -529,6 +529,15 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 
 当经验成功生成后，响应中还会附带 `concept_promotion_candidates`。这些候选由经验记录、因果签名和经验不变量契约自动抽取生成，用于后续人工确认是否将该经验晋升为概念层公共语义单元，或补强现有概念。
 
+经验写入公共经验库前必须通过可迁移契约编译与净化：
+
+- `invariant_contract.binding_slots` 保存类型化槽位及语义要求，不以来源空间的对象或区域 ID 作为规范执行依赖；
+- `invariant_contract.source_binding_evidence` 可保留本次形成经验时的对象/区域绑定，但仅作来源审计，不参与后续迁移的规范匹配；
+- `action.target_slots` 引用类型化槽位，不再保存来源环境 `target_refs`；
+- `portable_contract_validation` 校验三类不变量、事实终止条件和类型化槽位是否完整，并递归拒绝绝对坐标、关节角、固定执行时长、轨迹和底层控制信号；
+- 校验失败返回 `nonportable_experience_rejected`，经验不得进入公共经验库；
+- `bind_portable_invariant_contract` 可在不改写规范契约的情况下，针对当前空间语义实体和执行体能力重新绑定。
+
 ## POST /experience/dialogue-teach
 
 用途：接收自然语言形式的对话教学内容，并复用教学步骤解析器生成候选经验。

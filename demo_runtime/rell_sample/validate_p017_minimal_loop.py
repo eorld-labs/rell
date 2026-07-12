@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -8,11 +9,13 @@ from api_server import (
     AUDIT_STORE,
     build_causal_signature,
     build_invariant_contract,
+    bind_portable_invariant_contract,
     dispatch_execution_loop_payload,
     get_process_chain_for_intent,
     get_runtime_world_state,
     migrate_experience,
     release_runtime_world_state,
+    validate_experience_portability,
 )
 from runtime_core import write_json
 
@@ -122,6 +125,23 @@ EVIDENCE_INDEX = [
         ],
         "examination_use": "用于说明快照释放是防状态污染的任务安全控制，并通过释放令牌和审计记录留下可验证证据。",
     },
+    {
+        "file": "07_portability_compilation.json",
+        "technical_feature": "经验入库前编译可迁移不变量契约，并基于类型化槽位完成跨空间跨主体重绑定",
+        "claim_1_step": "基于经验不变量契约对经验进行迁移适配",
+        "key_fields": [
+            "portability_validation.accepted_for_public_experience_library",
+            "source_space_and_executor_binding.bound_slots",
+            "alternate_space_and_executor_binding.bound_slots",
+            "contaminated_experience_validation.violations",
+        ],
+        "code_sources": [
+            "api_server.py::validate_experience_portability",
+            "api_server.py::bind_portable_invariant_contract",
+            "api_server.py::build_portable_binding_slot",
+        ],
+        "examination_use": "用于证明公共经验库保存的是可重新绑定的规范契约而非来源环境对象、绝对坐标或机器人专用控制参数。",
+    },
 ]
 
 
@@ -228,9 +248,57 @@ def main() -> None:
     )
     write_json(OUTPUT / "06_release_and_audit.json", release_and_audit)
 
+    portable_experience = {
+        "process_chain": process_chain,
+        "causal_signature": causal_signature,
+        "invariant_contract": invariant_contract,
+        "action": {
+            "action_type": "process_chain",
+            "target_slots": [item["slot_id"] for item in invariant_contract.get("binding_slots", [])],
+        },
+    }
+    portability_validation = validate_experience_portability(portable_experience)
+    source_space_bindings = {
+        item["slot_id"]: item["source_entity_ref"]
+        for item in invariant_contract.get("source_binding_evidence", [])
+    }
+    alternate_space_bindings = {
+        "TARGET_OPERATION_REGION": "site_b_preparation_surface",
+        "TARGET_GRASPABLE_CONTAINER": "site_b_reusable_tumbler",
+        "TARGET_LIQUID_SOURCE_REGION": "site_b_corridor_dispenser_zone",
+        "SOURCE_LIQUID_RESOURCE_REGION": "site_b_corridor_dispenser_zone",
+    }
+    required_capabilities = sorted({item.get("required_capability") for item in invariant_contract.get("binding_slots", []) if item.get("required_capability")})
+    source_executor = {"executor_id": "simulated_robot_a", "supported_actions": required_capabilities}
+    alternate_executor = {"executor_id": "mobile_manipulator_b", "supported_actions": required_capabilities}
+    source_binding = bind_portable_invariant_contract(invariant_contract, source_space_bindings, source_executor)
+    alternate_binding = bind_portable_invariant_contract(invariant_contract, alternate_space_bindings, alternate_executor)
+    contaminated_experience = deepcopy(portable_experience)
+    contaminated_experience["action"]["joint_angles"] = [0.1, 0.2, 0.3]
+    contaminated_validation = validate_experience_portability(contaminated_experience)
+    portability_compilation = evidence(
+        "经验入库前编译为类型化绑定槽并拒绝不可迁移执行细节，同一规范契约可在不同空间和主体上重新绑定",
+        "基于经验不变量契约完成跨空间跨主体适配",
+        {
+            "portability_validation": portability_validation,
+            "source_space_and_executor_binding": source_binding,
+            "alternate_space_and_executor_binding": alternate_binding,
+            "contaminated_experience_validation": contaminated_validation,
+            "normative_contract": {key: value for key, value in invariant_contract.items() if key != "source_binding_evidence"},
+        },
+    )
+    write_json(OUTPUT / "07_portability_compilation.json", portability_compilation)
+
     assert_true(process_chain, "experience record must include process steps")
     assert_true(causal_signature["produces_fact"] == "cup_contains_water", "target causal fact must be cup_contains_water")
     assert_true(invariant_contract.get("forbidden_storage"), "invariant contract must exclude non-transferable parameters")
+    assert_true(portability_validation.get("accepted_for_public_experience_library"), "portable contract must pass public-library admission")
+    assert_true(source_binding.get("accepted") and alternate_binding.get("accepted"), "same contract must bind across source and alternate spaces/executors")
+    assert_true(not contaminated_validation.get("accepted_for_public_experience_library"), "joint-angle contamination must be rejected")
+    assert_true(any("joint_angles" in item for item in contaminated_validation.get("violations", [])), "rejection must locate joint-angle field")
+    normative_text = str(portability_compilation["normative_contract"])
+    for source_ref in source_space_bindings.values():
+        assert_true(source_ref not in normative_text, f"normative contract must not depend on source entity {source_ref}")
     assert_true(runtime_snapshot_before["release_status"] == "not_released", "runtime world snapshot must be active before release")
     assert_true(migration["binding_candidate"]["step_bindings"], "binding candidate must contain step bindings")
     assert_true(migration["execution_feasibility"]["result"] == "executable", "minimal loop must be executable")
@@ -256,6 +324,7 @@ def main() -> None:
             "04_binding_and_feasibility.json",
             "05_execution_fact_feedback.json",
             "06_release_and_audit.json",
+            "07_portability_compilation.json",
         ],
         "closed_loop_checks": {
             "experience_record": True,
