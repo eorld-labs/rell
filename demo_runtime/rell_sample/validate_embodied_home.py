@@ -5,7 +5,7 @@ import math
 from pathlib import Path
 
 from concept_core.perceptual_grounding import activate_task_perception, ground_task_observations
-from embodied_scene import begin_motion_command, confirm_pending_motion, execute_command, load_scene, set_perception_scenario, set_protection_policy, set_stool, start_session, step_motion_command
+from embodied_scene import begin_learned_replay, begin_motion_command, begin_teaching_control, confirm_pending_motion, evaluate_learned_replay, execute_command, finish_embodied_teaching, load_scene, set_perception_scenario, set_protection_policy, set_stool, start_embodied_teaching, start_session, step_motion_command
 
 
 OUTPUT = Path(__file__).resolve().parents[1] / "output" / "rell_sample" / "embodied_home"
@@ -14,6 +14,16 @@ OUTPUT = Path(__file__).resolve().parents[1] / "output" / "rell_sample" / "embod
 def require(condition: bool, message: str) -> None:
     if not condition:
         raise AssertionError(message)
+
+
+def drain_motion(started: dict) -> dict:
+    job_id = started.get("job_id")
+    require(bool(job_id), f"expected motion job: {started}")
+    while True:
+        step = step_motion_command(job_id)
+        if step.get("status") == "motion_completed":
+            return step
+        require(step.get("status") == "frame_verified_and_committed", f"motion did not commit safely: {step}")
 
 
 def main() -> None:
@@ -119,6 +129,59 @@ def main() -> None:
     require("不能横向平移" in right["body_self_judgment"]["explanation"], f"body explanation missing: {right}")
     require(right["session"]["state"]["executor_yaw_deg"] == -90.0, f"body yaw did not turn right: {right}")
     require(any(frame.get("yaw_deg") not in (None, 0.0) for frame in right["frames"]), f"turn animation frames missing: {right}")
+
+    rotate_session = start_session()
+    rotate = execute_command(rotate_session["session_id"], "向右转")
+    require(rotate["status"] == "fact_established", f"pure rotation command failed: {rotate}")
+    require(rotate["concept"]["body_realization"] == "clockwise_rotation_in_place", f"pure rotation was treated as side translation: {rotate}")
+    require(rotate["session"]["state"]["executor_position"] == rotate_session["state"]["executor_position"], f"pure rotation translated body: {rotate}")
+    require(rotate["terminal_fact"] == "executor_heading_changed", f"pure rotation terminal fact incorrect: {rotate}")
+
+    teaching_session = start_session()
+    teaching_started = start_embodied_teaching(teaching_session["session_id"], "拿杯子")
+    require(teaching_started["status"] == "teaching_control_granted", f"teaching authority not granted: {teaching_started}")
+    require(not teaching_started["teaching_session"]["authority"]["safety_bypass_allowed"], f"teaching bypassed safety: {teaching_started}")
+    premature_grasp = begin_teaching_control(teaching_session["session_id"], "grasp")["immediate_result"]
+    require(premature_grasp["status"] == "grasp_blocked", f"out-of-reach grasp was accepted: {premature_grasp}")
+    for _ in range(17):
+        drain_motion(begin_teaching_control(teaching_session["session_id"], "forward"))
+    taught_grasp = begin_teaching_control(teaching_session["session_id"], "grasp")["immediate_result"]
+    require(taught_grasp["status"] == "fact_established", f"reachable taught grasp failed: {taught_grasp}")
+    require(taught_grasp["verification_evidence"]["final_fact_established"], f"taught grasp lacked physical verification: {taught_grasp}")
+    compiled = finish_embodied_teaching(teaching_session["session_id"])
+    require(compiled["status"] == "demonstration_compiled", f"teaching did not compile: {compiled}")
+    contract = compiled["experience"]["invariant_contract"]
+    require(contract["storage_policy"] == "store_invariants_not_concrete_teleoperation_parameters", f"wrong teaching storage policy: {compiled}")
+    require("teacher_key_sequence" in contract["forbidden_storage"], f"teacher keys leaked into experience: {compiled}")
+    require(not compiled["experience"]["demonstration_summary"]["raw_teleoperation_trace_persisted"], f"raw trace persisted: {compiled}")
+    interrupted_replay = begin_learned_replay(teaching_session["session_id"])
+    for _ in range(3):
+        require(step_motion_command(interrupted_replay["job_id"])["status"] == "frame_verified_and_committed", f"replay precondition frame failed: {interrupted_replay}")
+    set_protection_policy(
+        teaching_session["session_id"],
+        {"declaration_id": "teaching_replay_revision_test", "motion_policy": {"max_speed_mps": 0.5}},
+    )
+    invalidated_replay = step_motion_command(interrupted_replay["job_id"])
+    require(invalidated_replay["status"] == "motion_completed", f"specialized replay did not terminate on policy change: {invalidated_replay}")
+    require(invalidated_replay["result"]["status"] == "learned_replay_invalidated", f"specialized replay fell into ordinary command replanning: {invalidated_replay}")
+    set_protection_policy(teaching_session["session_id"], None)
+    replay_started = begin_learned_replay(teaching_session["session_id"])
+    require(replay_started["status"] == "learned_replay_started", f"learned replay did not start: {replay_started}")
+    replay_completed = drain_motion(replay_started)
+    require(replay_completed["result"]["status"] == "fact_established", f"autonomous replay failed physical fact: {replay_completed}")
+    require(replay_completed["result"]["control_source"] == "autonomous_learned_experience_replay", f"replay control source missing: {replay_completed}")
+    learned = evaluate_learned_replay(teaching_session["session_id"], True)
+    require(learned["status"] == "experience_learned", f"verified accepted replay was not learned: {learned}")
+    require(learned["experience"]["status"] == "trusted_local_experience", f"experience trust state incorrect: {learned}")
+
+    revoked_teaching_session = start_session()
+    start_embodied_teaching(revoked_teaching_session["session_id"], "拿杯子")
+    set_protection_policy(
+        revoked_teaching_session["session_id"],
+        {"declaration_id": "revoke_active_teaching", "motion_policy": {"max_speed_mps": 0.4}},
+    )
+    revoked_control = begin_teaching_control(revoked_teaching_session["session_id"], "forward")
+    require(revoked_control.get("error") == "teaching_control_authority_not_active", f"policy change left old teaching authority active: {revoked_control}")
 
     backward_session = start_session()
     backward = execute_command(backward_session["session_id"], "往后退一点")

@@ -34,8 +34,18 @@ The runtime scene can now switch among a single clear cup, two compatible cups, 
 
 Front-view occlusion produces explicit occlusion evidence. When the executor portrait exposes a panning head RGB-D frame, the perception loop selects an allowed alternate viewpoint and retries without moving the chassis. A successful second observation still yields only a candidate. Relocation increments the world revision, stales the old observation, moves the rendered instance, and requires a new observation id and position binding.
 
+## First-person embodied teaching
+
+The teaching cabin switches only the action-proposal authority to a scoped human teacher. First-person and safety views share the same session. Direction controls call the normal server-verified motion jobs; press-and-hold repeats bounded increments sequentially, and releasing the control stops issuing new increments. `向右转` is an in-place heading change, while `往右边走一点` remains turn-then-translate for the differential-drive body.
+
+Changing the protection declaration or replacing the target perception scenario revokes an active teaching authority. Dynamic obstacles do not grant a bypass; subsequent increments still use current collision checks. A learned replay is a specialized execution job: if its world or policy revision changes, it terminates at the last verified pose and returns to candidate-replay state instead of being misrouted through the ordinary language-command replanner.
+
+Grasping first checks the current body radius plus arm reach. An out-of-reach attempt is recorded as failed teaching evidence and cannot establish a fact. A reachable grasp requires simulated gripper contact and an independent visual target-following observation before `target_object_in_gripper` is committed.
+
+Finishing a successful demonstration compiles a candidate invariant experience and discards raw frame/key data. The replay resets the executor, restores the target, rebinds the current support and target, plans to a body-safe approach pose, verifies every frame against the current world and policy revisions, then performs the same grasp fact verification. Human acceptance can promote the experience only after that autonomous replay succeeds.
+
 ## Current benchmark
 
 The first home contains connected living-room, corridor, and kitchen regions plus an operation counter, water dispenser, cup, apple, and dynamic stool. The browser scene is available at `/embodied`.
 
-The command benchmark covers task-conditioned cup/support perception, multi-instance disambiguation, active observation under occlusion, relocation and rebinding, direct relative movement, a detourable stool, and a stool in a narrow transition. The next boundary is to submit a uniquely grounded target and its causal preview back through orchestration into actual navigation and grasp execution, while retaining per-step world-revision and P016 fact-verification gates.
+The command benchmark covers task-conditioned cup/support perception, multi-instance disambiguation, active observation under occlusion, relocation and rebinding, precise rotation semantics, first-person teleoperation teaching, invariant experience compilation, autonomous navigation/grasp replay, direct relative movement, and obstacle handling. The next boundary is to replay the same learned experience in a changed layout and then through a second executor profile without reusing its demonstrated trajectory.

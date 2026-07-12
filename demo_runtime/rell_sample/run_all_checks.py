@@ -58,6 +58,19 @@ def get_text(path: str) -> str:
         return response.read().decode("utf-8")
 
 
+def restore_text_with_retry(path: Path, content: str, attempts: int = 8) -> None:
+    last_error: OSError | None = None
+    for attempt in range(attempts):
+        try:
+            path.write_text(content, encoding="utf-8")
+            return
+        except OSError as error:
+            last_error = error
+            time.sleep(0.1 * (attempt + 1))
+    if last_error:
+        raise last_error
+
+
 def run_http_smoke() -> None:
     global API_URL
     print("[check] api_server HTTP smoke")
@@ -425,23 +438,23 @@ def run_http_smoke() -> None:
         if original_library is None:
             experience_library_file.unlink(missing_ok=True)
         else:
-            experience_library_file.write_text(original_library, encoding="utf-8")
+            restore_text_with_retry(experience_library_file, original_library)
         if original_concept_library is None:
             concept_library_file.unlink(missing_ok=True)
         else:
-            concept_library_file.write_text(original_concept_library, encoding="utf-8")
+            restore_text_with_retry(concept_library_file, original_concept_library)
         if original_candidate_library is None:
             concept_candidate_library_file.unlink(missing_ok=True)
         else:
-            concept_candidate_library_file.write_text(original_candidate_library, encoding="utf-8")
+            restore_text_with_retry(concept_candidate_library_file, original_candidate_library)
         if original_preference_library is None:
             preference_library_file.unlink(missing_ok=True)
         else:
-            preference_library_file.write_text(original_preference_library, encoding="utf-8")
+            restore_text_with_retry(preference_library_file, original_preference_library)
         if original_recovery_library is None:
             recovery_library_file.unlink(missing_ok=True)
         else:
-            recovery_library_file.write_text(original_recovery_library, encoding="utf-8")
+            restore_text_with_retry(recovery_library_file, original_recovery_library)
     print("[ok] api_server HTTP smoke")
 
 
