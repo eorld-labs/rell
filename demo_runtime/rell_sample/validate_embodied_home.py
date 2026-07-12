@@ -4,6 +4,7 @@ import json
 import math
 from pathlib import Path
 
+from concept_core.perceptual_grounding import activate_task_perception, ground_task_observations
 from embodied_scene import begin_motion_command, confirm_pending_motion, execute_command, load_scene, set_protection_policy, set_stool, start_session, step_motion_command
 
 
@@ -26,6 +27,39 @@ def main() -> None:
     require(coordinate_contract["screen_direction_is_not_a_body_direction"], "screen direction must not define body direction")
     require(profile["body_envelope"]["radius_m"] > 0, "body envelope must constrain clearance")
     require(profile["turning_radius_m"] > 0 and profile["arm_reach_m"] > 0, "body portrait must expose mobility and reach")
+
+    perception_session = start_session()
+    perception_started = begin_motion_command(perception_session["session_id"], "去桌子上拿杯子")
+    perception = perception_started["immediate_result"]
+    require(perception["status"] == "perception_grounded_candidate", f"task-conditioned perception did not ground: {perception}")
+    require(perception["perception_observation"]["sensor_contract"]["reasoner_scene_truth_access"] is False, f"reasoner bypassed observation DTO: {perception}")
+    require(perception["concept_grounding"]["grounding_status"] == "spatially_grounded", f"cup/support relation did not ground: {perception}")
+    require(perception["concept_grounding"]["candidate_only"] and not perception["concept_grounding"]["direct_execution_allowed"], f"perception candidate gained execution authority: {perception}")
+    require(not perception["concept_grounding"]["runtime_fact_committed"], f"visual candidate was committed as fact: {perception}")
+    bound_roles = {item["role"]: item["entity_ref"] for item in perception["concept_grounding"]["candidate_bindings"]}
+    require(bound_roles == {"target": "cup_a", "support": "counter_a"}, f"wrong grounded instances: {perception}")
+    require(perception["concept_grounding"]["relation_evidence"]["relation"] == "on_top_of", f"support relation evidence missing: {perception}")
+    require(perception["perception_observation"]["semantically_suppressed_tracks"], f"task attention did not suppress irrelevant semantics: {perception}")
+    require(perception["perception_observation"]["safety_channels_always_on"], f"safety channels were pruned with task attention: {perception}")
+    require(perception["causal_preview"]["planning_is_established_fact"] is False, f"causal preview became a future fact: {perception}")
+    require(perception_started["session"]["perception_history"][-1]["runtime_fact_committed"] is False, f"session history misreported observation as fact: {perception_started}")
+    require(perception_started["session"]["perception_history"][-1]["current_use_status"] == "current_candidate", f"new observation was not eligible for current recheck: {perception_started}")
+
+    changed_perception_session = set_stool(perception_session["session_id"], "ahead")
+    require(changed_perception_session["perception_history"][-1]["current_use_status"] == "stale", f"world change did not stale prior grounding: {changed_perception_session}")
+    require(changed_perception_session["perception_history"][-1]["invalidation_reason"] == "world_revision_changed", f"stale grounding lacks cause: {changed_perception_session}")
+
+    activation = activate_task_perception("去桌子上拿杯子")
+    relation_missing_observation = {**perception["perception_observation"], "relation_candidates": []}
+    ungrounded = ground_task_observations(activation, relation_missing_observation)
+    require(ungrounded["grounding_status"] == "perceptual_candidate", f"grounder inferred relation outside observation DTO: {ungrounded}")
+    require(ungrounded["fallback"] == "active_observation_or_human_disambiguation", f"missing relation did not trigger observation fallback: {ungrounded}")
+
+    perception_safety_session = start_session()
+    set_stool(perception_safety_session["session_id"], "ahead")
+    perception_with_obstacle = execute_command(perception_safety_session["session_id"], "去桌子上拿杯子")
+    require(perception_with_obstacle["perception_observation"]["safety_observations"], f"task attention hid active obstacle: {perception_with_obstacle}")
+    require(perception_with_obstacle["perception_observation"]["safety_observations"][0]["semantic_task_relevance"] == "safety_always_on", f"obstacle was not retained as safety input: {perception_with_obstacle}")
 
     direct_session = start_session()
     direct = execute_command(direct_session["session_id"], "往前走一点")
@@ -160,7 +194,7 @@ def main() -> None:
     live_stool_position = live_stool["active_obstacles"][0]["position"]
     require(all(math.dist(position, live_stool_position) > combined_radius for position in committed_positions), f"live replanning committed a penetrating frame: {committed_positions}")
 
-    report = {"scene_id": scene["scene_id"], "direct": direct, "right": right, "backward": backward, "detour": detour, "blocked": blocked, "fixed_furniture_stop": furniture_blocked, "protected_policy_overlay": {"envelope": envelope, "continuous": protected_continuous, "confirmed": confirmed, "small": protected_small, "policy_change_invalidation": policy_invalidated}, "live_replanning": invalidated}
+    report = {"scene_id": scene["scene_id"], "task_conditioned_perception": perception, "direct": direct, "right": right, "backward": backward, "detour": detour, "blocked": blocked, "fixed_furniture_stop": furniture_blocked, "protected_policy_overlay": {"envelope": envelope, "continuous": protected_continuous, "confirmed": confirmed, "small": protected_small, "policy_change_invalidation": policy_invalidated}, "live_replanning": invalidated}
     OUTPUT.mkdir(parents=True, exist_ok=True)
     (OUTPUT / "embodied_home_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print("Embodied semantic home validation passed.")

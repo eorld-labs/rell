@@ -15,7 +15,7 @@
   "objects": [
     {"entity_id": "counter_a", "label": "操作台", "kind": "operation_surface", "region_id": "kitchen", "position": [3.8, -1.5], "size": [1.5, 0.65, 0.9], "color": "#66717e", "fixed": true},
     {"entity_id": "dispenser_a", "label": "饮水机", "kind": "water_source", "region_id": "kitchen", "position": [4.2, 1.45], "size": [0.7, 0.55, 1.45], "color": "#e9f3f7", "fixed": true},
-    {"entity_id": "cup_a", "label": "杯子", "kind": "graspable_container", "region_id": "kitchen", "position": [3.55, -1.35], "size": [0.18, 0.18, 0.25], "color": "#f6f6f2", "fixed": false},
+    {"entity_id": "cup_a", "label": "杯子", "kind": "graspable_container", "region_id": "kitchen", "position": [3.55, -1.35], "elevation_m": 0.9, "support_ref": "counter_a", "size": [0.18, 0.18, 0.25], "color": "#f6f6f2", "fixed": false},
     {"entity_id": "apple_a", "label": "苹果", "kind": "graspable_object", "region_id": "living_room", "position": [-3.6, 1.2], "size": [0.22, 0.22, 0.22], "color": "#c83f3f", "fixed": false},
     {"entity_id": "stool_dynamic", "label": "凳子", "kind": "movable_obstacle", "region_id": "corridor", "position": [0.0, 0.0], "size": [0.7, 0.7, 0.55], "color": "#a46f42", "fixed": false, "active": false}
   ],

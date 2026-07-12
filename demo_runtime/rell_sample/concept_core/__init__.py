@@ -20,6 +20,13 @@ from .concept_units import (
 )
 from .teaching_frames import build_teaching_frame
 from .query_router import resolve_runtime_state_query
+from .perceptual_grounding import (
+    activate_task_perception,
+    build_task_perception_result,
+    ground_task_observations,
+    load_object_concepts,
+    simulate_task_conditioned_observation,
+)
 
 __all__ = [
     "ACTION_CONCEPT_UNITS",
@@ -38,4 +45,9 @@ __all__ = [
     "request_cloud_concept_support",
     "resolve_action_concepts",
     "resolve_runtime_state_query",
+    "activate_task_perception",
+    "build_task_perception_result",
+    "ground_task_observations",
+    "load_object_concepts",
+    "simulate_task_conditioned_observation",
 ]

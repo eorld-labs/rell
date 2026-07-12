@@ -7,6 +7,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+from concept_core.perceptual_grounding import build_task_perception_result
 from execution_boundary import (
     build_effective_execution_envelope,
     build_p2_control_decision,
@@ -40,6 +41,7 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator") -> dict[
         "policy_runtime": {"status": "inactive", "applied_world_revision": None, "revocation_reason": None},
         "pending_confirmation": None,
         "authorization_history": [],
+        "perception_history": [],
         "state": state,
         "active_obstacles": [],
         "world_revision": 0,
@@ -72,6 +74,13 @@ def _revoke_pending_confirmation(session: dict[str, Any], reason: str) -> None:
         return
     session["authorization_history"].append({**deepcopy(pending), "status": "revoked", "revocation_reason": reason})
     session["pending_confirmation"] = None
+
+
+def _invalidate_perception_history(session: dict[str, Any], reason: str) -> None:
+    for record in session.get("perception_history", []):
+        if record.get("current_use_status") == "current_candidate":
+            record["current_use_status"] = "stale"
+            record["invalidation_reason"] = reason
 
 
 def _create_pending_confirmation(session: dict[str, Any], utterance: str) -> dict[str, Any]:
@@ -107,6 +116,7 @@ def set_protection_policy(session_id: str, policy_overlay: dict[str, Any] | None
     if not session:
         return {"error": "embodied_session_not_found", "session_id": session_id}
     _revoke_pending_confirmation(session, "policy_changed")
+    _invalidate_perception_history(session, "policy_revision_changed_requires_candidate_recheck")
     normalized_policy = deepcopy(policy_overlay) if policy_overlay else None
     next_world_revision = session["world_revision"] + 1
     if normalized_policy:
@@ -140,6 +150,7 @@ def set_stool(session_id: str, mode: str = "ahead") -> dict[str, Any]:
     stool_position = [position[0] + math.cos(yaw) * distance, position[1] + math.sin(yaw) * distance]
     session["active_obstacles"] = [{"entity_id": "stool_dynamic", "position": stool_position, "mode": mode}]
     _revoke_pending_confirmation(session, "world_revision_changed")
+    _invalidate_perception_history(session, "world_revision_changed")
     session["world_revision"] += 1
     return get_session(session_id)
 
@@ -149,6 +160,21 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
     if not session:
         return {"error": "embodied_session_not_found", "session_id": session_id}
     text = utterance.strip()
+    perception_result = build_task_perception_result(load_scene(), session, text)
+    if perception_result:
+        session["perception_history"].append(
+            {
+                "utterance": text,
+                "observation_id": perception_result["perception_observation"]["observation_id"],
+                "grounding_status": perception_result["concept_grounding"]["grounding_status"],
+                "candidate_bindings": deepcopy(perception_result["concept_grounding"]["candidate_bindings"]),
+                "world_revision": session["world_revision"],
+                "runtime_fact_committed": False,
+                "current_use_status": "current_candidate",
+            }
+        )
+        perception_result["session"] = get_session(session_id)
+        return perception_result
     direction = _relative_direction(text)
     if not direction:
         return {
@@ -330,12 +356,15 @@ def begin_motion_command(session_id: str, utterance: str, scoped_authorization: 
     before = deepcopy(session)
     result = execute_command(session_id, utterance, scoped_authorization)
     pending_confirmation = deepcopy(SESSIONS[session_id].get("pending_confirmation"))
+    perception_history = deepcopy(SESSIONS[session_id].get("perception_history", []))
     SESSIONS[session_id] = before
     frames = result.get("frames", [])
     if not frames:
         if pending_confirmation:
             SESSIONS[session_id]["pending_confirmation"] = pending_confirmation
-            result["session"] = get_session(session_id)
+        if result.get("task_perception_frame"):
+            SESSIONS[session_id]["perception_history"] = perception_history
+        result["session"] = get_session(session_id)
         return {"status": result.get("status"), "immediate_result": result, "session": get_session(session_id)}
     job_id = "motion_" + hashlib.sha1(f"{session_id}|{len(MOTION_JOBS) + 1}".encode()).hexdigest()[:12]
     job = {

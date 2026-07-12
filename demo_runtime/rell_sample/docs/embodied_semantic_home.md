@@ -24,8 +24,14 @@ Continuous or otherwise high-risk physical controls enter a P2-style causal cont
 
 A confirmation never disables the protection overlay. It creates a one-use authorization bound to the exact command hash, current world revision, declaration identity/version, and policy revision. Starting that execution consumes the authorization; command changes, world changes, policy replacement, policy removal, denial, or prior consumption make it unusable. The policy runtime separately records its application revision and active/revoked state. An active motion job is bound to both world and policy revisions, so a mid-motion policy change invalidates the old job and forces a fresh decision from the last verified pose.
 
+## Task-conditioned concept perception
+
+The first perception slice handles `去桌子上拿杯子` without allowing the concept grounder to read scene truth. Object concepts activate a target container, support surface, pickup action, and required `target_on_top_of_support` relation. A simulated RGB-D adapter reads the scene and emits a restricted observation DTO containing category candidates, estimated geometry, and relation candidates. The grounder receives only that DTO and the activated concept contract.
+
+The cup/support binding reaches `spatially_grounded`, not `runtime_verified`. It remains `candidate_only=true`, commits no runtime fact, and produces only a causal preview for navigation, alignment, grasping, and post-grasp verification. Removing support-relation evidence forces the result back to active observation instead of allowing the grounder to reconstruct the answer from scene configuration. Irrelevant object semantics are suppressed, while active obstacles and other safety channels remain always on.
+
 ## Current benchmark
 
 The first home contains connected living-room, corridor, and kitchen regions plus an operation counter, water dispenser, cup, apple, and dynamic stool. The browser scene is available at `/embodied`.
 
-The first command benchmark covers direct relative movement, a detourable stool, and a stool in a narrow transition. The next expansion should connect teaching confirmation to a learned relative-motion concept and add a second home layout for zero-trajectory migration.
+The command benchmark covers task-conditioned cup/support perception, direct relative movement, a detourable stool, and a stool in a narrow transition. The next perception expansion should add multiple compatible cups, occlusion, viewpoint change, observation expiry, and object relocation before replacing the simulated observation adapter with a real vision model.

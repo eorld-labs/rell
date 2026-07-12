@@ -31,6 +31,8 @@
 | P019 行为场景回归 | `validate_p019_behavior_scenarios.py` | 独立验证不会-教学-复用、阶段目标反向补前提、组合中断任务切换和可绕障碍 |
 | 经验进入概念前的可迁移准入 | `validate_experience_portability` | 只有通过类型化槽位编译和不可迁移字段净化的经验，才可进入公共经验库并继续作为概念晋升来源 |
 | 泛化压力分支 | `validate_p017_generalization_pressure.py` | 验证唯一候选、多候选确认、资源不可用、主体能力缺口和泛化结果回写，不以理想单候选冒充泛化能力 |
+| 任务条件化概念感知落地 | `concept_core/perceptual_grounding.py`、`data/embodied_object_concepts.json` | 任务只激活相关对象与关系概念，感知适配器输出受限候选，落地器不读取场景真值且不得直接提交运行时事实 |
+| 安全感知不可随任务注意力裁剪 | `perception_observation.safety_channels_always_on`、`safety_observations` | 无关对象可停止高层语义分析，但动态障碍、碰撞和保护策略等安全输入持续生效 |
 
 ## 三、证据包字段
 
@@ -62,6 +64,9 @@
 5. 状态查询命中的状态概念必须带有只读快照证据包。
 6. 同一输入重复解析时，概念生命周期必须由 `concept_formed` 进入 `concept_reused`；
 7. 模糊输入必须生成 `local_concept_reuse_failed` 回退事件，并继续禁止直接执行。
+8. “去桌子上拿杯子”必须由任务概念生成受限观测请求，并以观测中的类别和 `on_top_of` 关系证据完成空间候选落地；
+9. 删除关系观测后必须回退为继续观察，不得由落地器读取场景配置补齐答案；
+10. 任务注意力抑制无关语义时，动态障碍安全观测必须继续保留。
 
 这些断言保证端侧概念内化不会退化为“概念命中后直接动作”，而是继续服从 P018 的状态优先仲裁主链。
 

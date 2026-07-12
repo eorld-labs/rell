@@ -1,0 +1,62 @@
+{
+  "schema_version": "1.0.0",
+  "concepts": [
+    {
+      "concept_id": "concept_fillable_container",
+      "display_name": "可盛装容器",
+      "aliases": ["杯子", "水杯", "杯"],
+      "compatible_kinds": ["graspable_container"],
+      "perceptual_invariants": ["open_top", "bounded_inner_volume", "graspable_body"],
+      "variable_features": ["color", "size", "handle_presence"],
+      "functional_affordances": ["graspable", "receive_liquid"],
+      "expected_relations": ["on_top_of_support", "held_by_executor"]
+    },
+    {
+      "concept_id": "concept_support_surface",
+      "display_name": "支撑操作面",
+      "aliases": ["桌子", "桌面", "操作台", "台面"],
+      "compatible_kinds": ["operation_surface"],
+      "perceptual_invariants": ["stable_horizontal_support_surface", "body_supported_from_ground"],
+      "variable_features": ["color", "material", "size"],
+      "functional_affordances": ["support_object", "operation_workspace"],
+      "expected_relations": ["supports_object"]
+    },
+    {
+      "concept_id": "concept_edible_apple",
+      "display_name": "苹果",
+      "aliases": ["苹果"],
+      "compatible_kinds": ["graspable_object"],
+      "perceptual_invariants": ["compact_round_body", "fruit_surface"],
+      "variable_features": ["color", "size", "ripeness"],
+      "functional_affordances": ["graspable", "movable"],
+      "expected_relations": ["on_top_of_support", "held_by_executor"]
+    },
+    {
+      "concept_id": "concept_water_source_asset",
+      "display_name": "固定水源资产",
+      "aliases": ["饮水机", "水源"],
+      "compatible_kinds": ["water_source"],
+      "perceptual_invariants": ["fixed_vertical_asset", "liquid_outlet"],
+      "variable_features": ["color", "size", "outlet_height"],
+      "functional_affordances": ["provide_water"],
+      "expected_relations": ["fixed_in_operation_region"]
+    },
+    {
+      "concept_id": "concept_movable_stool_obstacle",
+      "display_name": "可移动凳子障碍",
+      "aliases": ["凳子", "椅子"],
+      "compatible_kinds": ["movable_obstacle"],
+      "perceptual_invariants": ["ground_supported_body", "occupies_navigation_space"],
+      "variable_features": ["color", "size", "leg_count"],
+      "functional_affordances": ["movable", "blocks_motion"],
+      "expected_relations": ["inside_navigation_space"]
+    }
+  ],
+  "shared_grounding_policy": {
+    "candidate_only": true,
+    "direct_execution_allowed": false,
+    "must_reenter_orchestration_layer": true,
+    "observation_states": ["unobserved", "perceptual_candidate", "spatially_grounded", "runtime_verified", "stale", "lost"]
+  },
+  "safety_channels_always_on": ["human", "collision_geometry", "dynamic_obstacle", "protection_policy"]
+}

@@ -128,6 +128,21 @@
 2. 连续控制指令
 3. 绕过运行时世界状态快照的最终执行命令
 
+### 4.6 任务条件化概念激活与感知落地器
+
+负责根据当前任务目标、缺失前提和安全边界，只激活与当前任务直接相关的对象概念、关系概念、状态概念和动作概念，并将其编译为感知请求。
+
+例如，“去桌子上拿杯子”应激活：
+
+1. 目标对象概念：可抓取、可盛装容器；
+2. 支撑对象概念：桌子或操作台；
+3. 空间关系概念：`target on_top_of support`；
+4. 动作概念：导航、接近、抓取；
+5. 目标事实：`target_object_in_gripper`；
+6. 安全通道：人体、碰撞体和动态障碍持续观测。
+
+概念激活结果用于说明“当前需要找什么、验证什么关系、补齐什么事实”，不直接调用执行器。感知适配器根据该请求生成对象、属性和关系候选；感知落地器再结合空间语义与当前观测，把候选绑定到当前空间实例。
+
 ## 5. 概念、状态、经验三者关系
 
 ### 5.1 概念
@@ -152,6 +167,21 @@
 6. 结果再回流状态层与经验层
 
 这是端侧主体性的核心闭环。
+
+### 5.5 概念、感知、状态、经验和执行闭环
+
+引入当前环境感知后，闭环扩展为：
+
+1. 任务语言激活任务相关概念子图；
+2. 概念子图生成对象类别、功能属性、空间关系和状态条件组成的感知契约；
+3. 视觉、深度、触觉或其他感知通道只返回候选证据；
+4. 空间语义与实例落地器将候选绑定到当前空间对象；
+5. 状态层区分未观测、感知候选、空间落地、运行时验真、失效或丢失；
+6. 经验层根据目标事实和当前缺失前提生成候选过程；
+7. 编排层基于当前状态、本体画像和治理边界决定是否执行；
+8. P016 执行并验真后，才把事实回写任务期运行时世界状态。
+
+“在脑海中预安排”在工程上表示候选因果链和预期事实投影，不表示未来事实已经成立。对象移动、观测过期、空间关系变化或治理条件改变后，依赖旧绑定形成的候选过程必须失效。
 
 ## 6. 与现有体系的关系
 
@@ -250,6 +280,57 @@ P017负责跨空间跨本体真实经验迁移。
 }
 ```
 
+### 7.4 PerceptualConceptContract
+
+对象概念不保存固定像素模板、绝对坐标或单一实例外观，而保存可跨实例复用的感知与功能不变量：
+
+```json
+{
+  "concept_id": "concept_fillable_container",
+  "concept_type": "object",
+  "aliases": ["杯子", "水杯", "杯"],
+  "perceptual_invariants": {
+    "shape_features": ["open_top", "bounded_inner_volume"],
+    "variable_features": ["color", "size", "handle_presence"]
+  },
+  "functional_affordances": ["graspable", "receive_liquid"],
+  "expected_relations": ["on_top_of_support", "held_by_executor"],
+  "state_schema": ["unobserved", "perceptual_candidate", "spatially_grounded", "runtime_verified", "stale", "lost"],
+  "perception_query_policy": {
+    "activate_when": ["task_target", "missing_prerequisite", "verification_target"],
+    "candidate_only": true
+  },
+  "grounding_contract": {
+    "requires_current_observation": true,
+    "requires_space_relation_consistency": true,
+    "direct_execution_allowed": false
+  },
+  "uncertainty_policy": {
+    "multiple_candidates": "request_disambiguation_or_active_observation",
+    "occluded": "change_viewpoint_or_report_occlusion",
+    "observation_expired": "invalidate_binding_and_reobserve"
+  }
+}
+```
+
+感知模型负责生成候选，概念契约负责约束候选解释，空间语义负责关系定位，状态层负责候选生命周期。具体视觉模型、检测器或特征编码器属于可替换感知适配器，不构成概念本体。
+
+### 7.5 TaskPerceptionFrame
+
+```json
+{
+  "task_utterance": "去桌子上拿杯子",
+  "activated_concepts": ["concept_fillable_container", "concept_support_surface", "concept_pick_up"],
+  "requested_relations": ["target_on_top_of_support"],
+  "safety_channels_always_on": ["human", "collision", "dynamic_obstacle"],
+  "candidate_bindings": [],
+  "candidate_only": true,
+  "must_reenter_orchestration_layer": true
+}
+```
+
+任务相关注意力只裁剪非任务对象的高层语义分析，不关闭基础视觉输入，也不关闭安全检测。对苹果、装饰物等无关对象可以只保留低成本占用或障碍信息，而不进入“拿杯子”任务的主要语义推演链。
+
 ## 8. 第一版最小实现范围
 
 第一版不要做全语义系统，只做两个主干。
@@ -340,8 +421,10 @@ P017负责跨空间跨本体真实经验迁移。
 
 1. 先把状态概念主干做稳
 2. 再把高频动作概念主干做稳
-3. 再把教学语言拆到目标/过程/偏好三层
-4. 最后接云脑补给桥
+3. 在仿真环境中加入任务条件化概念激活、受限观测和对象关系落地，禁止推理器直接读取场景真值
+4. 验证多候选、遮挡、对象移动和观测失效后的主动观察、澄清与重新绑定
+5. 再把教学语言拆到目标/过程/偏好三层
+6. 最后接云脑补给桥和真实感知适配器
 
 ## 12. 结论
 
