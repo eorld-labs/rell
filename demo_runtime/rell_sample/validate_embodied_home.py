@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 import os
+from concept_core.lightweight_orchestrator import build_lightweight_causal_candidate
 from pathlib import Path
 
 from concept_core.perceptual_grounding import activate_task_perception, ground_task_observations
@@ -71,10 +72,40 @@ def main() -> None:
     orchestrator_catalog = build_factory_orchestrator_catalog()
     require(orchestrator_catalog["boundary"]["fixed_task_script_forbidden"], f"factory orchestrator regressed to scripts: {orchestrator_catalog}")
     require(orchestrator_catalog["boundary"]["backward_chain_from_current_fact_gap"], f"orchestrator is not fact-gap-driven: {orchestrator_catalog}")
-    producer_operators = {item["producer"] for item in state_catalog["prerequisite_strategies"].values() if item.get("producer")}
-    defined_operators = {item["operator"] for item in orchestrator_catalog["fact_producer_contracts"].values()}
-    missing_producer_contracts = sorted(producer_operators - defined_operators)
-    require(not missing_producer_contracts, f"automatic prerequisite strategies lack causal producer contracts: {missing_producer_contracts}")
+    require(orchestrator_catalog["boundary"]["business_event_specific_solver_code_forbidden"], f"orchestrator still encodes business events in solver: {orchestrator_catalog}")
+    require(orchestrator_catalog["boundary"]["event_concepts_register_automatically"], f"event contracts do not auto-register: {orchestrator_catalog}")
+    require(orchestrator_catalog["fact_implications"]["gripper_empty"] == ["gripper_available"], f"basic fact implication missing: {orchestrator_catalog}")
+    require(orchestrator_catalog["registry_summary"]["compiled_from"]["event_concept_count"] == factory_catalog["concept_count"], f"not all factory events entered causal registry: {orchestrator_catalog}")
+
+    synthetic_event = {
+        "concept_id": "synthetic_event_heat_object",
+        "display_name": "测试加热事件",
+        "capability": "heat_object",
+        "concept_kernel": {
+            "operator": "heat_object",
+            "effect_contract": {
+                "requires": ["object_grounded"],
+                "produces": ["object_temperature_above_target"],
+                "destroys": ["object_temperature_below_target"],
+                "verification": ["temperature_sensor_above_target"],
+            },
+        },
+    }
+    synthetic_goal = {
+        "operator": "serve_warm_object",
+        "recognized_goal_fact": "warm_object_served",
+        "required_capability": "serve_object",
+        "effect_contract": {"requires": ["object_temperature_above_target"], "produces": ["warm_object_served"], "destroys": []},
+    }
+    synthetic_plan = build_lightweight_causal_candidate(
+        goal_concept=synthetic_goal,
+        fact_snapshot={"world_revision": 0, "established_facts": ["object_grounded"], "negated_facts": []},
+        supported_capabilities=["heat_object", "serve_object"],
+        available_experience_capabilities=["heat_object", "serve_object"],
+        event_concepts=[synthetic_event],
+    )
+    require(synthetic_plan["candidate_process_chain"] == ["heat_object", "serve_warm_object"], f"new event contract required solver-specific code: {synthetic_plan}")
+    require(not synthetic_plan["unresolved_facts"] and synthetic_plan["candidate_status"] == "candidate_ready_for_runtime_arbitration", f"synthetic contract did not auto-register: {synthetic_plan}")
 
     zero_experience_session = start_session()
     zero_id = zero_experience_session["session_id"]
@@ -97,6 +128,11 @@ def main() -> None:
     require(zero_candidate["nodes"][1]["gate"] == "blocked_by_missing_experience", f"missing grasp experience was not gated: {zero_candidate}")
     require(zero_candidate["candidate_only"] and not zero_candidate["direct_execution_allowed"] and not zero_candidate["runtime_fact_committed"], f"candidate plan bypassed runtime verification: {zero_candidate}")
     require(not zero_candidate["cycles"] and not zero_candidate["unresolved_facts"], f"basic grasp chain is structurally incomplete: {zero_candidate}")
+    require(zero_candidate["planner_type"] == "contract_compiled_backward_causal_search", f"legacy enumerated solver is still active: {zero_candidate}")
+    require(zero_candidate["search_metrics"]["total_solver_ms"] >= 0, f"solver latency audit missing: {zero_candidate}")
+    require(zero_candidate["decision_latency"]["input_to_candidate_decision_ms"] >= zero_candidate["search_metrics"]["total_solver_ms"], f"end-to-end decision latency is inconsistent: {zero_candidate}")
+    second_zero_result = execute_command(zero_id, "拿起苹果")
+    require(second_zero_result["causal_candidate"]["search_metrics"]["registry_cache_hit"], f"unchanged concept and experience contracts were recompiled: {second_zero_result}")
 
     experienced_session = start_session()
     experienced_result = execute_command(experienced_session["session_id"], "拿起苹果")
@@ -118,6 +154,7 @@ def main() -> None:
     destination_gap = next(item for item in support_gap["factory_concept"]["incompatible_roles"] if item["role"] == "destination")
     require("support_object" in destination_gap["missing_affordances"], f"support affordance gap not exposed: {support_gap}")
     require(all(item["entity_ref"] != "apple_a" for item in support_gap["factory_concept"]["incompatible_roles"] if item["role"] == "object"), f"destination was incorrectly rebound as moved object: {support_gap}")
+    require(support_gap["causal_candidate"]["candidate_process_chain"] == ["navigate_until_target_within_reach", "grasp_object", "compute_current_body_placement_candidate", "place_object"], f"geometric placement mechanism missing from causal chain: {support_gap}")
 
     body_gap = execute_command(zero_id, "擦操作台")
     require(body_gap["factory_concept"]["reason_code"] == "executor_capability_not_available", f"missing body capability was not explained: {body_gap}")

@@ -66,6 +66,9 @@ def derive_runtime_fact_snapshot(
     negated: set[str] = set()
     evidence: dict[str, Any] = {}
     holding = session.get("state", {}).get("holding")
+    if session.get("executor_profile", {}).get("sensor_frames"):
+        established.add("sensor_available")
+        evidence["sensor_available"] = {"source": "current_executor_profile.sensor_frames"}
     if holding:
         established.update({"object_in_gripper", "activity_stopped"})
         negated.add("gripper_empty")

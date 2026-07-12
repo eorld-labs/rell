@@ -3,11 +3,12 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from time import perf_counter_ns
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
-from concept_core.factory_event_units import build_factory_inability_diagnosis, find_factory_event_concepts_by_text
+from concept_core.factory_event_units import FACTORY_EVENT_CONCEPT_UNITS, build_factory_inability_diagnosis, find_factory_event_concepts_by_text
 from concept_core.functional_object_reasoning import build_functional_object_catalog, build_functional_profile, evaluate_role_compatibility
 from concept_core.factory_state_facts import build_factory_state_catalog, derive_runtime_fact_snapshot, explain_prerequisite_gaps
 from concept_core.lightweight_orchestrator import build_lightweight_causal_candidate, build_lightweight_orchestrator_catalog
@@ -146,6 +147,31 @@ def _available_experience_capabilities(session: dict[str, Any]) -> list[str]:
     return sorted(capabilities)
 
 
+def _causal_experience_contracts(session: dict[str, Any]) -> list[dict[str, Any]]:
+    contracts: list[dict[str, Any]] = []
+    for catalog_item in session.get("available_local_experiences", []):
+        experience = get_trusted_experience(catalog_item["experience_id"])
+        if not experience:
+            continue
+        process = set(experience.get("process_chain", []))
+        if "grasp_bound_target" in process:
+            capability = "grasp_object"
+        elif "navigate_until_target_within_reach" in process:
+            capability = "navigate_to_region"
+        else:
+            capability = None
+        contracts.append({**experience, "required_capability": capability})
+    return contracts
+
+
+def _causal_registry_cache_key(experience_contracts: list[dict[str, Any]]) -> str:
+    experience_versions = [
+        str(item.get("integrity", {}).get("portable_contract_digest") or item.get("experience_id"))
+        for item in experience_contracts
+    ]
+    return "factory_events_v1|" + "|".join(sorted(experience_versions))
+
+
 def _ground_factory_roles(
     concept: dict[str, Any],
     session: dict[str, Any],
@@ -209,9 +235,12 @@ def _build_factory_response(
     text: str,
     concept: dict[str, Any],
     perception_result: dict[str, Any] | None,
+    decision_started_ns: int,
 ) -> dict[str, Any]:
+    concept_resolved_ns = perf_counter_ns()
     grounded_roles = _ground_factory_roles(concept, session, perception_result, text)
     fact_snapshot = derive_runtime_fact_snapshot(session, grounded_roles=grounded_roles)
+    facts_derived_ns = perf_counter_ns()
     required_facts = concept["concept_kernel"]["effect_contract"].get("requires", [])
     prerequisite_analysis = explain_prerequisite_gaps(required_facts, fact_snapshot)
     supported_capabilities = list(session["executor_profile"].get("supported_actions", []))
@@ -240,12 +269,24 @@ def _build_factory_response(
         gap_suffix += " 当前可先补：" + "；".join(item["response"] for item in recoverable[:2]) + "。"
     if external:
         gap_suffix += " 仍需外部确认：" + "；".join(item["response"] for item in external[:2]) + "。"
+    experience_contracts = _causal_experience_contracts(session)
     causal_candidate = build_lightweight_causal_candidate(
         goal_concept=diagnosis,
         fact_snapshot=fact_snapshot,
         supported_capabilities=supported_capabilities,
         available_experience_capabilities=available_experience_capabilities,
+        event_concepts=FACTORY_EVENT_CONCEPT_UNITS,
+        experience_contracts=experience_contracts,
+        registry_cache_key=_causal_registry_cache_key(experience_contracts),
     )
+    decision_completed_ns = perf_counter_ns()
+    causal_candidate["decision_latency"] = {
+        "concept_and_role_resolution_ms": round((concept_resolved_ns - decision_started_ns) / 1_000_000, 4),
+        "runtime_fact_derivation_ms": round((facts_derived_ns - concept_resolved_ns) / 1_000_000, 4),
+        "diagnosis_and_orchestration_ms": round((decision_completed_ns - facts_derived_ns) / 1_000_000, 4),
+        "input_to_candidate_decision_ms": round((decision_completed_ns - decision_started_ns) / 1_000_000, 4),
+        "clock": "perf_counter_ns_monotonic",
+    }
     if causal_candidate["candidate_process_chain"]:
         gap_suffix += " 候选因果链：" + " → ".join(causal_candidate["candidate_process_chain"]) + "。"
     return {
@@ -307,7 +348,7 @@ def build_factory_state_fact_catalog() -> dict[str, Any]:
 
 
 def build_factory_orchestrator_catalog() -> dict[str, Any]:
-    return build_lightweight_orchestrator_catalog()
+    return build_lightweight_orchestrator_catalog(FACTORY_EVENT_CONCEPT_UNITS)
 def _command_hash(utterance: str) -> str:
     return hashlib.sha256(utterance.strip().encode("utf-8")).hexdigest()[:16]
 
@@ -1042,6 +1083,7 @@ def _record_completed_teaching_motion(session: dict[str, Any], job: dict[str, An
 
 
 def execute_command(session_id: str, utterance: str, scoped_authorization: dict[str, Any] | None = None) -> dict[str, Any]:
+    decision_started_ns = perf_counter_ns()
     session = SESSIONS.get(session_id)
     if not session:
         return {"error": "embodied_session_not_found", "session_id": session_id}
@@ -1062,7 +1104,7 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
             }
         )
         if not native_relative_motion and not existing_supported_task:
-            return _build_factory_response(session, text, concept, perception_result)
+            return _build_factory_response(session, text, concept, perception_result, decision_started_ns)
     if perception_result:
         _invalidate_perception_history(session, "superseded_by_new_task_observation")
         session["perception_history"].append(

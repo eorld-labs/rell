@@ -32,9 +32,10 @@ from .factory_state_facts import (
     explain_prerequisite_gaps,
 )
 from .lightweight_orchestrator import (
-    FACT_PRODUCER_CONTRACTS,
+    ATOMIC_CAUSAL_OPERATORS,
     build_lightweight_causal_candidate,
     build_lightweight_orchestrator_catalog,
+    compile_causal_operator_registry,
 )
 from .concept_units import (
     STATE_CONCEPT_UNITS,
@@ -59,7 +60,7 @@ __all__ = [
     "FUNCTIONAL_ROLE_CONTRACTS",
     "FACTORY_STATE_FACT_CONCEPTS",
     "FACT_PREREQUISITE_STRATEGIES",
-    "FACT_PRODUCER_CONTRACTS",
+    "ATOMIC_CAUSAL_OPERATORS",
     "STATE_CONCEPT_UNITS",
     "build_teaching_frame",
     "build_cloud_recall_packet",
@@ -81,6 +82,7 @@ __all__ = [
     "explain_prerequisite_gaps",
     "build_lightweight_causal_candidate",
     "build_lightweight_orchestrator_catalog",
+    "compile_causal_operator_registry",
     "infer_local_concept_gap",
     "request_cloud_concept_support",
     "resolve_action_concepts",
