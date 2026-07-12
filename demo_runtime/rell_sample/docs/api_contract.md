@@ -358,7 +358,7 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 - `concept_package.concept_kernel.semantic_roles`：分别声明 `mention_status` 与 `grounding_status`，避免把语言明确提及误当成现实对象已经唯一绑定；
 - `concept_package.concept_kernel.effect_contract`：声明 `requires`、`produces`、`destroys` 和 `verification`，其中事实变化在 P016 验真前仅为投影；
 - `concept_package.fact_alignment`：基于当前可用事实输出已满足前提、缺失前提和目标是否已成立；
-- 当携带有效 `task_id` 时，隐含对象可依据当前快照中的唯一手持兼容对象形成 `implicit + inferred` 绑定；隐含空间角色可依据执行体当前位置形成有依据的推定。无快照、多候选或条件不唯一时继续保持 `unresolved` 并要求确认；
+- 当携带有效 `task_id` 时，隐含对象可依据当前快照中的唯一手持兼容对象形成 `implicit + inferred` 绑定；隐含空间角色可依据执行体当前位置形成有依据的推定。当前空间模型只有一个满足概念类型且状态可用的默认资源时，也可形成较低置信度的弱推定。多候选、无可用候选或约束冲突时继续保持 `unresolved` 并要求确认；
 - `concept_package.experience_lookup.candidates`：按缺失前提事实检索能够生产该事实的步骤或经验链，并按缺口覆盖数排序；该检索明确不使用整句输入到经验的直接匹配；
 - `concept_package.grounding_summary`：汇总必需角色是否已落地、未落地角色和确认问题；
 - 统一 `/agent/query` 入口在必需角色未落地时返回 `decision=concept_grounding_required`。该门控同时作用于预览和 `auto_execute=true`，防止第二次执行请求绕过澄清；

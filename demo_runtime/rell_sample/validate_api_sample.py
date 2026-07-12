@@ -552,9 +552,12 @@ def main() -> None:
         ungrounded_container = ungrounded_package.get("concept_kernel", {}).get("semantic_roles", {}).get("container", {})
         if ungrounded_container.get("grounding_status") != "inferred" or ungrounded_container.get("binding_basis") != "single_compatible_object_in_space_model":
             raise AssertionError(f"a unique compatible space-model object may support weak implicit grounding: {ungrounded_fill_concept}")
+        ungrounded_source = ungrounded_package.get("concept_kernel", {}).get("semantic_roles", {}).get("source", {})
+        if ungrounded_source.get("grounding_status") != "inferred" or ungrounded_source.get("binding_basis") != "single_available_default_source_in_space_model":
+            raise AssertionError(f"a unique available water source should support weak source grounding: {ungrounded_fill_concept}")
         ungrounded_summary = ungrounded_package.get("grounding_summary", {})
-        if not ungrounded_summary.get("clarification_required") or "source" not in ungrounded_summary.get("unresolved_roles", []):
-            raise AssertionError(f"remaining unresolved required roles must block execution even when another role is inferred: {ungrounded_fill_concept}")
+        if ungrounded_summary.get("clarification_required"):
+            raise AssertionError(f"all uniquely inferred roles should pass grounding and let causal prerequisites drive planning: {ungrounded_fill_concept}")
         experience_lookup = ungrounded_package.get("experience_lookup", {})
         if experience_lookup.get("whole_utterance_match_used") or not experience_lookup.get("candidates"):
             raise AssertionError(f"missing prerequisites must drive producer lookup without whole-utterance matching: {ungrounded_fill_concept}")
@@ -666,7 +669,10 @@ def main() -> None:
         agent_execution_run = handle_agent_query("到水源处接一杯水", scenario="auto", auto_execute=True)
         if agent_execution_run.get("route_result", {}).get("audit_summary", {}).get("outcome") != "completed":
             raise AssertionError(f"agent query auto_execute must run through unified execution path: {agent_execution_run}")
-        grounding_blocked_run = handle_agent_query("接一杯水", scenario="auto", auto_execute=True)
+        inferred_fill_run = handle_agent_query("接一杯水", scenario="auto", auto_execute=True)
+        if inferred_fill_run.get("route_result", {}).get("audit_summary", {}).get("outcome") != "completed":
+            raise AssertionError(f"a unique cup and water source should enter causal planning instead of unnecessary clarification: {inferred_fill_run}")
+        grounding_blocked_run = handle_agent_query("绕开障碍", scenario="auto", auto_execute=True)
         grounding_blocked_result = grounding_blocked_run.get("route_result", {})
         if grounding_blocked_result.get("decision") != "concept_grounding_required" or not grounding_blocked_result.get("auto_execute_blocked"):
             raise AssertionError(f"unresolved concept roles must block auto execution at the unified agent entry: {grounding_blocked_run}")

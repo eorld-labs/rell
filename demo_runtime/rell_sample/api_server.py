@@ -6495,19 +6495,29 @@ def attach_missing_fact_experience_candidates(action_concepts: list[dict[str, An
                     "process_chain": experience.get("process_chain", []),
                     "source": "experience_library",
                 })
-        deduplicated: dict[tuple[str, str], dict[str, Any]] = {}
+        deduplicated: dict[tuple[str, tuple[str, ...], tuple[str, ...]], dict[str, Any]] = {}
         for candidate in candidates:
-            key = (candidate["candidate_type"], str(candidate["candidate_id"]))
+            key = (
+                candidate["candidate_type"],
+                tuple(sorted(candidate["covers_missing_facts"])),
+                tuple(candidate.get("process_chain", [])),
+            )
             existing = deduplicated.get(key)
             if existing:
                 existing["covers_missing_facts"] = sorted(set(existing["covers_missing_facts"] + candidate["covers_missing_facts"]))
+                existing.setdefault("equivalent_candidate_ids", []).append(candidate["candidate_id"])
             else:
                 deduplicated[key] = candidate
         ranked = sorted(
             deduplicated.values(),
-            key=lambda item: (-len(item["covers_missing_facts"]), 0 if item["source"] == "experience_library" else 1, str(item["candidate_id"])),
+            key=lambda item: (
+                -len(item["covers_missing_facts"]),
+                len(item.get("process_chain", [])),
+                0 if item["source"] == "step_library" else 1,
+                str(item["candidate_id"]),
+            ),
         )
-        package.setdefault("experience_lookup", {})["candidates"] = ranked
+        package.setdefault("experience_lookup", {})["candidates"] = ranked[:5]
         package["experience_lookup"]["selection_basis"] = "missing_fact_producer_coverage"
         package["experience_lookup"]["whole_utterance_match_used"] = False
 

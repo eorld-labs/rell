@@ -24,7 +24,7 @@
 | 提及与落地分离 | `concept_parser.py::_role_binding` | 明确提及不等于现实对象已唯一绑定，隐含对象不允许被臆造为已落地实体 |
 | 当前事实前提对齐 | `concept_package.fact_alignment` | 从任务期快照区分已满足和缺失前提，并以缺失前提驱动后续经验检索 |
 | 验真后提交事实 | `commit_requires_p016_verification=true` | `produces/destroys` 在概念阶段只作状态投影，必须经 P016 验真后提交 |
-| 隐含角色快照落地 | `concept_parser.py::_role_binding` | 当前手中唯一兼容对象或当前位置可形成带依据的 `implicit + inferred` 绑定，条件不唯一时保持未解析 |
+| 隐含角色状态落地 | `concept_parser.py::_role_binding` | 当前手中唯一兼容对象、当前位置或空间模型中唯一可用资源可形成带依据的 `implicit + inferred` 绑定，条件不唯一时保持未解析 |
 | 缺失前提驱动经验检索 | `attach_missing_fact_experience_candidates` | 以当前缺失事实检索步骤或经验生产者并按覆盖率排序，不按整句输入绑定固定经验 |
 | 必需角色执行前门控 | `build_concept_grounding_gate`、`handle_agent_query` | 必需角色未落地时预览和自动执行统一返回澄清态，禁止绕过确认进入执行 |
 

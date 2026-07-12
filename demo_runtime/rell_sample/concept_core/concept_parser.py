@@ -14,6 +14,7 @@ def _role_binding(
     object_constraints: list[dict[str, Any]],
     spatial_constraints: list[dict[str, Any]],
     runtime_context_view: dict[str, Any] | None,
+    current_facts: list[str],
 ) -> dict[str, Any]:
     binding = {"role": role_template.get("role"), "entity_type": role_template.get("entity_type")}
     explicit_object = object_constraints[0] if object_constraints and role_name in {"container", "object"} else None
@@ -75,6 +76,19 @@ def _role_binding(
             "binding_basis": "executor_current_location_matches_role_default",
             "fallback": "confirm_if_runtime_state_changes",
         })
+    elif (
+        role_name == "source"
+        and role_template.get("default_entity_ref")
+        and "water_source_available" in set(current_facts)
+    ):
+        binding.update({
+            "mention_status": "implicit",
+            "grounding_status": "inferred",
+            "entity_ref": role_template.get("default_entity_ref"),
+            "binding_confidence": 0.78,
+            "binding_basis": "single_available_default_source_in_space_model",
+            "fallback": "confirm_if_multiple_sources_or_constraints_appear",
+        })
     elif role_name == "material" and role_template.get("value") and role_template["value"] in {"water"}:
         binding.update({
             "mention_status": "explicit" if "水" in text else "implicit",
@@ -115,6 +129,7 @@ def _build_concept_package(
             object_constraints=object_constraints,
             spatial_constraints=spatial_constraints,
             runtime_context_view=runtime_context_view,
+            current_facts=current_facts,
         )
         for name, template in kernel.get("semantic_roles", {}).items()
     }
