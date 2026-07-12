@@ -464,7 +464,14 @@ def _is_open_world_observation_query(text: str) -> bool:
         _directed_observation_concept(text) is not None
         and re.search(r"看到.{0,12}(?:没有|吗|么|没)", text) is not None
     )
-    return broad or directed or colloquial_directed
+    # Treat omitted-result forms such as “你看的杯子吗” as the same visual
+    # operator. The object concept and interrogative tail provide the semantic
+    # evidence; no individual object phrase is enumerated here.
+    abbreviated_directed = (
+        _directed_observation_concept(text) is not None
+        and re.search(r"看[^，。！？!?]{0,16}(?:没有|没|吗|么|呢)", text) is not None
+    )
+    return broad or directed or colloquial_directed or abbreviated_directed
 
 
 def _directed_observation_concept(text: str) -> dict[str, Any] | None:
