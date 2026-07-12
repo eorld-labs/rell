@@ -159,6 +159,10 @@ def main() -> None:
     require(contract["storage_policy"] == "store_invariants_not_concrete_teleoperation_parameters", f"wrong teaching storage policy: {compiled}")
     require("teacher_key_sequence" in contract["forbidden_storage"], f"teacher keys leaked into experience: {compiled}")
     require(not compiled["experience"]["demonstration_summary"]["raw_teleoperation_trace_persisted"], f"raw trace persisted: {compiled}")
+    require(compiled["experience"]["pedagogical_signals"]["signal_types"] == ["demonstration"], f"teaching signal classification missing: {compiled}")
+    negative_constraints = compiled["experience"]["applicability_constraints"]["negative_constraints"]
+    require(negative_constraints and negative_constraints[0]["disposition"] == "candidate_constraint_pending_revalidation", f"failed teaching action was not compiled into scoped infeasibility evidence: {compiled}")
+    require(negative_constraints[0]["scope"]["world_revision"] == teaching_session["world_revision"], f"infeasibility scope lost world revision: {compiled}")
     interrupted_replay = begin_learned_replay(teaching_session["session_id"])
     for _ in range(3):
         require(step_motion_command(interrupted_replay["job_id"])["status"] == "frame_verified_and_committed", f"replay precondition frame failed: {interrupted_replay}")
@@ -186,6 +190,8 @@ def main() -> None:
     require("source_teaching_id" not in persisted_text and "replay_job_id" not in persisted_text, f"session identifiers leaked into persistent contract: {persisted}")
     require(persisted["target_binding"] == {"concept_id": "concept_fillable_container", "rebind_by_concept_and_current_observation": True}, f"persistent binding is not portable: {persisted}")
     require(persisted["validation_summary"]["accepted_validation_count"] == 1, f"accepted validation summary incorrect: {persisted}")
+    require(persisted["pedagogical_signals"] == {"signal_types": ["demonstration"], "interruption_occurred": False, "clarification_occurred": False, "outcome": "completed_successfully"}, f"persistent pedagogical signals were not normalized: {persisted}")
+    require("source_teaching_id" not in json.dumps(persisted["pedagogical_signals"], ensure_ascii=False), f"teaching session identity leaked into pedagogical signals: {persisted}")
 
     cold_session = start_session()
     require(cold_session["available_local_experiences"][0]["experience_id"] == persisted["experience_id"], f"new session did not discover trusted experience: {cold_session}")

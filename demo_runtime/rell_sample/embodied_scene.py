@@ -8,7 +8,12 @@ from pathlib import Path
 from typing import Any
 
 from concept_core.perceptual_grounding import build_task_perception_result
-from embodied_teaching import append_validation_result, build_teaching_authority, compile_demonstration_experience
+from embodied_teaching import (
+    append_validation_result,
+    build_pedagogical_signals,
+    build_teaching_authority,
+    compile_demonstration_experience,
+)
 from embodied_experience_store import get_trusted_experience, load_trusted_experiences, persist_trusted_experience
 from execution_boundary import (
     build_effective_execution_envelope,
@@ -277,6 +282,7 @@ def start_embodied_teaching(session_id: str, goal_utterance: str = "拿杯子") 
         "target_initial_object_state": deepcopy(target_object),
         "authority": build_teaching_authority(session_id, goal_utterance, session["world_revision"]),
         "demonstrated_actions": [],
+        "pedagogical_signals": build_pedagogical_signals(signal_types=["demonstration"]),
         "transient_trace_policy": "discard_raw_frames_after_invariant_compilation",
         "safety_and_policy_checks_remain_active": True,
     }
@@ -358,6 +364,8 @@ def finish_embodied_teaching(session_id: str) -> dict[str, Any]:
         target_concept_id=teaching["target_concept_id"],
         target_entity_ref=teaching["target_entity_ref"],
         demonstrated_actions=teaching["demonstrated_actions"],
+        pedagogical_signals=teaching.get("pedagogical_signals"),
+        world_revision=session["world_revision"],
     )
     teaching["status"] = "demonstration_compiled"
     teaching["authority"]["status"] = "consumed"

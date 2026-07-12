@@ -5,6 +5,59 @@ from copy import deepcopy
 from typing import Any
 
 
+def build_pedagogical_signals(
+    *,
+    signal_types: list[str] | None = None,
+    target_experience_ref: str | None = None,
+    interruption_occurred: bool = False,
+    clarification_occurred: bool = False,
+    outcome: str = "in_progress",
+) -> dict[str, Any]:
+    allowed = {"demonstration", "correction", "boundary_indication", "negative_example", "confirmation"}
+    normalized = [item for item in (signal_types or ["demonstration"]) if item in allowed]
+    return {
+        "signal_types": list(dict.fromkeys(normalized)),
+        "target_experience_ref": target_experience_ref,
+        "interruption_occurred": bool(interruption_occurred),
+        "clarification_occurred": bool(clarification_occurred),
+        "outcome": outcome,
+    }
+
+
+def compile_infeasibility_summaries(
+    demonstrated_actions: list[dict[str, Any]],
+    *,
+    concept_id: str,
+    world_revision: int | None = None,
+    executor_profile: str = "current_executor_profile",
+) -> list[dict[str, Any]]:
+    summaries: list[dict[str, Any]] = []
+    for action in demonstrated_actions:
+        if action.get("verified") or not action.get("failure_reason"):
+            continue
+        summary = {
+            "concept_id": concept_id,
+            "action_class": action.get("action_class"),
+            "failed_requirement": (action.get("requires") or [None])[0],
+            "failed_verification": (action.get("verification") or {}).get("failed_channel")
+            if isinstance(action.get("verification"), dict)
+            else None,
+            "negative_constraint": action.get("failure_reason"),
+            "scope": {
+                "executor_profile": executor_profile,
+                "world_revision": world_revision,
+            },
+            "evidence": {
+                "source": "teaching_action_result",
+                "support_count": 1,
+                "confidence": 0.72,
+            },
+            "disposition": "candidate_constraint_pending_revalidation",
+        }
+        summaries.append(summary)
+    return summaries
+
+
 def build_teaching_authority(session_id: str, goal_utterance: str, world_revision: int) -> dict[str, Any]:
     authority_id = "teach_auth_" + hashlib.sha1(
         f"{session_id}|{goal_utterance}|{world_revision}".encode("utf-8")
@@ -28,6 +81,8 @@ def compile_demonstration_experience(
     target_concept_id: str,
     target_entity_ref: str,
     demonstrated_actions: list[dict[str, Any]],
+    pedagogical_signals: dict[str, Any] | None = None,
+    world_revision: int | None = None,
 ) -> dict[str, Any]:
     successful = [item for item in demonstrated_actions if item.get("verified")]
     has_translation = any(item.get("action_class") == "body_relative_translation" for item in successful)
@@ -43,6 +98,18 @@ def compile_demonstration_experience(
     experience_id = "teleop_exp_" + hashlib.sha1(
         f"{teaching_id}|{goal_utterance}|{target_concept_id}|{'|'.join(process)}".encode("utf-8")
     ).hexdigest()[:12]
+    signals = build_pedagogical_signals(
+        signal_types=(pedagogical_signals or {}).get("signal_types"),
+        target_experience_ref=(pedagogical_signals or {}).get("target_experience_ref"),
+        interruption_occurred=(pedagogical_signals or {}).get("interruption_occurred", False),
+        clarification_occurred=(pedagogical_signals or {}).get("clarification_occurred", False),
+        outcome="completed_successfully" if successful else "failed",
+    )
+    infeasibility_summaries = compile_infeasibility_summaries(
+        demonstrated_actions,
+        concept_id=target_concept_id,
+        world_revision=world_revision,
+    )
     return {
         "experience_id": experience_id,
         "source": "human_first_person_teleoperation",
@@ -61,6 +128,10 @@ def compile_demonstration_experience(
             "produces": ["target_object_in_gripper"],
             "destroys": ["gripper_empty", "target_object_on_support"],
             "verification": ["gripper_closed_around_target", "target_follows_end_effector"],
+        },
+        "applicability_constraints": {
+            "negative_constraints": infeasibility_summaries,
+            "policy": "scoped_candidate_constraints_require_revalidation_before_global_concept_update",
         },
         "invariant_contract": {
             "storage_policy": "store_invariants_not_concrete_teleoperation_parameters",
@@ -89,8 +160,10 @@ def compile_demonstration_experience(
         "demonstration_summary": {
             "verified_action_count": len(successful),
             "raw_action_count": len(demonstrated_actions),
+            "failed_action_count": len(demonstrated_actions) - len(successful),
             "raw_teleoperation_trace_persisted": False,
         },
+        "pedagogical_signals": signals,
         "promotion_policy": {
             "requires_autonomous_replay": True,
             "requires_physical_fact_verification": True,

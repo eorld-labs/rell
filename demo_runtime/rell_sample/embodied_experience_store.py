@@ -71,7 +71,14 @@ def _build_portable_record(experience: dict[str, Any]) -> dict[str, Any]:
         "goal_fact": experience.get("goal_fact"),
         "process_chain": deepcopy(experience.get("process_chain", [])),
         "effect_contract": deepcopy(experience.get("effect_contract", {})),
+        "applicability_constraints": deepcopy(experience.get("applicability_constraints", {})),
         "invariant_contract": invariant,
+        "pedagogical_signals": {
+            "signal_types": deepcopy((experience.get("pedagogical_signals") or {}).get("signal_types", [])),
+            "interruption_occurred": bool((experience.get("pedagogical_signals") or {}).get("interruption_occurred", False)),
+            "clarification_occurred": bool((experience.get("pedagogical_signals") or {}).get("clarification_occurred", False)),
+            "outcome": (experience.get("pedagogical_signals") or {}).get("outcome", "unknown"),
+        },
         "promotion_policy": deepcopy(experience.get("promotion_policy", {})),
         "validation_summary": {
             "accepted_validation_count": len(accepted_validations),
