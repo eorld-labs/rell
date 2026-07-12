@@ -63,15 +63,39 @@ def execute_command(session_id: str, utterance: str) -> dict[str, Any]:
             "prompt": "请告诉我这个指令相对机器人自身朝向应如何移动。",
             "session": get_session(session_id),
         }
-    distance = 0.35 if "一点" in text else 0.7
+    continuous = any(token in text for token in ("一直", "持续", "不停"))
+    distance = 8.0 if continuous else (0.35 if "一点" in text else 0.7)
     start = list(session["state"]["executor_position"])
     yaw = math.radians(session["state"]["executor_yaw_deg"])
     target = [start[0] + math.cos(yaw) * distance, start[1] + math.sin(yaw) * distance]
     profile = session["executor_profile"]
-    obstacle = _blocking_obstacle(session, start, target, profile["body_envelope"]["radius_m"])
+    collision = _first_collision(session, start, target, profile["body_envelope"]["radius_m"])
+    obstacle = collision["obstacle"] if collision else None
     frames: list[dict[str, Any]] = []
     route_kind = "direct"
     if obstacle:
+        if obstacle.get("obstacle_class") in {"fixed_furniture", "scene_boundary"}:
+            safe_target = collision["safe_position"]
+            frames = _interpolate(start, safe_target, max(2, min(80, int(math.dist(start, safe_target) / 0.05) + 1)))
+            session["state"]["executor_position"] = safe_target
+            session["state"]["active_region"] = _region_for(safe_target, load_scene())
+            result = {
+                "status": "stopped_by_physical_obstacle",
+                "reason": "body_envelope_contact_with_fixed_scene_geometry",
+                "prompt": f"前方是{obstacle['label']}，本体无法继续前进，已在接触前停止。",
+                "obstacle": obstacle,
+                "contact_evidence": {
+                    "detector": "swept_body_envelope",
+                    "body_radius_m": profile["body_envelope"]["radius_m"],
+                    "motion_terminated_before_penetration": True,
+                    "safe_position_is_transient_execution_state": True
+                },
+                "frames": frames,
+                "terminal_fact": "forward_motion_blocked_by_physical_geometry",
+                "session": get_session(session_id),
+            }
+            session["event_history"].append({"utterance": text, "result": result["status"], "reason": result["reason"], "obstacle": obstacle["entity_id"]})
+            return result
         detour = _detour_target(start, target, obstacle, profile["body_envelope"]["radius_m"])
         if obstacle.get("mode") == "narrow" or detour is None:
             result = {
@@ -97,8 +121,8 @@ def execute_command(session_id: str, utterance: str) -> dict[str, Any]:
         "concept": {
             "concept_id": "relative_forward_motion",
             "reference_frame": "executor_heading",
-            "distance_class": "small_increment" if distance == 0.35 else "normal_increment",
-            "learnable_invariant": "move_forward_relative_to_current_body_heading_until_relative_distance_reached"
+            "distance_class": "continuous_until_termination" if continuous else ("small_increment" if distance == 0.35 else "normal_increment"),
+            "learnable_invariant": "move_forward_relative_to_current_body_heading_until_requested_distance_or_physical_termination"
         },
         "route_kind": route_kind,
         "frames": frames,
@@ -109,12 +133,42 @@ def execute_command(session_id: str, utterance: str) -> dict[str, Any]:
     return result
 
 
-def _blocking_obstacle(session: dict[str, Any], start: list[float], target: list[float], radius: float) -> dict[str, Any] | None:
+def _first_collision(session: dict[str, Any], start: list[float], target: list[float], radius: float) -> dict[str, Any] | None:
+    scene = load_scene()
+    distance = math.dist(start, target)
+    sample_count = max(2, int(distance / 0.04) + 1)
+    previous = list(start)
+    for index in range(1, sample_count):
+        ratio = index / (sample_count - 1)
+        point = [start[0] + (target[0] - start[0]) * ratio, start[1] + (target[1] - start[1]) * ratio]
+        collider = _collider_at(point, radius, session, scene)
+        if collider:
+            return {"obstacle": collider, "contact_position": point, "safe_position": previous}
+        previous = point
+    return None
+
+
+def _collider_at(point: list[float], radius: float, session: dict[str, Any], scene: dict[str, Any]) -> dict[str, Any] | None:
+    x, y = point
+    if x - radius < -5.0 or x + radius > 5.0 or y - radius < -2.3 or y + radius > 2.3:
+        return {"entity_id": "home_wall_boundary", "label": "墙体", "obstacle_class": "scene_boundary", "fixed": True}
+    for item in scene["objects"]:
+        if not item.get("fixed"):
+            continue
+        ox, oy = item["position"]
+        sx, sy = item["size"][:2]
+        if abs(x - ox) <= sx / 2 + radius and abs(y - oy) <= sy / 2 + radius:
+            return {
+                "entity_id": item["entity_id"],
+                "label": item["label"],
+                "kind": item["kind"],
+                "obstacle_class": "fixed_furniture",
+                "fixed": True,
+            }
     for obstacle in session["active_obstacles"]:
         ox, oy = obstacle["position"]
-        distance = _point_segment_distance(ox, oy, start[0], start[1], target[0], target[1])
-        if distance <= radius + 0.38:
-            return obstacle
+        if math.hypot(x - ox, y - oy) <= radius + 0.38:
+            return {**obstacle, "label": "凳子", "obstacle_class": "movable_obstacle", "fixed": False}
     return None
 
 

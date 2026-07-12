@@ -41,7 +41,17 @@ def main() -> None:
     require("搬走" in blocked["prompt"], f"blocked route must ask permission to move stool: {blocked}")
     require(not blocked["frames"], f"blocked command must not animate through obstacle: {blocked}")
 
-    report = {"scene_id": scene["scene_id"], "direct": direct, "detour": detour, "blocked": blocked}
+    furniture_session = start_session()
+    furniture_blocked = execute_command(furniture_session["session_id"], "一直往前走")
+    require(furniture_blocked["status"] == "stopped_by_physical_obstacle", f"continuous motion crossed furniture: {furniture_blocked}")
+    require(furniture_blocked["obstacle"]["entity_id"] == "counter_a", f"wrong fixed collision target: {furniture_blocked}")
+    require(furniture_blocked["contact_evidence"]["motion_terminated_before_penetration"], f"penetration guard missing: {furniture_blocked}")
+    first_stop = furniture_blocked["session"]["state"]["executor_position"]
+    repeated = execute_command(furniture_session["session_id"], "一直往前走")
+    require(repeated["status"] == "stopped_by_physical_obstacle", f"repeated forward crossed furniture: {repeated}")
+    require(repeated["session"]["state"]["executor_position"] == first_stop, f"blocked body moved on repeat: {repeated}")
+
+    report = {"scene_id": scene["scene_id"], "direct": direct, "detour": detour, "blocked": blocked, "fixed_furniture_stop": furniture_blocked}
     OUTPUT.mkdir(parents=True, exist_ok=True)
     (OUTPUT / "embodied_home_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print("P021 embodied semantic home validation passed.")
