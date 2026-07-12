@@ -6,7 +6,7 @@ from copy import deepcopy
 from typing import Any, Callable
 from urllib.request import Request, urlopen
 
-from concept_kernel_contract import validate_concept_kernel_proposal
+from concept_kernel_contract import validate_concept_kernel_proposal, validate_external_visual_claims
 
 
 JsonRequester = Callable[[str, dict[str, str], dict[str, Any]], dict[str, Any]]
@@ -62,7 +62,7 @@ class QwenVisualConceptAdapter:
             payload,
         )
         proposal = _extract_proposal(response)
-        contract_errors = validate_concept_kernel_proposal(proposal)
+        contract_errors = validate_concept_kernel_proposal(proposal) + validate_external_visual_claims(proposal)
         repair_attempted = False
         if contract_errors:
             repair_attempted = True
@@ -74,7 +74,7 @@ class QwenVisualConceptAdapter:
                 ],
             }
             proposal = _extract_proposal(self.requester(endpoint, headers, repair_payload))
-            contract_errors = validate_concept_kernel_proposal(proposal)
+            contract_errors = validate_concept_kernel_proposal(proposal) + validate_external_visual_claims(proposal)
         if contract_errors:
             return {
                 "error": "qwen_concept_kernel_contract_invalid",

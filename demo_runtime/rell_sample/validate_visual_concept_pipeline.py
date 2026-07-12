@@ -120,6 +120,23 @@ def main() -> None:
         source_type="external_model_candidate",
     )
     require(wrong_types.get("error") == "concept_kernel_candidate_contract_invalid", f"object-valued model fields bypassed compiler: {wrong_types}")
+    quantified_claim = compile_concept_kernel_candidate(
+        bowl_gap["gap_id"],
+        {
+            "concept_id": "concept_quantified_visual_claim",
+            "display_name": "量化视觉候选",
+            "aliases": ["候选"],
+            "compatible_kinds": ["furniture"],
+            "functional_role_contract": {"roles": ["support"], "affordances": ["support_load_candidate"]},
+            "physical_properties_and_boundaries": {"properties": ["ground_supported"], "safety_boundaries": ["load_capacity_100kg_requires_verification"]},
+            "perceptual_invariants": ["support_surface"],
+            "variable_features": [],
+            "expected_relations": [],
+            "runtime_verification_policy": {"candidate_checks": ["structure_observed"], "functional_checks": ["load_capacity_verified"]},
+        },
+        source_type="external_model_candidate",
+    )
+    require(quantified_claim.get("error") == "concept_kernel_candidate_contract_invalid", f"quantified visual claim bypassed compiler: {quantified_claim}")
     bowl_kernel = compile_concept_kernel_candidate(
         bowl_gap["gap_id"],
         {

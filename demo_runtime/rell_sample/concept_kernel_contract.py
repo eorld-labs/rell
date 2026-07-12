@@ -6,6 +6,7 @@ from typing import Any
 
 MACHINE_TOKEN = re.compile(r"^[a-z][a-z0-9_.:-]*$")
 CONCEPT_ID = re.compile(r"^(?:concept_[a-z0-9_]+|urn:[a-z0-9_.:-]+)$")
+QUANTIFIED_PHYSICAL_CLAIM = re.compile(r"(?:\d|_gt_|_lt_|_min_|_max_|estimated_[0-9])")
 
 
 def validate_concept_kernel_proposal(proposal: Any) -> list[dict[str, str]]:
@@ -32,6 +33,26 @@ def validate_concept_kernel_proposal(proposal: Any) -> list[dict[str, str]]:
         ("candidate_checks", "functional_checks"),
         errors,
     )
+    return errors
+
+
+def validate_external_visual_claims(proposal: Any) -> list[dict[str, str]]:
+    if not isinstance(proposal, dict):
+        return [{"path": "$", "reason": "must_be_object"}]
+    errors: list[dict[str, str]] = []
+    physical = proposal.get("physical_properties_and_boundaries", {})
+    if not isinstance(physical, dict):
+        return errors
+    for field in ("properties", "safety_boundaries"):
+        values = physical.get(field, [])
+        if not isinstance(values, list):
+            continue
+        for index, value in enumerate(values):
+            if isinstance(value, str) and QUANTIFIED_PHYSICAL_CLAIM.search(value):
+                errors.append({
+                    "path": f"physical_properties_and_boundaries.{field}[{index}]",
+                    "reason": "quantified_physical_claim_requires_measurement_evidence",
+                })
     return errors
 
 

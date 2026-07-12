@@ -77,6 +77,33 @@ def main() -> None:
     ).propose_kernel({"gap_id": "gap_bowl", "display_name": "碗"}, ["data:image/png;base64,ZmFrZQ=="])
     require(len(repair_calls) == 2 and repaired["repair_attempted"] and repaired["contract_validated"], f"invalid provider structure was not repaired exactly once: {repaired}")
     require(len(repair_calls[1]["messages"]) == 3, f"repair feedback was not returned to provider: {repair_calls}")
+
+    quantified_calls = []
+
+    def quantified_requester(url: str, headers: dict[str, str], payload: dict) -> dict:
+        quantified_calls.append(payload)
+        boundary = "load_capacity_100kg_requires_verification" if len(quantified_calls) == 1 else "load_capacity_requires_physical_verification"
+        content = {
+            "concept_id": "concept_sofa",
+            "display_name": "沙发",
+            "aliases": ["沙发"],
+            "compatible_kinds": ["furniture"],
+            "functional_role_contract": {"roles": ["human_support_furniture"], "affordances": ["support_sitting_candidate"]},
+            "physical_properties_and_boundaries": {"properties": ["ground_supported_structure"], "safety_boundaries": [boundary]},
+            "perceptual_invariants": ["seating_surface", "back_support_structure"],
+            "variable_features": [],
+            "expected_relations": ["on_floor_candidate"],
+            "runtime_verification_policy": {"candidate_checks": ["structure_observed"], "functional_checks": ["load_capacity_verified"]},
+        }
+        return {"choices": [{"message": {"content": __import__("json").dumps(content, ensure_ascii=False)}}]}
+
+    quantified = QwenVisualConceptAdapter(
+        base_url="https://qwen.example/compatible-mode/v1",
+        api_key="test-secret-not-real",
+        model="qwen-vl-test",
+        requester=quantified_requester,
+    ).propose_kernel({"gap_id": "gap_sofa", "display_name": "沙发"}, ["data:image/png;base64,ZmFrZQ=="])
+    require(len(quantified_calls) == 2 and quantified["contract_validated"], f"quantified visual claim bypassed repair: {quantified}")
     print("Qwen visual concept adapter validation passed.")
 
 

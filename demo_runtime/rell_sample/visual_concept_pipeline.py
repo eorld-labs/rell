@@ -10,7 +10,7 @@ from typing import Any, Protocol
 from urllib.request import Request, urlopen
 
 from concept_core.perceptual_grounding import load_object_concepts
-from concept_kernel_contract import validate_concept_kernel_proposal
+from concept_kernel_contract import validate_concept_kernel_proposal, validate_external_visual_claims
 
 
 DEFAULT_STORE = Path(__file__).resolve().parents[1] / "output" / "rell_sample" / "runtime" / "visual_concept_pipeline.json"
@@ -102,6 +102,8 @@ def compile_concept_kernel_candidate(
     if not gap:
         return {"error": "visual_concept_gap_not_found", "gap_id": gap_id}
     contract_errors = validate_concept_kernel_proposal(proposal)
+    if source_type == "external_model_candidate":
+        contract_errors += validate_external_visual_claims(proposal)
     if contract_errors:
         return {
             "error": "concept_kernel_candidate_contract_invalid",
