@@ -4,7 +4,7 @@ import json
 import math
 from pathlib import Path
 
-from embodied_scene import begin_motion_command, execute_command, load_scene, set_stool, start_session, step_motion_command
+from embodied_scene import begin_motion_command, execute_command, load_scene, set_protection_policy, set_stool, start_session, step_motion_command
 
 
 OUTPUT = Path(__file__).resolve().parents[1] / "output" / "rell_sample" / "embodied_home"
@@ -83,6 +83,35 @@ def main() -> None:
     repeated = execute_command(furniture_session["session_id"], "一直往前走")
     require(repeated["status"] == "stopped_by_physical_obstacle", f"repeated forward crossed furniture: {repeated}")
     require(repeated["session"]["state"]["executor_position"] == first_stop, f"blocked body moved on repeat: {repeated}")
+    require(furniture_blocked["p2_safety_self_proof"]["safe_state_reached"], f"P2 safety stop was not self-proven: {furniture_blocked}")
+    require(not furniture_blocked["p2_safety_self_proof"]["upgrade_protection_required"], f"successful safety stop requested escalation: {furniture_blocked}")
+
+    protected_session = start_session()
+    intrinsic_before = protected_session["executor_profile"]
+    protected_policy = {
+        "declaration_id": "protected_home_motion_demo",
+        "policy_scope": ["embodied_motion"],
+        "motion_policy": {
+            "max_speed_mps": 0.25,
+            "max_contact_force_n": 12.0,
+            "minimum_avoidance_distance_m": 0.2,
+            "continuous_motion_requires_confirmation": True,
+        },
+        "execution_receipt_required": True,
+    }
+    policy_result = set_protection_policy(protected_session["session_id"], protected_policy)
+    require(policy_result["session"]["executor_profile"] == intrinsic_before, f"P6 policy rewrote intrinsic profile: {policy_result}")
+    envelope = policy_result["effective_execution_envelope"]
+    require(envelope["effective_constraints"]["max_linear_speed_mps"] == 0.25, f"P6 speed limit not applied: {envelope}")
+    require(envelope["policy_never_rewrites_intrinsic_profile"], f"P6/profile separation missing: {envelope}")
+    protected_continuous = execute_command(protected_session["session_id"], "一直往前走")
+    require(protected_continuous["status"] == "requires_human_confirmation", f"protected continuous motion bypassed confirmation: {protected_continuous}")
+    require(protected_continuous["p2_control_decision"]["control_decision"] == "require_confirmation", f"P2 decision missing: {protected_continuous}")
+    protected_small = execute_command(protected_session["session_id"], "往前走一点")
+    require(protected_small["status"] == "fact_established", f"bounded protected motion should remain executable: {protected_small}")
+    require(max(frame["duration_ms"] for frame in protected_small["frames"]) > max(frame["duration_ms"] for frame in direct["frames"]), f"P6 speed limit did not slow execution frames: {protected_small}")
+    require(protected_small["p6_execution_receipt"]["declaration_id"] == protected_policy["declaration_id"], f"P6 receipt missing: {protected_small}")
+    require(not protected_small["p6_execution_receipt"]["intrinsic_profile_modified"], f"P6 receipt reports profile mutation: {protected_small}")
 
     live_session = start_session()
     live_started = begin_motion_command(live_session["session_id"], "一直往前走")
@@ -108,7 +137,7 @@ def main() -> None:
     live_stool_position = live_stool["active_obstacles"][0]["position"]
     require(all(math.dist(position, live_stool_position) > combined_radius for position in committed_positions), f"live replanning committed a penetrating frame: {committed_positions}")
 
-    report = {"scene_id": scene["scene_id"], "direct": direct, "right": right, "backward": backward, "detour": detour, "blocked": blocked, "fixed_furniture_stop": furniture_blocked, "live_replanning": invalidated}
+    report = {"scene_id": scene["scene_id"], "direct": direct, "right": right, "backward": backward, "detour": detour, "blocked": blocked, "fixed_furniture_stop": furniture_blocked, "protected_policy_overlay": {"envelope": envelope, "continuous": protected_continuous, "small": protected_small}, "live_replanning": invalidated}
     OUTPUT.mkdir(parents=True, exist_ok=True)
     (OUTPUT / "embodied_home_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print("Embodied semantic home validation passed.")

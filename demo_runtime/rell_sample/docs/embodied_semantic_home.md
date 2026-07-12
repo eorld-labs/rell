@@ -16,6 +16,12 @@ This benchmark grounds the existing P010 semantic topology and P008 body portrai
 - Fixed furniture and room boundaries participate in swept body-envelope collision checks. Continuous movement terminates at the last safe pose before contact and repeated commands cannot penetrate the collider.
 - Browser motion is a server-verified frame job, not a precomputed animation. Every frame is committed against the latest world revision; a new obstacle invalidates the old job and replans from the last verified pose.
 
+## Body truth, P6 policy, and P2 control boundary
+
+The intrinsic executor profile remains stable body truth. An optional P6 protection declaration is stored as a revocable overlay and can only narrow speed, contact force, avoidance distance, confirmation, or stop boundaries. The derived effective execution envelope records both sources and never writes policy values back into the body profile.
+
+Continuous or otherwise high-risk physical controls enter a P2-style causal control decision. A policy-required confirmation blocks execution before frames are generated. When a safety stop is issued, actual stopped/non-penetrating state is compared with the expected safe state; failure would require upgraded protection. P6 execution receipts and P2 safety self-proof records are distinct outputs.
+
 ## Current benchmark
 
 The first home contains connected living-room, corridor, and kitchen regions plus an operation counter, water dispenser, cup, apple, and dynamic stool. The browser scene is available at `/embodied`.

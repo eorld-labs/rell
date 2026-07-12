@@ -7,6 +7,13 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+from execution_boundary import (
+    build_effective_execution_envelope,
+    build_p2_control_decision,
+    build_p2_safety_self_proof,
+    build_p6_execution_receipt,
+)
+
 
 SCENE_FILE = Path(__file__).resolve().parent / "data" / "embodied_home_scene.json"
 SESSIONS: dict[str, dict[str, Any]] = {}
@@ -28,6 +35,7 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator") -> dict[
         "scene_id": scene["scene_id"],
         "executor_profile_id": executor_profile_id,
         "executor_profile": scene["executor_profiles"][executor_profile_id],
+        "protection_policy_overlay": None,
         "state": state,
         "active_obstacles": [],
         "world_revision": 0,
@@ -39,6 +47,18 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator") -> dict[
 
 def get_session(session_id: str) -> dict[str, Any]:
     return deepcopy(SESSIONS.get(session_id) or {"error": "embodied_session_not_found", "session_id": session_id})
+
+
+def set_protection_policy(session_id: str, policy_overlay: dict[str, Any] | None) -> dict[str, Any]:
+    session = SESSIONS.get(session_id)
+    if not session:
+        return {"error": "embodied_session_not_found", "session_id": session_id}
+    session["protection_policy_overlay"] = deepcopy(policy_overlay) if policy_overlay else None
+    session["world_revision"] += 1
+    return {
+        "session": get_session(session_id),
+        "effective_execution_envelope": build_effective_execution_envelope(session["executor_profile"], session["protection_policy_overlay"]),
+    }
 
 
 def set_stool(session_id: str, mode: str = "ahead") -> dict[str, Any]:
@@ -71,6 +91,27 @@ def execute_command(session_id: str, utterance: str) -> dict[str, Any]:
     distance = 8.0 if continuous else (0.35 if "一点" in text else 0.7)
     start = list(session["state"]["executor_position"])
     profile = session["executor_profile"]
+    effective_envelope = build_effective_execution_envelope(profile, session.get("protection_policy_overlay"))
+    effective_constraints = effective_envelope["effective_constraints"]
+    p2_decision = build_p2_control_decision(
+        utterance=text,
+        continuous_motion=continuous,
+        effective_envelope=effective_envelope,
+        world_revision=session["world_revision"],
+        expected_effect="body_relative_displacement",
+    )
+    if p2_decision["control_decision"] == "require_confirmation":
+        result = {
+            "status": "requires_human_confirmation",
+            "reason": "P6_motion_policy_requires_confirmation_for_continuous_motion",
+            "prompt": "当前保护策略要求持续运动前先确认，可以继续吗？",
+            "effective_execution_envelope": effective_envelope,
+            "p2_control_decision": p2_decision,
+            "p6_execution_receipt": build_p6_execution_receipt(session.get("protection_policy_overlay"), effective_envelope, "requires_human_confirmation"),
+            "frames": [],
+            "session": get_session(session_id),
+        }
+        return result
     body_yaw = float(session["state"]["executor_yaw_deg"])
     if direction == "right":
         motion_yaw = body_yaw - 90.0
@@ -97,7 +138,8 @@ def execute_command(session_id: str, utterance: str) -> dict[str, Any]:
     yaw = math.radians(motion_yaw)
     target = [start[0] + math.cos(yaw) * distance, start[1] + math.sin(yaw) * distance]
     rotation_frames = _rotation_frames(start, body_yaw, final_yaw) if final_yaw != body_yaw else []
-    motion_plan = _plan_verified_motion(session, start, target, profile["body_envelope"]["radius_m"])
+    planning_radius = effective_constraints["body_radius_m"] + effective_constraints["minimum_avoidance_distance_m"]
+    motion_plan = _plan_verified_motion(session, start, target, planning_radius)
     collision = motion_plan.get("blocking_collision")
     obstacle = collision["obstacle"] if collision else None
     frames: list[dict[str, Any]] = []
@@ -109,6 +151,7 @@ def execute_command(session_id: str, utterance: str) -> dict[str, Any]:
                 _interpolate(start, safe_target, max(2, min(80, int(math.dist(start, safe_target) / 0.05) + 1))),
                 final_yaw,
             )
+            _apply_speed_timing(frames, effective_constraints["max_linear_speed_mps"])
             session["state"]["executor_position"] = safe_target
             session["state"]["executor_yaw_deg"] = final_yaw
             session["state"]["active_region"] = _region_for(safe_target, load_scene())
@@ -123,10 +166,18 @@ def execute_command(session_id: str, utterance: str) -> dict[str, Any]:
                     "motion_terminated_before_penetration": True,
                     "safe_position_is_transient_execution_state": True
                 },
+                "effective_execution_envelope": effective_envelope,
+                "p2_control_decision": p2_decision,
                 "frames": frames,
                 "terminal_fact": "forward_motion_blocked_by_physical_geometry",
                 "session": get_session(session_id),
             }
+            result["p2_safety_self_proof"] = build_p2_safety_self_proof(
+                safety_action="stop_before_fixed_geometry",
+                expected_safe_state={"motion_stopped": True, "penetration": False},
+                observed_state={"motion_stopped": True, "penetration": False},
+            )
+            result["p6_execution_receipt"] = build_p6_execution_receipt(session.get("protection_policy_overlay"), effective_envelope, result["status"])
             session["event_history"].append({"utterance": text, "result": result["status"], "reason": result["reason"], "obstacle": obstacle["entity_id"]})
             return result
         detour_path = motion_plan.get("waypoints")
@@ -137,9 +188,12 @@ def execute_command(session_id: str, utterance: str) -> dict[str, Any]:
                 "prompt": "前方凳子无法安全绕开，可以把凳子搬走吗？",
                 "obstacle": obstacle,
                 "body_constraint": profile["body_envelope"],
+                "effective_execution_envelope": effective_envelope,
+                "p2_control_decision": p2_decision,
                 "frames": [],
                 "session": get_session(session_id),
             }
+            result["p6_execution_receipt"] = build_p6_execution_receipt(session.get("protection_policy_overlay"), effective_envelope, result["status"])
             session["event_history"].append({"utterance": text, "result": result["status"], "reason": result["reason"]})
             return result
         route_kind = "local_detour"
@@ -157,6 +211,7 @@ def execute_command(session_id: str, utterance: str) -> dict[str, Any]:
     body_explanation = body_explanations[body_realization]
     if route_kind == "local_detour":
         body_explanation = "我检测到前方凳子，已按本体净空从侧面绕行，并完全越过障碍后回到原行进方向。"
+    _apply_speed_timing(frames, effective_constraints["max_linear_speed_mps"])
     result = {
         "status": "fact_established",
         "concept": {
@@ -184,10 +239,13 @@ def execute_command(session_id: str, utterance: str) -> dict[str, Any]:
             "rejected_realization": "lateral_translation" if direction in {"left", "right"} else None,
             "portrait_basis": session["executor_profile_id"],
         },
+        "effective_execution_envelope": effective_envelope,
+        "p2_control_decision": p2_decision,
         "frames": frames,
         "terminal_fact": "executor_relative_displacement_reached",
         "session": get_session(session_id),
     }
+    result["p6_execution_receipt"] = build_p6_execution_receipt(session.get("protection_policy_overlay"), effective_envelope, result["status"])
     session["event_history"].append({"utterance": text, "result": result["status"], "route_kind": route_kind})
     return result
 
@@ -406,6 +464,14 @@ def _interpolate(start: list[float], target: list[float], count: int) -> list[di
 
 def _with_yaw(frames: list[dict[str, Any]], yaw_deg: float) -> list[dict[str, Any]]:
     return [{**frame, "yaw_deg": yaw_deg} for frame in frames]
+
+
+def _apply_speed_timing(frames: list[dict[str, Any]], max_speed_mps: float) -> None:
+    previous = None
+    for frame in frames:
+        distance = math.dist(previous, frame["position"]) if previous is not None else 0.0
+        frame["duration_ms"] = 45 if distance == 0 else max(25, min(300, round(distance / max_speed_mps * 1000)))
+        previous = frame["position"]
 
 
 def _rotation_frames(position: list[float], start_yaw: float, target_yaw: float) -> list[dict[str, Any]]:

@@ -29,6 +29,8 @@
       "body_profile": "wheeled_dual_arm",
       "body_envelope": {"radius_m": 0.32, "height_m": 1.35},
       "turning_radius_m": 0.42,
+      "max_linear_speed_mps": 1.0,
+      "max_contact_force_n": 60.0,
       "kinematic_model": "differential_drive",
       "can_translate_laterally": false,
       "can_reverse_without_turning": true,
