@@ -159,8 +159,13 @@ def _recall_trusted_experience(utterance: str) -> dict[str, Any] | None:
     matches = []
     object_concepts = {item["concept_id"]: item for item in load_object_concepts()["concepts"]}
     for experience in load_trusted_experiences():
-        trigger = str(experience.get("source_concept_contract", {}).get("language_trigger") or "")
-        target_concept_id = experience.get("target_binding", {}).get("concept_id")
+        # Persisted experiences from older teaching runs may explicitly carry
+        # null contracts/bindings. Treat those as non-matchable records rather
+        # than allowing an observation query to tear down the request thread.
+        source_contract = experience.get("source_concept_contract") or {}
+        target_binding = experience.get("target_binding") or {}
+        trigger = str(source_contract.get("language_trigger") or "")
+        target_concept_id = target_binding.get("concept_id")
         aliases = (object_concepts.get(target_concept_id) or {}).get("aliases", [])
         if trigger and trigger in utterance and any(alias in utterance for alias in aliases):
             matches.append(experience)
