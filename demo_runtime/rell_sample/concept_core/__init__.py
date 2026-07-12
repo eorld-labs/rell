@@ -24,6 +24,13 @@ from .functional_object_reasoning import (
     build_functional_profile,
     evaluate_role_compatibility,
 )
+from .factory_state_facts import (
+    FACTORY_STATE_FACT_CONCEPTS,
+    FACT_PREREQUISITE_STRATEGIES,
+    build_factory_state_catalog,
+    derive_runtime_fact_snapshot,
+    explain_prerequisite_gaps,
+)
 from .concept_units import (
     STATE_CONCEPT_UNITS,
     build_supported_runtime_questions,
@@ -45,6 +52,8 @@ __all__ = [
     "FACTORY_EVENT_CONCEPT_UNITS",
     "FACTORY_RELATION_CONCEPTS",
     "FUNCTIONAL_ROLE_CONTRACTS",
+    "FACTORY_STATE_FACT_CONCEPTS",
+    "FACT_PREREQUISITE_STRATEGIES",
     "STATE_CONCEPT_UNITS",
     "build_teaching_frame",
     "build_cloud_recall_packet",
@@ -61,6 +70,9 @@ __all__ = [
     "build_functional_object_catalog",
     "build_functional_profile",
     "evaluate_role_compatibility",
+    "build_factory_state_catalog",
+    "derive_runtime_fact_snapshot",
+    "explain_prerequisite_gaps",
     "infer_local_concept_gap",
     "request_cloud_concept_support",
     "resolve_action_concepts",

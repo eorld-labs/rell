@@ -9,6 +9,7 @@ from typing import Any
 
 from concept_core.factory_event_units import build_factory_inability_diagnosis, find_factory_event_concepts_by_text
 from concept_core.functional_object_reasoning import build_functional_object_catalog, build_functional_profile, evaluate_role_compatibility
+from concept_core.factory_state_facts import build_factory_state_catalog, derive_runtime_fact_snapshot, explain_prerequisite_gaps
 from concept_core.perceptual_grounding import build_task_perception_result, load_object_concepts
 from embodied_teaching import (
     append_validation_result,
@@ -209,6 +210,9 @@ def _build_factory_response(
     perception_result: dict[str, Any] | None,
 ) -> dict[str, Any]:
     grounded_roles = _ground_factory_roles(concept, session, perception_result, text)
+    fact_snapshot = derive_runtime_fact_snapshot(session, grounded_roles=grounded_roles)
+    required_facts = concept["concept_kernel"]["effect_contract"].get("requires", [])
+    prerequisite_analysis = explain_prerequisite_gaps(required_facts, fact_snapshot)
     diagnosis = build_factory_inability_diagnosis(
         concept,
         supported_capabilities=session["executor_profile"].get("supported_actions", []),
@@ -224,11 +228,20 @@ def _build_factory_response(
         "request_verification_support": diagnosis["explanation"] + " 请补充可观察的成功标准或人工确认方式。",
         "reenter_orchestration": diagnosis["explanation"],
     }
+    recoverable = prerequisite_analysis["recoverable_subgoals"]
+    external = prerequisite_analysis["human_or_external_dependencies"]
+    gap_suffix = ""
+    if recoverable:
+        gap_suffix += " 当前可先补：" + "；".join(item["response"] for item in recoverable[:2]) + "。"
+    if external:
+        gap_suffix += " 仍需外部确认：" + "；".join(item["response"] for item in external[:2]) + "。"
     return {
         "status": "factory_concept_recognized_execution_gap",
         "reason": diagnosis["reason_code"],
-        "prompt": prompts[diagnosis["next_action"]],
+        "prompt": prompts[diagnosis["next_action"]] + gap_suffix,
         "factory_concept": diagnosis,
+        "runtime_fact_snapshot": fact_snapshot,
+        "prerequisite_analysis": prerequisite_analysis,
         "post_action": {
             "action": diagnosis["next_action"],
             "teaching_available": diagnosis["next_action"] == "offer_embodied_teaching",
@@ -273,6 +286,10 @@ def build_factory_concept_catalog() -> dict[str, Any]:
 
 def build_factory_object_catalog() -> dict[str, Any]:
     return build_functional_object_catalog(load_object_concepts()["concepts"])
+
+
+def build_factory_state_fact_catalog() -> dict[str, Any]:
+    return build_factory_state_catalog()
 def _command_hash(utterance: str) -> str:
     return hashlib.sha256(utterance.strip().encode("utf-8")).hexdigest()[:16]
 

@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 from concept_core.perceptual_grounding import activate_task_perception, ground_task_observations
-from embodied_scene import SESSIONS, begin_learned_replay, begin_motion_command, begin_persisted_experience_replay, begin_teaching_control, build_factory_concept_catalog, build_factory_object_catalog, confirm_pending_motion, evaluate_learned_replay, execute_command, finish_embodied_teaching, load_scene, record_teaching_signal, set_perception_scenario, set_protection_policy, set_stool, start_embodied_teaching, start_session, step_motion_command
+from embodied_scene import SESSIONS, begin_learned_replay, begin_motion_command, begin_persisted_experience_replay, begin_teaching_control, build_factory_concept_catalog, build_factory_object_catalog, build_factory_state_fact_catalog, confirm_pending_motion, evaluate_learned_replay, execute_command, finish_embodied_teaching, load_scene, record_teaching_signal, set_perception_scenario, set_protection_policy, set_stool, start_embodied_teaching, start_session, step_motion_command
 
 
 OUTPUT = Path(__file__).resolve().parents[1] / "output" / "rell_sample" / "embodied_home"
@@ -56,6 +56,18 @@ def main() -> None:
     require(object_catalog["shared_boundary"]["appearance_is_not_role_proof"], f"appearance incorrectly proves functional role: {object_catalog}")
     require(object_catalog["shared_boundary"]["runtime_relation_requires_current_observation_or_physical_verification"], f"possible relation was treated as current fact: {object_catalog}")
 
+    state_catalog = build_factory_state_fact_catalog()
+    require(len(state_catalog["state_fact_concepts"]) >= 10, f"factory state fact vocabulary is too narrow: {state_catalog}")
+    require(state_catalog["shared_boundary"]["closed_world_assumption_forbidden"], f"state facts used closed-world reasoning: {state_catalog}")
+    require(state_catalog["shared_boundary"]["absence_of_observation_is_not_negative_fact"], f"missing observation became a negative fact: {state_catalog}")
+    all_factory_requirements = {
+        fact
+        for concept in factory_catalog["concepts"]
+        for fact in concept["effect_contract"].get("requires", [])
+    }
+    uncovered_requirements = sorted(all_factory_requirements - set(state_catalog["prerequisite_strategies"]))
+    require(not uncovered_requirements, f"factory event prerequisites lack recovery strategies: {uncovered_requirements}")
+
     zero_experience_session = start_session()
     zero_id = zero_experience_session["session_id"]
     SESSIONS[zero_id]["available_local_experiences"] = []
@@ -67,6 +79,10 @@ def main() -> None:
     require(grasp_diagnosis["executor_capability_available"] and not grasp_diagnosis["applicable_experience_available"], f"body capability and experience were conflated: {understood_without_experience}")
     require(understood_without_experience["post_action"]["teaching_available"], f"recoverable gap did not offer teaching: {understood_without_experience}")
     require(not grasp_diagnosis["direct_execution_allowed"], f"factory semantics directly executed without experience: {understood_without_experience}")
+    apple_gaps = understood_without_experience["prerequisite_analysis"]
+    reach_gap = next(item for item in apple_gaps["gaps"] if item["fact"] == "object_within_reach")
+    require(reach_gap["truth_status"] == "verified_false" and reach_gap["producer"] == "navigate_until_target_within_reach", f"out-of-reach object did not generate navigation subgoal: {understood_without_experience}")
+    require("object_grounded" in understood_without_experience["runtime_fact_snapshot"]["established_facts"], f"grounded target missing from runtime facts: {understood_without_experience}")
 
     fixed_asset_gap = execute_command(zero_id, "拿起饮水机")
     require(fixed_asset_gap["factory_concept"]["reason_code"] == "entity_not_compatible_with_semantic_role", f"fixed asset was treated as graspable: {fixed_asset_gap}")
