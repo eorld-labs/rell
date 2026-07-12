@@ -44,6 +44,8 @@ Grasping first checks the current body radius plus arm reach. An out-of-reach at
 
 Finishing a successful demonstration compiles a candidate invariant experience and discards raw frame/key data. The replay resets the executor, restores the target, rebinds the current support and target, plans to a body-safe approach pose, verifies every frame against the current world and policy revisions, then performs the same grasp fact verification. Human acceptance can promote the experience only after that autonomous replay succeeds.
 
+Promotion now persists a second, whitelisted portable record in the runtime trusted-experience store. The record excludes demonstration entity refs, teaching ids, replay job ids and validation traces tied to one run. A new process/session loads only a catalog, then `执行已学经验` reads the trusted contract, observes the current scene, fills the target concept slot with a current entity, and generates a new route. The cold-start binding explicitly reports `trajectory_reused=false`. Trusted re-execution still performs current collision, policy, reach and grasp-fact checks but does not require promotion again.
+
 ## Current benchmark
 
 The first home contains connected living-room, corridor, and kitchen regions plus an operation counter, water dispenser, cup, apple, and dynamic stool. The browser scene is available at `/embodied`.

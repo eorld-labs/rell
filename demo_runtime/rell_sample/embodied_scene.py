@@ -9,6 +9,7 @@ from typing import Any
 
 from concept_core.perceptual_grounding import build_task_perception_result
 from embodied_teaching import append_validation_result, build_teaching_authority, compile_demonstration_experience
+from embodied_experience_store import get_trusted_experience, load_trusted_experiences, persist_trusted_experience
 from execution_boundary import (
     build_effective_execution_envelope,
     build_p2_control_decision,
@@ -47,6 +48,7 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator") -> dict[
         "runtime_objects": deepcopy(scene["objects"]),
         "teaching_session": None,
         "learned_experience": None,
+        "available_local_experiences": _experience_catalog(),
         "state": state,
         "active_obstacles": [],
         "world_revision": 0,
@@ -58,6 +60,20 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator") -> dict[
 
 def get_session(session_id: str) -> dict[str, Any]:
     return deepcopy(SESSIONS.get(session_id) or {"error": "embodied_session_not_found", "session_id": session_id})
+
+
+def _experience_catalog() -> list[dict[str, Any]]:
+    return [
+        {
+            "experience_id": item["experience_id"],
+            "status": item["status"],
+            "source_goal_utterance": item.get("source_goal_utterance"),
+            "goal_fact": item.get("goal_fact"),
+            "target_concept_id": item.get("target_binding", {}).get("concept_id"),
+            "process_chain": deepcopy(item.get("process_chain", [])),
+        }
+        for item in load_trusted_experiences()
+    ]
 
 
 def _command_hash(utterance: str) -> str:
@@ -356,14 +372,69 @@ def finish_embodied_teaching(session_id: str) -> dict[str, Any]:
     }
 
 
+def begin_persisted_experience_replay(session_id: str, experience_id: str) -> dict[str, Any]:
+    session = SESSIONS.get(session_id)
+    if not session:
+        return {"error": "embodied_session_not_found", "session_id": session_id}
+    experience = get_trusted_experience(experience_id)
+    if not experience:
+        return {"error": "trusted_local_experience_not_found", "experience_id": experience_id}
+    goal_utterance = str(experience.get("source_goal_utterance") or "拿杯子")
+    perception = build_task_perception_result(load_scene(), session, goal_utterance)
+    if not perception or perception["concept_grounding"]["grounding_status"] != "spatially_grounded":
+        return {
+            "status": "persisted_experience_rebinding_required",
+            "reason": "current_target_could_not_be_uniquely_rebound",
+            "prompt": perception["prompt"] if perception else "已学经验存在，但当前目标还没有唯一落地。",
+            "perception": perception,
+            "session": get_session(session_id),
+        }
+    target = next(
+        item for item in perception["concept_grounding"]["candidate_bindings"] if item["role"] == "target"
+    )
+    expected_concept = experience.get("target_binding", {}).get("concept_id")
+    if target.get("concept_id") != expected_concept:
+        return {
+            "status": "persisted_experience_rebinding_required",
+            "reason": "current_target_concept_does_not_match_experience_slot",
+            "session": get_session(session_id),
+        }
+    target_object = next(item for item in session["runtime_objects"] if item["entity_id"] == target["entity_ref"])
+    loaded = deepcopy(experience)
+    loaded.setdefault("validation_history", [])
+    session["learned_experience"] = loaded
+    session["teaching_session"] = {
+        "teaching_id": "cold_start_loaded_experience",
+        "status": "loaded_from_persistent_store",
+        "goal_utterance": goal_utterance,
+        "goal_fact": loaded["goal_fact"],
+        "target_entity_ref": target["entity_ref"],
+        "target_concept_id": target["concept_id"],
+        "target_initial_object_state": deepcopy(target_object),
+        "demonstrated_actions": [],
+    }
+    started = begin_learned_replay(session_id)
+    started["loaded_from_persistent_store"] = True
+    started["cold_start_binding"] = {
+        "experience_id": experience_id,
+        "target_concept_id": expected_concept,
+        "current_entity_ref": target["entity_ref"],
+        "observation_id": perception["perception_observation"]["observation_id"],
+        "trajectory_reused": False,
+    }
+    started["prompt"] = "已从本地经验库载入不变量，并用当前观测重新绑定目标；不会复用示教坐标或轨迹。"
+    return started
+
+
 def begin_learned_replay(session_id: str) -> dict[str, Any]:
     session = SESSIONS.get(session_id)
     if not session:
         return {"error": "embodied_session_not_found", "session_id": session_id}
     experience = session.get("learned_experience") or {}
     teaching = session.get("teaching_session") or {}
-    if experience.get("status") not in {"candidate_pending_autonomous_replay", "needs_correction"}:
+    if experience.get("status") not in {"candidate_pending_autonomous_replay", "needs_correction", "trusted_local_experience"}:
         return {"error": "learned_experience_not_ready_for_replay", "session": get_session(session_id)}
+    trusted_replay = experience.get("status") == "trusted_local_experience"
     target_ref = teaching["target_entity_ref"]
     initial_target = deepcopy(teaching["target_initial_object_state"])
     session["runtime_objects"] = [
@@ -412,7 +483,7 @@ def begin_learned_replay(session_id: str) -> dict[str, Any]:
     job_id = "replay_" + hashlib.sha1(
         f"{session_id}|{experience['experience_id']}|{session['world_revision']}".encode("utf-8")
     ).hexdigest()[:12]
-    experience["status"] = "autonomous_replay_running"
+    experience["status"] = "trusted_experience_replay_running" if trusted_replay else "autonomous_replay_running"
     MOTION_JOBS[job_id] = {
         "job_id": job_id,
         "session_id": session_id,
@@ -430,6 +501,8 @@ def begin_learned_replay(session_id: str) -> dict[str, Any]:
         },
         "post_completion": {"action": "grasp", "target_entity_ref": target_ref},
         "replay_experience_id": experience["experience_id"],
+        "human_acceptance_required": not trusted_replay,
+        "loaded_trusted_experience_replay": trusted_replay,
     }
     return {
         "status": "learned_replay_started",
@@ -457,9 +530,12 @@ def evaluate_learned_replay(session_id: str, accepted: bool) -> dict[str, Any]:
     session["learned_experience"] = append_validation_result(experience, validation)
     if replay_verified and accepted:
         session["learned_experience"]["status"] = "trusted_local_experience"
+        persisted = persist_trusted_experience(session["learned_experience"])
+        session["available_local_experiences"] = _experience_catalog()
         prompt = "这次自主复做通过了物理验真和你的确认，经验已晋升为本地可信经验。"
         status = "experience_learned"
     else:
+        persisted = None
         session["learned_experience"]["status"] = "needs_correction"
         prompt = "这次结果没有通过完整确认，经验保持候选状态，需要重新教学或纠正。"
         status = "teaching_correction_required"
@@ -467,6 +543,12 @@ def evaluate_learned_replay(session_id: str, accepted: bool) -> dict[str, Any]:
         "status": status,
         "prompt": prompt,
         "experience": deepcopy(session["learned_experience"]),
+        "persisted_experience": deepcopy(persisted),
+        "persistence": {
+            "durable": persisted is not None,
+            "reload_on_new_session": persisted is not None,
+            "raw_teleoperation_trace_persisted": False,
+        },
         "session": get_session(session_id),
     }
 
@@ -844,7 +926,7 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
         job["status"] = "invalidated_by_world_change"
         if job.get("replay_experience_id"):
             experience = session.get("learned_experience") or {}
-            experience["status"] = "candidate_pending_autonomous_replay"
+            experience["status"] = "trusted_local_experience" if job.get("loaded_trusted_experience_replay") else "candidate_pending_autonomous_replay"
             result = {
                 "status": "learned_replay_invalidated",
                 "reason": "runtime_world_or_policy_revision_changed",
@@ -873,7 +955,7 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
         job["status"] = "invalidated_by_contact"
         if job.get("replay_experience_id"):
             experience = session.get("learned_experience") or {}
-            experience["status"] = "candidate_pending_autonomous_replay"
+            experience["status"] = "trusted_local_experience" if job.get("loaded_trusted_experience_replay") else "candidate_pending_autonomous_replay"
             result = {
                 "status": "learned_replay_invalidated",
                 "reason": "next_replay_frame_swept_body_not_clear",
@@ -922,18 +1004,26 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
             "physical_fact_verified": result.get("status") == "fact_established",
             "terminal_fact": result.get("terminal_fact"),
             "world_revision": session["world_revision"],
-            "human_acceptance_pending": True,
+            "human_acceptance_pending": bool(job.get("human_acceptance_required", True)),
+            "loaded_from_persistent_store": bool(job.get("loaded_trusted_experience_replay")),
         }
         session["learned_experience"] = append_validation_result(experience, replay_validation)
-        session["learned_experience"]["status"] = (
-            "awaiting_human_acceptance" if result.get("status") == "fact_established" else "needs_correction"
-        )
+        if result.get("status") == "fact_established" and not job.get("human_acceptance_required", True):
+            session["learned_experience"]["status"] = "trusted_local_experience"
+        else:
+            session["learned_experience"]["status"] = (
+                "awaiting_human_acceptance" if result.get("status") == "fact_established" else "needs_correction"
+            )
         result["experience"] = deepcopy(session["learned_experience"])
-        result["prompt"] = (
-            "我已按新绑定自主完成导航和抓取，物理事实已验真。请判断这次是否符合你的教学目标。"
-            if result.get("status") == "fact_established"
-            else "自主复做没有建立目标事实，需要重新教学或纠正。"
-        )
+        if result.get("status") == "fact_established" and not job.get("human_acceptance_required", True):
+            result["prompt"] = "我已按冷启动加载的可信经验重新绑定当前目标，并完成物理事实验真。"
+            result["loaded_from_persistent_store"] = True
+        else:
+            result["prompt"] = (
+                "我已按新绑定自主完成导航和抓取，物理事实已验真。请判断这次是否符合你的教学目标。"
+                if result.get("status") == "fact_established"
+                else "自主复做没有建立目标事实，需要重新教学或纠正。"
+            )
     result["session"] = get_session(job["session_id"])
     session["event_history"].append({"utterance": job["utterance"], "result": result.get("status"), "route_kind": result.get("route_kind")})
     return {"status": "motion_completed", "job_id": job_id, "frame": frame, "result": result, "session": get_session(job["session_id"])}

@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import json
 import math
+import os
 from pathlib import Path
 
 from concept_core.perceptual_grounding import activate_task_perception, ground_task_observations
-from embodied_scene import begin_learned_replay, begin_motion_command, begin_teaching_control, confirm_pending_motion, evaluate_learned_replay, execute_command, finish_embodied_teaching, load_scene, set_perception_scenario, set_protection_policy, set_stool, start_embodied_teaching, start_session, step_motion_command
+from embodied_scene import begin_learned_replay, begin_motion_command, begin_persisted_experience_replay, begin_teaching_control, confirm_pending_motion, evaluate_learned_replay, execute_command, finish_embodied_teaching, load_scene, set_perception_scenario, set_protection_policy, set_stool, start_embodied_teaching, start_session, step_motion_command
 
 
 OUTPUT = Path(__file__).resolve().parents[1] / "output" / "rell_sample" / "embodied_home"
@@ -27,6 +28,10 @@ def drain_motion(started: dict) -> dict:
 
 
 def main() -> None:
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    test_store = OUTPUT / "trusted_local_experience_test_store.json"
+    test_store.unlink(missing_ok=True)
+    os.environ["RELL_EMBODIED_EXPERIENCE_STORE"] = str(test_store)
     scene = load_scene()
     require(len(scene["semantic_regions"]) >= 3, "home scene needs connected semantic regions")
     require(all(region.get("center") and region.get("size") for region in scene["semantic_regions"]), "semantic regions need 3D volume bindings")
@@ -173,6 +178,25 @@ def main() -> None:
     learned = evaluate_learned_replay(teaching_session["session_id"], True)
     require(learned["status"] == "experience_learned", f"verified accepted replay was not learned: {learned}")
     require(learned["experience"]["status"] == "trusted_local_experience", f"experience trust state incorrect: {learned}")
+    require(learned["persistence"]["durable"] and learned["persistence"]["reload_on_new_session"], f"trusted experience was not durably persisted: {learned}")
+    require(test_store.exists(), f"trusted experience store was not created: {learned}")
+    persisted = learned["persisted_experience"]
+    persisted_text = json.dumps(persisted, ensure_ascii=False)
+    require("demonstration_entity_ref" not in persisted_text, f"demonstration instance leaked into persistent contract: {persisted}")
+    require("source_teaching_id" not in persisted_text and "replay_job_id" not in persisted_text, f"session identifiers leaked into persistent contract: {persisted}")
+    require(persisted["target_binding"] == {"concept_id": "concept_fillable_container", "rebind_by_concept_and_current_observation": True}, f"persistent binding is not portable: {persisted}")
+    require(persisted["validation_summary"]["accepted_validation_count"] == 1, f"accepted validation summary incorrect: {persisted}")
+
+    cold_session = start_session()
+    require(cold_session["available_local_experiences"][0]["experience_id"] == persisted["experience_id"], f"new session did not discover trusted experience: {cold_session}")
+    cold_started = begin_persisted_experience_replay(cold_session["session_id"], persisted["experience_id"])
+    require(cold_started["status"] == "learned_replay_started", f"cold-start replay did not start: {cold_started}")
+    require(cold_started["cold_start_binding"]["trajectory_reused"] is False, f"cold start reused demonstration trajectory: {cold_started}")
+    require(cold_started["cold_start_binding"]["current_entity_ref"] == "cup_a", f"cold start did not rebind current cup: {cold_started}")
+    cold_completed = drain_motion(cold_started)
+    require(cold_completed["result"]["status"] == "fact_established", f"cold-start trusted replay failed: {cold_completed}")
+    require(cold_completed["result"]["loaded_from_persistent_store"], f"cold-start provenance missing: {cold_completed}")
+    require(cold_completed["result"]["experience"]["status"] == "trusted_local_experience", f"trusted replay incorrectly required promotion again: {cold_completed}")
 
     revoked_teaching_session = start_session()
     start_embodied_teaching(revoked_teaching_session["session_id"], "拿杯子")
@@ -300,8 +324,9 @@ def main() -> None:
     require(all(math.dist(position, live_stool_position) > combined_radius for position in committed_positions), f"live replanning committed a penetrating frame: {committed_positions}")
 
     report = {"scene_id": scene["scene_id"], "task_conditioned_perception": {"normal": perception, "multiple": multiple, "occluded": occluded, "relocated": after_relocation}, "direct": direct, "right": right, "backward": backward, "detour": detour, "blocked": blocked, "fixed_furniture_stop": furniture_blocked, "protected_policy_overlay": {"envelope": envelope, "continuous": protected_continuous, "confirmed": confirmed, "small": protected_small, "policy_change_invalidation": policy_invalidated}, "live_replanning": invalidated}
-    OUTPUT.mkdir(parents=True, exist_ok=True)
     (OUTPUT / "embodied_home_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    test_store.unlink(missing_ok=True)
+    os.environ.pop("RELL_EMBODIED_EXPERIENCE_STORE", None)
     print("Embodied semantic home validation passed.")
     print(f"Output: {OUTPUT / 'embodied_home_report.json'}")
 

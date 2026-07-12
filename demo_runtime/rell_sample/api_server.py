@@ -37,6 +37,7 @@ from embodied_scene import execute_command as execute_embodied_command
 from embodied_scene import begin_motion_command as begin_embodied_motion
 from embodied_scene import begin_teaching_control as begin_embodied_teaching_control
 from embodied_scene import begin_learned_replay as begin_embodied_learned_replay
+from embodied_scene import begin_persisted_experience_replay as begin_embodied_persisted_replay
 from embodied_scene import confirm_pending_motion as confirm_embodied_motion
 from embodied_scene import evaluate_learned_replay as evaluate_embodied_learned_replay
 from embodied_scene import finish_embodied_teaching as finish_embodied_teaching_session
@@ -48,6 +49,7 @@ from embodied_scene import set_perception_scenario as set_embodied_perception_sc
 from embodied_scene import start_session as start_embodied_session
 from embodied_scene import start_embodied_teaching as start_embodied_teaching_session
 from embodied_scene import step_motion_command as step_embodied_motion
+from embodied_experience_store import load_trusted_experiences
 
 
 ROOT = Path(__file__).resolve().parent
@@ -8298,6 +8300,9 @@ class RellSampleHandler(BaseHTTPRequestHandler):
         if path == "/embodied/scene":
             self._send_json(load_embodied_scene())
             return
+        if path == "/embodied/experience/library":
+            self._send_json({"schema_version": "1.0.0", "experiences": load_trusted_experiences()})
+            return
         if path == "/health":
             self._send_json({"status": "ok", "service": "eorld-rell"})
             return
@@ -8620,6 +8625,13 @@ class RellSampleHandler(BaseHTTPRequestHandler):
             result = evaluate_embodied_learned_replay(
                 str(body.get("session_id", "")),
                 bool(body.get("accepted", False)),
+            )
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/embodied/experience/replay":
+            result = begin_embodied_persisted_replay(
+                str(body.get("session_id", "")),
+                str(body.get("experience_id", "")),
             )
             self._send_json(result, status=400 if "error" in result else 200)
             return
