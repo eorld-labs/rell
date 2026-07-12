@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 from concept_core.perceptual_grounding import activate_task_perception, ground_task_observations
-from embodied_scene import SESSIONS, begin_learned_replay, begin_motion_command, begin_persisted_experience_replay, begin_teaching_control, build_factory_concept_catalog, build_factory_object_catalog, build_factory_state_fact_catalog, confirm_pending_motion, evaluate_learned_replay, execute_command, finish_embodied_teaching, load_scene, record_teaching_signal, set_perception_scenario, set_protection_policy, set_stool, start_embodied_teaching, start_session, step_motion_command
+from embodied_scene import SESSIONS, begin_learned_replay, begin_motion_command, begin_persisted_experience_replay, begin_teaching_control, build_factory_concept_catalog, build_factory_object_catalog, build_factory_orchestrator_catalog, build_factory_state_fact_catalog, confirm_pending_motion, evaluate_learned_replay, execute_command, finish_embodied_teaching, load_scene, record_teaching_signal, set_perception_scenario, set_protection_policy, set_stool, start_embodied_teaching, start_session, step_motion_command
 
 
 OUTPUT = Path(__file__).resolve().parents[1] / "output" / "rell_sample" / "embodied_home"
@@ -68,6 +68,14 @@ def main() -> None:
     uncovered_requirements = sorted(all_factory_requirements - set(state_catalog["prerequisite_strategies"]))
     require(not uncovered_requirements, f"factory event prerequisites lack recovery strategies: {uncovered_requirements}")
 
+    orchestrator_catalog = build_factory_orchestrator_catalog()
+    require(orchestrator_catalog["boundary"]["fixed_task_script_forbidden"], f"factory orchestrator regressed to scripts: {orchestrator_catalog}")
+    require(orchestrator_catalog["boundary"]["backward_chain_from_current_fact_gap"], f"orchestrator is not fact-gap-driven: {orchestrator_catalog}")
+    producer_operators = {item["producer"] for item in state_catalog["prerequisite_strategies"].values() if item.get("producer")}
+    defined_operators = {item["operator"] for item in orchestrator_catalog["fact_producer_contracts"].values()}
+    missing_producer_contracts = sorted(producer_operators - defined_operators)
+    require(not missing_producer_contracts, f"automatic prerequisite strategies lack causal producer contracts: {missing_producer_contracts}")
+
     zero_experience_session = start_session()
     zero_id = zero_experience_session["session_id"]
     SESSIONS[zero_id]["available_local_experiences"] = []
@@ -83,6 +91,21 @@ def main() -> None:
     reach_gap = next(item for item in apple_gaps["gaps"] if item["fact"] == "object_within_reach")
     require(reach_gap["truth_status"] == "verified_false" and reach_gap["producer"] == "navigate_until_target_within_reach", f"out-of-reach object did not generate navigation subgoal: {understood_without_experience}")
     require("object_grounded" in understood_without_experience["runtime_fact_snapshot"]["established_facts"], f"grounded target missing from runtime facts: {understood_without_experience}")
+    zero_candidate = understood_without_experience["causal_candidate"]
+    require(zero_candidate["candidate_process_chain"] == ["navigate_until_target_within_reach", "grasp_object"], f"fact-gap backward chain is incorrect: {zero_candidate}")
+    require(zero_candidate["nodes"][0]["gate"] == "candidate_ready_for_orchestration", f"available navigation subgoal was blocked: {zero_candidate}")
+    require(zero_candidate["nodes"][1]["gate"] == "blocked_by_missing_experience", f"missing grasp experience was not gated: {zero_candidate}")
+    require(zero_candidate["candidate_only"] and not zero_candidate["direct_execution_allowed"] and not zero_candidate["runtime_fact_committed"], f"candidate plan bypassed runtime verification: {zero_candidate}")
+    require(not zero_candidate["cycles"] and not zero_candidate["unresolved_facts"], f"basic grasp chain is structurally incomplete: {zero_candidate}")
+
+    experienced_session = start_session()
+    experienced_result = execute_command(experienced_session["session_id"], "拿起苹果")
+    experienced_candidate = experienced_result["causal_candidate"]
+    require(experienced_candidate["candidate_process_chain"] == zero_candidate["candidate_process_chain"], f"experience changed causal structure instead of gate state: {experienced_candidate}")
+    if experienced_session["available_local_experiences"]:
+        require(experienced_candidate["nodes"][-1]["gate"] == "candidate_ready_for_orchestration", f"trusted grasp experience did not unlock candidate gate: {experienced_candidate}")
+        require(experienced_candidate["candidate_status"] == "candidate_ready_for_runtime_arbitration", f"fully supported candidate did not reenter arbitration: {experienced_candidate}")
+        require(not experienced_candidate["direct_execution_allowed"], f"trusted experience directly executed from concept planner: {experienced_candidate}")
 
     fixed_asset_gap = execute_command(zero_id, "拿起饮水机")
     require(fixed_asset_gap["factory_concept"]["reason_code"] == "entity_not_compatible_with_semantic_role", f"fixed asset was treated as graspable: {fixed_asset_gap}")

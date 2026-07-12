@@ -10,6 +10,7 @@ from typing import Any
 from concept_core.factory_event_units import build_factory_inability_diagnosis, find_factory_event_concepts_by_text
 from concept_core.functional_object_reasoning import build_functional_object_catalog, build_functional_profile, evaluate_role_compatibility
 from concept_core.factory_state_facts import build_factory_state_catalog, derive_runtime_fact_snapshot, explain_prerequisite_gaps
+from concept_core.lightweight_orchestrator import build_lightweight_causal_candidate, build_lightweight_orchestrator_catalog
 from concept_core.perceptual_grounding import build_task_perception_result, load_object_concepts
 from embodied_teaching import (
     append_validation_result,
@@ -213,10 +214,14 @@ def _build_factory_response(
     fact_snapshot = derive_runtime_fact_snapshot(session, grounded_roles=grounded_roles)
     required_facts = concept["concept_kernel"]["effect_contract"].get("requires", [])
     prerequisite_analysis = explain_prerequisite_gaps(required_facts, fact_snapshot)
+    supported_capabilities = list(session["executor_profile"].get("supported_actions", []))
+    if session.get("executor_profile", {}).get("sensor_frames"):
+        supported_capabilities.append("active_perception")
+    available_experience_capabilities = _available_experience_capabilities(session)
     diagnosis = build_factory_inability_diagnosis(
         concept,
-        supported_capabilities=session["executor_profile"].get("supported_actions", []),
-        available_experience_capabilities=_available_experience_capabilities(session),
+        supported_capabilities=supported_capabilities,
+        available_experience_capabilities=available_experience_capabilities,
         grounded_roles=grounded_roles,
         incompatible_roles=_evaluate_factory_role_compatibility(concept, session, grounded_roles),
     )
@@ -235,6 +240,14 @@ def _build_factory_response(
         gap_suffix += " 当前可先补：" + "；".join(item["response"] for item in recoverable[:2]) + "。"
     if external:
         gap_suffix += " 仍需外部确认：" + "；".join(item["response"] for item in external[:2]) + "。"
+    causal_candidate = build_lightweight_causal_candidate(
+        goal_concept=diagnosis,
+        fact_snapshot=fact_snapshot,
+        supported_capabilities=supported_capabilities,
+        available_experience_capabilities=available_experience_capabilities,
+    )
+    if causal_candidate["candidate_process_chain"]:
+        gap_suffix += " 候选因果链：" + " → ".join(causal_candidate["candidate_process_chain"]) + "。"
     return {
         "status": "factory_concept_recognized_execution_gap",
         "reason": diagnosis["reason_code"],
@@ -242,6 +255,7 @@ def _build_factory_response(
         "factory_concept": diagnosis,
         "runtime_fact_snapshot": fact_snapshot,
         "prerequisite_analysis": prerequisite_analysis,
+        "causal_candidate": causal_candidate,
         "post_action": {
             "action": diagnosis["next_action"],
             "teaching_available": diagnosis["next_action"] == "offer_embodied_teaching",
@@ -290,6 +304,10 @@ def build_factory_object_catalog() -> dict[str, Any]:
 
 def build_factory_state_fact_catalog() -> dict[str, Any]:
     return build_factory_state_catalog()
+
+
+def build_factory_orchestrator_catalog() -> dict[str, Any]:
+    return build_lightweight_orchestrator_catalog()
 def _command_hash(utterance: str) -> str:
     return hashlib.sha256(utterance.strip().encode("utf-8")).hexdigest()[:16]
 
