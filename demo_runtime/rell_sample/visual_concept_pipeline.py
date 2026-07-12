@@ -10,6 +10,7 @@ from typing import Any, Protocol
 from urllib.request import Request, urlopen
 
 from concept_core.perceptual_grounding import load_object_concepts
+from concept_kernel_contract import validate_concept_kernel_proposal
 
 
 DEFAULT_STORE = Path(__file__).resolve().parents[1] / "output" / "rell_sample" / "runtime" / "visual_concept_pipeline.json"
@@ -100,22 +101,12 @@ def compile_concept_kernel_candidate(
     gap = next((item for item in store["concept_gap_candidates"] if item["gap_id"] == gap_id), None)
     if not gap:
         return {"error": "visual_concept_gap_not_found", "gap_id": gap_id}
-    required_paths = {
-        "concept_id": proposal.get("concept_id"),
-        "functional_role_contract.roles": proposal.get("functional_role_contract", {}).get("roles"),
-        "functional_role_contract.affordances": proposal.get("functional_role_contract", {}).get("affordances"),
-        "physical_properties_and_boundaries.properties": proposal.get("physical_properties_and_boundaries", {}).get("properties"),
-        "physical_properties_and_boundaries.safety_boundaries": proposal.get("physical_properties_and_boundaries", {}).get("safety_boundaries"),
-        "perceptual_invariants": proposal.get("perceptual_invariants"),
-        "runtime_verification_policy.candidate_checks": proposal.get("runtime_verification_policy", {}).get("candidate_checks"),
-        "runtime_verification_policy.functional_checks": proposal.get("runtime_verification_policy", {}).get("functional_checks"),
-    }
-    missing = sorted(path for path, value in required_paths.items() if not value)
-    if missing:
+    contract_errors = validate_concept_kernel_proposal(proposal)
+    if contract_errors:
         return {
-            "error": "concept_kernel_candidate_incomplete",
+            "error": "concept_kernel_candidate_contract_invalid",
             "gap_id": gap_id,
-            "missing_fields": missing,
+            "contract_errors": contract_errors,
             "candidate_only": True,
         }
     concept_id = str(proposal["concept_id"])

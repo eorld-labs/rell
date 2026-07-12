@@ -6,6 +6,8 @@ from copy import deepcopy
 from typing import Any, Callable
 from urllib.request import Request, urlopen
 
+from concept_kernel_contract import validate_concept_kernel_proposal
+
 
 JsonRequester = Callable[[str, dict[str, str], dict[str, Any]], dict[str, Any]]
 
@@ -52,12 +54,38 @@ class QwenVisualConceptAdapter:
             "temperature": 0,
             "response_format": {"type": "json_object"},
         }
+        endpoint = self.base_url + "/chat/completions"
+        headers = {"Authorization": "Bearer " + self.api_key, "Content-Type": "application/json"}
         response = self.requester(
-            self.base_url + "/chat/completions",
-            {"Authorization": "Bearer " + self.api_key, "Content-Type": "application/json"},
+            endpoint,
+            headers,
             payload,
         )
         proposal = _extract_proposal(response)
+        contract_errors = validate_concept_kernel_proposal(proposal)
+        repair_attempted = False
+        if contract_errors:
+            repair_attempted = True
+            repair_payload = {
+                **payload,
+                "messages": payload["messages"] + [
+                    {"role": "assistant", "content": json.dumps(proposal, ensure_ascii=False)},
+                    {"role": "user", "content": _repair_prompt(contract_errors)},
+                ],
+            }
+            proposal = _extract_proposal(self.requester(endpoint, headers, repair_payload))
+            contract_errors = validate_concept_kernel_proposal(proposal)
+        if contract_errors:
+            return {
+                "error": "qwen_concept_kernel_contract_invalid",
+                "provider_id": self.provider_id,
+                "model": self.model,
+                "contract_errors": contract_errors,
+                "repair_attempted": repair_attempted,
+                "candidate_only": True,
+                "runtime_visible": False,
+                "direct_execution_allowed": False,
+            }
         return {
             "provider_id": self.provider_id,
             "model": self.model,
@@ -70,6 +98,8 @@ class QwenVisualConceptAdapter:
             "runtime_visible": False,
             "direct_execution_allowed": False,
             "raw_provider_response_retained": False,
+            "contract_validated": True,
+            "repair_attempted": repair_attempted,
         }
 
 
@@ -109,9 +139,20 @@ def _proposal_prompt(gap: dict[str, Any], language_context: str) -> str:
         "不得声称已识别、已验真或可执行。不能从外观证明的功能与物理属性必须写成待验候选。"
         f"对象名称候选：{gap.get('display_name', '')}；建议角色：{gap.get('proposed_roles', [])}；"
         f"教师补充：{language_context or '无'}。仅输出 JSON 对象，必须包含："
-        "concept_id, display_name, aliases, compatible_kinds, "
+        "concept_id, display_name, aliases, compatible_kinds；concept_id 必须严格采用 concept_<snake_case>，例如 concept_fillable_bowl；"
         "functional_role_contract.roles, functional_role_contract.affordances, "
         "physical_properties_and_boundaries.properties, physical_properties_and_boundaries.safety_boundaries, "
         "perceptual_invariants, variable_features, expected_relations, "
         "runtime_verification_policy.candidate_checks, runtime_verification_policy.functional_checks。"
+        "除 display_name 与 aliases 外，所有值列表都必须是非空 JSON 字符串数组；"
+        "每个机器字段字符串只能使用小写英文字母、数字、下划线、点、冒号或连字符，不能返回对象、说明句或单位键值表。"
+    )
+
+
+def _repair_prompt(contract_errors: list[dict[str, str]]) -> str:
+    return (
+        "上一个 JSON 未通过本地契约编译。请只修复结构和机器字段，不增加已验真结论。"
+        "所有被指出的列表必须改为 JSON 字符串数组，每个机器字符串改为 snake_case。"
+        "只输出完整修正后的 JSON 对象。错误："
+        + json.dumps(contract_errors, ensure_ascii=False)
     )

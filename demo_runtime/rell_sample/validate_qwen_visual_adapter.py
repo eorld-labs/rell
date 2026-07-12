@@ -47,7 +47,36 @@ def main() -> None:
     require(captured["headers"]["Authorization"] == "Bearer test-secret-not-real", "authorization contract missing")
     require(captured["payload"]["temperature"] == 0 and captured["payload"]["response_format"] == {"type": "json_object"}, f"structured output contract missing: {captured}")
     require(captured["payload"]["messages"][0]["content"][1]["type"] == "image_url", f"image input missing: {captured}")
+    require("concept_<snake_case>" in captured["payload"]["messages"][0]["content"][0]["text"], f"concept identifier contract missing from prompt: {captured}")
     require(adapter.propose_kernel({"gap_id": "gap"}, ["file:///unsafe.jpg"]).get("error") == "unsupported_image_reference", "local file path escaped adapter boundary")
+
+    repair_calls = []
+
+    def repair_requester(url: str, headers: dict[str, str], payload: dict) -> dict:
+        repair_calls.append(payload)
+        properties = {"shape": "round"} if len(repair_calls) == 1 else ["bounded_inner_volume"]
+        content = {
+            "concept_id": "concept_fillable_bowl",
+            "display_name": "可盛装碗状容器",
+            "aliases": ["碗"],
+            "compatible_kinds": ["graspable_container"],
+            "functional_role_contract": {"roles": ["container"], "affordances": ["receive_material"]},
+            "physical_properties_and_boundaries": {"properties": properties, "safety_boundaries": ["grasp_force_below_damage_limit"]},
+            "perceptual_invariants": ["open_top"],
+            "variable_features": [],
+            "expected_relations": [],
+            "runtime_verification_policy": {"candidate_checks": ["shape_observed"], "functional_checks": ["capacity_verified"]},
+        }
+        return {"choices": [{"message": {"content": __import__("json").dumps(content, ensure_ascii=False)}}]}
+
+    repaired = QwenVisualConceptAdapter(
+        base_url="https://qwen.example/compatible-mode/v1",
+        api_key="test-secret-not-real",
+        model="qwen-vl-test",
+        requester=repair_requester,
+    ).propose_kernel({"gap_id": "gap_bowl", "display_name": "碗"}, ["data:image/png;base64,ZmFrZQ=="])
+    require(len(repair_calls) == 2 and repaired["repair_attempted"] and repaired["contract_validated"], f"invalid provider structure was not repaired exactly once: {repaired}")
+    require(len(repair_calls[1]["messages"]) == 3, f"repair feedback was not returned to provider: {repair_calls}")
     print("Qwen visual concept adapter validation passed.")
 
 

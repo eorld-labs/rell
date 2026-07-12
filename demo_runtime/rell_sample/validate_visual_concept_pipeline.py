@@ -102,7 +102,24 @@ def main() -> None:
         {"concept_id": "concept_fillable_bowl"},
         source_type="external_model_candidate",
     )
-    require(incomplete_kernel.get("error") == "concept_kernel_candidate_incomplete", f"incomplete model output became a kernel candidate: {incomplete_kernel}")
+    require(incomplete_kernel.get("error") == "concept_kernel_candidate_contract_invalid", f"incomplete model output became a kernel candidate: {incomplete_kernel}")
+    wrong_types = compile_concept_kernel_candidate(
+        bowl_gap["gap_id"],
+        {
+            "concept_id": "concept_wrong_types",
+            "display_name": "错误类型候选",
+            "aliases": ["候选"],
+            "compatible_kinds": ["container"],
+            "functional_role_contract": {"roles": ["container"], "affordances": ["receive_material"]},
+            "physical_properties_and_boundaries": {"properties": {"shape": "round"}, "safety_boundaries": {"load": "unknown"}},
+            "perceptual_invariants": ["open_top"],
+            "variable_features": [],
+            "expected_relations": [],
+            "runtime_verification_policy": {"candidate_checks": ["shape_observed"], "functional_checks": ["capacity_verified"]},
+        },
+        source_type="external_model_candidate",
+    )
+    require(wrong_types.get("error") == "concept_kernel_candidate_contract_invalid", f"object-valued model fields bypassed compiler: {wrong_types}")
     bowl_kernel = compile_concept_kernel_candidate(
         bowl_gap["gap_id"],
         {

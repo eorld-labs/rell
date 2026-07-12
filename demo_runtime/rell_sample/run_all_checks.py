@@ -144,6 +144,8 @@ def run_http_smoke() -> None:
                     "functional_role_contract": {"roles": ["container"], "affordances": ["receive_material"]},
                     "physical_properties_and_boundaries": {"properties": ["bounded_inner_volume", "open_top"], "safety_boundaries": ["grasp_force_below_damage_limit"]},
                     "perceptual_invariants": ["open_top", "bounded_inner_volume", "stable_base"],
+                    "variable_features": [],
+                    "expected_relations": [],
                     "runtime_verification_policy": {"candidate_checks": ["shape_invariants_observed"], "functional_checks": ["container_role_physically_verified_before_use"]},
                 },
             },
