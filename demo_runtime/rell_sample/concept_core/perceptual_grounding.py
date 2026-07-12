@@ -9,6 +9,10 @@ from typing import Any
 
 
 CONCEPT_FILE = Path(__file__).resolve().parents[1] / "data" / "embodied_object_concepts.json"
+COLOR_ALIASES = {
+    "white": ["白色", "白的"],
+    "light_blue": ["浅蓝色", "浅蓝", "蓝色", "蓝的"],
+}
 
 
 def load_object_concepts() -> dict[str, Any]:
@@ -31,6 +35,10 @@ def activate_task_perception(utterance: str) -> dict[str, Any] | None:
     supports = [item for item in matched if "support_object" in item.get("functional_affordances", [])]
     support = supports[0] if supports else None
     activated = [target] + ([support] if support else [])
+    color_constraint = next(
+        (color for color, aliases in COLOR_ALIASES.items() if any(alias in text for alias in aliases)),
+        None,
+    )
     return {
         "task_utterance": text,
         "action_concept": "concept_pick_up_object",
@@ -38,6 +46,7 @@ def activate_task_perception(utterance: str) -> dict[str, Any] | None:
         "support_concept_id": support["concept_id"] if support else None,
         "activated_concepts": activated,
         "requested_relations": ["target_on_top_of_support"] if support else [],
+        "target_constraints": {"color": color_constraint} if color_constraint else {},
         "safety_channels_always_on": deepcopy(library["safety_channels_always_on"]),
         "candidate_only": True,
         "direct_execution_allowed": False,
@@ -49,6 +58,7 @@ def simulate_task_conditioned_observation(
     scene: dict[str, Any],
     session: dict[str, Any],
     activation: dict[str, Any],
+    viewpoint: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Simulate a sensor adapter. Only its DTO is allowed into concept grounding."""
     concepts = {item["concept_id"]: item for item in activation["activated_concepts"]}
@@ -59,12 +69,14 @@ def simulate_task_conditioned_observation(
     }
     session_state = session["state"]
     executor_position = session_state["executor_position"]
-    yaw = math.radians(float(session_state["executor_yaw_deg"]))
+    viewpoint = viewpoint or {"viewpoint_id": "head_center", "yaw_offset_deg": 0.0}
+    yaw = math.radians(float(session_state["executor_yaw_deg"]) + float(viewpoint.get("yaw_offset_deg", 0.0)))
     sensor_range_m = 8.5
     half_fov_rad = math.radians(70.0)
     raw_tracks = []
+    occluded_candidates = []
     semantically_suppressed = []
-    for item in scene["objects"]:
+    for item in session.get("runtime_objects", scene["objects"]):
         if item.get("active") is False:
             continue
         dx = item["position"][0] - executor_position[0]
@@ -74,14 +86,24 @@ def simulate_task_conditioned_observation(
         raw_visible = distance <= sensor_range_m and angle <= half_fov_rad
         if not raw_visible:
             continue
-        if item["kind"] not in requested_kinds:
-            semantically_suppressed.append({"track_id": _track_id(item["entity_id"]), "reason": "not_required_by_active_task_concepts"})
-            continue
         compatible = [
             concept
             for concept in concepts.values()
             if item["kind"] in concept.get("compatible_kinds", [])
         ]
+        if compatible and viewpoint["viewpoint_id"] in item.get("occluded_from_viewpoints", []):
+            occluded_candidates.append(
+                {
+                    "spatial_entity_candidate_ref": item["entity_id"],
+                    "candidate_concept_id": compatible[0]["concept_id"],
+                    "viewpoint_id": viewpoint["viewpoint_id"],
+                    "reason": "line_of_sight_occluded",
+                }
+            )
+            continue
+        if item["kind"] not in requested_kinds:
+            semantically_suppressed.append({"track_id": _track_id(item["entity_id"]), "reason": "not_required_by_active_task_concepts"})
+            continue
         if not compatible:
             continue
         concept = compatible[0]
@@ -96,6 +118,7 @@ def simulate_task_conditioned_observation(
                 "estimated_base_elevation_m": float(item.get("elevation_m", 0.0)),
                 "estimated_size": deepcopy(item["size"]),
                 "observed_invariants": deepcopy(concept["perceptual_invariants"]),
+                "observed_attributes": deepcopy(item.get("perceptual_attributes", {})),
                 "observation_source": "simulated_rgbd_adapter_without_reasoner_scene_access",
             }
         )
@@ -112,15 +135,18 @@ def simulate_task_conditioned_observation(
     ]
     return {
         "observation_id": "obs_" + hashlib.sha1(
-            f"{activation['task_utterance']}|{executor_position}|{session_state['executor_yaw_deg']}|{session['world_revision']}".encode("utf-8")
+            f"{activation['task_utterance']}|{executor_position}|{session_state['executor_yaw_deg']}|{session['world_revision']}|{viewpoint['viewpoint_id']}".encode("utf-8")
         ).hexdigest()[:12],
         "sensor_contract": {
             "sensor_type": "simulated_rgbd",
             "range_m": sensor_range_m,
             "horizontal_fov_deg": 140.0,
             "reasoner_scene_truth_access": False,
+            "sensor_frame": "head_rgbd",
+            "viewpoint": deepcopy(viewpoint),
         },
         "semantic_candidates": raw_tracks,
+        "occluded_candidates": occluded_candidates,
         "relation_candidates": relations,
         "semantically_suppressed_tracks": semantically_suppressed,
         "safety_observations": safety_observations,
@@ -133,10 +159,26 @@ def ground_task_observations(activation: dict[str, Any], observation: dict[str, 
     by_concept: dict[str, list[dict[str, Any]]] = {}
     for item in observation["semantic_candidates"]:
         by_concept.setdefault(item["candidate_concept_id"], []).append(item)
-    target_candidates = by_concept.get(activation["target_concept_id"], [])
+    raw_target_candidates = by_concept.get(activation["target_concept_id"], [])
+    target_constraints = activation.get("target_constraints", {})
+    target_candidates = [
+        item
+        for item in raw_target_candidates
+        if all(item.get("observed_attributes", {}).get(key) == value for key, value in target_constraints.items())
+    ]
     support_candidates = by_concept.get(activation.get("support_concept_id"), []) if activation.get("support_concept_id") else []
     support_required = bool(activation.get("support_concept_id"))
     ambiguity = len(target_candidates) != 1 or (support_required and len(support_candidates) != 1)
+    if len(target_candidates) > 1:
+        ambiguity_reason = "multiple_target_candidates"
+    elif not target_candidates:
+        ambiguity_reason = "target_not_observed"
+    elif support_required and len(support_candidates) > 1:
+        ambiguity_reason = "multiple_support_candidates"
+    elif support_required and not support_candidates:
+        ambiguity_reason = "support_not_observed"
+    else:
+        ambiguity_reason = None
     relation_evidence = None
     if not ambiguity and support_candidates:
         target_track = target_candidates[0]["track_id"]
@@ -163,6 +205,31 @@ def ground_task_observations(activation: dict[str, Any], observation: dict[str, 
         "candidate_bindings": bindings,
         "relation_evidence": relation_evidence,
         "ambiguity": ambiguity,
+        "ambiguity_reason": ambiguity_reason,
+        "candidate_summary": {
+            "detected_target_count": len(raw_target_candidates),
+            "target_count": len(target_candidates),
+            "support_count": len(support_candidates),
+        },
+        "candidate_options": [
+            {
+                "entity_ref": item["spatial_entity_candidate_ref"],
+                "label_hint": item["label_hint"],
+                "estimated_position": deepcopy(item["estimated_position"]),
+                "classification_confidence": item["classification_confidence"],
+                "observed_attributes": deepcopy(item.get("observed_attributes", {})),
+            }
+            for item in target_candidates
+        ],
+        "constraint_rejections": [
+            {
+                "entity_ref": item["spatial_entity_candidate_ref"],
+                "observed_attributes": deepcopy(item.get("observed_attributes", {})),
+                "reason": "target_attribute_constraint_not_satisfied",
+            }
+            for item in raw_target_candidates
+            if item not in target_candidates
+        ],
         "candidate_only": True,
         "direct_execution_allowed": False,
         "must_reenter_orchestration_layer": True,
@@ -176,27 +243,94 @@ def build_task_perception_result(scene: dict[str, Any], session: dict[str, Any],
     if not activation:
         return None
     observation = simulate_task_conditioned_observation(scene, session, activation)
+    observations = [observation]
     grounding = ground_task_observations(activation, observation)
+    active_perception_trace = [
+        {
+            "viewpoint": deepcopy(observation["sensor_contract"]["viewpoint"]),
+            "observation_id": observation["observation_id"],
+            "grounding_status": grounding["grounding_status"],
+            "ambiguity_reason": grounding["ambiguity_reason"],
+        }
+    ]
+    occluded_target = any(
+        item["candidate_concept_id"] == activation["target_concept_id"]
+        for item in observation.get("occluded_candidates", [])
+    )
+    if grounding["ambiguity_reason"] == "target_not_observed" and occluded_target:
+        sensor_profile = session.get("executor_profile", {}).get("sensor_frames", {}).get("head_rgbd", {})
+        for viewpoint in sensor_profile.get("active_scan_viewpoints", []):
+            observation = simulate_task_conditioned_observation(scene, session, activation, viewpoint)
+            observations.append(observation)
+            grounding = ground_task_observations(activation, observation)
+            active_perception_trace.append(
+                {
+                    "viewpoint": deepcopy(viewpoint),
+                    "observation_id": observation["observation_id"],
+                    "grounding_status": grounding["grounding_status"],
+                    "ambiguity_reason": grounding["ambiguity_reason"],
+                }
+            )
+            if grounding["grounding_status"] == "spatially_grounded":
+                break
     grounded = grounding["grounding_status"] == "spatially_grounded"
     target = next((item for item in grounding["candidate_bindings"] if item["role"] == "target"), None)
     support = next((item for item in grounding["candidate_bindings"] if item["role"] == "support"), None)
-    prompt = (
-        f"我观察到{support['label_hint']}上的{target['label_hint']}，空间关系已经落地为候选；"
-        "接下来仍需编排导航和抓取，并在执行后验真。"
-        if grounded and target and support
-        else "我已经按任务概念观察环境，但当前候选不足或不唯一，需要继续观察或请你确认。"
+    if grounded and target and support and len(active_perception_trace) > 1:
+        prompt = (
+            f"正面视角中的{target['label_hint']}被遮挡，我转动头部换了观察角度；"
+            f"现在已观察到{support['label_hint']}上的{target['label_hint']}。这仍是候选，执行后还要验真。"
+        )
+    elif grounded and target and support:
+        prompt = (
+            f"我观察到{support['label_hint']}上的{target['label_hint']}，空间关系已经落地为候选；"
+            "接下来仍需编排导航和抓取，并在执行后验真。"
+        )
+    elif grounded and target:
+        color_names = {"white": "白色", "light_blue": "浅蓝色"}
+        color = activation.get("target_constraints", {}).get("color")
+        prompt = (
+            f"我根据{color_names.get(color, '当前')}特征把目标重新落地为{target['label_hint']}候选；"
+            "没有擅自沿用上一轮歧义结果，执行前仍需编排和验真。"
+        )
+    elif grounding["ambiguity_reason"] == "multiple_target_candidates":
+        option_labels = [
+            {"white": "白色杯子", "light_blue": "浅蓝色杯子"}.get(item.get("observed_attributes", {}).get("color"), item["label_hint"])
+            for item in grounding["candidate_options"]
+        ]
+        prompt = (
+            f"我观察到{grounding['candidate_summary']['target_count']}个都符合杯子概念的对象："
+            f"{'、'.join(option_labels)}。我不能擅自选择，请按可观察特征确认。"
+        )
+    else:
+        prompt = "我已经按任务概念观察环境，但当前候选或空间关系证据不足，需要继续观察或请你确认。"
+    status = "perception_grounded_candidate" if grounded else (
+        "perception_disambiguation_required"
+        if grounding["ambiguity_reason"] in {"multiple_target_candidates", "multiple_support_candidates"}
+        else "active_perception_required"
     )
     return {
-        "status": "perception_grounded_candidate" if grounded else "active_perception_required",
+        "status": status,
         "reason": "task_conditioned_concept_perception_grounding",
         "prompt": prompt,
         "task_perception_frame": activation,
         "perception_observation": observation,
+        "perception_observations": observations,
+        "active_perception_trace": active_perception_trace,
         "concept_grounding": grounding,
         "causal_preview": {
             "goal_fact": "target_object_in_gripper",
-            "required_facts": ["target_object_spatially_grounded", "executor_at_target_support", "target_object_within_reach"],
-            "candidate_process": ["navigate_to_support", "align_end_effector", "grasp_target", "verify_target_in_gripper"],
+            "required_facts": [
+                "target_object_spatially_grounded",
+                "executor_at_target_support" if support else "executor_at_bound_target",
+                "target_object_within_reach",
+            ],
+            "candidate_process": [
+                "navigate_to_support" if support else "navigate_to_bound_target",
+                "align_end_effector",
+                "grasp_target",
+                "verify_target_in_gripper",
+            ],
             "planning_is_established_fact": False,
         },
         "frames": [],
@@ -212,6 +346,8 @@ def _binding(role: str, candidate: dict[str, Any], observation_id: str) -> dict[
         "binding_strength": "observation_and_spatial_relation",
         "evidence_ref": observation_id,
         "state": "spatially_grounded",
+        "estimated_position": deepcopy(candidate["estimated_position"]),
+        "observed_attributes": deepcopy(candidate.get("observed_attributes", {})),
     }
 
 

@@ -5,7 +5,7 @@ import math
 from pathlib import Path
 
 from concept_core.perceptual_grounding import activate_task_perception, ground_task_observations
-from embodied_scene import begin_motion_command, confirm_pending_motion, execute_command, load_scene, set_protection_policy, set_stool, start_session, step_motion_command
+from embodied_scene import begin_motion_command, confirm_pending_motion, execute_command, load_scene, set_perception_scenario, set_protection_policy, set_stool, start_session, step_motion_command
 
 
 OUTPUT = Path(__file__).resolve().parents[1] / "output" / "rell_sample" / "embodied_home"
@@ -60,6 +60,48 @@ def main() -> None:
     perception_with_obstacle = execute_command(perception_safety_session["session_id"], "去桌子上拿杯子")
     require(perception_with_obstacle["perception_observation"]["safety_observations"], f"task attention hid active obstacle: {perception_with_obstacle}")
     require(perception_with_obstacle["perception_observation"]["safety_observations"][0]["semantic_task_relevance"] == "safety_always_on", f"obstacle was not retained as safety input: {perception_with_obstacle}")
+
+    multiple_session = start_session()
+    set_perception_scenario(multiple_session["session_id"], "multiple_cups")
+    multiple = execute_command(multiple_session["session_id"], "去桌子上拿杯子")
+    require(multiple["status"] == "perception_disambiguation_required", f"multiple cups did not require disambiguation: {multiple}")
+    require(multiple["concept_grounding"]["ambiguity_reason"] == "multiple_target_candidates", f"wrong ambiguity reason: {multiple}")
+    require(multiple["concept_grounding"]["candidate_summary"]["target_count"] == 2, f"both cups were not retained: {multiple}")
+    require(len(multiple["concept_grounding"]["candidate_options"]) == 2, f"candidate options missing: {multiple}")
+    require(not multiple["concept_grounding"]["candidate_bindings"], f"ambiguous perception selected a cup: {multiple}")
+    require(not multiple["concept_grounding"]["runtime_fact_committed"], f"ambiguous candidates became fact: {multiple}")
+    selected_white = execute_command(multiple_session["session_id"], "拿白色杯子")
+    require(selected_white["status"] == "perception_grounded_candidate", f"attribute clarification did not reground target: {selected_white}")
+    require(selected_white["concept_grounding"]["candidate_summary"]["detected_target_count"] == 2, f"clarification hid original candidate set: {selected_white}")
+    require(selected_white["concept_grounding"]["candidate_summary"]["target_count"] == 1, f"color constraint did not select exactly one candidate: {selected_white}")
+    require(selected_white["concept_grounding"]["candidate_bindings"][0]["entity_ref"] == "cup_a", f"white cup was not selected from current observation: {selected_white}")
+    require(selected_white["concept_grounding"]["candidate_bindings"][0]["observed_attributes"]["color"] == "white", f"selection evidence omitted observed color: {selected_white}")
+    require(selected_white["concept_grounding"]["constraint_rejections"][0]["entity_ref"] == "cup_b", f"rejected alternative was not preserved: {selected_white}")
+    require(selected_white["session"]["perception_history"][-2]["current_use_status"] == "stale", f"ambiguous observation remained current after clarification: {selected_white}")
+    require(selected_white["session"]["perception_history"][-1]["current_use_status"] == "current_candidate", f"clarified observation was not current: {selected_white}")
+
+    occluded_session = start_session()
+    initial_occluded_position = occluded_session["state"]["executor_position"]
+    set_perception_scenario(occluded_session["session_id"], "occluded_cup")
+    occluded = execute_command(occluded_session["session_id"], "去桌子上拿杯子")
+    require(occluded["status"] == "perception_grounded_candidate", f"active observation did not recover occluded cup: {occluded}")
+    require(len(occluded["active_perception_trace"]) == 2, f"occlusion did not trigger viewpoint change: {occluded}")
+    require(occluded["active_perception_trace"][0]["ambiguity_reason"] == "target_not_observed", f"initial occlusion was not recorded: {occluded}")
+    require(occluded["active_perception_trace"][1]["grounding_status"] == "spatially_grounded", f"alternate viewpoint did not ground cup: {occluded}")
+    require(occluded["session"]["state"]["executor_position"] == initial_occluded_position, f"head scan incorrectly moved chassis: {occluded}")
+    require("转动头部" in occluded["prompt"], f"body did not explain active observation: {occluded}")
+
+    relocated_session = start_session()
+    before_relocation = execute_command(relocated_session["session_id"], "去桌子上拿杯子")
+    before_observation_id = before_relocation["perception_observation"]["observation_id"]
+    relocation = set_perception_scenario(relocated_session["session_id"], "relocated_cup")
+    require(relocation["session"]["perception_history"][-1]["current_use_status"] == "stale", f"relocation did not stale old binding: {relocation}")
+    after_relocation = execute_command(relocated_session["session_id"], "去桌子上拿杯子")
+    relocated_target = next(item for item in after_relocation["concept_grounding"]["candidate_bindings"] if item["role"] == "target")
+    require(relocated_target["estimated_position"] == [4.25, -1.35], f"new cup position was not rebound: {after_relocation}")
+    require(after_relocation["perception_observation"]["observation_id"] != before_observation_id, f"relocation reused stale observation identity: {after_relocation}")
+    require(after_relocation["session"]["perception_history"][-2]["current_use_status"] == "stale", f"old history became current again: {after_relocation}")
+    require(after_relocation["session"]["perception_history"][-1]["current_use_status"] == "current_candidate", f"new binding was not current: {after_relocation}")
 
     direct_session = start_session()
     direct = execute_command(direct_session["session_id"], "往前走一点")
@@ -194,7 +236,7 @@ def main() -> None:
     live_stool_position = live_stool["active_obstacles"][0]["position"]
     require(all(math.dist(position, live_stool_position) > combined_radius for position in committed_positions), f"live replanning committed a penetrating frame: {committed_positions}")
 
-    report = {"scene_id": scene["scene_id"], "task_conditioned_perception": perception, "direct": direct, "right": right, "backward": backward, "detour": detour, "blocked": blocked, "fixed_furniture_stop": furniture_blocked, "protected_policy_overlay": {"envelope": envelope, "continuous": protected_continuous, "confirmed": confirmed, "small": protected_small, "policy_change_invalidation": policy_invalidated}, "live_replanning": invalidated}
+    report = {"scene_id": scene["scene_id"], "task_conditioned_perception": {"normal": perception, "multiple": multiple, "occluded": occluded, "relocated": after_relocation}, "direct": direct, "right": right, "backward": backward, "detour": detour, "blocked": blocked, "fixed_furniture_stop": furniture_blocked, "protected_policy_overlay": {"envelope": envelope, "continuous": protected_continuous, "confirmed": confirmed, "small": protected_small, "policy_change_invalidation": policy_invalidated}, "live_replanning": invalidated}
     OUTPUT.mkdir(parents=True, exist_ok=True)
     (OUTPUT / "embodied_home_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print("Embodied semantic home validation passed.")

@@ -40,6 +40,7 @@ from embodied_scene import get_session as get_embodied_session
 from embodied_scene import load_scene as load_embodied_scene
 from embodied_scene import set_stool as set_embodied_stool
 from embodied_scene import set_protection_policy as set_embodied_protection_policy
+from embodied_scene import set_perception_scenario as set_embodied_perception_scenario
 from embodied_scene import start_session as start_embodied_session
 from embodied_scene import step_motion_command as step_embodied_motion
 
@@ -8560,6 +8561,10 @@ class RellSampleHandler(BaseHTTPRequestHandler):
             return
         if path == "/embodied/obstacle":
             result = set_embodied_stool(str(body.get("session_id", "")), str(body.get("mode", "ahead")))
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/embodied/perception/scenario":
+            result = set_embodied_perception_scenario(str(body.get("session_id", "")), str(body.get("mode", "normal")))
             self._send_json(result, status=400 if "error" in result else 200)
             return
         if path == "/embodied/policy":

@@ -42,6 +42,8 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator") -> dict[
         "pending_confirmation": None,
         "authorization_history": [],
         "perception_history": [],
+        "perception_scenario": "normal",
+        "runtime_objects": deepcopy(scene["objects"]),
         "state": state,
         "active_obstacles": [],
         "world_revision": 0,
@@ -155,6 +157,56 @@ def set_stool(session_id: str, mode: str = "ahead") -> dict[str, Any]:
     return get_session(session_id)
 
 
+def set_perception_scenario(session_id: str, mode: str) -> dict[str, Any]:
+    session = SESSIONS.get(session_id)
+    if not session:
+        return {"error": "embodied_session_not_found", "session_id": session_id}
+    if mode not in {"normal", "multiple_cups", "occluded_cup", "relocated_cup"}:
+        return {"error": "unsupported_perception_scenario", "mode": mode}
+    objects = deepcopy(load_scene()["objects"])
+    cup = next(item for item in objects if item["entity_id"] == "cup_a")
+    if mode == "multiple_cups":
+        second_cup = deepcopy(cup)
+        second_cup.update(
+            {
+                "entity_id": "cup_b",
+                "label": "浅蓝色杯子",
+                "position": [4.08, -1.35],
+                "color": "#d6e7ef",
+                "perceptual_attributes": {"color": "light_blue"},
+            }
+        )
+        objects.append(second_cup)
+    elif mode == "occluded_cup":
+        cup["occluded_from_viewpoints"] = ["head_center"]
+        objects.append(
+            {
+                "entity_id": "occluder_panel",
+                "label": "遮挡板",
+                "kind": "visual_occluder",
+                "region_id": "kitchen",
+                "position": [3.35, -1.28],
+                "elevation_m": 0.9,
+                "size": [0.08, 0.62, 0.58],
+                "color": "#535d64",
+                "fixed": False,
+            }
+        )
+    elif mode == "relocated_cup":
+        cup["position"] = [4.25, -1.35]
+    _revoke_pending_confirmation(session, "world_revision_changed")
+    _invalidate_perception_history(session, f"perception_scenario_changed_to_{mode}")
+    session["runtime_objects"] = objects
+    session["perception_scenario"] = mode
+    session["world_revision"] += 1
+    return {
+        "status": "perception_scenario_applied",
+        "mode": mode,
+        "runtime_objects": deepcopy(objects),
+        "session": get_session(session_id),
+    }
+
+
 def execute_command(session_id: str, utterance: str, scoped_authorization: dict[str, Any] | None = None) -> dict[str, Any]:
     session = SESSIONS.get(session_id)
     if not session:
@@ -162,12 +214,15 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
     text = utterance.strip()
     perception_result = build_task_perception_result(load_scene(), session, text)
     if perception_result:
+        _invalidate_perception_history(session, "superseded_by_new_task_observation")
         session["perception_history"].append(
             {
                 "utterance": text,
                 "observation_id": perception_result["perception_observation"]["observation_id"],
                 "grounding_status": perception_result["concept_grounding"]["grounding_status"],
                 "candidate_bindings": deepcopy(perception_result["concept_grounding"]["candidate_bindings"]),
+                "candidate_options": deepcopy(perception_result["concept_grounding"]["candidate_options"]),
+                "active_perception_trace": deepcopy(perception_result["active_perception_trace"]),
                 "world_revision": session["world_revision"],
                 "runtime_fact_committed": False,
                 "current_use_status": "current_candidate",

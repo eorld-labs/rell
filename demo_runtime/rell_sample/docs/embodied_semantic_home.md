@@ -30,8 +30,12 @@ The first perception slice handles `去桌子上拿杯子` without allowing the 
 
 The cup/support binding reaches `spatially_grounded`, not `runtime_verified`. It remains `candidate_only=true`, commits no runtime fact, and produces only a causal preview for navigation, alignment, grasping, and post-grasp verification. Removing support-relation evidence forces the result back to active observation instead of allowing the grounder to reconstruct the answer from scene configuration. Irrelevant object semantics are suppressed, while active obstacles and other safety channels remain always on.
 
+The runtime scene can now switch among a single clear cup, two compatible cups, front-view occlusion, and a relocated cup. Two cups produce `perception_disambiguation_required` with both candidates preserved and no selected binding. `拿白色杯子` or `拿浅蓝色杯子` starts a new observation interpretation, filters by an observed attribute, preserves the rejected alternative and its reason, and stales the preceding ambiguous result. It does not use screen-left or screen-right as an implicit spatial reference.
+
+Front-view occlusion produces explicit occlusion evidence. When the executor portrait exposes a panning head RGB-D frame, the perception loop selects an allowed alternate viewpoint and retries without moving the chassis. A successful second observation still yields only a candidate. Relocation increments the world revision, stales the old observation, moves the rendered instance, and requires a new observation id and position binding.
+
 ## Current benchmark
 
 The first home contains connected living-room, corridor, and kitchen regions plus an operation counter, water dispenser, cup, apple, and dynamic stool. The browser scene is available at `/embodied`.
 
-The command benchmark covers task-conditioned cup/support perception, direct relative movement, a detourable stool, and a stool in a narrow transition. The next perception expansion should add multiple compatible cups, occlusion, viewpoint change, observation expiry, and object relocation before replacing the simulated observation adapter with a real vision model.
+The command benchmark covers task-conditioned cup/support perception, multi-instance disambiguation, active observation under occlusion, relocation and rebinding, direct relative movement, a detourable stool, and a stool in a narrow transition. The next boundary is to submit a uniquely grounded target and its causal preview back through orchestration into actual navigation and grasp execution, while retaining per-step world-revision and P016 fact-verification gates.
