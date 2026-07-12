@@ -746,3 +746,7 @@ python .\demo_runtime\rell_sample\run_all_checks.py
 - `site_b_corridor`：走廊饮水区，用于验证同一经验契约绑定到不同操作台、容器和水源区域。
 
 迁移响应中的 `experience_invariant_contract` 为规范契约，`binding_candidate.step_bindings[].contract_slot` 为各步骤使用的类型化槽位，`space_binding/object_binding.target_ref` 为当前空间解析得到的实体。执行载荷携带同一绑定候选，运行时状态跃迁按当前实体更新，不回退到来源空间实体。
+
+候选绑定遵循状态过滤优先：不可达或不可用候选写入 `rejected_candidates`；过滤后只有一个候选时自动绑定；多个有效候选写入 `ambiguous_bindings` 并返回 `requires_human_confirmation`；没有有效候选时形成 `missing_binding_target`。主体缺少槽位所需能力时形成 `missing_body_capability`。
+
+执行反馈中的 `generalization_result` 记录空间、主体、槽位绑定、排除候选、歧义候选和目标事实结果。单次结果只进入验证历史，不直接改写公共经验契约。

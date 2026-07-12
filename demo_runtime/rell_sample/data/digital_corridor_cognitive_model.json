@@ -48,6 +48,50 @@
     "SOURCE_LIQUID_RESOURCE_REGION": "site_b_corridor_dispenser_zone",
     "TARGET_POUR_DESTINATION_REGION": "site_b_preparation_surface"
   },
+  "binding_candidate_sets": {
+    "TARGET_GRASPABLE_CONTAINER": [
+      {
+        "entity_ref": "site_b_reusable_tumbler",
+        "availability": "available",
+        "reachable": true,
+        "confidence": 0.94
+      },
+      {
+        "entity_ref": "site_b_spare_cup_unreachable",
+        "availability": "available",
+        "reachable": false,
+        "confidence": 0.88
+      }
+    ],
+    "TARGET_LIQUID_SOURCE_REGION": [
+      {
+        "entity_ref": "site_b_corridor_dispenser_zone",
+        "availability": "available",
+        "reachable": true,
+        "confidence": 0.95
+      },
+      {
+        "entity_ref": "site_b_maintenance_dispenser_zone",
+        "availability": "unavailable",
+        "reachable": true,
+        "confidence": 0.9
+      }
+    ],
+    "SOURCE_LIQUID_RESOURCE_REGION": [
+      {
+        "entity_ref": "site_b_corridor_dispenser_zone",
+        "availability": "available",
+        "reachable": true,
+        "confidence": 0.95
+      },
+      {
+        "entity_ref": "site_b_maintenance_dispenser_zone",
+        "availability": "unavailable",
+        "reachable": true,
+        "confidence": 0.9
+      }
+    ]
+  },
   "local_environment_summary": {
     "space_id": "site_b_corridor",
     "region_count": 3,

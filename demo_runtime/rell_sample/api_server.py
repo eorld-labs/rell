@@ -250,6 +250,7 @@ EXECUTION_DISPATCH_STORE: dict[str, dict[str, Any]] = {}
 TEACHING_SESSION_STORE: dict[str, dict[str, Any]] = {}
 CONCEPT_LIFECYCLE_STORE: dict[str, dict[str, Any]] = {}
 CONCEPT_FALLBACK_STORE: dict[str, dict[str, Any]] = {}
+GENERALIZATION_RESULT_STORE: dict[str, dict[str, Any]] = {}
 
 
 STEP_LIBRARY = {
@@ -2486,6 +2487,12 @@ INDEX_HTML = """<!doctype html>
           const target = binding.space_binding?.target_ref || binding.object_binding?.target_ref || "未绑定";
           rows.push(`<div class="stage-row"><strong>${escapeHtml(binding.step)}</strong><span>${escapeHtml(slot)} → ${escapeHtml(target)} / ${escapeHtml(binding.capability || "-")}</span></div>`);
         }
+      }
+      for (const rejected of (payload.binding_candidate?.rejected_candidates || [])) {
+        rows.push(`<div class="stage-row"><strong>排除候选</strong><span>${escapeHtml(rejected.slot_id || "-")} / ${escapeHtml(rejected.entity_ref || "-")} / ${escapeHtml(rejected.reason || "-")}</span></div>`);
+      }
+      for (const ambiguous of (payload.binding_candidate?.ambiguous_bindings || [])) {
+        rows.push(`<div class="stage-row"><strong>绑定待确认</strong><span>${escapeHtml(ambiguous.slot_id || "-")} / ${escapeHtml((ambiguous.candidate_refs || []).join(", "))}</span></div>`);
       }
       factsEl.innerHTML = rows.join("");
     }
@@ -5995,12 +6002,41 @@ def build_binding_candidates(
     contract = invariant_contract or build_invariant_contract(chain)
     slot_specs = {item.get("slot_id"): item for item in contract.get("binding_slots", [])}
     current_space_slots = cognitive_model.get("binding_candidates", {})
+    candidate_sets = cognitive_model.get("binding_candidate_sets", {})
+    ambiguous_bindings: list[dict[str, Any]] = []
+    rejected_candidates: list[dict[str, Any]] = []
     for step in chain:
         meta = STEP_LIBRARY.get(step, {})
         portable_slot = build_portable_binding_slot(step, meta)
         slot_id = portable_slot["slot_id"]
         slot_spec = slot_specs.get(slot_id, portable_slot)
-        bound_target = current_space_slots.get(slot_id)
+        slot_candidates = candidate_sets.get(slot_id, [])
+        eligible_candidates = [
+            item for item in slot_candidates
+            if item.get("availability", "available") == "available" and item.get("reachable", True)
+        ]
+        for item in slot_candidates:
+            if item not in eligible_candidates:
+                rejected_candidates.append({
+                    "slot_id": slot_id,
+                    "entity_ref": item.get("entity_ref"),
+                    "reason": "unavailable" if item.get("availability") != "available" else "unreachable",
+                })
+        if len(eligible_candidates) == 1:
+            bound_target = eligible_candidates[0].get("entity_ref")
+            binding_selection = "unique_eligible_candidate"
+        elif len(eligible_candidates) > 1:
+            bound_target = None
+            binding_selection = "ambiguous_candidates_require_confirmation"
+            ambiguous_bindings.append({
+                "step": step,
+                "slot_id": slot_id,
+                "candidate_refs": [item.get("entity_ref") for item in eligible_candidates],
+                "recommended_action": "request_human_confirmation",
+            })
+        else:
+            bound_target = None if slot_candidates else current_space_slots.get(slot_id)
+            binding_selection = "all_candidates_filtered_out" if slot_candidates else ("declared_default_candidate" if bound_target else "no_candidate")
         binding: dict[str, Any] = {
             "step": step,
             "contract_slot": slot_spec,
@@ -6008,6 +6044,8 @@ def build_binding_candidates(
             "requires_facts": meta.get("requires_facts", []),
             "produces_fact": meta.get("produces_fact"),
             "destroys_facts": meta.get("destroys_facts", []),
+            "binding_selection": binding_selection,
+            "eligible_candidate_refs": [item.get("entity_ref") for item in eligible_candidates],
         }
         if slot_spec.get("entity_kind") == "semantic_region":
             if bound_target in regions:
@@ -6053,6 +6091,8 @@ def build_binding_candidates(
         ],
         "step_bindings": step_bindings,
         "missing_targets": missing_targets,
+        "ambiguous_bindings": ambiguous_bindings,
+        "rejected_candidates": rejected_candidates,
         "invariant_contract_ref": {
             "storage_policy": contract.get("storage_policy"),
             "binding_slot_ids": [item.get("slot_id") for item in contract.get("binding_slots", [])],
@@ -6108,6 +6148,8 @@ def build_execution_feasibility(
     reasons: list[dict[str, Any]] = []
     for item in binding_candidate.get("missing_targets", []):
         reasons.append({"reason": "missing_binding_target", **item})
+    for item in binding_candidate.get("ambiguous_bindings", []):
+        reasons.append({"reason": "ambiguous_binding_requires_confirmation", **item})
     for item in missing_capabilities:
         reasons.append({"reason": "missing_body_capability", **item})
     for item in missing_facts:
@@ -6119,7 +6161,7 @@ def build_execution_feasibility(
     if not reasons:
         result = "executable"
         recommended_actions = ["dispatch_to_execution_loop"]
-    elif runtime_world_state.get("runtime_conflicts"):
+    elif runtime_world_state.get("runtime_conflicts") or binding_candidate.get("ambiguous_bindings"):
         result = "requires_human_confirmation"
         recommended_actions = ["request_human_confirmation", "trigger_readaptation", "search_alternative_experience", "terminate_execution"]
     elif executable_steps:
@@ -6319,6 +6361,9 @@ def migrate_experience(
         "execution_feasibility": feasibility,
         "body_capability_profile": profile,
         "experience_gap_record_id": gap_record.get("gap_record_id") if gap_record else None,
+        "space_id": cognitive_model.get("local_environment_summary", {}).get("space_id"),
+        "experience_invariant_contract": invariant_contract,
+        "binding_candidate": binding_candidate,
     }
     AUDIT_STORE[runtime_world_state["audit_record_id"]] = {
         "schema_version": "1.0.0",
@@ -6770,6 +6815,46 @@ def build_concept_grounding_gate(concept_resolution: dict[str, Any] | None) -> d
         "direct_execution_allowed": False,
         "must_reenter_orchestration_layer": True,
     }
+
+
+def build_generalization_result_record(
+    task_id: str,
+    binding_candidate: dict[str, Any],
+    profile: dict[str, Any],
+    runtime_world_state: dict[str, Any],
+    outcome: str,
+    target_fact: str | None,
+) -> dict[str, Any]:
+    state_meta = STATE_STORE.get(task_id, {})
+    record_id = "generalization_" + hashlib.sha1(
+        "|".join([task_id, str(state_meta.get("space_id")), str(profile.get("executor_id")), outcome]).encode("utf-8")
+    ).hexdigest()[:12]
+    record = {
+        "schema_version": "1.0.0",
+        "generalization_result_id": record_id,
+        "migration_task_id": task_id,
+        "space_id": state_meta.get("space_id"),
+        "executor_id": profile.get("executor_id"),
+        "executor_type": profile.get("executor_type") or profile.get("body_profile"),
+        "binding_candidate_id": binding_candidate.get("binding_candidate_id"),
+        "resolved_bindings": [
+            {
+                "step": item.get("step"),
+                "slot_id": item.get("contract_slot", {}).get("slot_id"),
+                "entity_ref": item.get("space_binding", {}).get("target_ref") or item.get("object_binding", {}).get("target_ref"),
+                "selection": item.get("binding_selection"),
+            }
+            for item in binding_candidate.get("step_bindings", [])
+        ],
+        "rejected_candidates": binding_candidate.get("rejected_candidates", []),
+        "ambiguous_bindings": binding_candidate.get("ambiguous_bindings", []),
+        "outcome": outcome,
+        "target_fact": target_fact,
+        "target_fact_established": bool(target_fact and target_fact in set(runtime_world_state.get("established_facts", []))),
+        "public_experience_update_policy": "record_validation_history_only_no_single_run_contract_rewrite",
+    }
+    GENERALIZATION_RESULT_STORE[record_id] = record
+    return record
 
 
 def build_concept_evidence_summary(evidence_packets: list[dict[str, Any]]) -> dict[str, Any]:
@@ -7711,6 +7796,15 @@ def dispatch_execution_loop_payload(payload: dict[str, Any], executor_type: str 
                 "experience_gap_record_id": gap_record.get("gap_record_id") if gap_record else None,
             },
         )
+    generalization_result = build_generalization_result_record(
+        task_id,
+        payload.get("binding_candidate_payload", {}),
+        profile,
+        state,
+        outcome,
+        target_fact,
+    )
+    audit["generalization_result_id"] = generalization_result["generalization_result_id"]
     record = {
         "schema_version": "1.0.0",
         "dispatch_id": dispatch_id,
@@ -7725,6 +7819,7 @@ def dispatch_execution_loop_payload(payload: dict[str, Any], executor_type: str 
         "stepwise_readaptation": stepwise_readaptation,
         "recovery_record": recovery_record,
         "audit_record_id": audit_record_id,
+        "generalization_result": generalization_result,
     }
     EXECUTION_DISPATCH_STORE[dispatch_id] = record
     return record
