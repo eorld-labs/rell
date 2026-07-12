@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 from concept_core.perceptual_grounding import activate_task_perception, ground_task_observations
-from embodied_scene import SESSIONS, begin_learned_replay, begin_motion_command, begin_persisted_experience_replay, begin_teaching_control, build_factory_concept_catalog, confirm_pending_motion, evaluate_learned_replay, execute_command, finish_embodied_teaching, load_scene, record_teaching_signal, set_perception_scenario, set_protection_policy, set_stool, start_embodied_teaching, start_session, step_motion_command
+from embodied_scene import SESSIONS, begin_learned_replay, begin_motion_command, begin_persisted_experience_replay, begin_teaching_control, build_factory_concept_catalog, build_factory_object_catalog, confirm_pending_motion, evaluate_learned_replay, execute_command, finish_embodied_teaching, load_scene, record_teaching_signal, set_perception_scenario, set_protection_policy, set_stool, start_embodied_teaching, start_session, step_motion_command
 
 
 OUTPUT = Path(__file__).resolve().parents[1] / "output" / "rell_sample" / "embodied_home"
@@ -50,6 +50,12 @@ def main() -> None:
     for forbidden in ["absolute_coordinates", "joint_angles", "fixed_duration", "single_body_trajectory"]:
         require(forbidden in serialized_factory, f"factory concept storage boundary omitted {forbidden}: {factory_catalog}")
 
+    object_catalog = build_factory_object_catalog()
+    require(len(object_catalog["object_concepts"]) >= 5, f"functional object catalog is too narrow: {object_catalog}")
+    require(len(object_catalog["relation_concepts"]) >= 7, f"factory relation skeleton is too narrow: {object_catalog}")
+    require(object_catalog["shared_boundary"]["appearance_is_not_role_proof"], f"appearance incorrectly proves functional role: {object_catalog}")
+    require(object_catalog["shared_boundary"]["runtime_relation_requires_current_observation_or_physical_verification"], f"possible relation was treated as current fact: {object_catalog}")
+
     zero_experience_session = start_session()
     zero_id = zero_experience_session["session_id"]
     SESSIONS[zero_id]["available_local_experiences"] = []
@@ -62,7 +68,19 @@ def main() -> None:
     require(understood_without_experience["post_action"]["teaching_available"], f"recoverable gap did not offer teaching: {understood_without_experience}")
     require(not grasp_diagnosis["direct_execution_allowed"], f"factory semantics directly executed without experience: {understood_without_experience}")
 
-    body_gap = execute_command(zero_id, "把杯子放到操作台")
+    fixed_asset_gap = execute_command(zero_id, "拿起饮水机")
+    require(fixed_asset_gap["factory_concept"]["reason_code"] == "entity_not_compatible_with_semantic_role", f"fixed asset was treated as graspable: {fixed_asset_gap}")
+    fixed_incompatibility = fixed_asset_gap["factory_concept"]["incompatible_roles"][0]
+    require("fixed_asset" in fixed_incompatibility["forbidden_properties_present"], f"fixed property was not used in role rejection: {fixed_asset_gap}")
+    require(set(fixed_incompatibility["missing_affordances"]) == {"graspable", "movable"}, f"grasp role missing affordances not explained: {fixed_asset_gap}")
+
+    support_gap = execute_command(zero_id, "把杯子放到苹果上")
+    require(support_gap["factory_concept"]["reason_code"] == "entity_not_compatible_with_semantic_role", f"apple was accepted as support surface: {support_gap}")
+    destination_gap = next(item for item in support_gap["factory_concept"]["incompatible_roles"] if item["role"] == "destination")
+    require("support_object" in destination_gap["missing_affordances"], f"support affordance gap not exposed: {support_gap}")
+    require(all(item["entity_ref"] != "apple_a" for item in support_gap["factory_concept"]["incompatible_roles"] if item["role"] == "object"), f"destination was incorrectly rebound as moved object: {support_gap}")
+
+    body_gap = execute_command(zero_id, "擦操作台")
     require(body_gap["factory_concept"]["reason_code"] == "executor_capability_not_available", f"missing body capability was not explained: {body_gap}")
     require(body_gap["post_action"]["human_help_suggested"] and not body_gap["post_action"]["teaching_available"], f"teaching was offered for impossible body capability: {body_gap}")
 

@@ -254,15 +254,21 @@ def build_factory_inability_diagnosis(
     supported_capabilities: list[str],
     available_experience_capabilities: list[str] | None = None,
     grounded_roles: dict[str, str] | None = None,
+    incompatible_roles: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     capability = concept["capability"]
     supported = capability in set(supported_capabilities)
     experienced = capability in set(available_experience_capabilities or [])
     role_templates = concept["concept_kernel"]["semantic_roles"]
     grounded_roles = grounded_roles or {}
+    incompatible_roles = incompatible_roles or []
     missing_roles = [name for name, template in role_templates.items() if not template.get("optional") and not grounded_roles.get(name)]
     verification = concept["concept_kernel"]["effect_contract"]["verification"]
-    if missing_roles:
+    if incompatible_roles:
+        reason_code = "entity_not_compatible_with_semantic_role"
+        next_action = "explain_role_incompatibility_and_request_alternative"
+        explanation = "；".join(item["reason"] for item in incompatible_roles)
+    elif missing_roles:
         reason_code = "required_semantic_roles_not_grounded"
         next_action = "request_clarification"
         explanation = f"我理解这是“{concept['display_name']}”，但还不知道" + "、".join(missing_roles) + "具体指什么。"
@@ -291,6 +297,7 @@ def build_factory_inability_diagnosis(
         "reason_code": reason_code,
         "explanation": explanation,
         "missing_roles": missing_roles,
+        "incompatible_roles": deepcopy(incompatible_roles),
         "required_capability": capability,
         "executor_capability_available": supported,
         "applicable_experience_available": experienced,

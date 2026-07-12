@@ -17,6 +17,13 @@ from .factory_event_units import (
     build_factory_inability_diagnosis,
     find_factory_event_concepts_by_text,
 )
+from .functional_object_reasoning import (
+    FACTORY_RELATION_CONCEPTS,
+    FUNCTIONAL_ROLE_CONTRACTS,
+    build_functional_object_catalog,
+    build_functional_profile,
+    evaluate_role_compatibility,
+)
 from .concept_units import (
     STATE_CONCEPT_UNITS,
     build_supported_runtime_questions,
@@ -36,6 +43,8 @@ from .perceptual_grounding import (
 __all__ = [
     "ACTION_CONCEPT_UNITS",
     "FACTORY_EVENT_CONCEPT_UNITS",
+    "FACTORY_RELATION_CONCEPTS",
+    "FUNCTIONAL_ROLE_CONTRACTS",
     "STATE_CONCEPT_UNITS",
     "build_teaching_frame",
     "build_cloud_recall_packet",
@@ -49,6 +58,9 @@ __all__ = [
     "find_state_concepts_by_text",
     "find_factory_event_concepts_by_text",
     "build_factory_inability_diagnosis",
+    "build_functional_object_catalog",
+    "build_functional_profile",
+    "evaluate_role_compatibility",
     "infer_local_concept_gap",
     "request_cloud_concept_support",
     "resolve_action_concepts",

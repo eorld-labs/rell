@@ -8,7 +8,8 @@ from pathlib import Path
 from typing import Any
 
 from concept_core.factory_event_units import build_factory_inability_diagnosis, find_factory_event_concepts_by_text
-from concept_core.perceptual_grounding import build_task_perception_result
+from concept_core.functional_object_reasoning import build_functional_object_catalog, build_functional_profile, evaluate_role_compatibility
+from concept_core.perceptual_grounding import build_task_perception_result, load_object_concepts
 from embodied_teaching import (
     append_validation_result,
     build_pedagogical_signals,
@@ -154,15 +155,21 @@ def _ground_factory_roles(
     target = next((item for item in bindings if item.get("role") == "target"), None)
     held = session.get("state", {}).get("holding")
     roles = concept["concept_kernel"]["semantic_roles"]
-    mentioned_entities = [
-        item for item in session.get("runtime_objects", [])
-        if item.get("label") and item["label"] in text
-    ]
+    object_concepts = load_object_concepts()["concepts"]
+    mentioned_entities: list[dict[str, Any]] = []
+    for entity in session.get("runtime_objects", []):
+        matching_concepts = [item for item in object_concepts if entity.get("kind") in item.get("compatible_kinds", [])]
+        aliases = [alias for item in matching_concepts for alias in item.get("aliases", [])]
+        surface_forms = [entity.get("label", ""), *aliases]
+        positions = [text.find(form) for form in surface_forms if form and form in text]
+        if positions:
+            mentioned_entities.append({**entity, "mention_position": min(positions)})
+    mentioned_entities.sort(key=lambda item: item["mention_position"])
     for role_name, template in roles.items():
         entity_type = template.get("entity_type")
         if role_name in {"object", "target", "device"} and target:
             grounded[role_name] = target.get("entity_ref")
-        elif role_name in {"object", "target", "device"} and len(mentioned_entities) == 1:
+        elif role_name in {"object", "target", "device"} and mentioned_entities:
             grounded[role_name] = mentioned_entities[0]["entity_id"]
         elif role_name in {"destination", "source"} and mentioned_entities:
             grounded[role_name] = mentioned_entities[-1]["entity_id"]
@@ -173,20 +180,45 @@ def _ground_factory_roles(
     return grounded
 
 
+def _evaluate_factory_role_compatibility(
+    concept: dict[str, Any],
+    session: dict[str, Any],
+    grounded_roles: dict[str, str],
+) -> list[dict[str, Any]]:
+    objects = {item["entity_id"]: item for item in session.get("runtime_objects", [])}
+    object_concepts = load_object_concepts()["concepts"]
+    incompatible: list[dict[str, Any]] = []
+    for role_name, entity_ref in grounded_roles.items():
+        entity = objects.get(entity_ref)
+        required_type = concept["concept_kernel"]["semantic_roles"].get(role_name, {}).get("entity_type")
+        if not entity or not required_type:
+            continue
+        profile = build_functional_profile(entity, object_concepts)
+        if session.get("state", {}).get("holding") == entity_ref:
+            profile["current_relations"] = sorted(set(profile.get("current_relations", [])) | {"held_by_executor"})
+        result = evaluate_role_compatibility(profile, required_type)
+        if result.get("compatible") is False:
+            incompatible.append({"role": role_name, **result})
+    return incompatible
+
+
 def _build_factory_response(
     session: dict[str, Any],
     text: str,
     concept: dict[str, Any],
     perception_result: dict[str, Any] | None,
 ) -> dict[str, Any]:
+    grounded_roles = _ground_factory_roles(concept, session, perception_result, text)
     diagnosis = build_factory_inability_diagnosis(
         concept,
         supported_capabilities=session["executor_profile"].get("supported_actions", []),
         available_experience_capabilities=_available_experience_capabilities(session),
-        grounded_roles=_ground_factory_roles(concept, session, perception_result, text),
+        grounded_roles=grounded_roles,
+        incompatible_roles=_evaluate_factory_role_compatibility(concept, session, grounded_roles),
     )
     prompts = {
         "request_clarification": diagnosis["explanation"] + " 请指出具体对象、位置或方向。",
+        "explain_role_incompatibility_and_request_alternative": diagnosis["explanation"] + " 请换一个具备所需功能的对象。",
         "explain_body_limit_and_request_compatible_body_or_help": diagnosis["explanation"] + " 可以换用具备该能力的本体，或由人协助。",
         "offer_embodied_teaching": diagnosis["explanation"] + " 你可以进入真人教学，示范一次并让我自主复做验真。",
         "request_verification_support": diagnosis["explanation"] + " 请补充可观察的成功标准或人工确认方式。",
@@ -237,6 +269,10 @@ def build_factory_concept_catalog() -> dict[str, Any]:
             for item in FACTORY_EVENT_CONCEPT_UNITS
         ],
     }
+
+
+def build_factory_object_catalog() -> dict[str, Any]:
+    return build_functional_object_catalog(load_object_concepts()["concepts"])
 def _command_hash(utterance: str) -> str:
     return hashlib.sha256(utterance.strip().encode("utf-8")).hexdigest()[:16]
 
