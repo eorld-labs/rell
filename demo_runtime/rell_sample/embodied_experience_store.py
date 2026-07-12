@@ -58,6 +58,13 @@ def _build_portable_record(experience: dict[str, Any]) -> dict[str, Any]:
         for item in experience.get("validation_history", [])
         if item.get("physical_fact_verified") and item.get("human_accepted")
     ]
+    source_contract = deepcopy(experience.get("source_concept_contract"))
+    if source_contract:
+        for role in source_contract.get("semantic_roles", {}).values():
+            role.pop("entity_ref", None)
+            role.pop("surface_form", None)
+            role["binding_scope"] = "rebind_from_current_observation"
+        source_contract.pop("world_revision", None)
     portable_experience = {
         "schema_version": "1.0.0",
         "experience_id": experience["experience_id"],
@@ -69,6 +76,7 @@ def _build_portable_record(experience: dict[str, Any]) -> dict[str, Any]:
             "rebind_by_concept_and_current_observation": True,
         },
         "goal_fact": experience.get("goal_fact"),
+        "source_concept_contract": source_contract,
         "process_chain": deepcopy(experience.get("process_chain", [])),
         "effect_contract": deepcopy(experience.get("effect_contract", {})),
         "applicability_constraints": deepcopy(experience.get("applicability_constraints", {})),

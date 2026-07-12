@@ -127,6 +127,18 @@ def _experience_catalog() -> list[dict[str, Any]]:
     ]
 
 
+def _recall_trusted_experience(utterance: str) -> dict[str, Any] | None:
+    matches = []
+    object_concepts = {item["concept_id"]: item for item in load_object_concepts()["concepts"]}
+    for experience in load_trusted_experiences():
+        trigger = str(experience.get("source_concept_contract", {}).get("language_trigger") or "")
+        target_concept_id = experience.get("target_binding", {}).get("concept_id")
+        aliases = (object_concepts.get(target_concept_id) or {}).get("aliases", [])
+        if trigger and trigger in utterance and any(alias in utterance for alias in aliases):
+            matches.append(experience)
+    return matches[0] if len(matches) == 1 else None
+
+
 def _normalize_factory_text(text: str) -> str:
     return "".join(text.strip().lower().split())
 
@@ -499,6 +511,9 @@ def set_perception_scenario(session_id: str, mode: str) -> dict[str, Any]:
         )
     elif mode == "relocated_cup":
         cup["position"] = [4.25, -1.35]
+    elif mode == "relocated_apple":
+        apple = next(item for item in objects if item["entity_id"] == "apple_a")
+        apple["position"] = [-4.25, -1.65]
     _revoke_pending_confirmation(session, "world_revision_changed")
     _invalidate_perception_history(session, f"perception_scenario_changed_to_{mode}")
     _revoke_teaching_authority(session, "target_binding_invalidated")
@@ -526,7 +541,26 @@ def start_embodied_teaching(session_id: str, goal_utterance: str = "拿杯子") 
         ]
         session["state"] = deepcopy(load_scene()["initial_state"])
         session["world_revision"] += 1
-    perception = build_task_perception_result(load_scene(), session, goal_utterance)
+    gap_dialogue = session.get("concept_gap_dialogue") or {}
+    source_contract = deepcopy(gap_dialogue.get("compiled_contract"))
+    if source_contract:
+        canonical_goal = source_contract.get("effect_contract", {}).get("canonical_goal_fact")
+        if not canonical_goal:
+            return {
+                "status": "teaching_goal_verification_adapter_required",
+                "reason": "temporary_goal_has_no_runtime_verification_adapter",
+                "prompt": "我已经理解你描述的目标，但当前教学舱还不能验真这个目标状态。不能用一次抓取或移动冒充整个任务成功。",
+                "temporary_effect_contract": source_contract,
+                "session": get_session(session_id),
+            }
+        goal_utterance = gap_dialogue.get("source_utterance") or goal_utterance
+    contract_target = (source_contract or {}).get("semantic_roles", {}).get("target", {})
+    perception_utterance = (
+        "拿" + str(contract_target.get("surface_form") or "目标对象")
+        if source_contract
+        else goal_utterance
+    )
+    perception = build_task_perception_result(load_scene(), session, perception_utterance)
     if not perception or perception["concept_grounding"]["grounding_status"] != "spatially_grounded":
         return {
             "status": "teaching_target_grounding_required",
@@ -554,7 +588,9 @@ def start_embodied_teaching(session_id: str, goal_utterance: str = "拿杯子") 
         "teaching_id": teaching_id,
         "status": "human_control_active",
         "goal_utterance": goal_utterance,
-        "goal_fact": "target_object_in_gripper",
+        "goal_fact": (source_contract or {}).get("effect_contract", {}).get("canonical_goal_fact", {}).get("fact") or "target_object_in_gripper",
+        "source_concept_contract": source_contract,
+        "perception_activation_source": "compiled_concept_target_role" if source_contract else "goal_utterance",
         "target_entity_ref": target["entity_ref"],
         "target_concept_id": target["concept_id"],
         "target_initial_object_state": deepcopy(target_object),
@@ -754,6 +790,7 @@ def finish_embodied_teaching(session_id: str) -> dict[str, Any]:
         pedagogical_signals=teaching.get("pedagogical_signals"),
         world_revision=session["world_revision"],
         observation_packet=teaching.get("observation_packet"),
+        source_concept_contract=teaching.get("source_concept_contract"),
     )
     signal_constraints = deepcopy(teaching.get("scoped_constraint_candidates", []))
     experience["applicability_constraints"]["negative_constraints"].extend(signal_constraints)
@@ -795,7 +832,13 @@ def begin_persisted_experience_replay(session_id: str, experience_id: str) -> di
     if not experience:
         return {"error": "trusted_local_experience_not_found", "experience_id": experience_id}
     goal_utterance = str(experience.get("source_goal_utterance") or "拿杯子")
-    perception = build_task_perception_result(load_scene(), session, goal_utterance)
+    expected_concept = experience.get("target_binding", {}).get("concept_id")
+    target_concept = next(
+        (item for item in load_object_concepts()["concepts"] if item.get("concept_id") == expected_concept),
+        None,
+    )
+    target_aliases = (target_concept or {}).get("aliases") or ["目标对象"]
+    perception = build_task_perception_result(load_scene(), session, "拿" + str(target_aliases[0]))
     if not perception or perception["concept_grounding"]["grounding_status"] != "spatially_grounded":
         return {
             "status": "persisted_experience_rebinding_required",
@@ -807,7 +850,6 @@ def begin_persisted_experience_replay(session_id: str, experience_id: str) -> di
     target = next(
         item for item in perception["concept_grounding"]["candidate_bindings"] if item["role"] == "target"
     )
-    expected_concept = experience.get("target_binding", {}).get("concept_id")
     if target.get("concept_id") != expected_concept:
         return {
             "status": "persisted_experience_rebinding_required",
@@ -836,6 +878,7 @@ def begin_persisted_experience_replay(session_id: str, experience_id: str) -> di
         "current_entity_ref": target["entity_ref"],
         "observation_id": perception["perception_observation"]["observation_id"],
         "trajectory_reused": False,
+        "perception_activation_source": "persisted_target_concept_binding",
     }
     started["prompt"] = "已从本地经验库载入不变量，并用当前观测重新绑定目标；不会复用示教坐标或轨迹。"
     return started
@@ -864,15 +907,65 @@ def begin_learned_replay(session_id: str) -> dict[str, Any]:
         (item for item in session["runtime_objects"] if item["entity_id"] == target.get("support_ref")),
         None,
     )
-    if not support:
-        return {"error": "replay_support_binding_missing", "target_ref": target_ref}
     radius = float(session["executor_profile"]["body_envelope"]["radius_m"])
-    support_left_edge = support["position"][0] - support["size"][0] / 2
-    approach = [support_left_edge - radius - 0.03, target["position"][1]]
     start = list(session["state"]["executor_position"])
     envelope = build_effective_execution_envelope(session["executor_profile"], session.get("protection_policy_overlay"))
     planning_radius = radius + envelope["effective_constraints"]["minimum_avoidance_distance_m"]
-    plan = _plan_verified_motion(session, start, approach, planning_radius)
+    reachable_distance = radius + float(session["executor_profile"]["arm_reach_m"])
+    if support:
+        support_x, support_y = support["position"]
+        half_x, half_y = support["size"][0] / 2, support["size"][1] / 2
+        clearance = planning_radius + 0.03
+        approach_candidates = [
+            ([support_x - half_x - clearance, target["position"][1]], []),
+            ([support_x + half_x + clearance, target["position"][1]], []),
+            ([target["position"][0], support_y - half_y - clearance], [[support_x - half_x - clearance, support_y - half_y - clearance]]),
+            ([target["position"][0], support_y + half_y + clearance], [[support_x - half_x - clearance, support_y + half_y + clearance]]),
+        ]
+        feasible_approaches = []
+        for candidate, perimeter_entries in approach_candidates:
+            if math.dist(candidate, target["position"]) > reachable_distance:
+                continue
+            waypoints = perimeter_entries + [candidate]
+            segment_start = start
+            if any(_first_collision(session, segment_start if index == 0 else waypoints[index - 1], waypoint, planning_radius) for index, waypoint in enumerate(waypoints)):
+                continue
+            if _collider_at(candidate, planning_radius, session, load_scene()):
+                continue
+            route_length = sum(math.dist(a, b) for a, b in zip([start] + waypoints[:-1], waypoints))
+            candidate_plan = {
+                "outcome": "verified",
+                "route_kind": "support_perimeter_approach" if perimeter_entries else "direct",
+                "waypoints": waypoints,
+                "path_length_m": route_length,
+                "safety_contract": {
+                    "planner_world_revision": session["world_revision"],
+                    "all_segments_swept_volume_verified": True,
+                    "terminal_pose_verified": True,
+                    "execution_must_recheck_world_revision": True,
+                    "unverified_path_never_becomes_executable_fact": True,
+                },
+            }
+            feasible_approaches.append((route_length, candidate, candidate_plan))
+        if not feasible_approaches:
+            return {
+                "status": "learned_replay_blocked",
+                "reason": "no_reachable_collision_free_approach_for_current_target_geometry",
+                "approach_candidates": [item[0] for item in approach_candidates],
+                "session": get_session(session_id),
+            }
+        _, approach, plan = min(feasible_approaches, key=lambda item: item[0])
+        approach_basis = "current_support_perimeter_candidates_filtered_by_reach_and_motion_verification"
+    else:
+        target_distance = math.dist(start, target["position"])
+        stand_off = min(float(session["executor_profile"]["arm_reach_m"]) * 0.72, max(0.0, target_distance - 0.05))
+        ratio = 0.0 if target_distance == 0 else (target_distance - stand_off) / target_distance
+        approach = [
+            start[0] + (target["position"][0] - start[0]) * ratio,
+            start[1] + (target["position"][1] - start[1]) * ratio,
+        ]
+        approach_basis = "current_target_observation_and_body_reach_envelope"
+        plan = _plan_verified_motion(session, start, approach, planning_radius)
     if plan.get("outcome") != "verified":
         return {
             "status": "learned_replay_blocked",
@@ -925,6 +1018,7 @@ def begin_learned_replay(session_id: str) -> dict[str, Any]:
         },
         "post_completion": {"action": "grasp", "target_entity_ref": target_ref},
         "replay_experience_id": experience["experience_id"],
+        "approach_basis": approach_basis,
         "human_acceptance_required": not trusted_replay,
         "loaded_trusted_experience_replay": trusted_replay,
     }
@@ -932,7 +1026,7 @@ def begin_learned_replay(session_id: str) -> dict[str, Any]:
         "status": "learned_replay_started",
         "job_id": job_id,
         "frame_count": len(frames),
-        "prompt": "我会重新绑定当前杯子和操作台，按经验不变量自主执行；每一帧仍需通过当前碰撞和策略检查。",
+        "prompt": f"我会重新绑定当前{target['label']}，按经验不变量和当前本体可达边界自主执行；每一帧仍需通过当前碰撞和策略检查。",
         "experience": deepcopy(experience),
         "session": get_session(session_id),
     }
@@ -1100,6 +1194,7 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
             current_world_revision=session["world_revision"],
         )
         session["concept_gap_dialogue"] = continued["dialogue"]
+        teaching_available = continued.get("knowledge_self_report", {}).get("next_safe_route") == "offer_embodied_teaching"
         return {
             "status": "temporary_effect_contract_compiled" if continued.get("compiled_contract") else "concept_gap_clarification_required",
             "reason": "unknown_event_multi_turn_causal_analysis",
@@ -1113,8 +1208,10 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
             },
             "temporary_effect_contract": continued.get("compiled_contract"),
             "post_action": {
-                "action": "offer_embodied_teaching" if continued.get("compiled_contract") else "await_clarification_answer",
-                "teaching_available": bool(continued.get("compiled_contract")),
+                "action": "offer_embodied_teaching" if teaching_available else (
+                    "await_teaching_goal_verification_adapter" if continued.get("compiled_contract") else "await_clarification_answer"
+                ),
+                "teaching_available": teaching_available,
                 "clarification_required": not continued.get("compiled_contract"),
             },
             "session": get_session(session_id),
@@ -1163,6 +1260,7 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
         )
         session["concept_gap_dialogue"] = gap_started["dialogue"]
         compiled_contract = gap_started.get("compiled_contract")
+        teaching_available = gap_started.get("knowledge_self_report", {}).get("next_safe_route") == "offer_embodied_teaching"
         return {
             "status": "temporary_effect_contract_compiled" if compiled_contract else "concept_gap_clarification_required",
             "reason": "no_stable_factory_event_concept_match",
@@ -1191,8 +1289,10 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
                 "analysis_ms": gap_started["analysis"]["analysis_ms"],
             },
             "post_action": {
-                "action": "offer_embodied_teaching" if compiled_contract else "request_goal_clarification_or_offer_embodied_teaching",
-                "teaching_available": bool(compiled_contract),
+                "action": "offer_embodied_teaching" if teaching_available else (
+                    "await_teaching_goal_verification_adapter" if compiled_contract else "request_goal_clarification_or_offer_embodied_teaching"
+                ),
+                "teaching_available": teaching_available,
                 "clarification_required": not compiled_contract,
             },
             "temporary_effect_contract": compiled_contract,
@@ -1371,6 +1471,17 @@ def begin_motion_command(session_id: str, utterance: str, scoped_authorization: 
     session = SESSIONS.get(session_id)
     if not session:
         return {"error": "embodied_session_not_found", "session_id": session_id}
+    if not (session.get("concept_gap_dialogue") or {}).get("status") == "collecting_minimum_causal_contract":
+        recalled = _recall_trusted_experience(utterance)
+        if recalled:
+            started = begin_persisted_experience_replay(session_id, recalled["experience_id"])
+            started["experience_recall"] = {
+                "match_basis": "language_trigger_and_target_concept_alias",
+                "experience_id": recalled["experience_id"],
+                "candidate_only_before_runtime_rebinding": True,
+                "trajectory_reused": False,
+            }
+            return started
     before = deepcopy(session)
     result = execute_command(session_id, utterance, scoped_authorization)
     pending_confirmation = deepcopy(SESSIONS[session_id].get("pending_confirmation"))

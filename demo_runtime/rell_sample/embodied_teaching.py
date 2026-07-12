@@ -86,6 +86,7 @@ def compile_demonstration_experience(
     pedagogical_signals: dict[str, Any] | None = None,
     world_revision: int | None = None,
     observation_packet: dict[str, Any] | None = None,
+    source_concept_contract: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     successful = [item for item in demonstrated_actions if item.get("verified")]
     has_translation = any(item.get("action_class") == "body_relative_translation" for item in successful)
@@ -98,8 +99,10 @@ def compile_demonstration_experience(
         process.append("orient_executor_within_body_constraints")
     if has_grasp:
         process.extend(["grasp_bound_target", "verify_target_in_gripper"])
+    task_goal = (source_concept_contract or {}).get("effect_contract", {}).get("canonical_goal_fact") or {}
+    goal_fact = task_goal.get("fact") or "target_object_in_gripper"
     experience_id = "teleop_exp_" + hashlib.sha1(
-        f"{teaching_id}|{goal_utterance}|{target_concept_id}|{'|'.join(process)}".encode("utf-8")
+        f"{teaching_id}|{goal_utterance}|{target_concept_id}|{goal_fact}|{'|'.join(process)}".encode("utf-8")
     ).hexdigest()[:12]
     signals = build_pedagogical_signals(
         signal_types=(pedagogical_signals or {}).get("signal_types"),
@@ -124,7 +127,8 @@ def compile_demonstration_experience(
             "demonstration_entity_ref": target_entity_ref,
             "rebind_by_concept_and_current_observation": True,
         },
-        "goal_fact": "target_object_in_gripper",
+        "goal_fact": goal_fact,
+        "source_concept_contract": deepcopy(source_concept_contract),
         "process_chain": process,
         "effect_contract": {
             "requires": ["target_object_spatially_grounded", "target_object_within_reach", "gripper_available"],

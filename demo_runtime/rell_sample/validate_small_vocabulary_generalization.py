@@ -57,7 +57,6 @@ def main() -> None:
         require(contract["candidate_only"], f"candidate boundary missing: {contract}")
         require(not contract["direct_execution_allowed"], f"temporary concept gained execution authority: {contract}")
         require(contract["must_reenter_orchestration_layer"], f"temporary concept bypassed orchestration: {contract}")
-        require(contract["knowledge_boundary"]["requires_embodied_teaching"], f"unknown mechanism skipped teaching: {contract}")
         return contract
 
     complete_cases = [
@@ -179,7 +178,7 @@ def main() -> None:
         require(contract["effect_contract"]["human_readable_postcondition"] == "苹果和其他水果在一起", f"pronoun answer lost target: {contract}")
         report = third["knowledge_self_report"]
         require([item["kind"] for item in report["unknown"]] == ["operator_mechanism", "embodied_process"], f"compiled self-report overclaimed knowing how: {report}")
-        require(report["next_safe_route"] == "offer_embodied_teaching", f"compiled self-report did not route to teaching: {report}")
+        require(report["next_safe_route"] == "teaching_goal_verification_adapter_required", f"unsupported goal incorrectly entered teaching: {report}")
 
     record("two_clarifications_compile_contract", dialogue_compiles_with_minimum_turns)
 
@@ -200,6 +199,15 @@ def main() -> None:
         require(before == after, "temporary concept mutated factory object library")
 
     record("unknown_concept_does_not_mutate_factory_library", unknown_does_not_mutate_factory_library)
+
+    def longest_alias_wins_at_same_position() -> None:
+        result = start("携来杯子，让杯子在手中，以视觉确认杯子随夹爪移动为准")
+        contract = assert_safe_contract(result)
+        require(contract["language_trigger"] == "携来", f"short alias polluted unknown action surface: {contract}")
+        require(contract["semantic_roles"]["target"]["surface_form"] == "杯子", f"short alias displaced full object mention: {contract}")
+        require(contract["effect_contract"]["canonical_goal_fact"]["fact"] == "target_object_in_gripper", f"holding goal did not map to state primitive: {contract}")
+
+    record("longest_alias_preserves_action_surface", longest_alias_wins_at_same_position)
 
     latency_samples = [
         "归整苹果",

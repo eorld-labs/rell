@@ -15,6 +15,17 @@ SLOT_NAMES = {
 }
 
 
+def _canonical_goal_fact(postcondition: str) -> dict[str, Any] | None:
+    normalized = "".join(postcondition.split())
+    if any(marker in normalized for marker in ("在手里", "在手中", "在夹爪中", "被拿着", "被抓住")):
+        return {
+            "fact": "target_object_in_gripper",
+            "verification_adapter": "current_gripper_and_target_following_state",
+            "mapping_basis": "factory_holding_state_primitive",
+        }
+    return None
+
+
 def _action_focus_text(text: str) -> str:
     focused = text.strip()
     conditional_prefix = re.match(r"^(?:如果|当).+?(?:时[，,]?|[，,](?:就|则)?|就|则)", focused)
@@ -99,7 +110,7 @@ def _known_entity_mentions(
         forms = [entity.get("label", ""), *[alias for item in matching_concepts for alias in item.get("aliases", [])]]
         matched = [(text.find(form), form) for form in forms if form and form in text]
         if matched:
-            position, surface = min(matched)
+            position, surface = min(matched, key=lambda item: (item[0], -len(item[1])))
             mentions.append({"entity_ref": entity["entity_id"], "label": entity["label"], "surface_form": surface, "position": position})
     return sorted(mentions, key=lambda item: item["position"])
 
@@ -144,6 +155,7 @@ def _build_knowledge_self_report(dialogue: dict[str, Any], question: str | None 
 
     missing_slots = [slot for slot in SLOT_PRIORITY if not slots.get(slot)]
     unknown = [{"kind": slot, "description": SLOT_NAMES[slot]} for slot in missing_slots]
+    canonical_goal = _canonical_goal_fact(slots.get("desired_postcondition") or "") if not missing_slots else None
     if not missing_slots:
         unknown.extend([
             {"kind": "operator_mechanism", "description": "实现该状态跃迁的物理机制"},
@@ -154,7 +166,7 @@ def _build_knowledge_self_report(dialogue: dict[str, Any], question: str | None 
         next_safe_route = "request_minimum_causal_information"
     else:
         cannot_do_because = "目标和验真边界已理解，但缺少实现该跃迁的物理机制与当前本体经验"
-        next_safe_route = "offer_embodied_teaching"
+        next_safe_route = "offer_embodied_teaching" if canonical_goal else "teaching_goal_verification_adapter_required"
 
     known_text = "；".join(item["value"] for item in known) if known else "还没有可唯一落地的任务事实"
     unknown_text = "、".join(item["description"] for item in unknown)
@@ -163,12 +175,15 @@ def _build_knowledge_self_report(dialogue: dict[str, Any], question: str | None 
         spoken_summary += question
     elif next_safe_route == "offer_embodied_teaching":
         spoken_summary += "你可以进入真人教学，让我观察并验真一次。"
+    else:
+        spoken_summary += "当前教学舱还没有这个目标状态的验真适配器，不能把其他动作的成功冒充任务成功。"
     return {
         "known": known,
         "unknown": unknown,
         "cannot_do_because": cannot_do_because,
         "requested_human_input": question,
         "next_safe_route": next_safe_route,
+        "canonical_goal_fact": deepcopy(canonical_goal),
         "candidate_only": True,
         "direct_execution_allowed": False,
         "spoken_summary": spoken_summary,
@@ -319,6 +334,7 @@ def _compile_temporary_contract(dialogue: dict[str, Any], current_world_revision
     target = updated["slots"]["target_entity"]
     fact_digest = hashlib.sha1(updated["slots"]["desired_postcondition"].encode("utf-8")).hexdigest()[:10]
     operator_digest = hashlib.sha1(updated["unknown_action_surface"].encode("utf-8")).hexdigest()[:10]
+    canonical_goal = _canonical_goal_fact(updated["slots"]["desired_postcondition"])
     contract = {
         "schema_version": "1.0.0",
         "concept_id": "temporary_concept_" + operator_digest,
@@ -341,12 +357,14 @@ def _compile_temporary_contract(dialogue: dict[str, Any], current_world_revision
             "destroys": [],
             "verification": ["human_described_verification:" + updated["slots"]["verification_condition"]],
             "human_readable_postcondition": updated["slots"]["desired_postcondition"],
+            "canonical_goal_fact": deepcopy(canonical_goal),
         },
         "knowledge_boundary": {
             "operator_mechanism_known": False,
             "goal_and_verification_understood": True,
             "execution_experience_available": False,
             "requires_embodied_teaching": True,
+            "teaching_goal_verification_adapter_available": bool(canonical_goal),
             "not_promoted_to_factory_library": True,
         },
         "world_revision": current_world_revision,
@@ -360,7 +378,12 @@ def _compile_temporary_contract(dialogue: dict[str, Any], current_world_revision
     prompt = (
         f"我现在理解了目标：{target['label']}需要达到“{updated['slots']['desired_postcondition']}”，"
         f"并以“{updated['slots']['verification_condition']}”验真；但我仍不知道实现这一跃迁的物理机制和当前本体过程。"
-        "这个临时契约不会直接执行，也不会写入出厂库。你现在可以进入真人教学，让我观察一次并自主复做。"
+        "这个临时契约不会直接执行，也不会写入出厂库。"
+        + (
+            "当前目标可映射到已有状态验真原语，你现在可以进入真人教学，让我观察一次并自主复做。"
+            if canonical_goal
+            else "当前教学舱还没有这个目标状态的验真适配器，不能用其他动作成功冒充任务成功。"
+        )
     )
     updated["turns"].append({"speaker": "robot", "text": prompt, "slot": "contract_summary"})
     return {

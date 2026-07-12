@@ -197,9 +197,9 @@ def main() -> None:
     require(temporary["language_trigger"] == "归整" and temporary["semantic_roles"]["target"]["entity_ref"] == "apple_a", f"temporary concept lost language or object binding: {temporary}")
     require(temporary["effect_contract"]["human_readable_postcondition"] == "苹果和其他水果放在同一个收纳区域", f"temporary goal fact lost human semantics: {temporary}")
     require(temporary["knowledge_boundary"]["goal_and_verification_understood"] and not temporary["knowledge_boundary"]["operator_mechanism_known"], f"goal understanding was conflated with knowing how: {temporary}")
-    require(temporary["knowledge_boundary"]["requires_embodied_teaching"] and temporary["knowledge_boundary"]["not_promoted_to_factory_library"], f"temporary contract bypassed teaching promotion: {temporary}")
-    require(verification_answer["post_action"]["teaching_available"] and not temporary["direct_execution_allowed"], f"compiled gap contract did not enter safe teaching path: {verification_answer}")
-    require(verification_answer["knowledge_self_report"]["next_safe_route"] == "offer_embodied_teaching", f"completed causal understanding did not expose teaching route: {verification_answer}")
+    require(temporary["knowledge_boundary"]["requires_embodied_teaching"] and not temporary["knowledge_boundary"]["teaching_goal_verification_adapter_available"] and temporary["knowledge_boundary"]["not_promoted_to_factory_library"], f"teaching need and current teaching availability were conflated: {temporary}")
+    require(not verification_answer["post_action"]["teaching_available"] and not temporary["direct_execution_allowed"], f"unsupported goal entered teaching without a verifier: {verification_answer}")
+    require(verification_answer["knowledge_self_report"]["next_safe_route"] == "teaching_goal_verification_adapter_required", f"unsupported goal did not expose verifier gap: {verification_answer}")
 
     motion_gap_session = start_session()
     motion_gap_id = motion_gap_session["session_id"]
@@ -224,7 +224,7 @@ def main() -> None:
     require(one_turn_contract["effect_contract"]["human_readable_postcondition"] == "苹果和其他水果都在收纳区", f"one-turn postcondition lost: {one_turn_contract}")
     require(one_turn_contract["effect_contract"]["verification"] == ["human_described_verification:看到所有水果都在收纳区"], f"one-turn verification lost: {one_turn_contract}")
     require("human_described_precondition:水果散落" in one_turn_contract["effect_contract"]["requires"], f"one-turn precondition lost: {one_turn_contract}")
-    require(one_turn_gap["post_action"]["teaching_available"] and not one_turn_contract["direct_execution_allowed"], f"one-turn contract bypassed safe teaching path: {one_turn_gap}")
+    require(not one_turn_gap["post_action"]["teaching_available"] and not one_turn_contract["direct_execution_allowed"], f"unsupported one-turn goal entered teaching: {one_turn_gap}")
 
     pronoun_gap = begin_motion_command(
         start_session()["session_id"],
@@ -351,8 +351,19 @@ def main() -> None:
     require(confirmation_signal["signal"]["candidate_only"], f"teacher confirmation bypassed verification gates: {confirmation_signal}")
 
     teaching_session = start_session()
-    teaching_started = start_embodied_teaching(teaching_session["session_id"], "拿杯子")
+    unfamiliar_task = execute_command(
+        teaching_session["session_id"],
+        "携来杯子，让杯子在手中，以视觉确认杯子随夹爪移动为准",
+    )
+    require(unfamiliar_task["status"] == "temporary_effect_contract_compiled", f"unknown phrase did not compile a temporary contract: {unfamiliar_task}")
+    require(unfamiliar_task["temporary_effect_contract"]["language_trigger"] == "携来", f"unknown action surface was not retained: {unfamiliar_task}")
+    require(unfamiliar_task["temporary_effect_contract"]["effect_contract"]["canonical_goal_fact"]["fact"] == "target_object_in_gripper", f"human goal did not map to holding state primitive: {unfamiliar_task}")
+    require(unfamiliar_task["post_action"]["teaching_available"], f"verifiable unknown goal did not expose teaching: {unfamiliar_task}")
+    teaching_started = start_embodied_teaching(teaching_session["session_id"], "以视觉确认杯子随夹爪移动为准")
     require(teaching_started["status"] == "teaching_control_granted", f"teaching authority not granted: {teaching_started}")
+    require(teaching_started["teaching_session"]["goal_utterance"].startswith("携来杯子"), f"teaching used stale input instead of compiled task: {teaching_started}")
+    require(teaching_started["teaching_session"]["source_concept_contract"]["language_trigger"] == "携来", f"teaching lost temporary concept contract: {teaching_started}")
+    require(teaching_started["teaching_session"]["perception_activation_source"] == "compiled_concept_target_role", f"teaching perception depended on unknown language trigger: {teaching_started}")
     require(not teaching_started["teaching_session"]["authority"]["safety_bypass_allowed"], f"teaching bypassed safety: {teaching_started}")
     observation_packet = teaching_started["teaching_session"]["observation_packet"]
     require(observation_packet["source"]["source_type"] == "live_first_person_embodied_teaching", f"teaching observation source not normalized: {observation_packet}")
@@ -369,6 +380,7 @@ def main() -> None:
     compiled = finish_embodied_teaching(teaching_session["session_id"])
     require(compiled["status"] == "demonstration_compiled", f"teaching did not compile: {compiled}")
     contract = compiled["experience"]["invariant_contract"]
+    require(compiled["experience"]["source_concept_contract"]["effect_contract"]["canonical_goal_fact"]["fact"] == compiled["experience"]["goal_fact"], f"experience was detached from the taught goal contract: {compiled}")
     require(contract["storage_policy"] == "store_invariants_not_concrete_teleoperation_parameters", f"wrong teaching storage policy: {compiled}")
     require("teacher_key_sequence" in contract["forbidden_storage"], f"teacher keys leaked into experience: {compiled}")
     require(not compiled["experience"]["demonstration_summary"]["raw_teleoperation_trace_persisted"], f"raw trace persisted: {compiled}")
@@ -409,6 +421,7 @@ def main() -> None:
     persisted = learned["persisted_experience"]
     persisted_text = json.dumps(persisted, ensure_ascii=False)
     require("demonstration_entity_ref" not in persisted_text, f"demonstration instance leaked into persistent contract: {persisted}")
+    require("entity_ref" not in json.dumps(persisted["source_concept_contract"], ensure_ascii=False), f"temporary target instance leaked into portable concept contract: {persisted}")
     require("source_teaching_id" not in persisted_text and "replay_job_id" not in persisted_text, f"session identifiers leaked into persistent contract: {persisted}")
     require(persisted["target_binding"] == {"concept_id": "concept_fillable_container", "rebind_by_concept_and_current_observation": True}, f"persistent binding is not portable: {persisted}")
     require(persisted["validation_summary"]["accepted_validation_count"] == 1, f"accepted validation summary incorrect: {persisted}")
@@ -428,17 +441,31 @@ def main() -> None:
 
     html = (Path(__file__).with_name("embodied_home.html")).read_text(encoding="utf-8")
     require('id="teachingTimeline"' in html and html.count("data-signal=") == 5, "3D page does not expose five teaching signals and timeline")
+    require("teachingButton.disabled=!r.post_action?.teaching_available" in html, "teaching button does not revoke stale teachability")
 
     cold_session = start_session()
     require(cold_session["available_local_experiences"][0]["experience_id"] == persisted["experience_id"], f"new session did not discover trusted experience: {cold_session}")
+    relocated = set_perception_scenario(cold_session["session_id"], "relocated_cup")
+    relocated_cup = next(item for item in relocated["runtime_objects"] if item["entity_id"] == "cup_a")
+    require(relocated_cup["position"] != teaching_session["runtime_objects"][2]["position"], f"cold-start target did not move: {relocated}")
     cold_started = begin_persisted_experience_replay(cold_session["session_id"], persisted["experience_id"])
     require(cold_started["status"] == "learned_replay_started", f"cold-start replay did not start: {cold_started}")
     require(cold_started["cold_start_binding"]["trajectory_reused"] is False, f"cold start reused demonstration trajectory: {cold_started}")
     require(cold_started["cold_start_binding"]["current_entity_ref"] == "cup_a", f"cold start did not rebind current cup: {cold_started}")
+    require(cold_started["cold_start_binding"]["trajectory_reused"] is False, f"relocated replay reused teaching trajectory: {cold_started}")
     cold_completed = drain_motion(cold_started)
     require(cold_completed["result"]["status"] == "fact_established", f"cold-start trusted replay failed: {cold_completed}")
     require(cold_completed["result"]["loaded_from_persistent_store"], f"cold-start provenance missing: {cold_completed}")
     require(cold_completed["result"]["experience"]["status"] == "trusted_local_experience", f"trusted replay incorrectly required promotion again: {cold_completed}")
+
+    language_recall_session = start_session()
+    set_perception_scenario(language_recall_session["session_id"], "relocated_cup")
+    recalled_started = begin_motion_command(language_recall_session["session_id"], "携来杯子")
+    require(recalled_started["status"] == "learned_replay_started", f"learned unknown phrase did not recall trusted experience: {recalled_started}")
+    require(recalled_started["experience_recall"]["match_basis"] == "language_trigger_and_target_concept_alias", f"experience recall basis missing: {recalled_started}")
+    require(not recalled_started["experience_recall"]["trajectory_reused"], f"language recall reused demonstration trajectory: {recalled_started}")
+    recalled_completed = drain_motion(recalled_started)
+    require(recalled_completed["result"]["status"] == "fact_established", f"learned phrase failed after target relocation: {recalled_completed}")
 
     revoked_teaching_session = start_session()
     start_embodied_teaching(revoked_teaching_session["session_id"], "拿杯子")
