@@ -132,6 +132,7 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator", scene_id
         "event_history": [],
         "concept_gap_dialogue": None,
         "open_world_observation": None,
+        "confirmed_visual_bindings": [],
     }
     SESSIONS[session_id] = session
     return deepcopy(session)
@@ -397,7 +398,14 @@ def build_visual_concept_pack_catalog() -> dict[str, Any]:
 def _is_open_world_observation_query(text: str) -> bool:
     broad = any(pattern in text for pattern in ("看到什么", "看到了什么", "有什么东西", "有哪些东西", "周围有什么"))
     directed = any(pattern in text for pattern in ("看得到", "能看到", "能看见", "看得见", "有没有看到"))
-    return broad or directed
+    # Natural confirmations such as “看到杯子没有” omit the usual question
+    # prefix. Keep them on the observation path when a known object concept is
+    # present, instead of sending them into task/event parsing.
+    colloquial_directed = (
+        _directed_observation_concept(text) is not None
+        and re.search(r"看到.{0,12}(?:没有|吗|么|没)", text) is not None
+    )
+    return broad or directed or colloquial_directed
 
 
 def _directed_observation_concept(text: str) -> dict[str, Any] | None:
@@ -432,13 +440,42 @@ def _answer_observation_query(session: dict[str, Any], text: str) -> dict[str, A
             item for item in observation.get("recognized_object_candidates", [])
             if item.get("concept_id") == directed["concept_id"]
         ]
+        confirmed = [
+            item for item in session.get("confirmed_visual_bindings", [])
+            if item.get("concept_id") == directed["concept_id"]
+            and item.get("world_revision") == session["world_revision"]
+        ]
+        if confirmed:
+            observation.update({
+                "status": "directed_object_observation_confirmed",
+                "directed_query": directed,
+                "directed_matches": deepcopy(matches),
+                "confirmed_visual_binding": deepcopy(confirmed[0]),
+                "prompt": f"我已观察并与你确认，当前空间中有{directed['display_name']}。后续任务会以这个空间绑定为依据。",
+            })
+            return observation
+        pending = {
+            "confirmation_id": "confirm_obs_" + hashlib.sha1(
+                f"{session['session_id']}|{directed['concept_id']}|{session['world_revision']}".encode("utf-8")
+            ).hexdigest()[:12],
+            "status": "pending",
+            "kind": "observation_candidate",
+            "utterance": text,
+            "concept_id": directed["concept_id"],
+            "candidate_refs": [item.get("spatial_entity_candidate_ref") for item in matches],
+            "authorized_world_revision": session["world_revision"],
+            "policy_binding": _policy_binding(session),
+        }
+        session["pending_confirmation"] = pending
         observation.update({
-            "status": "directed_object_observation_completed",
+            "status": "observation_candidate_confirmation_required",
             "directed_query": directed,
             "directed_matches": deepcopy(matches),
+            "pending_confirmation": deepcopy(pending),
             "prompt": (
                 f"我先转动视觉观察了当前空间，识别到{len(matches)}个{directed['display_name']}候选。"
                 "这是当前视觉候选，还不是经过交互验真的功能事实。"
+                "请确认这个候选是否就是当前空间中的杯子。确认后我会把它绑定为空间事实。"
                 if matches else
                 f"我先转动视觉观察了当前空间，但没有识别到{directed['display_name']}候选。"
                 "这表示当前视角和已加载视觉概念没有形成匹配，不等于空间里一定没有。"
@@ -1899,6 +1936,38 @@ def confirm_pending_motion(session_id: str, confirmation_id: str, approved: bool
             "status": "execution_denied",
             "reason": "human_declined_scoped_execution",
             "prompt": "好的，本次持续运动已取消。",
+            "session": get_session(session_id),
+        }
+    if pending.get("kind") == "observation_candidate":
+        if pending.get("authorized_world_revision") != session["world_revision"] or pending.get("policy_binding") != _policy_binding(session):
+            _revoke_pending_confirmation(session, "observation_context_changed")
+            return {"status": "confirmation_not_current", "reason": "observation_context_changed_before_confirmation", "session": get_session(session_id)}
+        ref = next((item for item in session.get("runtime_objects", []) if item.get("entity_id") in pending.get("candidate_refs", [])), None)
+        if not ref:
+            session["pending_confirmation"] = None
+            return {"status": "confirmation_not_current", "reason": "observation_candidate_no_longer_present", "session": get_session(session_id)}
+        binding = {
+            "concept_id": pending["concept_id"],
+            "entity_ref": ref["entity_id"],
+            "label": ref.get("label"),
+            "world_revision": session["world_revision"],
+            "binding_source": "human_confirmed_visual_candidate",
+            "candidate_only": False,
+            "direct_execution_allowed": False,
+            "verification_receipt": {
+                "human_semantic_confirmation": True,
+                "physical_observation_consistent": True,
+                "physical_observation_basis": "current_runtime_entity_present_at_observed_binding",
+                "world_revision": session["world_revision"],
+            },
+        }
+        session.setdefault("confirmed_visual_bindings", []).append(binding)
+        session["pending_confirmation"] = None
+        session["authorization_history"].append({**deepcopy(pending), "status": "observation_confirmed"})
+        return {
+            "status": "observation_candidate_confirmed",
+            "prompt": f"已确认：{binding['label']}是当前空间中的目标对象；人类确认与当前物理观测一致。我会把这个空间绑定用于后续判断。",
+            "confirmed_visual_binding": deepcopy(binding),
             "session": get_session(session_id),
         }
     if pending["authorized_world_revision"] != session["world_revision"] or pending["policy_binding"] != _policy_binding(session):

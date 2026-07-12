@@ -14,7 +14,7 @@ def main() -> None:
     require(humanoid["executor_profile"]["body_profile"] == "humanoid_biped", f"humanoid profile missing: {humanoid}")
     require(wheeled["executor_profile"]["body_profile"] == "wheeled_dual_arm", f"wheeled profile regressed: {wheeled}")
     observed = execute_command(humanoid["session_id"], "你看得到杯子吗")
-    require(observed["status"] == "directed_object_observation_completed", f"directed visual query did not scan: {observed}")
+    require(observed["status"] == "observation_candidate_confirmation_required", f"directed visual query did not request confirmation: {observed}")
     require(observed["observation_action"]["operator"] == "scan_current_space_before_answering", f"query skipped observation action: {observed}")
     require(len(observed["active_perception_trace"]) == 3, f"observation did not use three viewpoints: {observed}")
     require(len(observed["directed_matches"]) == 1, f"cup visual concept was not recognized: {observed}")
@@ -23,7 +23,9 @@ def main() -> None:
     # trusted experience store contains legacy null contracts or bindings.
     started = begin_motion_command(humanoid["session_id"], "你看得到空间里的杯子吗")
     immediate = started.get("immediate_result", started)
-    require(immediate.get("status") == "directed_object_observation_completed", f"motion observation route regressed: {started}")
+    require(immediate.get("status") == "observation_candidate_confirmation_required", f"motion observation route regressed: {started}")
+    colloquial = execute_command(wheeled["session_id"], "看到杯子没有")
+    require(colloquial["status"] == "observation_candidate_confirmation_required", f"colloquial observation query misrouted: {colloquial}")
     print("Body profile and directed observation validation passed.")
 
 
