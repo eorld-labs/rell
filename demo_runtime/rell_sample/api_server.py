@@ -36,6 +36,7 @@ from runtime_core import (
 from embodied_scene import execute_command as execute_embodied_command
 from embodied_scene import begin_motion_command as begin_embodied_motion
 from embodied_scene import begin_teaching_control as begin_embodied_teaching_control
+from embodied_scene import build_factory_concept_catalog
 from embodied_scene import begin_learned_replay as begin_embodied_learned_replay
 from embodied_scene import begin_persisted_experience_replay as begin_embodied_persisted_replay
 from embodied_scene import confirm_pending_motion as confirm_embodied_motion
@@ -8300,6 +8301,9 @@ class RellSampleHandler(BaseHTTPRequestHandler):
             return
         if path == "/embodied/scene":
             self._send_json(load_embodied_scene())
+            return
+        if path == "/embodied/factory-concepts":
+            self._send_json(build_factory_concept_catalog())
             return
         if path == "/embodied/experience/library":
             self._send_json({"schema_version": "1.0.0", "experiences": load_trusted_experiences()})

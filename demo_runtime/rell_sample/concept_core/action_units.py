@@ -3,8 +3,10 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
+from .factory_event_units import FACTORY_EVENT_CONCEPT_UNITS
 
-ACTION_CONCEPT_UNITS: list[dict[str, Any]] = [
+
+TASK_ACTION_CONCEPT_UNITS: list[dict[str, Any]] = [
     {
         "concept_id": "action_concept_move_to_counter",
         "display_name": "前往操作台动作概念",
@@ -137,6 +139,8 @@ ACTION_CONCEPT_UNITS: list[dict[str, Any]] = [
         "source_policy": "semantic_only_then_reenter_orchestration",
     },
 ]
+
+ACTION_CONCEPT_UNITS: list[dict[str, Any]] = TASK_ACTION_CONCEPT_UNITS + FACTORY_EVENT_CONCEPT_UNITS
 
 
 def _copy_unit(unit: dict[str, Any]) -> dict[str, Any]:

@@ -12,6 +12,11 @@ from .concept_bridge import (
 from .concept_evidence import build_concept_evidence_packet, build_gap_evidence_packet
 from .concept_lifecycle import build_concept_lifecycle_view, record_concept_fallback, record_concept_reuse
 from .concept_parser import resolve_action_concepts
+from .factory_event_units import (
+    FACTORY_EVENT_CONCEPT_UNITS,
+    build_factory_inability_diagnosis,
+    find_factory_event_concepts_by_text,
+)
 from .concept_units import (
     STATE_CONCEPT_UNITS,
     build_supported_runtime_questions,
@@ -30,6 +35,7 @@ from .perceptual_grounding import (
 
 __all__ = [
     "ACTION_CONCEPT_UNITS",
+    "FACTORY_EVENT_CONCEPT_UNITS",
     "STATE_CONCEPT_UNITS",
     "build_teaching_frame",
     "build_cloud_recall_packet",
@@ -41,6 +47,8 @@ __all__ = [
     "build_unsupported_runtime_query_result",
     "find_state_concepts_by_query_type",
     "find_state_concepts_by_text",
+    "find_factory_event_concepts_by_text",
+    "build_factory_inability_diagnosis",
     "infer_local_concept_gap",
     "request_cloud_concept_support",
     "resolve_action_concepts",

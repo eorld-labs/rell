@@ -7,6 +7,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+from concept_core.factory_event_units import build_factory_inability_diagnosis, find_factory_event_concepts_by_text
 from concept_core.perceptual_grounding import build_task_perception_result
 from embodied_teaching import (
     append_validation_result,
@@ -120,6 +121,122 @@ def _experience_catalog() -> list[dict[str, Any]]:
     ]
 
 
+def _normalize_factory_text(text: str) -> str:
+    return "".join(text.strip().lower().split())
+
+
+def _available_experience_capabilities(session: dict[str, Any]) -> list[str]:
+    capabilities: set[str] = set()
+    for experience in session.get("available_local_experiences", []):
+        process = set(experience.get("process_chain", []))
+        if "grasp_bound_target" in process:
+            capabilities.add("grasp_object")
+        if "navigate_until_target_within_reach" in process:
+            capabilities.add("navigate_to_region")
+    active = session.get("learned_experience") or {}
+    if active.get("status") in {"candidate_pending_autonomous_replay", "trusted_local_experience"}:
+        process = set(active.get("process_chain", []))
+        if "grasp_bound_target" in process:
+            capabilities.add("grasp_object")
+        if "navigate_until_target_within_reach" in process:
+            capabilities.add("navigate_to_region")
+    return sorted(capabilities)
+
+
+def _ground_factory_roles(
+    concept: dict[str, Any],
+    session: dict[str, Any],
+    perception_result: dict[str, Any] | None,
+    text: str,
+) -> dict[str, str]:
+    grounded: dict[str, str] = {}
+    bindings = (perception_result or {}).get("concept_grounding", {}).get("candidate_bindings", [])
+    target = next((item for item in bindings if item.get("role") == "target"), None)
+    held = session.get("state", {}).get("holding")
+    roles = concept["concept_kernel"]["semantic_roles"]
+    mentioned_entities = [
+        item for item in session.get("runtime_objects", [])
+        if item.get("label") and item["label"] in text
+    ]
+    for role_name, template in roles.items():
+        entity_type = template.get("entity_type")
+        if role_name in {"object", "target", "device"} and target:
+            grounded[role_name] = target.get("entity_ref")
+        elif role_name in {"object", "target", "device"} and len(mentioned_entities) == 1:
+            grounded[role_name] = mentioned_entities[0]["entity_id"]
+        elif role_name in {"destination", "source"} and mentioned_entities:
+            grounded[role_name] = mentioned_entities[-1]["entity_id"]
+        elif entity_type == "held_object" and held:
+            grounded[role_name] = held
+        elif role_name == "activity" and session.get("active_motion_job_id"):
+            grounded[role_name] = session["active_motion_job_id"]
+    return grounded
+
+
+def _build_factory_response(
+    session: dict[str, Any],
+    text: str,
+    concept: dict[str, Any],
+    perception_result: dict[str, Any] | None,
+) -> dict[str, Any]:
+    diagnosis = build_factory_inability_diagnosis(
+        concept,
+        supported_capabilities=session["executor_profile"].get("supported_actions", []),
+        available_experience_capabilities=_available_experience_capabilities(session),
+        grounded_roles=_ground_factory_roles(concept, session, perception_result, text),
+    )
+    prompts = {
+        "request_clarification": diagnosis["explanation"] + " 请指出具体对象、位置或方向。",
+        "explain_body_limit_and_request_compatible_body_or_help": diagnosis["explanation"] + " 可以换用具备该能力的本体，或由人协助。",
+        "offer_embodied_teaching": diagnosis["explanation"] + " 你可以进入真人教学，示范一次并让我自主复做验真。",
+        "request_verification_support": diagnosis["explanation"] + " 请补充可观察的成功标准或人工确认方式。",
+        "reenter_orchestration": diagnosis["explanation"],
+    }
+    return {
+        "status": "factory_concept_recognized_execution_gap",
+        "reason": diagnosis["reason_code"],
+        "prompt": prompts[diagnosis["next_action"]],
+        "factory_concept": diagnosis,
+        "post_action": {
+            "action": diagnosis["next_action"],
+            "teaching_available": diagnosis["next_action"] == "offer_embodied_teaching",
+            "clarification_required": diagnosis["next_action"] == "request_clarification",
+            "human_help_suggested": diagnosis["next_action"] == "explain_body_limit_and_request_compatible_body_or_help",
+        },
+        "perception": perception_result,
+        "session": get_session(session["session_id"]),
+    }
+
+
+def build_factory_concept_catalog() -> dict[str, Any]:
+    from concept_core.factory_event_units import FACTORY_EVENT_CONCEPT_UNITS
+
+    return {
+        "schema_version": "1.0.0",
+        "catalog_type": "body_independent_factory_event_concepts",
+        "concept_count": len(FACTORY_EVENT_CONCEPT_UNITS),
+        "load_policy": "factory_default_for_any_executor_then_bind_current_body_profile",
+        "storage_boundary": {
+            "contains": ["semantic_roles", "effect_contract", "verification", "inability_response_policy"],
+            "forbids": ["absolute_coordinates", "joint_angles", "fixed_duration", "single_body_trajectory"],
+            "direct_execution_allowed": False,
+        },
+        "concepts": [
+            {
+                "concept_id": item["concept_id"],
+                "display_name": item["display_name"],
+                "operator": item["concept_kernel"]["operator"],
+                "aliases": deepcopy(item["aliases"]),
+                "required_capability": item["capability"],
+                "semantic_roles": deepcopy(item["concept_kernel"]["semantic_roles"]),
+                "effect_contract": deepcopy(item["concept_kernel"]["effect_contract"]),
+                "response_policy": deepcopy(item["response_policy"]),
+                "candidate_only": True,
+                "direct_execution_allowed": False,
+            }
+            for item in FACTORY_EVENT_CONCEPT_UNITS
+        ],
+    }
 def _command_hash(utterance: str) -> str:
     return hashlib.sha256(utterance.strip().encode("utf-8")).hexdigest()[:16]
 
@@ -859,6 +976,22 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
         return {"error": "embodied_session_not_found", "session_id": session_id}
     text = utterance.strip()
     perception_result = build_task_perception_result(load_scene(), session, text)
+    factory_matches = find_factory_event_concepts_by_text(_normalize_factory_text(text))
+    if factory_matches:
+        concept = factory_matches[0]
+        native_relative_motion = concept["concept_id"] == "factory_event_orient" or (
+            concept["concept_id"] == "factory_event_navigate" and _relative_direction(text)
+        )
+        existing_supported_task = bool(
+            perception_result
+            and perception_result.get("concept_grounding", {}).get("grounding_status") in {
+                "spatially_grounded",
+                "perception_candidates_available",
+                "active_perception_required",
+            }
+        )
+        if not native_relative_motion and not existing_supported_task:
+            return _build_factory_response(session, text, concept, perception_result)
     if perception_result:
         _invalidate_perception_history(session, "superseded_by_new_task_observation")
         session["perception_history"].append(
@@ -879,9 +1012,23 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
     direction = _relative_direction(text)
     if not direction:
         return {
-            "status": "teaching_required",
-            "reason": "relative_motion_concept_not_grounded",
-            "prompt": "请告诉我这个指令相对机器人自身朝向应如何移动。",
+            "status": "factory_concept_gap",
+            "reason": "no_stable_factory_event_concept_match",
+            "prompt": "我还不能把这句话稳定映射到一个客观状态跃迁，因此不知道成功后世界应发生什么变化。请说明要改变哪个对象的什么状态，或进入真人教学示范一次。",
+            "concept_gap": {
+                "utterance": text,
+                "understanding_status": "operator_and_goal_fact_unknown",
+                "known_state_transition": None,
+                "missing_information": ["target_entity_or_activity", "expected_postcondition", "verification_condition"],
+                "next_actions": ["request_goal_clarification", "offer_embodied_teaching"],
+                "candidate_only": True,
+                "direct_execution_allowed": False,
+            },
+            "post_action": {
+                "action": "request_goal_clarification_or_offer_embodied_teaching",
+                "teaching_available": True,
+                "clarification_required": True,
+            },
             "session": get_session(session_id),
         }
     rotation_only = direction in {"left", "right"} and "转" in text and not any(token in text for token in ("走", "移动", "前进", "后退"))

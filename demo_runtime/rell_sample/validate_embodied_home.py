@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 from concept_core.perceptual_grounding import activate_task_perception, ground_task_observations
-from embodied_scene import SESSIONS, begin_learned_replay, begin_motion_command, begin_persisted_experience_replay, begin_teaching_control, confirm_pending_motion, evaluate_learned_replay, execute_command, finish_embodied_teaching, load_scene, record_teaching_signal, set_perception_scenario, set_protection_policy, set_stool, start_embodied_teaching, start_session, step_motion_command
+from embodied_scene import SESSIONS, begin_learned_replay, begin_motion_command, begin_persisted_experience_replay, begin_teaching_control, build_factory_concept_catalog, confirm_pending_motion, evaluate_learned_replay, execute_command, finish_embodied_teaching, load_scene, record_teaching_signal, set_perception_scenario, set_protection_policy, set_stool, start_embodied_teaching, start_session, step_motion_command
 
 
 OUTPUT = Path(__file__).resolve().parents[1] / "output" / "rell_sample" / "embodied_home"
@@ -42,6 +42,38 @@ def main() -> None:
     require(coordinate_contract["screen_direction_is_not_a_body_direction"], "screen direction must not define body direction")
     require(profile["body_envelope"]["radius_m"] > 0, "body envelope must constrain clearance")
     require(profile["turning_radius_m"] > 0 and profile["arm_reach_m"] > 0, "body portrait must expose mobility and reach")
+
+    factory_catalog = build_factory_concept_catalog()
+    require(factory_catalog["concept_count"] >= 13, f"factory event concept skeleton is too narrow: {factory_catalog}")
+    require(not factory_catalog["storage_boundary"]["direct_execution_allowed"], f"factory concepts bypass orchestration: {factory_catalog}")
+    serialized_factory = json.dumps(factory_catalog, ensure_ascii=False)
+    for forbidden in ["absolute_coordinates", "joint_angles", "fixed_duration", "single_body_trajectory"]:
+        require(forbidden in serialized_factory, f"factory concept storage boundary omitted {forbidden}: {factory_catalog}")
+
+    zero_experience_session = start_session()
+    zero_id = zero_experience_session["session_id"]
+    SESSIONS[zero_id]["available_local_experiences"] = []
+    understood_without_experience = execute_command(zero_id, "拿起苹果")
+    require(understood_without_experience["status"] == "factory_concept_recognized_execution_gap", f"zero-experience robot did not recognize basic event: {understood_without_experience}")
+    grasp_diagnosis = understood_without_experience["factory_concept"]
+    require(grasp_diagnosis["concept_id"] == "factory_event_grasp", f"wrong factory concept selected: {understood_without_experience}")
+    require(grasp_diagnosis["reason_code"] == "execution_experience_not_available", f"experience absence was not distinguished: {understood_without_experience}")
+    require(grasp_diagnosis["executor_capability_available"] and not grasp_diagnosis["applicable_experience_available"], f"body capability and experience were conflated: {understood_without_experience}")
+    require(understood_without_experience["post_action"]["teaching_available"], f"recoverable gap did not offer teaching: {understood_without_experience}")
+    require(not grasp_diagnosis["direct_execution_allowed"], f"factory semantics directly executed without experience: {understood_without_experience}")
+
+    body_gap = execute_command(zero_id, "把杯子放到操作台")
+    require(body_gap["factory_concept"]["reason_code"] == "executor_capability_not_available", f"missing body capability was not explained: {body_gap}")
+    require(body_gap["post_action"]["human_help_suggested"] and not body_gap["post_action"]["teaching_available"], f"teaching was offered for impossible body capability: {body_gap}")
+
+    role_gap = execute_command(zero_id, "打开冰箱")
+    require(role_gap["factory_concept"]["reason_code"] == "required_semantic_roles_not_grounded", f"unknown object was not distinguished from skill absence: {role_gap}")
+    require(role_gap["post_action"]["clarification_required"], f"role gap did not ask for grounding: {role_gap}")
+
+    unknown_gap = execute_command(zero_id, "跳起来")
+    require(unknown_gap["status"] == "factory_concept_gap", f"unknown event did not expose concept gap: {unknown_gap}")
+    require(unknown_gap["concept_gap"]["understanding_status"] == "operator_and_goal_fact_unknown", f"unknown concept overclaimed understanding: {unknown_gap}")
+    require(unknown_gap["post_action"]["teaching_available"] and unknown_gap["post_action"]["clarification_required"], f"unknown concept did not enter recoverable post-processing: {unknown_gap}")
 
     perception_session = start_session()
     perception_started = begin_motion_command(perception_session["session_id"], "去桌子上拿杯子")
