@@ -10,6 +10,7 @@ from typing import Any
 
 SCENE_FILE = Path(__file__).resolve().parent / "data" / "embodied_home_scene.json"
 SESSIONS: dict[str, dict[str, Any]] = {}
+MOTION_JOBS: dict[str, dict[str, Any]] = {}
 
 
 def load_scene() -> dict[str, Any]:
@@ -29,6 +30,7 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator") -> dict[
         "executor_profile": scene["executor_profiles"][executor_profile_id],
         "state": state,
         "active_obstacles": [],
+        "world_revision": 0,
         "event_history": [],
     }
     SESSIONS[session_id] = session
@@ -48,6 +50,7 @@ def set_stool(session_id: str, mode: str = "ahead") -> dict[str, Any]:
     distance = 0.75
     stool_position = [position[0] + math.cos(yaw) * distance, position[1] + math.sin(yaw) * distance]
     session["active_obstacles"] = [{"entity_id": "stool_dynamic", "position": stool_position, "mode": mode}]
+    session["world_revision"] += 1
     return get_session(session_id)
 
 
@@ -94,7 +97,8 @@ def execute_command(session_id: str, utterance: str) -> dict[str, Any]:
     yaw = math.radians(motion_yaw)
     target = [start[0] + math.cos(yaw) * distance, start[1] + math.sin(yaw) * distance]
     rotation_frames = _rotation_frames(start, body_yaw, final_yaw) if final_yaw != body_yaw else []
-    collision = _first_collision(session, start, target, profile["body_envelope"]["radius_m"])
+    motion_plan = _plan_verified_motion(session, start, target, profile["body_envelope"]["radius_m"])
+    collision = motion_plan.get("blocking_collision")
     obstacle = collision["obstacle"] if collision else None
     frames: list[dict[str, Any]] = []
     route_kind = "direct"
@@ -125,7 +129,7 @@ def execute_command(session_id: str, utterance: str) -> dict[str, Any]:
             }
             session["event_history"].append({"utterance": text, "result": result["status"], "reason": result["reason"], "obstacle": obstacle["entity_id"]})
             return result
-        detour_path = _detour_path(session, start, target, obstacle, profile["body_envelope"]["radius_m"])
+        detour_path = motion_plan.get("waypoints")
         if obstacle.get("mode") == "narrow" or detour_path is None:
             result = {
                 "status": "requires_human_confirmation",
@@ -170,6 +174,9 @@ def execute_command(session_id: str, utterance: str) -> dict[str, Any]:
             "requested_distance_m": distance,
             "terminal_policy": "clear_entire_obstacle_body_envelope_before_returning_to_travel_axis" if route_kind == "local_detour" else "requested_relative_displacement",
             "detour_extended_goal_for_clearance": route_kind == "local_detour",
+            "motion_safety_contract": motion_plan.get("safety_contract"),
+            "selected_detour_side": motion_plan.get("selected_detour_side"),
+            "rejected_alternatives": motion_plan.get("rejected_alternatives", []),
         },
         "body_self_judgment": {
             "explanation": body_explanation,
@@ -185,6 +192,91 @@ def execute_command(session_id: str, utterance: str) -> dict[str, Any]:
     return result
 
 
+def begin_motion_command(session_id: str, utterance: str) -> dict[str, Any]:
+    session = SESSIONS.get(session_id)
+    if not session:
+        return {"error": "embodied_session_not_found", "session_id": session_id}
+    before = deepcopy(session)
+    result = execute_command(session_id, utterance)
+    SESSIONS[session_id] = before
+    frames = result.get("frames", [])
+    if not frames:
+        return {"status": result.get("status"), "immediate_result": result, "session": get_session(session_id)}
+    job_id = "motion_" + hashlib.sha1(f"{session_id}|{len(MOTION_JOBS) + 1}".encode()).hexdigest()[:12]
+    job = {
+        "job_id": job_id,
+        "session_id": session_id,
+        "utterance": utterance,
+        "status": "running",
+        "planned_world_revision": before["world_revision"],
+        "frames": frames,
+        "next_frame_index": 0,
+        "terminal_result": result,
+    }
+    MOTION_JOBS[job_id] = job
+    return {
+        "status": "motion_started",
+        "job_id": job_id,
+        "planned_world_revision": job["planned_world_revision"],
+        "frame_count": len(frames),
+        "body_self_judgment": result.get("body_self_judgment"),
+        "route_evidence": result.get("route_evidence"),
+        "session": get_session(session_id),
+    }
+
+
+def step_motion_command(job_id: str) -> dict[str, Any]:
+    job = MOTION_JOBS.get(job_id)
+    if not job:
+        return {"error": "motion_job_not_found", "job_id": job_id}
+    if job["status"] != "running":
+        return {"error": "motion_job_not_running", "status": job["status"], "job_id": job_id}
+    session = SESSIONS[job["session_id"]]
+    if session["world_revision"] != job["planned_world_revision"]:
+        job["status"] = "invalidated_by_world_change"
+        replacement = begin_motion_command(job["session_id"], job["utterance"])
+        return {
+            "status": "path_invalidated_and_replanned",
+            "reason": "runtime_world_revision_changed",
+            "old_job_id": job_id,
+            "old_revision": job["planned_world_revision"],
+            "new_revision": session["world_revision"],
+            "replacement": replacement,
+        }
+    frame = job["frames"][job["next_frame_index"]]
+    radius = session["executor_profile"]["body_envelope"]["radius_m"]
+    collider = _collider_at(frame["position"], radius, session, load_scene())
+    if collider:
+        job["status"] = "invalidated_by_contact"
+        replacement = begin_motion_command(job["session_id"], job["utterance"])
+        return {
+            "status": "path_invalidated_and_replanned",
+            "reason": "next_frame_swept_body_not_clear",
+            "old_job_id": job_id,
+            "blocking_obstacle": collider,
+            "replacement": replacement,
+        }
+    session["state"]["executor_position"] = list(frame["position"])
+    if frame.get("yaw_deg") is not None:
+        session["state"]["executor_yaw_deg"] = frame["yaw_deg"]
+    session["state"]["active_region"] = _region_for(frame["position"], load_scene())
+    job["next_frame_index"] += 1
+    if job["next_frame_index"] < len(job["frames"]):
+        return {
+            "status": "frame_verified_and_committed",
+            "job_id": job_id,
+            "frame": frame,
+            "next_frame_index": job["next_frame_index"],
+            "world_revision": session["world_revision"],
+            "session": get_session(job["session_id"]),
+        }
+    job["status"] = "completed"
+    result = deepcopy(job["terminal_result"])
+    result["session"] = get_session(job["session_id"])
+    session["event_history"].append({"utterance": job["utterance"], "result": result.get("status"), "route_kind": result.get("route_kind")})
+    return {"status": "motion_completed", "job_id": job_id, "frame": frame, "result": result, "session": get_session(job["session_id"])}
+
+
 def _first_collision(session: dict[str, Any], start: list[float], target: list[float], radius: float) -> dict[str, Any] | None:
     scene = load_scene()
     distance = math.dist(start, target)
@@ -198,6 +290,67 @@ def _first_collision(session: dict[str, Any], start: list[float], target: list[f
             return {"obstacle": collider, "contact_position": point, "safe_position": previous}
         previous = point
     return None
+
+
+def _plan_verified_motion(
+    session: dict[str, Any],
+    start: list[float],
+    target: list[float],
+    radius: float,
+) -> dict[str, Any]:
+    safety_contract = {
+        "planner_world_revision": session["world_revision"],
+        "all_segments_swept_volume_verified": True,
+        "terminal_pose_verified": False,
+        "execution_must_recheck_world_revision": True,
+        "unverified_path_never_becomes_executable_fact": True,
+    }
+    direct_collision = _first_collision(session, start, target, radius)
+    if not direct_collision:
+        safety_contract["terminal_pose_verified"] = _collider_at(target, radius, session, load_scene()) is None
+        return {"outcome": "verified", "route_kind": "direct", "waypoints": [target], "safety_contract": safety_contract}
+    obstacle = direct_collision["obstacle"]
+    if obstacle.get("obstacle_class") != "movable_obstacle" or obstacle.get("mode") == "narrow":
+        return {"outcome": "blocked", "route_kind": "none", "blocking_collision": direct_collision, "safety_contract": safety_contract}
+    candidates: list[dict[str, Any]] = []
+    rejected: list[dict[str, Any]] = []
+    for side_name, side_sign in (("left", 1.0), ("right", -1.0)):
+        waypoints = _detour_candidate(start, target, obstacle, radius, side_sign)
+        segment_start = start
+        rejection = None
+        for segment_index, waypoint in enumerate(waypoints):
+            collision = _first_collision(session, segment_start, waypoint, radius)
+            if collision:
+                rejection = {"side": side_name, "segment_index": segment_index, "blocking_obstacle": collision["obstacle"]}
+                break
+            segment_start = waypoint
+        if rejection:
+            rejected.append(rejection)
+            continue
+        if _collider_at(waypoints[-1], radius, session, load_scene()):
+            rejected.append({"side": side_name, "reason": "terminal_pose_not_clear"})
+            continue
+        route_length = sum(math.dist(a, b) for a, b in zip([start] + waypoints[:-1], waypoints))
+        candidates.append({"side": side_name, "waypoints": waypoints, "route_length": route_length})
+    if not candidates:
+        return {
+            "outcome": "blocked",
+            "route_kind": "none",
+            "blocking_collision": direct_collision,
+            "rejected_alternatives": rejected,
+            "safety_contract": safety_contract,
+        }
+    selected = min(candidates, key=lambda item: item["route_length"])
+    safety_contract["terminal_pose_verified"] = True
+    return {
+        "outcome": "verified",
+        "route_kind": "local_detour",
+        "waypoints": selected["waypoints"],
+        "selected_detour_side": selected["side"],
+        "rejected_alternatives": rejected,
+        "blocking_collision": direct_collision,
+        "safety_contract": safety_contract,
+    }
 
 
 def _collider_at(point: list[float], radius: float, session: dict[str, Any], scene: dict[str, Any]) -> dict[str, Any] | None:
@@ -224,30 +377,24 @@ def _collider_at(point: list[float], radius: float, session: dict[str, Any], sce
     return None
 
 
-def _detour_path(
-    session: dict[str, Any],
+def _detour_candidate(
     start: list[float],
     target: list[float],
     obstacle: dict[str, Any],
     radius: float,
-) -> list[list[float]] | None:
+    side_sign: float,
+) -> list[list[float]]:
     ox, oy = obstacle["position"]
     dx, dy = target[0] - start[0], target[1] - start[1]
     length = math.hypot(dx, dy) or 1.0
     forward = [dx / length, dy / length]
-    left = [-forward[1], forward[0]]
+    side = [-forward[1] * side_sign, forward[0] * side_sign]
     longitudinal_clearance = radius + 0.46
     lateral_clearance = radius + 0.58
-    before = [ox - forward[0] * longitudinal_clearance + left[0] * lateral_clearance, oy - forward[1] * longitudinal_clearance + left[1] * lateral_clearance]
-    after_side = [ox + forward[0] * longitudinal_clearance + left[0] * lateral_clearance, oy + forward[1] * longitudinal_clearance + left[1] * lateral_clearance]
+    before = [ox - forward[0] * longitudinal_clearance + side[0] * lateral_clearance, oy - forward[1] * longitudinal_clearance + side[1] * lateral_clearance]
+    after_side = [ox + forward[0] * longitudinal_clearance + side[0] * lateral_clearance, oy + forward[1] * longitudinal_clearance + side[1] * lateral_clearance]
     after_axis = [ox + forward[0] * longitudinal_clearance, oy + forward[1] * longitudinal_clearance]
-    waypoints = [before, after_side, after_axis]
-    segment_start = start
-    for waypoint in waypoints:
-        if _first_collision(session, segment_start, waypoint, radius):
-            return None
-        segment_start = waypoint
-    return waypoints
+    return [before, after_side, after_axis]
 
 
 def _interpolate(start: list[float], target: list[float], count: int) -> list[dict[str, Any]]:

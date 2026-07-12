@@ -13,6 +13,7 @@ This benchmark grounds the existing P010 semantic topology and P008 body portrai
 - A detour is accepted only when the body envelope has clearance. Otherwise the executor explains the blocker and asks whether the movable obstacle may be removed.
 - A local detour must pass the obstacle's full combined envelope before returning to the original travel axis. Every segment and the terminal pose are collision-checked; a short language distance may be extended only to satisfy this safety boundary, with the extension recorded as route evidence.
 - Fixed furniture and room boundaries participate in swept body-envelope collision checks. Continuous movement terminates at the last safe pose before contact and repeated commands cannot penetrate the collider.
+- Browser motion is a server-verified frame job, not a precomputed animation. Every frame is committed against the latest world revision; a new obstacle invalidates the old job and replans from the last verified pose.
 
 ## Current benchmark
 

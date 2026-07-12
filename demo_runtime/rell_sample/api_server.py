@@ -34,10 +34,12 @@ from runtime_core import (
     run_simulated_runtime_sample,
 )
 from embodied_scene import execute_command as execute_embodied_command
+from embodied_scene import begin_motion_command as begin_embodied_motion
 from embodied_scene import get_session as get_embodied_session
 from embodied_scene import load_scene as load_embodied_scene
 from embodied_scene import set_stool as set_embodied_stool
 from embodied_scene import start_session as start_embodied_session
+from embodied_scene import step_motion_command as step_embodied_motion
 
 
 ROOT = Path(__file__).resolve().parent
@@ -8560,6 +8562,14 @@ class RellSampleHandler(BaseHTTPRequestHandler):
             return
         if path == "/embodied/command":
             result = execute_embodied_command(str(body.get("session_id", "")), str(body.get("utterance", "")))
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/embodied/motion/start":
+            result = begin_embodied_motion(str(body.get("session_id", "")), str(body.get("utterance", "")))
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/embodied/motion/step":
+            result = step_embodied_motion(str(body.get("job_id", "")))
             self._send_json(result, status=400 if "error" in result else 200)
             return
         if path == "/physics/session/step":

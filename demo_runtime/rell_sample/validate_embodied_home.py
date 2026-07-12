@@ -4,7 +4,7 @@ import json
 import math
 from pathlib import Path
 
-from embodied_scene import execute_command, load_scene, set_stool, start_session
+from embodied_scene import begin_motion_command, execute_command, load_scene, set_stool, start_session, step_motion_command
 
 
 OUTPUT = Path(__file__).resolve().parents[1] / "output" / "rell_sample" / "embodied_home"
@@ -57,6 +57,11 @@ def main() -> None:
     require(detour["session"]["state"]["executor_position"][0] > stool_position[0] + combined_radius, f"detour did not fully pass stool: {detour}")
     require(detour["route_evidence"]["detour_extended_goal_for_clearance"], f"detour terminal policy missing: {detour}")
     require("完全越过障碍" in detour["body_self_judgment"]["explanation"], f"detour completion explanation missing: {detour}")
+    safety = detour["route_evidence"]["motion_safety_contract"]
+    require(safety["all_segments_swept_volume_verified"] and safety["terminal_pose_verified"], f"motion safety contract incomplete: {detour}")
+    require(safety["execution_must_recheck_world_revision"], f"runtime revision gate missing: {detour}")
+    require(detour["route_evidence"]["selected_detour_side"] == "left", f"planner did not select feasible side: {detour}")
+    require(any(item.get("side") == "right" for item in detour["route_evidence"]["rejected_alternatives"]), f"blocked alternative evidence missing: {detour}")
 
     blocked_session = start_session()
     set_stool(blocked_session["session_id"], "narrow")
@@ -75,7 +80,31 @@ def main() -> None:
     require(repeated["status"] == "stopped_by_physical_obstacle", f"repeated forward crossed furniture: {repeated}")
     require(repeated["session"]["state"]["executor_position"] == first_stop, f"blocked body moved on repeat: {repeated}")
 
-    report = {"scene_id": scene["scene_id"], "direct": direct, "right": right, "backward": backward, "detour": detour, "blocked": blocked, "fixed_furniture_stop": furniture_blocked}
+    live_session = start_session()
+    live_started = begin_motion_command(live_session["session_id"], "一直往前走")
+    live_job_id = live_started["job_id"]
+    for _ in range(8):
+        committed = step_motion_command(live_job_id)
+        require(committed["status"] == "frame_verified_and_committed", f"initial live frame failed: {committed}")
+    live_stool = set_stool(live_session["session_id"], "ahead")
+    invalidated = step_motion_command(live_job_id)
+    require(invalidated["status"] == "path_invalidated_and_replanned", f"world change did not invalidate path: {invalidated}")
+    require(invalidated["reason"] == "runtime_world_revision_changed", f"wrong invalidation reason: {invalidated}")
+    replacement = invalidated["replacement"]
+    require(replacement.get("job_id"), f"dynamic obstacle did not produce replacement path: {invalidated}")
+    replacement_id = replacement["job_id"]
+    committed_positions = []
+    while True:
+        live_step = step_motion_command(replacement_id)
+        if live_step.get("frame"):
+            committed_positions.append(live_step["frame"]["position"])
+        if live_step["status"] == "motion_completed":
+            break
+        require(live_step["status"] == "frame_verified_and_committed", f"replacement execution failed: {live_step}")
+    live_stool_position = live_stool["active_obstacles"][0]["position"]
+    require(all(math.dist(position, live_stool_position) > combined_radius for position in committed_positions), f"live replanning committed a penetrating frame: {committed_positions}")
+
+    report = {"scene_id": scene["scene_id"], "direct": direct, "right": right, "backward": backward, "detour": detour, "blocked": blocked, "fixed_furniture_stop": furniture_blocked, "live_replanning": invalidated}
     OUTPUT.mkdir(parents=True, exist_ok=True)
     (OUTPUT / "embodied_home_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print("Embodied semantic home validation passed.")
