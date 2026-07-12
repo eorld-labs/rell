@@ -9,6 +9,7 @@ This benchmark grounds the existing P010 semantic topology and P008 body portrai
 - The executor body portrait supplies collision radius, height, turning radius, arm reach, gripper span, and supported actions.
 - Relative language such as `往前走一点` is resolved in the executor heading frame, not as an absolute world coordinate.
 - Front, back, left, and right are body-frame concepts. The current differential-drive portrait realizes a side target by turning then driving and realizes backward motion by reversing; it never claims lateral translation.
+- Body directions are invariant under camera movement. The semantic ground frame uses `+x=forward`, `+y=left`, and counterclockwise positive yaw; the Three.js adapter maps semantic `+y` to negative render `z` to preserve handedness. Screen-left and screen-right never define body-left and body-right.
 - Animation frames are transient execution feedback. They are never admitted into a reusable experience.
 - A detour is accepted only when the body envelope has clearance. Otherwise the executor explains the blocker and asks whether the movable obstacle may be removed.
 - A local detour must pass the obstacle's full combined envelope before returning to the original travel axis. Every segment and the terminal pose are collision-checked; a short language distance may be extended only to satisfy this safety boundary, with the extension recorded as route evidence.

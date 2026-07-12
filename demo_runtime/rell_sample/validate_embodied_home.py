@@ -20,6 +20,10 @@ def main() -> None:
     require(len(scene["semantic_regions"]) >= 3, "home scene needs connected semantic regions")
     require(all(region.get("center") and region.get("size") for region in scene["semantic_regions"]), "semantic regions need 3D volume bindings")
     profile = scene["executor_profiles"]["home_mobile_manipulator"]
+    coordinate_contract = scene["coordinate_contract"]
+    require(coordinate_contract["semantic_ground_frame"]["left_axis"] == "+y", "body left axis must be semantic +y")
+    require(coordinate_contract["threejs_mapping"]["three_z"] == "negative_semantic_y", "render mapping must preserve body left/right handedness")
+    require(coordinate_contract["screen_direction_is_not_a_body_direction"], "screen direction must not define body direction")
     require(profile["body_envelope"]["radius_m"] > 0, "body envelope must constrain clearance")
     require(profile["turning_radius_m"] > 0 and profile["arm_reach_m"] > 0, "body portrait must expose mobility and reach")
 

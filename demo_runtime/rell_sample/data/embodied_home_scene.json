@@ -2,6 +2,11 @@
   "schema_version": "1.0.0",
   "scene_id": "home_semantic_3d_a",
   "display_name": "家庭具身测试场景 A",
+  "coordinate_contract": {
+    "semantic_ground_frame": {"forward_axis": "+x", "left_axis": "+y", "up_axis": "+z", "yaw_positive": "counterclockwise"},
+    "threejs_mapping": {"three_x": "semantic_x", "three_y": "semantic_z", "three_z": "negative_semantic_y"},
+    "screen_direction_is_not_a_body_direction": true
+  },
   "semantic_regions": [
     {"region_id": "living_room", "label": "客厅", "center": [-3.0, 0.0], "size": [4.0, 4.5], "color": "#d8e8df", "affordances": ["navigate", "human_interaction"]},
     {"region_id": "corridor", "label": "走廊", "center": [0.0, 0.0], "size": [2.0, 4.5], "color": "#e8e4d8", "affordances": ["navigate", "detour_if_clearance"]},
