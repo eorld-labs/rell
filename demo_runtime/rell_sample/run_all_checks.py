@@ -26,6 +26,16 @@ def run_python(script: str) -> None:
     subprocess.run([sys.executable, str(ROOT / script)], cwd=REPO, check=True)
 
 
+def run_physics_python(script: str) -> None:
+    configured = os.environ.get("RELL_PHYSICS_PYTHON")
+    default = Path.home() / "AppData" / "Local" / "Programs" / "Python" / "Python310" / "python.exe"
+    executable = Path(configured) if configured else default
+    if not executable.exists():
+        raise RuntimeError("MuJoCo validation requires Python 3.10; set RELL_PHYSICS_PYTHON to its executable")
+    print(f"[check:physics] {script}")
+    subprocess.run([str(executable), str(ROOT / script)], cwd=REPO, check=True)
+
+
 def post_json(path: str, payload: dict) -> dict:
     data = json.dumps(payload).encode("utf-8")
     request = Request(
@@ -449,6 +459,7 @@ def main() -> None:
     run_python("validate_p017_minimal_loop.py")
     run_python("validate_p017_generalization_pressure.py")
     run_python("validate_p019_behavior_scenarios.py")
+    run_physics_python("validate_p020_minimal_physics.py")
     run_http_smoke()
     print("All RELL sample checks passed.")
 
