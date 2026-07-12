@@ -615,6 +615,16 @@ def build_sequence_constraints(spatial_constraints: list[dict[str, Any]], detect
     return constraints
 
 
+def build_activation_constraint(text: str) -> dict[str, Any]:
+    immediate_markers = [marker for marker in ["现在", "马上", "立即"] if marker in text]
+    return {
+        "mode": "immediate" if immediate_markers else "default",
+        "mention_status": "explicit" if immediate_markers else "implicit",
+        "source_text": immediate_markers[0] if immediate_markers else None,
+        "arbitration_policy": "enter_p018_runtime_event_arbitration_before_execution",
+    }
+
+
 def build_intent_frame(text: str, cognitive_model: dict[str, Any]) -> dict[str, Any]:
     detected_steps = detect_process_chain(text)
     goal_fact = infer_goal_fact(text)
@@ -624,6 +634,9 @@ def build_intent_frame(text: str, cognitive_model: dict[str, Any]) -> dict[str, 
         text,
         detected_steps,
         normalize_text_fn=normalize_text,
+        object_constraints=object_constraints,
+        spatial_constraints=spatial_constraints,
+        current_facts=sorted(build_world_state_facts(cognitive_model)),
     )
     concept_matches = build_concept_matches(text, goal_fact, spatial_constraints, object_constraints, detected_steps)
     return {
@@ -631,6 +644,7 @@ def build_intent_frame(text: str, cognitive_model: dict[str, Any]) -> dict[str, 
         "translation_mode": "p012_concept_bridge_v1",
         "utterance": text,
         "goal_fact": goal_fact,
+        "activation_constraint": build_activation_constraint(text),
         "explicit_process_chain": detected_steps,
         "action_concepts": action_concepts,
         "spatial_constraints": spatial_constraints,
@@ -6441,6 +6455,19 @@ def resolve_concepts_for_intent(utterance: str, task_id: str | None = None) -> d
         intent_frame=intent_frame,
     )
     runtime_context_view = build_llm_context_view(task_id) if task_id else None
+    runtime_facts = (
+        runtime_context_view.get("established_facts", [])
+        if runtime_context_view and "error" not in runtime_context_view
+        else sorted(build_world_state_facts(cognitive_model))
+    )
+    intent_frame["action_concepts"] = resolve_action_concepts(
+        utterance,
+        intent_frame.get("explicit_process_chain", []),
+        normalize_text_fn=normalize_text,
+        object_constraints=intent_frame.get("object_constraints", []),
+        spatial_constraints=intent_frame.get("spatial_constraints", []),
+        current_facts=runtime_facts,
+    )
     concept_matches = build_concept_matches(
         utterance,
         intent_frame.get("goal_fact"),
@@ -6468,6 +6495,7 @@ def resolve_concepts_for_intent(utterance: str, task_id: str | None = None) -> d
         "semantic_request": semantic_request,
         "intent_frame_summary": {
             "goal_fact": intent_frame.get("goal_fact"),
+            "activation_constraint": intent_frame.get("activation_constraint"),
             "explicit_process_chain": intent_frame.get("explicit_process_chain", []),
             "action_concepts": intent_frame.get("action_concepts", []),
             "spatial_constraints": intent_frame.get("spatial_constraints", []),

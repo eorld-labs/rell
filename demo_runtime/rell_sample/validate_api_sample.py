@@ -521,6 +521,27 @@ def main() -> None:
             raise AssertionError(f"concept evidence packets must not grant direct execution: {concept_resolution}")
         if not concept_resolution.get("concept_evidence_summary", {}).get("all_candidate_only"):
             raise AssertionError(f"concept evidence summary must keep local concepts candidate-only: {concept_resolution}")
+        fill_concept = next(item for item in concept_resolution.get("action_concepts", []) if item.get("concept_id") == "action_concept_fill_cup")
+        fill_package = fill_concept.get("concept_package", {})
+        fill_kernel = fill_package.get("concept_kernel", {})
+        if fill_kernel.get("operator") != "fill_container":
+            raise AssertionError(f"high-frequency action concepts must expose causal operators instead of only fixed steps: {fill_concept}")
+        if not fill_package.get("language_adapters", {}).get("zh-CN") or not fill_kernel.get("applicability_constraints", {}).get("requires_runtime_grounding"):
+            raise AssertionError(f"concept packages must separate language triggers from causal applicability: {fill_concept}")
+        if "cup_empty" not in fill_kernel.get("effect_contract", {}).get("destroys", []):
+            raise AssertionError(f"fill concept must reserve invalidated facts for causal projection: {fill_concept}")
+        if fill_package.get("direct_execution_allowed") or not fill_package.get("fact_alignment", {}).get("commit_requires_p016_verification"):
+            raise AssertionError(f"concept packages must remain projections until P016 verification: {fill_concept}")
+        container_binding = fill_kernel.get("semantic_roles", {}).get("container", {})
+        if container_binding.get("mention_status") != "explicit" or container_binding.get("grounding_status") != "resolved":
+            raise AssertionError(f"explicit cup mentions must remain separate from runtime grounding status: {fill_concept}")
+        implicit_fill = resolve_concepts_for_intent("现在接一杯水", migration["migration_task_id"])
+        implicit_fill_concept = next(item for item in implicit_fill.get("action_concepts", []) if item.get("concept_id") == "action_concept_fill_cup")
+        implicit_container = implicit_fill_concept.get("concept_package", {}).get("concept_kernel", {}).get("semantic_roles", {}).get("container", {})
+        if implicit_container.get("mention_status") != "implicit" or implicit_container.get("fallback") != "require_confirmation_if_not_unique":
+            raise AssertionError(f"implicit containers must carry confirmation policy instead of fabricated grounding: {implicit_fill_concept}")
+        if implicit_fill.get("intent_frame_summary", {}).get("activation_constraint", {}).get("mode") != "immediate":
+            raise AssertionError(f"现在 must map to P018 task activation rather than a physical action: {implicit_fill}")
         lifecycle_events = concept_resolution.get("concept_lifecycle", {}).get("events", [])
         if not lifecycle_events or not all(item.get("event_type") in {"concept_formed", "concept_reused"} for item in lifecycle_events):
             raise AssertionError(f"concept resolution must record formation or reuse events: {concept_resolution}")

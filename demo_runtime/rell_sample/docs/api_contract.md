@@ -354,6 +354,10 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 - `semantic_request`：统一语义路由结果；
 - `intent_frame_summary`：目标事实、显式过程链、空间约束和对象约束摘要；
 - `action_concepts`：端侧动作概念候选，说明这次输入在本地动作语义层命中了哪些可复用动作单元；
+- `action_concepts[].concept_package`：以因果算子为核心的端侧概念包，包含语义角色、事实契约、当前事实对齐和经验检索策略；`step_id` 仅作为兼容性的经验提示；
+- `concept_package.concept_kernel.semantic_roles`：分别声明 `mention_status` 与 `grounding_status`，避免把语言明确提及误当成现实对象已经唯一绑定；
+- `concept_package.concept_kernel.effect_contract`：声明 `requires`、`produces`、`destroys` 和 `verification`，其中事实变化在 P016 验真前仅为投影；
+- `concept_package.fact_alignment`：基于当前可用事实输出已满足前提、缺失前提和目标是否已成立；
 - `concept_lifecycle`：本次概念首次形成或重复复用事件，以及对应的形成数、复用数；
 - `resolved_concepts`：概念层候选，每个候选带有 `activation_reason`、`effect_contract`、`runtime_binding_status` 和 `experience_link_policy`；
 - `concept_evidence_packets`：端侧概念命中的证据包，说明命中依据、置信度、运行时快照绑定和失败回退策略；

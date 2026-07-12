@@ -20,6 +20,10 @@
 | 统一证据摘要 | `resolve_concepts_for_intent` 输出 `concept_evidence_summary` | 为后续页面、审计、专利证据链提供可复核边界 |
 | 概念形成与复用留痕 | `concept_core/concept_lifecycle.py`、`concept_lifecycle` | 同一概念首次命中记为形成，后续命中记为复用，并保留次数、证据和快照绑定 |
 | 复用失败进入回退 | `concept_fallback_event` | 本地概念不足时形成失败事件，再进入云脑候选或人工澄清，不静默越权执行 |
+| 动作概念组合式内核 | `action_units.py::concept_kernel` | 高频动作由抽象因果算子、语义角色和事实契约定义，不再以固定步骤作为概念本体 |
+| 提及与落地分离 | `concept_parser.py::_role_binding` | 明确提及不等于现实对象已唯一绑定，隐含对象不允许被臆造为已落地实体 |
+| 当前事实前提对齐 | `concept_package.fact_alignment` | 从任务期快照区分已满足和缺失前提，并以缺失前提驱动后续经验检索 |
+| 验真后提交事实 | `commit_requires_p016_verification=true` | `produces/destroys` 在概念阶段只作状态投影，必须经 P016 验真后提交 |
 
 ## 三、证据包字段
 
