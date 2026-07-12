@@ -26,6 +26,7 @@
 | 验真后提交事实 | `commit_requires_p016_verification=true` | `produces/destroys` 在概念阶段只作状态投影，必须经 P016 验真后提交 |
 | 隐含角色快照落地 | `concept_parser.py::_role_binding` | 当前手中唯一兼容对象或当前位置可形成带依据的 `implicit + inferred` 绑定，条件不唯一时保持未解析 |
 | 缺失前提驱动经验检索 | `attach_missing_fact_experience_candidates` | 以当前缺失事实检索步骤或经验生产者并按覆盖率排序，不按整句输入绑定固定经验 |
+| 必需角色执行前门控 | `build_concept_grounding_gate`、`handle_agent_query` | 必需角色未落地时预览和自动执行统一返回澄清态，禁止绕过确认进入执行 |
 
 ## 三、证据包字段
 

@@ -2303,6 +2303,39 @@ INDEX_HTML = """<!doctype html>
       return concepts.map(item => `${item.display_name || item.concept_id}(${item.concept_level || "concept"})`).join(" / ");
     }
 
+    function renderConceptGroundingRows(conceptResolution, groundingGate = null) {
+      const rows = [];
+      for (const concept of (conceptResolution?.action_concepts || [])) {
+        const packageView = concept.concept_package || {};
+        const roles = packageView.concept_kernel?.semantic_roles || {};
+        const roleSummary = Object.entries(roles).map(([name, binding]) => {
+          const target = binding.entity_ref || binding.value || "未落地";
+          const basis = binding.binding_basis ? ` / ${binding.binding_basis}` : "";
+          return `${name}=${target} [${binding.mention_status || "-"}/${binding.grounding_status || "-"}]${basis}`;
+        }).join("；");
+        if (roleSummary) {
+          rows.push(`<div class="stage-row"><strong>${escapeHtml(concept.display_name || concept.concept_id)}</strong><span>${escapeHtml(roleSummary)}</span></div>`);
+        }
+        const missing = packageView.fact_alignment?.missing_requirements || [];
+        const experienceCandidates = packageView.experience_lookup?.candidates || [];
+        if (missing.length) {
+          rows.push(`<div class="stage-row"><strong>缺失前提</strong><span>${escapeHtml(missing.join(", "))}</span></div>`);
+        }
+        if (experienceCandidates.length) {
+          const candidates = experienceCandidates.map(item => `${item.candidate_id} -> ${(item.covers_missing_facts || []).join(",")}`).join(" / ");
+          rows.push(`<div class="stage-row"><strong>经验候选</strong><span>${escapeHtml(candidates)}</span></div>`);
+        }
+      }
+      const gate = groundingGate || {};
+      if (gate.gate_status) {
+        rows.push(`<div class="stage-row"><strong>角色落地门控</strong><span>${escapeHtml(gate.gate_status)} / direct_execution_allowed=${escapeHtml(String(gate.direct_execution_allowed))}</span></div>`);
+      }
+      for (const question of (gate.clarification_questions || [])) {
+        rows.push(`<div class="stage-row"><strong>需要确认</strong><span>${escapeHtml(question)}</span></div>`);
+      }
+      return rows;
+    }
+
     function humanizeSemanticReason(reason) {
       const reasonMap = {
         deictic_object_without_shared_reference: "对象指代未落地",
@@ -2354,6 +2387,7 @@ INDEX_HTML = """<!doctype html>
       if (conceptSummary) {
         rows.push(`<div class="stage-row"><strong>概念命中</strong><span>${escapeHtml(conceptSummary)}</span></div>`);
       }
+      rows.push(...renderConceptGroundingRows(conceptResolution, routeResult?.concept_grounding_gate));
       return rows;
     }
 
@@ -2773,12 +2807,12 @@ INDEX_HTML = """<!doctype html>
           }
         }
 
-        if (preview.decision === "clarification_required") {
-          setText(stateMetric, "clarification_required", "warn");
+        if (["clarification_required", "concept_grounding_required"].includes(preview.decision)) {
+          setText(stateMetric, preview.decision, "warn");
           setText(outcomeMetric, "需要澄清", "warn");
           setText(taskMetric, currentMigrationTaskId || "-");
           factsEl.innerHTML = [
-            `<div class="stage-row"><strong>任务澄清</strong><span>当前输入还不能直接进入执行，需要先补充共享参照或动作语义。</span></div>`,
+            `<div class="stage-row"><strong>任务澄清</strong><span>${escapeHtml(preview.clarification_prompt || "当前输入还不能直接进入执行，需要先补充共享参照或动作语义。")}</span></div>`,
             ...renderSemanticSignalRows(semanticRequest, preview),
             ...renderCloudRecallRows(preview.cloud_recall_preview)
           ].join("");
@@ -6478,6 +6512,29 @@ def attach_missing_fact_experience_candidates(action_concepts: list[dict[str, An
         package["experience_lookup"]["whole_utterance_match_used"] = False
 
 
+def build_concept_grounding_gate(concept_resolution: dict[str, Any] | None) -> dict[str, Any]:
+    blocked: list[dict[str, Any]] = []
+    for concept in (concept_resolution or {}).get("action_concepts", []):
+        summary = concept.get("concept_package", {}).get("grounding_summary", {})
+        if not summary.get("clarification_required"):
+            continue
+        blocked.append({
+            "concept_id": concept.get("concept_id"),
+            "display_name": concept.get("display_name"),
+            "unresolved_roles": summary.get("unresolved_roles", []),
+            "clarification_questions": summary.get("clarification_questions", []),
+        })
+    questions = [question for item in blocked for question in item["clarification_questions"]]
+    return {
+        "gate_status": "blocked" if blocked else "passed",
+        "clarification_required": bool(blocked),
+        "blocked_concepts": blocked,
+        "clarification_questions": questions,
+        "direct_execution_allowed": False,
+        "must_reenter_orchestration_layer": True,
+    }
+
+
 def build_concept_evidence_summary(evidence_packets: list[dict[str, Any]]) -> dict[str, Any]:
     direct_execution_allowed = any(
         packet.get("fallback_policy", {}).get("direct_execution_allowed")
@@ -6933,6 +6990,26 @@ def handle_agent_query(
     concept_resolution = None
     if request_type in {"task_execution", "teaching"}:
         concept_resolution = resolve_concepts_for_intent(utterance, task_id=task_id)
+    grounding_gate = build_concept_grounding_gate(concept_resolution)
+    if request_type == "task_execution" and grounding_gate.get("clarification_required") and not semantic_request.get("interrupt_requested"):
+        semantic_request["clarification_needed"] = True
+        semantic_request["clarification_reason"] = "required_concept_role_not_grounded"
+        semantic_request["confidence_reasons"].append("概念必需角色尚未落地，执行前必须澄清或确认")
+        return {
+            "schema_version": "1.0.0",
+            "semantic_request": semantic_request,
+            "route_result": {
+                "schema_version": "1.0.0",
+                "decision": "concept_grounding_required",
+                "clarification_needed": True,
+                "clarification_reason": "required_concept_role_not_grounded",
+                "clarification_prompt": grounding_gate.get("clarification_questions", ["请确认任务涉及的对象或区域。"])[0],
+                "concept_grounding_gate": grounding_gate,
+                "concept_resolution": concept_resolution,
+                "auto_execute_blocked": bool(auto_execute),
+                "direct_execution_allowed": False,
+            },
+        }
     if semantic_request.get("clarification_needed") and request_type == "task_execution" and not auto_execute:
         cloud_recall_preview = build_cloud_recall_preview(
             utterance,

@@ -550,8 +550,11 @@ def main() -> None:
         ungrounded_fill_concept = next(item for item in ungrounded_fill.get("action_concepts", []) if item.get("concept_id") == "action_concept_fill_cup")
         ungrounded_package = ungrounded_fill_concept.get("concept_package", {})
         ungrounded_container = ungrounded_package.get("concept_kernel", {}).get("semantic_roles", {}).get("container", {})
-        if ungrounded_container.get("grounding_status") != "unresolved" or ungrounded_container.get("fallback") != "require_confirmation_if_not_unique":
-            raise AssertionError(f"implicit containers without a runtime snapshot must remain unresolved: {ungrounded_fill_concept}")
+        if ungrounded_container.get("grounding_status") != "inferred" or ungrounded_container.get("binding_basis") != "single_compatible_object_in_space_model":
+            raise AssertionError(f"a unique compatible space-model object may support weak implicit grounding: {ungrounded_fill_concept}")
+        ungrounded_summary = ungrounded_package.get("grounding_summary", {})
+        if not ungrounded_summary.get("clarification_required") or "source" not in ungrounded_summary.get("unresolved_roles", []):
+            raise AssertionError(f"remaining unresolved required roles must block execution even when another role is inferred: {ungrounded_fill_concept}")
         experience_lookup = ungrounded_package.get("experience_lookup", {})
         if experience_lookup.get("whole_utterance_match_used") or not experience_lookup.get("candidates"):
             raise AssertionError(f"missing prerequisites must drive producer lookup without whole-utterance matching: {ungrounded_fill_concept}")
@@ -663,6 +666,13 @@ def main() -> None:
         agent_execution_run = handle_agent_query("到水源处接一杯水", scenario="auto", auto_execute=True)
         if agent_execution_run.get("route_result", {}).get("audit_summary", {}).get("outcome") != "completed":
             raise AssertionError(f"agent query auto_execute must run through unified execution path: {agent_execution_run}")
+        grounding_blocked_run = handle_agent_query("接一杯水", scenario="auto", auto_execute=True)
+        grounding_blocked_result = grounding_blocked_run.get("route_result", {})
+        if grounding_blocked_result.get("decision") != "concept_grounding_required" or not grounding_blocked_result.get("auto_execute_blocked"):
+            raise AssertionError(f"unresolved concept roles must block auto execution at the unified agent entry: {grounding_blocked_run}")
+        grounding_gate = grounding_blocked_result.get("concept_grounding_gate", {})
+        if grounding_gate.get("gate_status") != "blocked" or grounding_gate.get("direct_execution_allowed"):
+            raise AssertionError(f"concept grounding gate must expose blocked roles without execution authority: {grounding_blocked_run}")
         agent_teaching_query = handle_agent_query("教你：走向操作台，然后拿起杯子")
         if agent_teaching_query.get("route_result", {}).get("decision") != "routed_to_teaching":
             raise AssertionError(f"agent query must route teaching input: {agent_teaching_query}")

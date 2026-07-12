@@ -17,7 +17,9 @@ def _role_binding(
 ) -> dict[str, Any]:
     binding = {"role": role_template.get("role"), "entity_type": role_template.get("entity_type")}
     explicit_object = object_constraints[0] if object_constraints and role_name in {"container", "object"} else None
+    implicit_object_candidate = None
     if role_name == "container" and "一杯水" in text and not any(marker in text for marker in ["杯子", "水杯", "这个杯", "那个杯"]):
+        implicit_object_candidate = explicit_object
         explicit_object = None
     explicit_region = spatial_constraints[-1] if spatial_constraints and role_name in {"source", "destination"} else None
     executor = (runtime_context_view or {}).get("executor", {})
@@ -54,6 +56,15 @@ def _role_binding(
             "binding_confidence": 0.86,
             "binding_basis": "single_compatible_object_in_executor_holding",
             "fallback": "confirm_if_runtime_state_changes",
+        })
+    elif implicit_object_candidate:
+        binding.update({
+            "mention_status": "implicit",
+            "grounding_status": "inferred",
+            "entity_ref": implicit_object_candidate.get("object_ref"),
+            "binding_confidence": 0.74,
+            "binding_basis": "single_compatible_object_in_space_model",
+            "fallback": "confirm_if_multiple_candidates_appear",
         })
     elif inferred_region and inferred_region == role_template.get("default_entity_ref"):
         binding.update({
@@ -96,6 +107,19 @@ def _build_concept_package(
     kernel = concept.get("concept_kernel", {})
     contract = kernel.get("effect_contract", {})
     fact_set = set(current_facts)
+    semantic_roles = {
+        name: _role_binding(
+            name,
+            template,
+            text=text,
+            object_constraints=object_constraints,
+            spatial_constraints=spatial_constraints,
+            runtime_context_view=runtime_context_view,
+        )
+        for name, template in kernel.get("semantic_roles", {}).items()
+    }
+    unresolved_roles = [name for name, binding in semantic_roles.items() if binding.get("grounding_status") == "unresolved"]
+    clarification_questions = [f"请确认概念 {concept.get('display_name')} 的 {name} 对应当前空间中的哪个对象或区域。" for name in unresolved_roles]
     return {
         "schema_version": "1.0.0",
         "concept_id": concept.get("concept_id"),
@@ -105,17 +129,7 @@ def _build_concept_package(
         },
         "concept_kernel": {
             "operator": kernel.get("operator"),
-            "semantic_roles": {
-                name: _role_binding(
-                    name,
-                    template,
-                    text=text,
-                    object_constraints=object_constraints,
-                    spatial_constraints=spatial_constraints,
-                    runtime_context_view=runtime_context_view,
-                )
-                for name, template in kernel.get("semantic_roles", {}).items()
-            },
+            "semantic_roles": semantic_roles,
             "effect_contract": contract,
             "applicability_constraints": {
                 "required_role_types": {
@@ -134,6 +148,13 @@ def _build_concept_package(
             "goal_already_satisfied": any(fact in fact_set for fact in contract.get("produces", [])),
             "projection_only": True,
             "commit_requires_p016_verification": True,
+        },
+        "grounding_summary": {
+            "all_required_roles_grounded": not unresolved_roles,
+            "unresolved_roles": unresolved_roles,
+            "clarification_required": bool(unresolved_roles),
+            "clarification_questions": clarification_questions,
+            "execution_gate": "pass_to_orchestration" if not unresolved_roles else "block_before_execution",
         },
         "experience_lookup": {
             "legacy_step_hint": concept.get("step_id"),
