@@ -14,7 +14,7 @@ def main() -> None:
         request.get("obstacle", "none"),
     )
     steps = request.get("steps")
-    result = adapter.execute_steps(steps) if steps else adapter.execute_fill_task()
+    result = adapter.execute_steps(steps, request.get("initial_state")) if steps else adapter.execute_fill_task()
     sys.stdout.write(json.dumps(result, ensure_ascii=False))
 
 

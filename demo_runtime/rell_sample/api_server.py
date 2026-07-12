@@ -252,6 +252,7 @@ TEACHING_SESSION_STORE: dict[str, dict[str, Any]] = {}
 CONCEPT_LIFECYCLE_STORE: dict[str, dict[str, Any]] = {}
 CONCEPT_FALLBACK_STORE: dict[str, dict[str, Any]] = {}
 GENERALIZATION_RESULT_STORE: dict[str, dict[str, Any]] = {}
+PHYSICS_SESSION_STORE: dict[str, dict[str, Any]] = {}
 
 
 STEP_LIBRARY = {
@@ -1881,6 +1882,11 @@ INDEX_HTML = """<!doctype html>
         <div class="actions" style="margin-top:8px;">
           <button id="runPerturbationDispatchButton" class="secondary" title="在注入扰动后执行迁移链">执行扰动链</button>
         </div>
+        <div class="actions" style="margin-top:8px;">
+          <button id="startPhysicsSessionButton" class="secondary" title="创建可在阶段间暂停的 MuJoCo 会话">开始物理会话</button>
+          <button id="stepPhysicsSessionButton" class="secondary" title="只执行并验真下一个物理阶段">执行下一阶段</button>
+          <button id="interruptPhysicsSessionButton" class="secondary" title="使用主任务输入框中的新指令中断当前物理会话">中断并切换</button>
+        </div>
       </section>
       <section>
         <div class="summary">
@@ -1948,6 +1954,9 @@ INDEX_HTML = """<!doctype html>
     const preparePerturbationTaskButton = document.getElementById("preparePerturbationTaskButton");
     const injectPerturbationButton = document.getElementById("injectPerturbationButton");
     const runPerturbationDispatchButton = document.getElementById("runPerturbationDispatchButton");
+    const startPhysicsSessionButton = document.getElementById("startPhysicsSessionButton");
+    const stepPhysicsSessionButton = document.getElementById("stepPhysicsSessionButton");
+    const interruptPhysicsSessionButton = document.getElementById("interruptPhysicsSessionButton");
     const perturbationKind = document.getElementById("perturbationKind");
     const migrationSpace = document.getElementById("migrationSpace");
     const dispatchBackend = document.getElementById("dispatchBackend");
@@ -1981,6 +1990,7 @@ INDEX_HTML = """<!doctype html>
     let currentConceptCandidateId = "";
     let currentMigrationTaskId = "";
     let currentExecutionLoopPayload = null;
+    let currentPhysicsSessionId = null;
     let currentRuntimeWorldState = null;
 
     const eventLabel = {
@@ -3497,6 +3507,65 @@ INDEX_HTML = """<!doctype html>
       }
     }
 
+    function selectedPhysicsObstacle() {
+      if (perturbationKind.value === "stool_in_walkway_detourable") return "detourable";
+      if (perturbationKind.value === "stool_blocks_walkway") return "wall";
+      return "none";
+    }
+
+    async function startPhysicsSession() {
+      if (!currentExecutionLoopPayload) await preparePerturbationTask();
+      const result = await fetch("/physics/session/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          execution_loop_payload: currentExecutionLoopPayload,
+          executor_options: { physics_executor_type: physicsExecutorType.value, physics_obstacle: "none" }
+        })
+      }).then(r => r.json());
+      if (result.error) {
+        appendLog("物理会话启动失败：" + JSON.stringify(result));
+        return;
+      }
+      currentPhysicsSessionId = result.session_id;
+      setText(stateMetric, result.status, "warn");
+      appendLog("物理会话已启动，暂停在第一阶段前：" + JSON.stringify(result, null, 2));
+    }
+
+    async function stepPhysicsSession() {
+      if (!currentPhysicsSessionId) await startPhysicsSession();
+      if (!currentPhysicsSessionId) return;
+      await fetch("/physics/session/perturb", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: currentPhysicsSessionId, obstacle: selectedPhysicsObstacle() })
+      });
+      const result = await fetch("/physics/session/step", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: currentPhysicsSessionId })
+      }).then(r => r.json());
+      if (result.error) {
+        appendLog("物理阶段拒绝执行：" + JSON.stringify(result, null, 2));
+        return;
+      }
+      const stage = result.last_stage || result.stage_history?.[result.stage_history.length - 1];
+      appendLog("MuJoCo 单阶段验真：" + JSON.stringify(stage, null, 2));
+      setText(stateMetric, result.status, result.status === "completed" ? "ok" : "warn");
+      setText(outcomeMetric, stage?.outcome || result.status, stage?.outcome === "fact_established" ? "ok" : "bad");
+    }
+
+    async function interruptPhysicsSession() {
+      if (!currentPhysicsSessionId) return;
+      const result = await fetch("/physics/session/interrupt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: currentPhysicsSessionId, utterance: utteranceInput.value.trim() })
+      }).then(r => r.json());
+      appendLog("物理会话中断与重新仲裁：" + JSON.stringify(result, null, 2));
+      setText(stateMetric, result.status || "interrupt_failed", result.error ? "bad" : "warn");
+    }
+
     factsEl.addEventListener("click", async (event) => {
       const actionButton = event.target.closest("[data-cloud-action]");
       if (!actionButton) {
@@ -3535,6 +3604,9 @@ INDEX_HTML = """<!doctype html>
     preparePerturbationTaskButton.addEventListener("click", preparePerturbationTask);
     injectPerturbationButton.addEventListener("click", injectPerturbation);
     runPerturbationDispatchButton.addEventListener("click", runPerturbationDispatch);
+    startPhysicsSessionButton.addEventListener("click", startPhysicsSession);
+    stepPhysicsSessionButton.addEventListener("click", stepPhysicsSession);
+    interruptPhysicsSessionButton.addEventListener("click", interruptPhysicsSession);
     walkwayPerturbRegion.addEventListener("click", async () => {
       await triggerMapPerturbation("stool_in_walkway_detourable", "move_to_water_source", "过道放凳子（可绕开）");
     });
@@ -7688,6 +7760,7 @@ def run_mujoco_physics_bridge(task_id: str, options: dict[str, Any]) -> dict[str
         "executor_type": options.get("physics_executor_type", "mobile_manipulator"),
         "obstacle": options.get("physics_obstacle", "none"),
         "steps": options.get("physics_steps", []),
+        "initial_state": options.get("physics_initial_state", {}),
     }
     try:
         completed = subprocess.run(
@@ -7941,6 +8014,92 @@ def get_execution_dispatch(dispatch_id: str) -> dict[str, Any]:
     return record
 
 
+def start_physics_session(payload: dict[str, Any], options: dict[str, Any] | None = None) -> dict[str, Any]:
+    snapshot_id = payload.get("runtime_world_state_snapshot_id")
+    task_id = find_task_id_by_snapshot(snapshot_id)
+    if not task_id:
+        return {"error": "runtime_world_state_not_found", "runtime_world_state_snapshot_id": snapshot_id}
+    steps = [item.get("step") for item in payload.get("execution_step_payload", []) if item.get("step")]
+    seed = "|".join([task_id, payload.get("execution_callback_id", ""), str(len(PHYSICS_SESSION_STORE) + 1)])
+    session_id = "physics_session_" + hashlib.sha1(seed.encode("utf-8")).hexdigest()[:12]
+    session = {
+        "schema_version": "1.0.0",
+        "session_id": session_id,
+        "task_id": task_id,
+        "status": "paused_between_stages",
+        "steps": steps,
+        "next_step_index": 0,
+        "physics_state": {"location": "start", "holding_cup": False},
+        "executor_options": dict(options or {}),
+        "stage_history": [],
+        "target_causal_fact": payload.get("target_causal_fact"),
+        "interruption": None,
+    }
+    PHYSICS_SESSION_STORE[session_id] = session
+    return session
+
+
+def get_physics_session(session_id: str) -> dict[str, Any]:
+    return PHYSICS_SESSION_STORE.get(session_id) or {"error": "physics_session_not_found", "session_id": session_id}
+
+
+def step_physics_session(session_id: str) -> dict[str, Any]:
+    session = PHYSICS_SESSION_STORE.get(session_id)
+    if not session:
+        return {"error": "physics_session_not_found", "session_id": session_id}
+    if session["status"] in {"interrupted", "completed", "blocked"}:
+        return {"error": "physics_session_not_stepable", "status": session["status"], "session": session}
+    index = session["next_step_index"]
+    if index >= len(session["steps"]):
+        session["status"] = "completed"
+        return session
+    step = session["steps"][index]
+    options = dict(session["executor_options"])
+    options["physics_steps"] = [step]
+    options["physics_initial_state"] = session["physics_state"]
+    result = run_mujoco_physics_bridge(session["task_id"], options)
+    if result.get("error"):
+        return result
+    stage = (result.get("stage_results") or [{}])[0]
+    session["stage_history"].append(stage)
+    if stage.get("outcome") != "fact_established":
+        session["status"] = "blocked"
+        session["blocking_result"] = result
+        return session
+    session["physics_state"] = stage.get("after_state", session["physics_state"])
+    session["next_step_index"] += 1
+    session["status"] = "completed" if session["next_step_index"] >= len(session["steps"]) else "paused_between_stages"
+    session["last_stage"] = stage
+    return session
+
+
+def perturb_physics_session(session_id: str, obstacle: str) -> dict[str, Any]:
+    session = PHYSICS_SESSION_STORE.get(session_id)
+    if not session:
+        return {"error": "physics_session_not_found", "session_id": session_id}
+    if session["status"] != "paused_between_stages":
+        return {"error": "physics_session_not_perturbable", "status": session["status"]}
+    session["executor_options"]["physics_obstacle"] = obstacle
+    session["pending_perturbation"] = {"obstacle": obstacle, "applies_before_step_index": session["next_step_index"]}
+    return session
+
+
+def interrupt_physics_session(session_id: str, utterance: str) -> dict[str, Any]:
+    session = PHYSICS_SESSION_STORE.get(session_id)
+    if not session:
+        return {"error": "physics_session_not_found", "session_id": session_id}
+    if session["status"] == "completed":
+        return {"error": "physics_session_already_completed", "session": session}
+    session["status"] = "interrupted"
+    session["interruption"] = {
+        "utterance": utterance,
+        "decision": "pause_old_task_and_reenter_state_first_arbitration",
+        "old_task_fact_commit_blocked": True,
+        "resume_requires_new_runtime_snapshot": True,
+    }
+    return session
+
+
 def run_process_with_runtime_context(
     scenario: str = "auto",
     utterance: str = "给客人倒一杯水",
@@ -8178,6 +8337,11 @@ class RellSampleHandler(BaseHTTPRequestHandler):
             result = get_execution_dispatch(dispatch_id)
             self._send_json(result, status=404 if "error" in result else 200)
             return
+        if path.startswith("/physics/session/"):
+            session_id = path.removeprefix("/physics/session/")
+            result = get_physics_session(session_id)
+            self._send_json(result, status=404 if "error" in result else 200)
+            return
         if path.startswith("/teaching/session/"):
             session_id = path.removeprefix("/teaching/session/")
             result = get_teaching_session(session_id)
@@ -8360,6 +8524,22 @@ class RellSampleHandler(BaseHTTPRequestHandler):
                 body.get("executor_type", "digital_executor"),
                 body.get("executor_options", {}),
             )
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/physics/session/start":
+            result = start_physics_session(body.get("execution_loop_payload", {}), body.get("executor_options", {}))
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/physics/session/step":
+            result = step_physics_session(str(body.get("session_id", "")))
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/physics/session/perturb":
+            result = perturb_physics_session(str(body.get("session_id", "")), str(body.get("obstacle", "none")))
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/physics/session/interrupt":
+            result = interrupt_physics_session(str(body.get("session_id", "")), str(body.get("utterance", "")))
             self._send_json(result, status=400 if "error" in result else 200)
             return
         if path == "/experience/teach":

@@ -22,6 +22,8 @@ This phase replaces logical obstacle assertions with headless MuJoCo contact evi
 
 The liquid event is deliberately low-dimensional. This phase validates causal termination and observation routing, not computational fluid dynamics.
 
+Stagewise sessions pause between verified transitions. A perturbation can be injected before the next navigation stage, while an interruption freezes the old task and prevents any later stage from committing its target fact. Resumption requires a new runtime snapshot and state-first arbitration rather than continuing from stale process memory.
+
 ## Run
 
 ```powershell

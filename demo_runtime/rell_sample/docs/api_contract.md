@@ -703,6 +703,16 @@ move_to_counter -> pick_up_cup -> move_to_water_source -> fill_cup_at_water_sour
 
 ## GET /execution/dispatch/{dispatch_id}
 
+## Stagewise MuJoCo session
+
+- `POST /physics/session/start`: create a physics session from an `execution_loop_payload`; execution pauses before the first stage.
+- `POST /physics/session/step`: execute exactly one stage and persist only its verified symbolic after-state.
+- `POST /physics/session/perturb`: inject an obstacle before the next stage so route contact is evaluated at execution time.
+- `POST /physics/session/interrupt`: freeze the old task, block further fact commits, and require re-entry through state-first arbitration.
+- `GET /physics/session/{session_id}`: inspect the current stage index, symbolic physics state, stage history, and interruption record.
+
+Session state never stores absolute poses, joint angles, fixed durations, or trajectories. An interrupted session cannot resume without a new runtime snapshot and arbitration decision.
+
 用途：查询执行闭环分发记录和事实回传结果。该记录用于证明迁移适配控制器能够通过开放接口调用不同底层执行模块，并将因果产出事实和因果销毁事实回写任务期快照。
 
 ## GET /p017/minimal-loop

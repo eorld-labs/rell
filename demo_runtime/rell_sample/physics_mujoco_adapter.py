@@ -63,9 +63,10 @@ class MujocoEmbodiedAdapter:
     def execute_fill_task(self) -> dict[str, Any]:
         return self.execute_steps(["move_to_counter", "pick_up_cup", "move_to_water_source", "fill_cup_at_water_source"])
 
-    def execute_steps(self, steps: list[str]) -> dict[str, Any]:
-        location = "start"
-        holding_cup = False
+    def execute_steps(self, steps: list[str], initial_state: dict[str, Any] | None = None) -> dict[str, Any]:
+        initial_state = initial_state or {}
+        location = str(initial_state.get("location", "start"))
+        holding_cup = bool(initial_state.get("holding_cup", False))
         stage_results: list[dict[str, Any]] = []
         last_route = None
         for step in steps:
@@ -82,7 +83,8 @@ class MujocoEmbodiedAdapter:
             route = None
             observations: list[dict[str, Any]] = []
             if step == "move_to_counter":
-                route = self._navigate(self.layout["start"], self.layout["operation_region"])
+                start = self.layout["operation_region"] if location == "operation_region" else self.layout["start"]
+                route = self._navigate(start, self.layout["operation_region"])
                 last_route = route
                 if route.outcome == "blocked":
                     stage_results.append(self._stage(step, "fact_not_established", before, before, route=route))

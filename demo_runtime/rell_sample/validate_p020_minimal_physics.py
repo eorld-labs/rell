@@ -4,7 +4,14 @@ import json
 from pathlib import Path
 
 from physics_mujoco_adapter import MujocoEmbodiedAdapter
-from api_server import dispatch_execution_loop_payload, migrate_experience
+from api_server import (
+    dispatch_execution_loop_payload,
+    interrupt_physics_session,
+    migrate_experience,
+    perturb_physics_session,
+    start_physics_session,
+    step_physics_session,
+)
 
 
 OUTPUT = Path(__file__).resolve().parents[1] / "output" / "rell_sample" / "p020_minimal_physics"
@@ -67,6 +74,34 @@ def main() -> None:
     facts = blocked_dispatch["runtime_world_state_snapshot"].get("established_facts", [])
     require("cup_contains_water" not in facts, f"physics failure must not commit target fact: {blocked_dispatch}")
     report["scenarios"]["api_dispatch_capability_gap"] = blocked_dispatch["physics_result"]
+
+    session_migration = migrate_experience("到水源处接一杯水", space_id="site_b_corridor")
+    session = start_physics_session(
+        session_migration["execution_loop_payload"],
+        {"physics_executor_type": "mobile_manipulator", "physics_obstacle": "none"},
+    )
+    session_id = session["session_id"]
+    session = step_physics_session(session_id)
+    session = step_physics_session(session_id)
+    require(session["physics_state"]["holding_cup"], f"session must pause after verified grasp: {session}")
+    perturb_physics_session(session_id, "detourable")
+    session = step_physics_session(session_id)
+    require(session["last_stage"]["route_evidence"]["route_kind"] == "local_detour", f"dynamic detour failed: {session}")
+    session = step_physics_session(session_id)
+    require(session["status"] == "completed", f"stagewise session did not complete: {session}")
+    report["scenarios"]["stagewise_dynamic_detour"] = session
+
+    interrupt_migration = migrate_experience("到水源处接一杯水", space_id="home_a_kitchen")
+    interrupted = start_physics_session(interrupt_migration["execution_loop_payload"], {"physics_executor_type": "mobile_manipulator"})
+    interrupted_id = interrupted["session_id"]
+    step_physics_session(interrupted_id)
+    step_physics_session(interrupted_id)
+    interrupted = interrupt_physics_session(interrupted_id, "别做了，去拿苹果")
+    require(interrupted["interruption"]["old_task_fact_commit_blocked"], f"old task commit must be blocked: {interrupted}")
+    rejected_step = step_physics_session(interrupted_id)
+    require(rejected_step.get("error") == "physics_session_not_stepable", f"interrupted task advanced: {rejected_step}")
+    require(len(interrupted["stage_history"]) == 2, f"interrupted task history changed: {interrupted}")
+    report["scenarios"]["interrupt_after_grasp"] = interrupted
 
     OUTPUT.mkdir(parents=True, exist_ok=True)
     (OUTPUT / "physics_report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
