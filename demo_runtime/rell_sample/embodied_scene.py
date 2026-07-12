@@ -1858,10 +1858,26 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
     return result
 
 
+def _context_confirmation_value(utterance: str) -> bool | None:
+    normalized = re.sub(r"[\s，。！？、,.!?]+", "", utterance.strip().lower())
+    if normalized in {"是的", "对", "对的", "可以", "好的", "好", "正确", "ok", "okay", "没错", "就是", "确认", "行", "嗯", "恩", "是"}:
+        return True
+    if normalized in {"不是", "不对", "不可以", "不要", "取消", "否", "不", "错了", "不正确", "no", "不是这个"}:
+        return False
+    return None
+
+
 def begin_motion_command(session_id: str, utterance: str, scoped_authorization: dict[str, Any] | None = None) -> dict[str, Any]:
     session = SESSIONS.get(session_id)
     if not session:
         return {"error": "embodied_session_not_found", "session_id": session_id}
+    pending = session.get("pending_confirmation")
+    confirmation_value = _context_confirmation_value(utterance)
+    if pending and confirmation_value is not None and not scoped_authorization:
+        confirmed = confirm_pending_motion(session_id, pending["confirmation_id"], confirmation_value)
+        if confirmed.get("status") == "observation_candidate_confirmed":
+            return {"status": confirmed["status"], "immediate_result": confirmed, "session": confirmed.get("session")}
+        return confirmed
     if not (session.get("concept_gap_dialogue") or {}).get("status") == "collecting_minimum_causal_contract":
         recalled = _recall_trusted_experience(utterance)
         if recalled:

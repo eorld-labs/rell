@@ -26,6 +26,11 @@ def main() -> None:
     require(immediate.get("status") == "observation_candidate_confirmation_required", f"motion observation route regressed: {started}")
     colloquial = execute_command(wheeled["session_id"], "看到杯子没有")
     require(colloquial["status"] == "observation_candidate_confirmation_required", f"colloquial observation query misrouted: {colloquial}")
+    contextual = start_session(scene_id="home_semantic_3d_b", executor_profile_id="home_humanoid")
+    first = begin_motion_command(contextual["session_id"], "你看得到空间里的杯子吗")["immediate_result"]
+    accepted = begin_motion_command(contextual["session_id"], "对")
+    require(accepted.get("status") == "observation_candidate_confirmed", f"contextual confirmation not applied: {accepted}")
+    require(accepted["immediate_result"]["confirmed_visual_binding"]["verification_receipt"]["physical_observation_consistent"], f"confirmation lacked physical verification: {accepted}")
     print("Body profile and directed observation validation passed.")
 
 
