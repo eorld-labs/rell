@@ -65,9 +65,9 @@ def get_store_path() -> Path:
 def _load_store() -> dict[str, Any]:
     path = get_store_path()
     if not path.exists():
-        return {"schema_version": "1.0.0", "batches": [], "requests": [], "candidates": [], "concept_gap_candidates": [], "promoted_adapters": []}
+        return {"schema_version": "1.0.0", "batches": [], "requests": [], "candidates": [], "concept_gap_candidates": [], "concept_kernel_candidates": [], "promoted_adapters": []}
     store = json.loads(path.read_text(encoding="utf-8"))
-    for key in ("batches", "requests", "candidates", "concept_gap_candidates", "promoted_adapters"):
+    for key in ("batches", "requests", "candidates", "concept_gap_candidates", "concept_kernel_candidates", "promoted_adapters"):
         store.setdefault(key, [])
     return store
 
@@ -86,6 +86,122 @@ def _concept(concept_id: str) -> dict[str, Any] | None:
 
 def load_production_manifest() -> dict[str, Any]:
     return json.loads(MANIFEST_FILE.read_text(encoding="utf-8"))
+
+
+def compile_concept_kernel_candidate(
+    gap_id: str,
+    proposal: dict[str, Any],
+    *,
+    source_type: str,
+) -> dict[str, Any]:
+    if source_type not in {"human_structured_input", "external_model_candidate", "teaching_compiler"}:
+        return {"error": "unsupported_concept_kernel_source", "source_type": source_type}
+    store = _load_store()
+    gap = next((item for item in store["concept_gap_candidates"] if item["gap_id"] == gap_id), None)
+    if not gap:
+        return {"error": "visual_concept_gap_not_found", "gap_id": gap_id}
+    required_paths = {
+        "concept_id": proposal.get("concept_id"),
+        "functional_role_contract.roles": proposal.get("functional_role_contract", {}).get("roles"),
+        "functional_role_contract.affordances": proposal.get("functional_role_contract", {}).get("affordances"),
+        "physical_properties_and_boundaries.properties": proposal.get("physical_properties_and_boundaries", {}).get("properties"),
+        "physical_properties_and_boundaries.safety_boundaries": proposal.get("physical_properties_and_boundaries", {}).get("safety_boundaries"),
+        "perceptual_invariants": proposal.get("perceptual_invariants"),
+        "runtime_verification_policy.candidate_checks": proposal.get("runtime_verification_policy", {}).get("candidate_checks"),
+        "runtime_verification_policy.functional_checks": proposal.get("runtime_verification_policy", {}).get("functional_checks"),
+    }
+    missing = sorted(path for path, value in required_paths.items() if not value)
+    if missing:
+        return {
+            "error": "concept_kernel_candidate_incomplete",
+            "gap_id": gap_id,
+            "missing_fields": missing,
+            "candidate_only": True,
+        }
+    concept_id = str(proposal["concept_id"])
+    if _concept(concept_id):
+        return {"error": "factory_object_concept_already_exists", "concept_id": concept_id}
+    candidate_seed = json.dumps([gap_id, proposal], ensure_ascii=False, sort_keys=True)
+    candidate = {
+        "kernel_candidate_id": "object_kernel_candidate_" + hashlib.sha1(candidate_seed.encode("utf-8")).hexdigest()[:12],
+        "gap_id": gap_id,
+        "item_id": gap["item_id"],
+        "concept_id": concept_id,
+        "display_name": str(proposal.get("display_name") or gap["display_name"]),
+        "aliases": sorted(set(str(item) for item in proposal.get("aliases", [gap["display_name"]]) if item)),
+        "compatible_kinds": sorted(set(str(item) for item in proposal.get("compatible_kinds", []) if item)),
+        "functional_role_contract": deepcopy(proposal["functional_role_contract"]),
+        "physical_properties_and_boundaries": deepcopy(proposal["physical_properties_and_boundaries"]),
+        "perceptual_invariants": sorted(set(str(item) for item in proposal["perceptual_invariants"] if item)),
+        "variable_features": sorted(set(str(item) for item in proposal.get("variable_features", []) if item)),
+        "expected_relations": sorted(set(str(item) for item in proposal.get("expected_relations", []) if item)),
+        "runtime_verification_policy": deepcopy(proposal["runtime_verification_policy"]),
+        "source_type": source_type,
+        "status": "awaiting_human_kernel_review",
+        "candidate_only": True,
+        "image_generation_allowed": False,
+        "runtime_visible": False,
+        "direct_execution_allowed": False,
+        "must_reenter_orchestration_layer": True,
+        "compiled_at": datetime.now(timezone.utc).isoformat(),
+    }
+    store["concept_kernel_candidates"] = [
+        item for item in store["concept_kernel_candidates"] if item["kernel_candidate_id"] != candidate["kernel_candidate_id"]
+    ] + [candidate]
+    gap["status"] = "concept_kernel_candidate_compiled"
+    gap["kernel_candidate_id"] = candidate["kernel_candidate_id"]
+    _save_store(store)
+    return deepcopy(candidate)
+
+
+def review_concept_kernel_candidate(
+    kernel_candidate_id: str,
+    *,
+    approved: bool,
+    reviewer_ref: str,
+    review_notes: str = "",
+) -> dict[str, Any]:
+    if not reviewer_ref.strip():
+        return {"error": "human_reviewer_reference_required"}
+    store = _load_store()
+    candidate = next((item for item in store["concept_kernel_candidates"] if item["kernel_candidate_id"] == kernel_candidate_id), None)
+    if not candidate:
+        return {"error": "concept_kernel_candidate_not_found", "kernel_candidate_id": kernel_candidate_id}
+    candidate["human_review"] = {
+        "reviewer_ref": reviewer_ref.strip(),
+        "approved": bool(approved),
+        "review_notes": review_notes,
+        "reviewed_at": datetime.now(timezone.utc).isoformat(),
+    }
+    candidate["status"] = "approved_for_visual_generation" if approved else "kernel_revision_required"
+    candidate["image_generation_allowed"] = bool(approved)
+    _save_store(store)
+    return deepcopy(candidate)
+
+
+def release_kernel_candidate_generation(
+    kernel_candidate_id: str,
+    *,
+    sample_count: int = 8,
+) -> dict[str, Any]:
+    store = _load_store()
+    candidate = next((item for item in store["concept_kernel_candidates"] if item["kernel_candidate_id"] == kernel_candidate_id), None)
+    if not candidate:
+        return {"error": "concept_kernel_candidate_not_found", "kernel_candidate_id": kernel_candidate_id}
+    if candidate.get("status") != "approved_for_visual_generation" or not candidate.get("image_generation_allowed"):
+        return {"error": "concept_kernel_human_review_required", "kernel_candidate_id": kernel_candidate_id}
+    concept_snapshot = {
+        "concept_id": candidate["concept_id"],
+        "display_name": candidate["display_name"],
+        "kernel_candidate_id": kernel_candidate_id,
+        "kernel_status": candidate["status"],
+    }
+    return _create_generation_request(
+        concept_snapshot,
+        sample_count,
+        subject_label=candidate["display_name"],
+        item_id=candidate["item_id"],
+    )
 
 
 def create_production_batch(*, sample_count_per_concept: int = 8) -> dict[str, Any]:
@@ -177,6 +293,17 @@ def create_generation_request(
     concept = _concept(concept_id)
     if not concept:
         return {"error": "object_concept_not_found", "concept_id": concept_id}
+    return _create_generation_request(concept, sample_count, subject_label=subject_label, item_id=item_id)
+
+
+def _create_generation_request(
+    concept: dict[str, Any],
+    sample_count: int,
+    *,
+    subject_label: str | None,
+    item_id: str | None,
+) -> dict[str, Any]:
+    concept_id = concept["concept_id"]
     count = max(1, min(int(sample_count), 32))
     dimensions = [
         {"view": "front_three_quarter", "lighting": "daylight", "background": "home"},
@@ -203,6 +330,8 @@ def create_generation_request(
             "item_id": item_id,
             "concrete_label": subject,
             "parent_functional_concept": concept["display_name"],
+            "kernel_candidate_id": concept.get("kernel_candidate_id"),
+            "kernel_status": concept.get("kernel_status", "factory_object_concept"),
         },
         "status": "provider_generation_pending",
         "variant_specs": variants,
@@ -257,6 +386,7 @@ def ingest_provider_images(request_id: str, provider_id: str, images: list[dict[
     candidate = {
         "candidate_id": candidate_id,
         "concept_id": request["concept_id"],
+        "kernel_candidate_id": request.get("subject_profile", {}).get("kernel_candidate_id"),
         "status": "awaiting_real_world_calibration",
         "synthetic_samples": normalized,
         "real_calibration_evidence": [],
@@ -264,6 +394,7 @@ def ingest_provider_images(request_id: str, provider_id: str, images: list[dict[
             "minimum_synthetic_samples": 4,
             "minimum_real_observations": 1,
             "human_or_physical_confirmation_required": True,
+            "object_concept_kernel_must_be_promoted": bool(request.get("subject_profile", {}).get("kernel_candidate_id")),
         },
         "candidate_only": True,
         "runtime_visible": False,
@@ -309,6 +440,18 @@ def promote_visual_candidate(candidate_id: str) -> dict[str, Any]:
     if not candidate:
         return {"error": "visual_candidate_not_found", "candidate_id": candidate_id}
     requirements = candidate["promotion_requirements"]
+    kernel_candidate_id = candidate.get("kernel_candidate_id")
+    if requirements.get("object_concept_kernel_must_be_promoted"):
+        kernel_candidate = next(
+            (item for item in store["concept_kernel_candidates"] if item["kernel_candidate_id"] == kernel_candidate_id),
+            None,
+        )
+        if not kernel_candidate or kernel_candidate.get("status") != "promoted_object_concept_kernel":
+            return {
+                "error": "object_concept_kernel_promotion_required",
+                "kernel_candidate_id": kernel_candidate_id,
+                "candidate": deepcopy(candidate),
+            }
     confirmed = [item for item in candidate["real_calibration_evidence"] if item.get("human_confirmed")]
     if len(candidate["synthetic_samples"]) < requirements["minimum_synthetic_samples"] or len(confirmed) < requirements["minimum_real_observations"]:
         return {"error": "visual_candidate_promotion_requirements_not_met", "candidate": deepcopy(candidate)}

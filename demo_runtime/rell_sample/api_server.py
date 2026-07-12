@@ -56,6 +56,7 @@ from visual_concept_pipeline import (
     DeterministicImageProvider,
     HttpImageGenerationProvider,
     add_real_world_calibration,
+    compile_concept_kernel_candidate,
     create_production_batch,
     create_generation_request,
     execute_production_batch,
@@ -63,6 +64,8 @@ from visual_concept_pipeline import (
     get_pipeline_state,
     ingest_provider_images,
     promote_visual_candidate,
+    release_kernel_candidate_generation,
+    review_concept_kernel_candidate,
 )
 
 
@@ -8602,6 +8605,30 @@ class RellSampleHandler(BaseHTTPRequestHandler):
             return
         if path == "/visual-concepts/batches/create":
             result = create_production_batch(sample_count_per_concept=int(body.get("sample_count_per_concept", 8)))
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/visual-concepts/kernels/compile":
+            result = compile_concept_kernel_candidate(
+                str(body.get("gap_id", "")),
+                body.get("proposal", {}),
+                source_type=str(body.get("source_type", "external_model_candidate")),
+            )
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/visual-concepts/kernels/review":
+            result = review_concept_kernel_candidate(
+                str(body.get("kernel_candidate_id", "")),
+                approved=bool(body.get("approved", False)),
+                reviewer_ref=str(body.get("reviewer_ref", "")),
+                review_notes=str(body.get("review_notes", "")),
+            )
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/visual-concepts/kernels/release-generation":
+            result = release_kernel_candidate_generation(
+                str(body.get("kernel_candidate_id", "")),
+                sample_count=int(body.get("sample_count", 8)),
+            )
             self._send_json(result, status=400 if "error" in result else 200)
             return
         if path == "/visual-concepts/batches/execute":

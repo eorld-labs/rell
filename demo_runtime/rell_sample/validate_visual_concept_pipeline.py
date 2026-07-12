@@ -8,12 +8,15 @@ from embodied_scene import build_visual_concept_pack_catalog, execute_command, s
 from visual_concept_pipeline import (
     DeterministicImageProvider,
     add_real_world_calibration,
+    compile_concept_kernel_candidate,
     create_production_batch,
     create_generation_request,
     execute_production_batch,
     execute_generation_request,
     get_pipeline_state,
     promote_visual_candidate,
+    release_kernel_candidate_generation,
+    review_concept_kernel_candidate,
 )
 
 
@@ -91,6 +94,49 @@ def main() -> None:
     gaps = state_before_batch_execution["concept_gap_candidates"]
     require({item["display_name"] for item in gaps} == {"碗", "瓶子", "门", "垃圾桶", "冰箱"}, f"concept gap queue incorrect: {gaps}")
     require(all(not item["image_generation_allowed"] for item in gaps), f"images were generated before concept kernels existed: {gaps}")
+
+    bowl_gap = next(item for item in gaps if item["display_name"] == "碗")
+    incomplete_kernel = compile_concept_kernel_candidate(
+        bowl_gap["gap_id"],
+        {"concept_id": "concept_fillable_bowl"},
+        source_type="external_model_candidate",
+    )
+    require(incomplete_kernel.get("error") == "concept_kernel_candidate_incomplete", f"incomplete model output became a kernel candidate: {incomplete_kernel}")
+    bowl_kernel = compile_concept_kernel_candidate(
+        bowl_gap["gap_id"],
+        {
+            "concept_id": "concept_fillable_bowl",
+            "display_name": "可盛装碗状容器",
+            "aliases": ["碗"],
+            "compatible_kinds": ["graspable_container"],
+            "functional_role_contract": {"roles": ["container", "supportable_object"], "affordances": ["receive_material", "support_contents"]},
+            "physical_properties_and_boundaries": {"properties": ["bounded_inner_volume", "open_top"], "safety_boundaries": ["contents_temperature_within_body_limit", "grasp_force_below_damage_limit"]},
+            "perceptual_invariants": ["open_top", "bounded_inner_volume", "stable_base"],
+            "variable_features": ["color", "material", "size"],
+            "expected_relations": ["on_top_of_support"],
+            "runtime_verification_policy": {"candidate_checks": ["shape_invariants_observed"], "functional_checks": ["container_role_physically_verified_before_use"]},
+        },
+        source_type="external_model_candidate",
+    )
+    require(bowl_kernel["status"] == "awaiting_human_kernel_review" and not bowl_kernel["image_generation_allowed"], f"external model self-approved a concept: {bowl_kernel}")
+    blocked_release = release_kernel_candidate_generation(bowl_kernel["kernel_candidate_id"], sample_count=4)
+    require(blocked_release.get("error") == "concept_kernel_human_review_required", f"unreviewed kernel released image generation: {blocked_release}")
+    reviewed_kernel = review_concept_kernel_candidate(bowl_kernel["kernel_candidate_id"], approved=True, reviewer_ref="validation_human_reviewer")
+    require(reviewed_kernel["image_generation_allowed"] and not reviewed_kernel["runtime_visible"], f"kernel review crossed runtime boundary: {reviewed_kernel}")
+    bowl_request = release_kernel_candidate_generation(bowl_kernel["kernel_candidate_id"], sample_count=4)
+    require(bowl_request["status"] == "provider_generation_pending" and bowl_request["subject_profile"]["kernel_candidate_id"] == bowl_kernel["kernel_candidate_id"], f"reviewed kernel did not release an auditable image request: {bowl_request}")
+    require(not bowl_request["runtime_visible"] and bowl_request["candidate_only"], f"reviewed kernel became runtime truth: {bowl_request}")
+    bowl_visual_candidate = execute_generation_request(bowl_request["request_id"], DeterministicImageProvider())
+    calibrated_bowl = add_real_world_calibration(
+        bowl_visual_candidate["candidate_id"],
+        observation_ref="user_image://verified/bowl_1",
+        source_type="user_provided_real_image",
+        matched_features=["open_top", "bounded_inner_volume", "stable_base"],
+        human_confirmed=True,
+    )
+    require(calibrated_bowl["status"] == "eligible_for_promotion_review", f"real bowl evidence did not calibrate visual candidate: {calibrated_bowl}")
+    blocked_visual_promotion = promote_visual_candidate(bowl_visual_candidate["candidate_id"])
+    require(blocked_visual_promotion.get("error") == "object_concept_kernel_promotion_required", f"visual adapter outran its object concept kernel: {blocked_visual_promotion}")
 
     class OneRequestFailureProvider(DeterministicImageProvider):
         provider_id = "one_request_failure_test_provider"

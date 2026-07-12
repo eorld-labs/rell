@@ -129,6 +129,33 @@ def run_http_smoke() -> None:
             "/visual-concepts/batches/execute",
             {"batch_id": visual_batch["batch_id"], "provider": "deterministic_test"},
         )
+        visual_batch_state = get_json("/visual-concepts/pipeline")
+        bowl_gap = next(item for item in visual_batch_state["concept_gap_candidates"] if item["display_name"] == "碗")
+        bowl_kernel = post_json(
+            "/visual-concepts/kernels/compile",
+            {
+                "gap_id": bowl_gap["gap_id"],
+                "source_type": "external_model_candidate",
+                "proposal": {
+                    "concept_id": "concept_fillable_bowl",
+                    "display_name": "可盛装碗状容器",
+                    "aliases": ["碗"],
+                    "compatible_kinds": ["graspable_container"],
+                    "functional_role_contract": {"roles": ["container"], "affordances": ["receive_material"]},
+                    "physical_properties_and_boundaries": {"properties": ["bounded_inner_volume", "open_top"], "safety_boundaries": ["grasp_force_below_damage_limit"]},
+                    "perceptual_invariants": ["open_top", "bounded_inner_volume", "stable_base"],
+                    "runtime_verification_policy": {"candidate_checks": ["shape_invariants_observed"], "functional_checks": ["container_role_physically_verified_before_use"]},
+                },
+            },
+        )
+        bowl_kernel_review = post_json(
+            "/visual-concepts/kernels/review",
+            {"kernel_candidate_id": bowl_kernel["kernel_candidate_id"], "approved": True, "reviewer_ref": "http_smoke_human"},
+        )
+        bowl_generation = post_json(
+            "/visual-concepts/kernels/release-generation",
+            {"kernel_candidate_id": bowl_kernel["kernel_candidate_id"], "sample_count": 4},
+        )
         p017_loop = get_json("/p017/minimal-loop")
         semantic_route = post_json("/semantic/route", {"utterance": "当前杯子有没有水"})
         agent_execution_preview = post_json("/agent/query", {"utterance": "到水源处接一杯水"})
@@ -342,6 +369,12 @@ def run_http_smoke() -> None:
             raise AssertionError(f"visual batch endpoint failed: {visual_batch_result}")
         if visual_batch_result.get("concept_gap_count") != 5 or visual_batch_result.get("runtime_visible"):
             raise AssertionError(f"visual batch blurred concept gaps or runtime boundary: {visual_batch_result}")
+        if bowl_kernel.get("status") != "awaiting_human_kernel_review" or bowl_kernel.get("image_generation_allowed"):
+            raise AssertionError(f"external concept kernel proposal bypassed human review: {bowl_kernel}")
+        if bowl_kernel_review.get("status") != "approved_for_visual_generation" or bowl_kernel_review.get("runtime_visible"):
+            raise AssertionError(f"concept kernel review crossed runtime boundary: {bowl_kernel_review}")
+        if bowl_generation.get("status") != "provider_generation_pending" or bowl_generation.get("runtime_visible"):
+            raise AssertionError(f"reviewed concept kernel did not release a bounded generation request: {bowl_generation}")
         if not p017_loop.get("evidence_index") or len(p017_loop.get("evidence_files", {})) != 8:
             raise AssertionError(f"P017 minimal loop endpoint failed: {p017_loop}")
         if semantic_route.get("request_type") != "state_query":
