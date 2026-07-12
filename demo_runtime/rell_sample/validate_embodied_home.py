@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 from embodied_scene import execute_command, load_scene, set_stool, start_session
@@ -45,10 +46,17 @@ def main() -> None:
     require(backward["session"]["state"]["executor_yaw_deg"] == 0.0, f"reverse should preserve heading: {backward}")
 
     detour_session = start_session()
-    set_stool(detour_session["session_id"], "ahead")
+    detour_with_stool = set_stool(detour_session["session_id"], "ahead")
     detour = execute_command(detour_session["session_id"], "往前走一点")
     require(detour["route_kind"] == "local_detour", f"stool must trigger detour: {detour}")
     require(len(detour["frames"]) > len(direct["frames"]), f"detour must have a distinct continuous route: {detour}")
+    stool_position = detour_with_stool["active_obstacles"][0]["position"]
+    combined_radius = profile["body_envelope"]["radius_m"] + 0.38
+    frame_clearances = [math.dist(frame["position"], stool_position) for frame in detour["frames"]]
+    require(min(frame_clearances) > combined_radius, f"detour frames penetrate stool envelope: {detour}")
+    require(detour["session"]["state"]["executor_position"][0] > stool_position[0] + combined_radius, f"detour did not fully pass stool: {detour}")
+    require(detour["route_evidence"]["detour_extended_goal_for_clearance"], f"detour terminal policy missing: {detour}")
+    require("完全越过障碍" in detour["body_self_judgment"]["explanation"], f"detour completion explanation missing: {detour}")
 
     blocked_session = start_session()
     set_stool(blocked_session["session_id"], "narrow")

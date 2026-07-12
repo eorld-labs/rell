@@ -125,8 +125,8 @@ def execute_command(session_id: str, utterance: str) -> dict[str, Any]:
             }
             session["event_history"].append({"utterance": text, "result": result["status"], "reason": result["reason"], "obstacle": obstacle["entity_id"]})
             return result
-        detour = _detour_target(start, target, obstacle, profile["body_envelope"]["radius_m"])
-        if obstacle.get("mode") == "narrow" or detour is None:
+        detour_path = _detour_path(session, start, target, obstacle, profile["body_envelope"]["radius_m"])
+        if obstacle.get("mode") == "narrow" or detour_path is None:
             result = {
                 "status": "requires_human_confirmation",
                 "reason": "obstacle_blocks_route_and_no_body_clearance",
@@ -140,13 +140,19 @@ def execute_command(session_id: str, utterance: str) -> dict[str, Any]:
             return result
         route_kind = "local_detour"
         frames.extend(rotation_frames)
-        frames.extend(_with_yaw(_interpolate(start, detour, 8), final_yaw))
-        frames.extend(_with_yaw(_interpolate(detour, target, 8)[1:], final_yaw))
+        route_start = start
+        for waypoint in detour_path:
+            frames.extend(_with_yaw(_interpolate(route_start, waypoint, 8)[1:], final_yaw))
+            route_start = waypoint
+        target = detour_path[-1]
     else:
         frames = rotation_frames + _with_yaw(_interpolate(start, target, 12), final_yaw)
     session["state"]["executor_position"] = target
     session["state"]["executor_yaw_deg"] = final_yaw
     session["state"]["active_region"] = _region_for(target, load_scene())
+    body_explanation = body_explanations[body_realization]
+    if route_kind == "local_detour":
+        body_explanation = "我检测到前方凳子，已按本体净空从侧面绕行，并完全越过障碍后回到原行进方向。"
     result = {
         "status": "fact_established",
         "concept": {
@@ -160,8 +166,13 @@ def execute_command(session_id: str, utterance: str) -> dict[str, Any]:
             "learnable_invariant": "resolve_relative_direction_in_body_frame_then_select_motion_allowed_by_body_kinematics"
         },
         "route_kind": route_kind,
+        "route_evidence": {
+            "requested_distance_m": distance,
+            "terminal_policy": "clear_entire_obstacle_body_envelope_before_returning_to_travel_axis" if route_kind == "local_detour" else "requested_relative_displacement",
+            "detour_extended_goal_for_clearance": route_kind == "local_detour",
+        },
         "body_self_judgment": {
-            "explanation": body_explanations[body_realization],
+            "explanation": body_explanation,
             "selected_realization": body_realization,
             "rejected_realization": "lateral_translation" if direction in {"left", "right"} else None,
             "portrait_basis": session["executor_profile_id"],
@@ -213,12 +224,30 @@ def _collider_at(point: list[float], radius: float, session: dict[str, Any], sce
     return None
 
 
-def _detour_target(start: list[float], target: list[float], obstacle: dict[str, Any], radius: float) -> list[float] | None:
+def _detour_path(
+    session: dict[str, Any],
+    start: list[float],
+    target: list[float],
+    obstacle: dict[str, Any],
+    radius: float,
+) -> list[list[float]] | None:
     ox, oy = obstacle["position"]
     dx, dy = target[0] - start[0], target[1] - start[1]
     length = math.hypot(dx, dy) or 1.0
-    clearance = radius + 0.55
-    return [ox - dy / length * clearance, oy + dx / length * clearance]
+    forward = [dx / length, dy / length]
+    left = [-forward[1], forward[0]]
+    longitudinal_clearance = radius + 0.46
+    lateral_clearance = radius + 0.58
+    before = [ox - forward[0] * longitudinal_clearance + left[0] * lateral_clearance, oy - forward[1] * longitudinal_clearance + left[1] * lateral_clearance]
+    after_side = [ox + forward[0] * longitudinal_clearance + left[0] * lateral_clearance, oy + forward[1] * longitudinal_clearance + left[1] * lateral_clearance]
+    after_axis = [ox + forward[0] * longitudinal_clearance, oy + forward[1] * longitudinal_clearance]
+    waypoints = [before, after_side, after_axis]
+    segment_start = start
+    for waypoint in waypoints:
+        if _first_collision(session, segment_start, waypoint, radius):
+            return None
+        segment_start = waypoint
+    return waypoints
 
 
 def _interpolate(start: list[float], target: list[float], count: int) -> list[dict[str, Any]]:
