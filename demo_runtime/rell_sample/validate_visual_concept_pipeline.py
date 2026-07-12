@@ -15,6 +15,7 @@ from visual_concept_pipeline import (
     execute_generation_request,
     get_pipeline_state,
     promote_visual_candidate,
+    promote_concept_kernel_candidate,
     release_kernel_candidate_generation,
     review_concept_kernel_candidate,
 )
@@ -121,7 +122,13 @@ def main() -> None:
     require(bowl_kernel["status"] == "awaiting_human_kernel_review" and not bowl_kernel["image_generation_allowed"], f"external model self-approved a concept: {bowl_kernel}")
     blocked_release = release_kernel_candidate_generation(bowl_kernel["kernel_candidate_id"], sample_count=4)
     require(blocked_release.get("error") == "concept_kernel_human_review_required", f"unreviewed kernel released image generation: {blocked_release}")
-    reviewed_kernel = review_concept_kernel_candidate(bowl_kernel["kernel_candidate_id"], approved=True, reviewer_ref="validation_human_reviewer")
+    reviewed_kernel = review_concept_kernel_candidate(
+        bowl_kernel["kernel_candidate_id"],
+        approved=True,
+        reviewer_ref="validation_human_reviewer",
+        functional_role_confirmed=True,
+        physical_boundaries_confirmed=True,
+    )
     require(reviewed_kernel["image_generation_allowed"] and not reviewed_kernel["runtime_visible"], f"kernel review crossed runtime boundary: {reviewed_kernel}")
     bowl_request = release_kernel_candidate_generation(bowl_kernel["kernel_candidate_id"], sample_count=4)
     require(bowl_request["status"] == "provider_generation_pending" and bowl_request["subject_profile"]["kernel_candidate_id"] == bowl_kernel["kernel_candidate_id"], f"reviewed kernel did not release an auditable image request: {bowl_request}")
@@ -137,6 +144,10 @@ def main() -> None:
     require(calibrated_bowl["status"] == "eligible_for_promotion_review", f"real bowl evidence did not calibrate visual candidate: {calibrated_bowl}")
     blocked_visual_promotion = promote_visual_candidate(bowl_visual_candidate["candidate_id"])
     require(blocked_visual_promotion.get("error") == "object_concept_kernel_promotion_required", f"visual adapter outran its object concept kernel: {blocked_visual_promotion}")
+    promoted_kernel = promote_concept_kernel_candidate(bowl_kernel["kernel_candidate_id"])
+    require(promoted_kernel["status"] == "promoted_object_concept_kernel" and not promoted_kernel["runtime_visible"], f"object kernel promotion crossed deployment boundary: {promoted_kernel}")
+    promoted_bowl_visual = promote_visual_candidate(bowl_visual_candidate["candidate_id"])
+    require(promoted_bowl_visual["status"] == "promoted_visual_adapter" and not promoted_bowl_visual["runtime_visible"], f"visual adapter did not follow promoted object kernel: {promoted_bowl_visual}")
 
     class OneRequestFailureProvider(DeterministicImageProvider):
         provider_id = "one_request_failure_test_provider"

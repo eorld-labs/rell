@@ -65,9 +65,9 @@ def get_store_path() -> Path:
 def _load_store() -> dict[str, Any]:
     path = get_store_path()
     if not path.exists():
-        return {"schema_version": "1.0.0", "batches": [], "requests": [], "candidates": [], "concept_gap_candidates": [], "concept_kernel_candidates": [], "promoted_adapters": []}
+        return {"schema_version": "1.0.0", "batches": [], "requests": [], "candidates": [], "concept_gap_candidates": [], "concept_kernel_candidates": [], "promoted_object_kernels": [], "promoted_adapters": []}
     store = json.loads(path.read_text(encoding="utf-8"))
-    for key in ("batches", "requests", "candidates", "concept_gap_candidates", "concept_kernel_candidates", "promoted_adapters"):
+    for key in ("batches", "requests", "candidates", "concept_gap_candidates", "concept_kernel_candidates", "promoted_object_kernels", "promoted_adapters"):
         store.setdefault(key, [])
     return store
 
@@ -160,6 +160,8 @@ def review_concept_kernel_candidate(
     approved: bool,
     reviewer_ref: str,
     review_notes: str = "",
+    functional_role_confirmed: bool = False,
+    physical_boundaries_confirmed: bool = False,
 ) -> dict[str, Any]:
     if not reviewer_ref.strip():
         return {"error": "human_reviewer_reference_required"}
@@ -170,13 +172,63 @@ def review_concept_kernel_candidate(
     candidate["human_review"] = {
         "reviewer_ref": reviewer_ref.strip(),
         "approved": bool(approved),
+        "functional_role_confirmed": bool(functional_role_confirmed),
+        "physical_boundaries_confirmed": bool(physical_boundaries_confirmed),
         "review_notes": review_notes,
         "reviewed_at": datetime.now(timezone.utc).isoformat(),
     }
-    candidate["status"] = "approved_for_visual_generation" if approved else "kernel_revision_required"
-    candidate["image_generation_allowed"] = bool(approved)
+    structurally_confirmed = bool(approved and functional_role_confirmed and physical_boundaries_confirmed)
+    candidate["status"] = "approved_for_visual_generation" if structurally_confirmed else "kernel_revision_required"
+    candidate["image_generation_allowed"] = structurally_confirmed
     _save_store(store)
     return deepcopy(candidate)
+
+
+def promote_concept_kernel_candidate(kernel_candidate_id: str) -> dict[str, Any]:
+    store = _load_store()
+    candidate = next((item for item in store["concept_kernel_candidates"] if item["kernel_candidate_id"] == kernel_candidate_id), None)
+    if not candidate:
+        return {"error": "concept_kernel_candidate_not_found", "kernel_candidate_id": kernel_candidate_id}
+    review = candidate.get("human_review", {})
+    if (
+        candidate.get("status") != "approved_for_visual_generation"
+        or not review.get("functional_role_confirmed")
+        or not review.get("physical_boundaries_confirmed")
+    ):
+        return {"error": "concept_kernel_structural_review_required", "kernel_candidate_id": kernel_candidate_id}
+    visual_candidates = [item for item in store["candidates"] if item.get("kernel_candidate_id") == kernel_candidate_id]
+    confirmed_evidence = [
+        evidence
+        for visual_candidate in visual_candidates
+        for evidence in visual_candidate.get("real_calibration_evidence", [])
+        if evidence.get("human_confirmed")
+    ]
+    if not confirmed_evidence:
+        return {"error": "concept_kernel_real_world_calibration_required", "kernel_candidate_id": kernel_candidate_id}
+    promoted = {
+        "object_kernel_version_id": "object_kernel_" + hashlib.sha1(kernel_candidate_id.encode()).hexdigest()[:12],
+        "kernel_candidate_id": kernel_candidate_id,
+        "concept_id": candidate["concept_id"],
+        "display_name": candidate["display_name"],
+        "functional_role_contract": deepcopy(candidate["functional_role_contract"]),
+        "physical_properties_and_boundaries": deepcopy(candidate["physical_properties_and_boundaries"]),
+        "perceptual_invariants": deepcopy(candidate["perceptual_invariants"]),
+        "runtime_verification_policy": deepcopy(candidate["runtime_verification_policy"]),
+        "human_review": deepcopy(review),
+        "real_world_calibration_evidence": deepcopy(confirmed_evidence),
+        "status": "promoted_object_concept_kernel",
+        "deployment_status": "awaiting_controlled_deployment",
+        "runtime_visible": False,
+        "direct_execution_allowed": False,
+        "promoted_at": datetime.now(timezone.utc).isoformat(),
+    }
+    candidate["status"] = "promoted_object_concept_kernel"
+    candidate["runtime_visible"] = False
+    store["promoted_object_kernels"] = [
+        item for item in store["promoted_object_kernels"] if item["concept_id"] != promoted["concept_id"]
+    ] + [promoted]
+    _save_store(store)
+    return deepcopy(promoted)
 
 
 def release_kernel_candidate_generation(

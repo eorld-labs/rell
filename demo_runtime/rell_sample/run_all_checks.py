@@ -150,7 +150,13 @@ def run_http_smoke() -> None:
         )
         bowl_kernel_review = post_json(
             "/visual-concepts/kernels/review",
-            {"kernel_candidate_id": bowl_kernel["kernel_candidate_id"], "approved": True, "reviewer_ref": "http_smoke_human"},
+            {
+                "kernel_candidate_id": bowl_kernel["kernel_candidate_id"],
+                "approved": True,
+                "reviewer_ref": "http_smoke_human",
+                "functional_role_confirmed": True,
+                "physical_boundaries_confirmed": True,
+            },
         )
         bowl_generation = post_json(
             "/visual-concepts/kernels/release-generation",

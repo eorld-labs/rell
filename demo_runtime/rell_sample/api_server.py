@@ -64,6 +64,7 @@ from visual_concept_pipeline import (
     get_pipeline_state,
     ingest_provider_images,
     promote_visual_candidate,
+    promote_concept_kernel_candidate,
     release_kernel_candidate_generation,
     review_concept_kernel_candidate,
 )
@@ -8621,7 +8622,13 @@ class RellSampleHandler(BaseHTTPRequestHandler):
                 approved=bool(body.get("approved", False)),
                 reviewer_ref=str(body.get("reviewer_ref", "")),
                 review_notes=str(body.get("review_notes", "")),
+                functional_role_confirmed=bool(body.get("functional_role_confirmed", False)),
+                physical_boundaries_confirmed=bool(body.get("physical_boundaries_confirmed", False)),
             )
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/visual-concepts/kernels/promote":
+            result = promote_concept_kernel_candidate(str(body.get("kernel_candidate_id", "")))
             self._send_json(result, status=400 if "error" in result else 200)
             return
         if path == "/visual-concepts/kernels/release-generation":
