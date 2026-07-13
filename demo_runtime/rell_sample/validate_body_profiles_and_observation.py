@@ -65,6 +65,15 @@ def main() -> None:
     explicit_plan = explicit_support["immediate_result"]["candidate_execution_plan"]
     require(explicit_support["status"] == "requires_human_confirmation" and explicit_plan["goal_operator"] == "grasp_object", f"last causal operator was not selected as the terminal goal: {explicit_support}")
     require(explicit_plan["role_bindings"] == {"target": "cup_b", "support": "counter_b"}, f"explicit support and target were not jointly grounded: {explicit_support}")
+    bare_take_session = start_session(scene_id="home_semantic_3d_b", executor_profile_id="home_humanoid")
+    bare_take = begin_motion_command(bare_take_session["session_id"], "去桌子上拿杯子")
+    bare_take_result = bare_take["immediate_result"]
+    require(bare_take["status"] == "requires_human_confirmation", f"bare take verb stopped at perception instead of planning: {bare_take}")
+    require(bare_take_result["operator_candidate"] == "grasp_object", f"earlier navigation token displaced the final grasp goal: {bare_take}")
+    require(bare_take_result["candidate_execution_plan"]["role_bindings"] == {"target": "cup_b", "support": "counter_b"}, f"bare take did not jointly ground explicit support and target: {bare_take}")
+    direct_take_session = start_session(scene_id="home_semantic_3d_b", executor_profile_id="home_humanoid")
+    direct_take = begin_motion_command(direct_take_session["session_id"], "去拿杯子")
+    require(direct_take["status"] == "requires_human_confirmation" and direct_take["immediate_result"]["operator_candidate"] == "grasp_object", f"short bare take did not use the same terminal-goal paradigm: {direct_take}")
     apple_session = start_session(scene_id="home_semantic_3d_b", executor_profile_id="home_humanoid")
     apple_candidate = begin_motion_command(apple_session["session_id"], "拿起苹果")
     apple_plan = apple_candidate["immediate_result"]["candidate_execution_plan"]

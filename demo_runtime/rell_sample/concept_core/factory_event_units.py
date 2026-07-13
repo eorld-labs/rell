@@ -94,7 +94,7 @@ FACTORY_EVENT_CONCEPT_UNITS: list[dict[str, Any]] = [
         "factory_event_grasp",
         "获取对象事件概念",
         "grasp_object",
-        ["拿起", "拿着", "拿住", "抓起", "抓住", "取下"],
+        ["拿起", "拿着", "拿住", "抓起", "抓住", "取下", "拿"],
         "grasp_object",
         {"object": {"role": "target", "entity_type": "graspable_object"}},
         ["object_grounded", "object_within_reach", "gripper_available"],

@@ -1660,9 +1660,6 @@ def _build_object_relative_motion(
     _apply_speed_timing(frames, constraints["max_linear_speed_mps"])
     terminal_position = list(selected["position"])
     terminal_fact = "executor_near_object" if operator in {"navigate_near", "grasp_object", "place_object"} else "executor_cleared_object"
-    session["state"]["executor_position"] = terminal_position
-    session["state"]["executor_yaw_deg"] = target_yaw if operator in {"navigate_near", "grasp_object", "place_object"} else current_yaw
-    session["state"]["active_region"] = _region_for(terminal_position, _scene_for_session(session))
     result = {
         **contextual_affordance,
         "status": "fact_established",
@@ -1704,6 +1701,7 @@ def _build_object_relative_motion(
             "active_perception_trace": deepcopy(task_perception.get("active_perception_trace", [])),
             "concept_grounding": deepcopy(task_perception.get("concept_grounding")),
             "perception_observation": deepcopy(task_perception.get("perception_observation")),
+            "causal_preview": deepcopy(task_perception.get("causal_preview")),
         })
     if operator == "grasp_object":
         result["post_completion"] = {"action": "grasp", "target_entity_ref": entity["entity_id"], "mode": "direct_task"}
@@ -1715,11 +1713,16 @@ def _build_object_relative_motion(
             center_distance = math.dist(start, entity["position"])
             reachable_distance = float(session["executor_profile"]["body_envelope"]["radius_m"]) + float(session["executor_profile"]["arm_reach_m"])
             reach_gap = center_distance > reachable_distance
+            observation_summary = (
+                task_perception.get("prompt", "")
+                if len(task_perception.get("active_perception_trace", [])) > 1
+                else f"我先按抓取目标主动观察，识别到{support_text}{entity['label']}，并把该空间关系绑定到当前世界快照。"
+            )
             result.update({
                 "status": "requires_human_confirmation",
                 "reason": "candidate_route_requires_human_confirmation_before_motion_and_grasp",
                 "prompt": (
-                    f"我先按抓取目标主动观察，识别到{support_text}{entity['label']}，并把该空间关系绑定到当前世界快照。"
+                    observation_summary
                     + (f"它距当前本体中心约{center_distance:.2f}米，超出当前可达边界{reachable_distance:.2f}米，因此需要先移动到其可抓取范围。" if reach_gap else "它已处于当前本体可达范围。")
                     + f"我已生成无碰撞路径、对准、抓取和末态验真的候选计划。确认执行吗？"
                 ),
@@ -1868,9 +1871,6 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
         task_perception.get("concept_grounding", {}).get("candidate_bindings", [])
         if task_perception else []
     )
-    if task_perception and task_perception.get("concept_grounding", {}).get("grounding_status") != "spatially_grounded":
-        task_perception["session"] = get_session(session_id)
-        return task_perception
     if task_perception:
         _invalidate_perception_history(session, "superseded_by_new_goal_directed_observation")
         session["perception_history"].append({
@@ -1883,6 +1883,9 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
             "runtime_fact_committed": False,
             "current_use_status": "current_candidate",
         })
+    if task_perception and task_perception.get("concept_grounding", {}).get("grounding_status") != "spatially_grounded":
+        task_perception["session"] = get_session(session_id)
+        return task_perception
     contextual_affordance = resolve_contextual_affordance_request(
         text,
         entities=session["runtime_objects"],

@@ -14,7 +14,7 @@ TASK_OPERATORS = {
         "candidate_chain": ("ground_target_instance", "plan_route_to_standoff_pose", "navigate_and_verify_near_relation"),
     },
     "grasp_object": {
-        "tokens": ("拿起", "拿上", "抓取", "拾起", "拿住"),
+        "tokens": ("拿起", "拿上", "抓取", "拾起", "拿住", "拿"),
         "role": "grasp_target",
         "required_body_actions": ("grasp_object",),
         "required_object_claims": ("graspable",),
@@ -153,7 +153,7 @@ def resolve_contextual_affordance_request(
             ),
             None,
         )
-    if not entity and operator != "place_object" and any(token in utterance for token in ("拿起", "抓取", "拾起", "拿住")):
+    if not entity and operator != "place_object" and any(token in utterance for token in ("拿起", "抓取", "拾起", "拿住", "拿")):
         for concept in object_concepts:
             if any(alias and alias in utterance for alias in concept.get("aliases", [])):
                 compatible = [item for item in entities if item.get("kind") in concept.get("compatible_kinds", [])]

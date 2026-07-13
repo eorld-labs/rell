@@ -267,7 +267,7 @@ def main() -> None:
     perception_session = start_session()
     perception_started = begin_motion_command(perception_session["session_id"], "去桌子上拿杯子")
     perception = perception_started["immediate_result"]
-    require(perception["status"] == "perception_grounded_candidate", f"task-conditioned perception did not ground: {perception}")
+    require(perception["status"] == "requires_human_confirmation", f"grounded task did not continue through causal planning to arbitration: {perception}")
     require(perception["perception_observation"]["sensor_contract"]["reasoner_scene_truth_access"] is False, f"reasoner bypassed observation DTO: {perception}")
     require(perception["concept_grounding"]["grounding_status"] == "spatially_grounded", f"cup/support relation did not ground: {perception}")
     require(perception["concept_grounding"]["candidate_only"] and not perception["concept_grounding"]["direct_execution_allowed"], f"perception candidate gained execution authority: {perception}")
@@ -278,6 +278,7 @@ def main() -> None:
     require(perception["perception_observation"]["semantically_suppressed_tracks"], f"task attention did not suppress irrelevant semantics: {perception}")
     require(perception["perception_observation"]["safety_channels_always_on"], f"safety channels were pruned with task attention: {perception}")
     require(perception["causal_preview"]["planning_is_established_fact"] is False, f"causal preview became a future fact: {perception}")
+    require(perception["candidate_execution_plan"]["goal_operator"] == "grasp_object", f"bare take did not compile grounded perception into grasp goal: {perception}")
     require(perception_started["session"]["perception_history"][-1]["runtime_fact_committed"] is False, f"session history misreported observation as fact: {perception_started}")
     require(perception_started["session"]["perception_history"][-1]["current_use_status"] == "current_candidate", f"new observation was not eligible for current recheck: {perception_started}")
 
@@ -307,7 +308,7 @@ def main() -> None:
     require(not multiple["concept_grounding"]["candidate_bindings"], f"ambiguous perception selected a cup: {multiple}")
     require(not multiple["concept_grounding"]["runtime_fact_committed"], f"ambiguous candidates became fact: {multiple}")
     selected_white = execute_command(multiple_session["session_id"], "拿白色杯子")
-    require(selected_white["status"] == "perception_grounded_candidate", f"attribute clarification did not reground target: {selected_white}")
+    require(selected_white["status"] == "requires_human_confirmation", f"attribute clarification did not reground and plan target: {selected_white}")
     require(selected_white["concept_grounding"]["candidate_summary"]["detected_target_count"] == 2, f"clarification hid original candidate set: {selected_white}")
     require(selected_white["concept_grounding"]["candidate_summary"]["target_count"] == 1, f"color constraint did not select exactly one candidate: {selected_white}")
     require(selected_white["concept_grounding"]["candidate_bindings"][0]["entity_ref"] == "cup_a", f"white cup was not selected from current observation: {selected_white}")
@@ -320,7 +321,7 @@ def main() -> None:
     initial_occluded_position = occluded_session["state"]["executor_position"]
     set_perception_scenario(occluded_session["session_id"], "occluded_cup")
     occluded = execute_command(occluded_session["session_id"], "去桌子上拿杯子")
-    require(occluded["status"] == "perception_grounded_candidate", f"active observation did not recover occluded cup: {occluded}")
+    require(occluded["status"] == "requires_human_confirmation", f"active observation did not recover occluded cup and reach arbitration: {occluded}")
     require(len(occluded["active_perception_trace"]) == 2, f"occlusion did not trigger viewpoint change: {occluded}")
     require(occluded["active_perception_trace"][0]["ambiguity_reason"] == "target_not_observed", f"initial occlusion was not recorded: {occluded}")
     require(occluded["active_perception_trace"][1]["grounding_status"] == "spatially_grounded", f"alternate viewpoint did not ground cup: {occluded}")
