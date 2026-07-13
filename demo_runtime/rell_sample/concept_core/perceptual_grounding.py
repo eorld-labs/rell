@@ -419,12 +419,33 @@ def build_open_world_observation(scene: dict[str, Any], session: dict[str, Any])
     answer = "我当前识别到" + "、".join(labels) if labels else "我当前没有识别出已加载的对象概念"
     if unknown:
         answer += f"；另外看到{len(unknown)}个尚未识别的对象候选"
+    support_relations = []
+    for subject in recognized:
+        for support in recognized:
+            if subject is support or support.get("concept_id") != "concept_support_surface":
+                continue
+            sx, sy = subject["estimated_position"]
+            ox, oy = support["estimated_position"]
+            width, depth, height = support["estimated_size"]
+            support_top = float(support.get("estimated_base_elevation_m", 0.0)) + float(height)
+            within_surface = abs(float(sx) - float(ox)) <= float(width) / 2 and abs(float(sy) - float(oy)) <= float(depth) / 2
+            height_aligned = abs(float(subject.get("estimated_base_elevation_m", 0.0)) - support_top) <= 0.08
+            if within_surface and height_aligned:
+                support_relations.append({
+                    "subject_entity_ref": subject["spatial_entity_candidate_ref"],
+                    "relation": "on_top_of",
+                    "support_entity_ref": support["spatial_entity_candidate_ref"],
+                    "confidence": 0.96,
+                    "basis": ["projected_footprint_overlap", "support_height_alignment"],
+                    "evidence_kind": "visual_topological_candidate",
+                })
     return {
         "status": "open_world_observation_completed",
         "observation_id": observation_id,
         "world_revision": session["world_revision"],
         "prompt": answer + "。这些是当前观测候选，不等于已验真的功能事实。",
         "recognized_object_candidates": recognized,
+        "spatial_relation_candidates": support_relations,
         "unknown_object_candidates": unknown,
         "scan_viewpoints": viewpoints,
         "visual_pack_ids": [item["pack_id"] for item in packs],

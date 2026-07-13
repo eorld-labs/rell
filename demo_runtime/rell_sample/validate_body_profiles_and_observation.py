@@ -39,6 +39,17 @@ def main() -> None:
     require(variant["status"] == "observation_candidate_confirmation_required", f"看得到 variant did not enter observe concept: {variant}")
     abbreviated = execute_command(wheeled["session_id"], "你看的杯子吗")
     require(abbreviated["status"] == "observation_candidate_confirmation_required", f"abbreviated visual question did not enter observe concept: {abbreviated}")
+    location_session = start_session(scene_id="home_semantic_3d_b", executor_profile_id="home_humanoid")
+    cup_location = begin_motion_command(location_session["session_id"], "杯子在哪里")["immediate_result"]
+    require(cup_location["status"] == "object_location_state_answered", f"object location query entered task causality: {cup_location}")
+    require(cup_location["location_binding"] == {"relation": "on_top_of", "support_entity_ref": "counter_b"}, f"visual topology did not answer cup location: {cup_location}")
+    require(cup_location["evidence_status"] == "visual_topological_candidate" and cup_location["candidate_only"], f"visual location was overclaimed as verified: {cup_location}")
+    gap_location_session = start_session(scene_id="home_semantic_3d_b", executor_profile_id="home_humanoid")
+    unknown_started = begin_motion_command(gap_location_session["session_id"], "归整苹果")
+    require(unknown_started["status"] == "concept_gap_clarification_required", f"location bypass precondition did not start: {unknown_started}")
+    location_during_gap = begin_motion_command(gap_location_session["session_id"], "杯子在哪里")["immediate_result"]
+    require(location_during_gap["status"] == "object_location_state_answered", f"active concept-gap dialogue swallowed a state query: {location_during_gap}")
+    require(location_during_gap["session"]["concept_gap_dialogue"]["status"] == "collecting_minimum_causal_contract", f"state query destroyed active clarification context: {location_during_gap}")
     implicit_support_session = start_session(scene_id="home_semantic_3d_b", executor_profile_id="home_humanoid")
     implicit_support = begin_motion_command(implicit_support_session["session_id"], "拿起杯子")
     require(implicit_support["status"] == "requires_human_confirmation", f"goal-driven grasp did not reach arbitration: {implicit_support}")
@@ -104,6 +115,9 @@ def main() -> None:
     holding_query = execute_command(contextual["session_id"], "现在手上拿着什么")
     require(holding_query["status"] == "runtime_holding_state_answered", f"holding state query did not use runtime state: {holding_query}")
     require(holding_query["runtime_fact"] == "object_in_gripper", f"holding fact was not derived from verified grasp: {holding_query}")
+    held_location = execute_command(contextual["session_id"], "杯子在哪里")
+    require(held_location["status"] == "object_location_state_answered" and held_location["location_binding"]["relation"] == "held_by_executor", f"verified holding did not override visual support candidate: {held_location}")
+    require(held_location["evidence_status"] == "runtime_verified" and not held_location["candidate_only"], f"verified location was downgraded to a visual candidate: {held_location}")
     table_observation = begin_motion_command(contextual["session_id"], "你看得到桌子吗")["immediate_result"]
     require(table_observation["status"] == "observation_candidate_confirmation_required", f"support observation did not request confirmation: {table_observation}")
     require(table_observation["pending_confirmation"]["concept_display_name"] == "桌子", f"support confirmation reused a cup label: {table_observation}")

@@ -454,6 +454,86 @@ def _answer_holding_state_query(session: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _is_object_location_query(text: str) -> bool:
+    return (
+        _directed_observation_concept(text) is not None
+        and any(pattern in text for pattern in ("在哪里", "在哪", "什么位置", "哪个区域"))
+    )
+
+
+def _answer_object_location_query(session: dict[str, Any], text: str) -> dict[str, Any]:
+    directed = _directed_observation_concept(text)
+    observation = build_open_world_observation(_scene_for_session(session), session)
+    matches = [
+        item for item in observation.get("recognized_object_candidates", [])
+        if item.get("concept_id") == directed["concept_id"]
+    ]
+    if not matches:
+        return {
+            "status": "object_location_not_observed",
+            "query_type": "object_location",
+            "prompt": f"我已转动视觉扫描当前空间，但没有观察到{directed['matched_alias']}候选，因此不能声称它在哪里。",
+            "directed_query": directed,
+            "observation_action": {"operator": "scan_current_space_for_object_location", "scene_truth_read_directly": False},
+            "active_perception_trace": deepcopy(observation.get("scan_viewpoints", [])),
+            "candidate_only": True,
+            "direct_execution_allowed": False,
+            "session": get_session(session["session_id"]),
+        }
+    if len(matches) > 1:
+        return {
+            "status": "object_location_disambiguation_required",
+            "query_type": "object_location",
+            "prompt": f"我观察到{len(matches)}个{directed['matched_alias']}候选，请用颜色、材质或其他可观察特征指出你问的是哪一个。",
+            "directed_query": directed,
+            "candidate_options": deepcopy(matches),
+            "candidate_only": True,
+            "direct_execution_allowed": False,
+            "session": get_session(session["session_id"]),
+        }
+    match = matches[0]
+    entity_ref = match["spatial_entity_candidate_ref"]
+    runtime_entity = next((item for item in session["runtime_objects"] if item.get("entity_id") == entity_ref), None)
+    if session.get("state", {}).get("holding") == entity_ref:
+        location = {"relation": "held_by_executor", "executor_ref": session["executor_profile_id"]}
+        prompt = f"{runtime_entity.get('label', directed['matched_alias'])}当前在我手里。这个位置关系来自已经验真的持有事实。"
+        evidence_status = "runtime_verified"
+    else:
+        support_relation = next(
+            (item for item in observation.get("spatial_relation_candidates", []) if item.get("subject_entity_ref") == entity_ref),
+            None,
+        )
+        if support_relation:
+            support = next(
+                (item for item in session["runtime_objects"] if item.get("entity_id") == support_relation["support_entity_ref"]),
+                None,
+            )
+            location = {"relation": "on_top_of", "support_entity_ref": support_relation["support_entity_ref"]}
+            prompt = f"我当前观察到{runtime_entity.get('label', directed['matched_alias'])}在{support.get('label', '承载面')}上。这来自当前视觉和支撑拓扑候选，还不是交互后的功能验真事实。"
+            evidence_status = "visual_topological_candidate"
+        else:
+            position = match.get("estimated_position")
+            region_id = _region_for(position, _scene_for_session(session)) if position else None
+            region = next((item for item in _scene_for_session(session)["semantic_regions"] if item["region_id"] == region_id), None)
+            location = {"relation": "inside_region", "region_id": region_id, "estimated_position": deepcopy(position)}
+            prompt = f"我当前观察到{runtime_entity.get('label', directed['matched_alias'])}在{(region or {}).get('label', '当前可见区域')}。这是当前视觉空间候选。"
+            evidence_status = "visual_spatial_candidate"
+    return {
+        "status": "object_location_state_answered",
+        "query_type": "object_location",
+        "prompt": prompt,
+        "directed_query": directed,
+        "entity_ref": entity_ref,
+        "location_binding": location,
+        "evidence_status": evidence_status,
+        "observation_id": observation["observation_id"],
+        "world_revision": session["world_revision"],
+        "candidate_only": evidence_status != "runtime_verified",
+        "direct_execution_allowed": False,
+        "session": get_session(session["session_id"]),
+    }
+
+
 def _is_open_world_observation_query(text: str) -> bool:
     broad = any(pattern in text for pattern in ("看到什么", "看到了什么", "有什么东西", "有哪些东西", "周围有什么"))
     directed = any(pattern in text for pattern in ("看得到", "看的到", "能看到", "能看见", "看得见", "有没有看到", "看到吗", "看见吗"))
@@ -1826,6 +1906,8 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
     text = utterance.strip()
     if _is_holding_state_query(text):
         return _answer_holding_state_query(session)
+    if _is_object_location_query(text):
+        return _answer_object_location_query(session, text)
     if _is_open_world_observation_query(text):
         observation = _answer_observation_query(session, text)
         session["open_world_observation"] = deepcopy(observation)
