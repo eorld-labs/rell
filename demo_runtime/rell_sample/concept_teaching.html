@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>端侧概念教学台</title>
+  <style>
+    :root{color-scheme:light;--ink:#17201c;--muted:#617069;--line:#d7ddd9;--paper:#f5f7f5;--panel:#fff;--green:#176744;--amber:#a15c0b;--red:#a83232;--blue:#265a7d}
+    *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.5 system-ui,"Microsoft YaHei",sans-serif;letter-spacing:0}button,input,select{font:inherit}button{cursor:pointer}
+    header{height:58px;border-bottom:1px solid var(--line);background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 24px}header strong{font-size:17px}header a{color:var(--blue);text-decoration:none}
+    main{max-width:1280px;margin:auto;padding:20px 24px 40px;display:grid;grid-template-columns:280px minmax(0,1fr) 330px;gap:16px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;min-width:0}.panel h2{font-size:14px;margin:0;padding:14px 16px;border-bottom:1px solid var(--line)}.body{padding:16px}
+    label{display:block;color:var(--muted);font-size:12px;margin:0 0 6px}select,input{width:100%;height:38px;border:1px solid #bcc7c1;border-radius:4px;background:#fff;padding:0 10px;color:var(--ink)}.field{margin-bottom:14px}.meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}.datum{border-top:1px solid var(--line);padding-top:9px}.datum span{display:block;color:var(--muted);font-size:11px}.datum b{font-weight:600;font-size:13px;overflow-wrap:anywhere}
+    .tag{display:inline-block;padding:2px 7px;border:1px solid #bfc9c3;border-radius:3px;margin:3px 4px 3px 0;font-size:12px;background:#fafbfa}.boundary{margin-top:14px;padding:10px;border-left:3px solid var(--amber);background:#fff8ed;color:#6f470f}
+    .workflow{display:flex;border-bottom:1px solid var(--line);overflow:auto}.step{padding:11px 14px;white-space:nowrap;color:var(--muted);border-right:1px solid var(--line)}.step.active{color:var(--green);font-weight:700;background:#f1f8f4}
+    .section{padding:16px;border-bottom:1px solid var(--line)}.section:last-child{border-bottom:0}.section h3{font-size:13px;margin:0 0 12px}.checkrow{display:grid;grid-template-columns:minmax(0,1fr) 190px;gap:12px;align-items:center;padding:10px 0;border-top:1px solid #edf0ee}.checkrow:first-of-type{border-top:0}.claim{padding:10px 0;border-top:1px solid #edf0ee}.claim b{display:block}.claim small{color:var(--amber)}
+    .toggle{display:flex;align-items:center;gap:8px;color:var(--ink);font-size:13px}.toggle input{width:16px;height:16px}.actions{display:flex;gap:8px;margin-top:14px}.btn{border:1px solid #aebbb4;background:#fff;border-radius:4px;height:38px;padding:0 14px}.btn.primary{background:var(--green);color:#fff;border-color:var(--green)}.btn:disabled{opacity:.45;cursor:not-allowed}
+    .timeline{max-height:520px;overflow:auto}.event{padding:10px 0;border-bottom:1px solid #edf0ee}.event b{display:block;font-size:12px}.event time{font-size:11px;color:var(--muted)}.status{padding:10px;background:#eef4f0;border:1px solid #d4e1d9;border-radius:4px;overflow-wrap:anywhere}.result{white-space:pre-wrap;font:12px/1.45 ui-monospace,Consolas,monospace;background:#17201c;color:#e8f0eb;padding:12px;border-radius:4px;max-height:300px;overflow:auto}
+    @media(max-width:960px){main{grid-template-columns:1fr}.checkrow{grid-template-columns:1fr}.panel{width:100%}}
+  </style>
+</head>
+<body>
+  <header><strong>端侧概念教学台</strong><a href="/embodied">返回具身运行时</a></header>
+  <main>
+    <section class="panel"><h2>概念核</h2><div class="body">
+      <div class="field"><label for="concept">选择家庭概念</label><select id="concept"></select></div>
+      <button class="btn primary" id="start">开始观察教学</button>
+      <div id="kernel"></div>
+    </div></section>
+    <section class="panel">
+      <div class="workflow"><div class="step active">1 选择概念</div><div class="step">2 真实观测</div><div class="step">3 不变量判断</div><div class="step">4 编译候选</div></div>
+      <div class="section"><h3>真实世界观测</h3>
+        <div class="field"><label for="source">证据来源</label><select id="source"><option value="user_provided_real_image">用户提供的真实图片</option><option value="current_robot_camera_verified_crop">机器人相机验真裁剪</option></select></div>
+        <div class="field"><label for="observation">观测引用（本地路径或受控证据编号）</label><input id="observation" placeholder="例如：H:\home\refrigerator.jpg"></div>
+        <label class="toggle"><input type="checkbox" id="identity"> 人类确认该观测对象与所选概念同一</label>
+        <div class="actions"><button class="btn" id="attach" disabled>登记观测</button></div>
+      </div>
+      <div class="section"><h3>视觉不变量逐项判断</h3><div id="invariants"><span style="color:var(--muted)">开始会话后显示。</span></div><div class="actions"><button class="btn" id="assess" disabled>保存判断</button><button class="btn primary" id="finish" disabled>编译观察候选</button></div></div>
+      <div class="section"><h3>候选输出</h3><div id="result" class="status">尚未编译。候选不会进入运行时，也不会授予执行权。</div></div>
+    </section>
+    <aside class="panel"><h2>边界与审计</h2><div class="body"><div class="status" id="status">等待开始</div><h3>功能声明（待独立验真）</h3><div id="claims"></div><h3>会话时间线</h3><div class="timeline" id="timeline"></div></div></aside>
+  </main>
+  <script>
+    let catalog=[],session=null;
+    const $=s=>document.querySelector(s);const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    async function api(path,body){const r=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{});return r.json()}
+    function selected(){return catalog.find(x=>x.concept_id===$('#concept').value)}
+    function renderKernel(){const c=selected();if(!c)return;$('#kernel').innerHTML=`<div class="meta"><div class="datum"><span>分类</span><b>${esc(c.category)}</b></div><div class="datum"><span>驻留策略</span><b>${esc(c.load_policy)}</b></div></div><div style="margin-top:12px"><label>知觉不变量</label>${c.concept_kernel.perceptual_invariants.map(x=>`<span class="tag">${esc(x)}</span>`).join('')}</div><div style="margin-top:10px"><label>可变特征</label>${c.concept_kernel.variable_features.map(x=>`<span class="tag">${esc(x)}</span>`).join('')}</div><div class="boundary">概念核已经存在。本工具只收集对象观察证据，不重新定义概念，也不把外观候选当成功能事实。</div>`;renderClaims(c.functional_claims)}
+    function renderClaims(claims){$('#claims').innerHTML=(claims||[]).map(x=>`<div class="claim"><b>${esc(x.claim)}</b><small>未验真 · 需要独立运行时或物理证据</small></div>`).join('')||'<span style="color:var(--muted)">无</span>'}
+    function renderSession(){if(!session)return;const compiled=session.status==='candidate_compiled';$('#concept').disabled=!compiled;$('#start').textContent=compiled?'开始新观察会话':'观察会话进行中';$('#start').disabled=!compiled;$('#status').textContent=`${session.status} · ${session.session_id}`;const entries=Object.entries(session.invariant_assessments);$('#invariants').innerHTML=entries.map(([f,v])=>`<div class="checkrow"><b>${esc(f)}</b><select data-feature="${esc(f)}"><option value="pending" ${v==='pending'?'selected':''}>待判断</option><option value="observed" ${v==='observed'?'selected':''}>已观察到</option><option value="uncertain_or_occluded" ${v==='uncertain_or_occluded'?'selected':''}>不确定 / 遮挡</option><option value="contradicted" ${v==='contradicted'?'selected':''}>与观测矛盾</option></select></div>`).join('');$('#assess').disabled=!session.observation||session.identity_confirmation!=='confirmed'||compiled;$('#finish').disabled=compiled;$('#attach').disabled=compiled;$('#timeline').innerHTML=[...session.audit_timeline].reverse().map(x=>`<div class="event"><b>${esc(x.event)}</b><time>${esc(x.at)}</time></div>`).join('');renderClaims(session.functional_claims);const step=compiled?3:session.observation?2:1;document.querySelectorAll('.step').forEach((x,i)=>x.classList.toggle('active',i<=step))}
+    async function refresh(){if(!session)return;session=await api(`/concept-teaching/session/${session.session_id}`);renderSession()}
+    $('#concept').onchange=renderKernel;
+    $('#start').onclick=async()=>{session=await api('/concept-teaching/session/start',{concept_id:$('#concept').value});$('#attach').disabled=false;$('#result').className='status';$('#result').textContent='会话已建立，请登记真实观测。';renderSession()};
+    $('#attach').onclick=async()=>{const r=await api('/concept-teaching/session/observe',{session_id:session.session_id,observation_ref:$('#observation').value,source_type:$('#source').value,identity_confirmed:$('#identity').checked});if(r.error){$('#result').textContent=`登记失败：${r.error}`;return}session=r;renderSession()};
+    $('#assess').onclick=async()=>{const assessments=[...document.querySelectorAll('[data-feature]')].filter(x=>x.value!=='pending').map(x=>({feature:x.dataset.feature,status:x.value}));const r=await api('/concept-teaching/session/assess',{session_id:session.session_id,assessments});if(r.error){$('#result').textContent=`判断未保存：${r.error}`;return}session=r;renderSession()};
+    $('#finish').onclick=async()=>{const r=await api('/concept-teaching/session/finish',{session_id:session.session_id});$('#result').className=r.error?'status':'result';$('#result').textContent=JSON.stringify(r,null,2);await refresh()};
+    (async()=>{const data=await api('/concept-teaching/catalog');catalog=data.concepts;$('#concept').innerHTML=catalog.map(x=>`<option value="${esc(x.concept_id)}">${esc(x.display_name)}</option>`).join('');renderKernel()})().catch(e=>{$('#status').textContent=e.message});
+  </script>
+</body>
+</html>

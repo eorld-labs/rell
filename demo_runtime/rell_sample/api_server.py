@@ -70,6 +70,14 @@ from visual_concept_pipeline import (
     review_concept_kernel_candidate,
 )
 from qwen_visual_adapter import QwenVisualConceptAdapter
+from concept_core.concept_teaching_station import (
+    assess_concept_invariants,
+    attach_concept_observation,
+    finish_concept_teaching_session,
+    get_concept_teaching_catalog,
+    get_concept_teaching_session,
+    start_concept_teaching_session,
+)
 
 
 ROOT = Path(__file__).resolve().parent
@@ -8314,6 +8322,9 @@ class RellSampleHandler(BaseHTTPRequestHandler):
         if path == "/embodied":
             self._send_html((ROOT / "embodied_home.html").read_text(encoding="utf-8"))
             return
+        if path == "/concept-teaching":
+            self._send_html((ROOT / "concept_teaching.html").read_text(encoding="utf-8"))
+            return
         if path == "/vendor/three.min.js":
             self._send_javascript((ROOT / "vendor" / "three.min.js").read_text(encoding="utf-8"))
             return
@@ -8340,6 +8351,14 @@ class RellSampleHandler(BaseHTTPRequestHandler):
             return
         if path == "/visual-concepts/pipeline":
             self._send_json(get_pipeline_state())
+            return
+        if path == "/concept-teaching/catalog":
+            self._send_json(get_concept_teaching_catalog())
+            return
+        if path.startswith("/concept-teaching/session/"):
+            session_id = path.removeprefix("/concept-teaching/session/")
+            result = get_concept_teaching_session(session_id)
+            self._send_json(result, status=404 if "error" in result else 200)
             return
         if path == "/embodied/factory-state-facts":
             self._send_json(build_factory_state_fact_catalog())
@@ -8613,6 +8632,30 @@ class RellSampleHandler(BaseHTTPRequestHandler):
                 str(body.get("concept_id", "")),
                 int(body.get("sample_count", 8)),
             )
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/concept-teaching/session/start":
+            result = start_concept_teaching_session(str(body.get("concept_id", "")))
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/concept-teaching/session/observe":
+            result = attach_concept_observation(
+                str(body.get("session_id", "")),
+                observation_ref=str(body.get("observation_ref", "")),
+                source_type=str(body.get("source_type", "")),
+                identity_confirmed=bool(body.get("identity_confirmed", False)),
+            )
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/concept-teaching/session/assess":
+            result = assess_concept_invariants(
+                str(body.get("session_id", "")),
+                body.get("assessments") if isinstance(body.get("assessments"), list) else [],
+            )
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/concept-teaching/session/finish":
+            result = finish_concept_teaching_session(str(body.get("session_id", "")))
             self._send_json(result, status=400 if "error" in result else 200)
             return
         if path == "/visual-concepts/batches/create":
