@@ -39,6 +39,13 @@ def main() -> None:
     require(variant["status"] == "observation_candidate_confirmation_required", f"看得到 variant did not enter observe concept: {variant}")
     abbreviated = execute_command(wheeled["session_id"], "你看的杯子吗")
     require(abbreviated["status"] == "observation_candidate_confirmation_required", f"abbreviated visual question did not enter observe concept: {abbreviated}")
+    presence_session = start_session(scene_id="home_semantic_3d_b", executor_profile_id="home_humanoid")
+    apple_presence = begin_motion_command(presence_session["session_id"], "房间里有没有苹果")["immediate_result"]
+    require(apple_presence["status"] == "object_presence_observed", f"object presence query entered event-gap reasoning: {apple_presence}")
+    require(len(apple_presence["directed_matches"]) == 1 and apple_presence["directed_matches"][0]["spatial_entity_candidate_ref"] == "apple_b", f"presence query did not report current apple observation: {apple_presence}")
+    require(apple_presence["task_followup"]["status"] == "awaiting_human_goal", f"presence answer did not invite a next goal: {apple_presence}")
+    require(apple_presence["candidate_only"] and not apple_presence["runtime_fact_committed"], f"presence observation became a runtime fact: {apple_presence}")
+    require(presence_session["session_id"] in apple_presence["session"]["session_id"] and apple_presence["session"]["concept_gap_dialogue"] is None, f"presence query started a concept-gap dialogue: {apple_presence}")
     location_session = start_session(scene_id="home_semantic_3d_b", executor_profile_id="home_humanoid")
     cup_location = begin_motion_command(location_session["session_id"], "杯子在哪里")["immediate_result"]
     require(cup_location["status"] == "object_location_state_answered", f"object location query entered task causality: {cup_location}")

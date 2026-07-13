@@ -554,6 +554,15 @@ def _is_open_world_observation_query(text: str) -> bool:
     return broad or directed or colloquial_directed or abbreviated_directed
 
 
+def _is_object_presence_query(text: str) -> bool:
+    directed = _directed_observation_concept(text)
+    return bool(
+        directed
+        and any(pattern in text for pattern in ("有没有", "有无", "是否有"))
+        and not any(pattern in text for pattern in ("有没有看到", "是否看到"))
+    )
+
+
 def _directed_observation_concept(text: str) -> dict[str, Any] | None:
     concepts = load_object_concepts()["concepts"]
     matches = [
@@ -566,6 +575,59 @@ def _directed_observation_concept(text: str) -> dict[str, Any] | None:
         return None
     _, concept, alias = max(matches, key=lambda item: item[0])
     return {"concept_id": concept["concept_id"], "display_name": concept["display_name"], "matched_alias": alias}
+
+
+def _answer_object_presence_query(session: dict[str, Any], text: str) -> dict[str, Any]:
+    """Answer a present-world query without inventing an event or task contract."""
+    observation = build_open_world_observation(_scene_for_session(session), session)
+    directed = _directed_observation_concept(text)
+    assert directed is not None
+    matches = [
+        item for item in observation.get("recognized_object_candidates", [])
+        if item.get("concept_id") == directed["concept_id"]
+    ]
+    observation.update({
+        "query_type": "object_presence",
+        "status": "object_presence_observed" if matches else "object_presence_not_observed",
+        "directed_query": directed,
+        "directed_matches": deepcopy(matches),
+        "observation_action": {
+            "operator": "scan_current_space_before_presence_answer",
+            "sensor_frame": "head_rgbd",
+            "scene_truth_read_directly": False,
+        },
+        "active_perception_trace": [
+            {"viewpoint": deepcopy(viewpoint), "status": "observation_candidate_collected"}
+            for viewpoint in observation.get("scan_viewpoints", [])
+        ],
+        "candidate_only": True,
+        "direct_execution_allowed": False,
+        "runtime_fact_committed": False,
+        "task_followup": {
+            "status": "awaiting_human_goal",
+            "prompt": "你希望我对它做什么？",
+            "role_binding_requires_current_task_grounding": True,
+        },
+    })
+    if len(matches) == 1:
+        observation["prompt"] = (
+            f"我先转动视觉观察了当前空间，看到1个{directed['display_name']}候选。"
+            f"按当前视觉观察可以回答：这里有{directed['display_name']}。"
+            "它目前是观察候选，不是已经验真的功能事实。你希望我对它做什么？"
+        )
+    elif len(matches) > 1:
+        observation["prompt"] = (
+            f"我先转动视觉观察了当前空间，看到{len(matches)}个{directed['display_name']}候选。"
+            "你希望我对哪一个做什么？可以补充颜色、位置或其他可观察特征。"
+        )
+        observation["task_followup"]["status"] = "awaiting_target_disambiguation_and_goal"
+    else:
+        observation["prompt"] = (
+            f"我已扫描当前可观察范围，但没有看到{directed['display_name']}候选。"
+            "这不等于空间中一定没有，可能在遮挡处或当前视野外。"
+        )
+        observation["task_followup"]["status"] = "awaiting_reobservation_or_human_guidance"
+    return observation
 
 
 def _answer_observation_query(session: dict[str, Any], text: str) -> dict[str, Any]:
@@ -1908,6 +1970,11 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
         return _answer_holding_state_query(session)
     if _is_object_location_query(text):
         return _answer_object_location_query(session, text)
+    if _is_object_presence_query(text):
+        observation = _answer_object_presence_query(session, text)
+        session["open_world_observation"] = deepcopy(observation)
+        observation["session"] = get_session(session_id)
+        return observation
     if _is_open_world_observation_query(text):
         observation = _answer_observation_query(session, text)
         session["open_world_observation"] = deepcopy(observation)
