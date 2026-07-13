@@ -744,6 +744,21 @@ def _directed_observation_concept(text: str) -> dict[str, Any] | None:
     return {"concept_id": concept["concept_id"], "display_name": concept["display_name"], "matched_alias": alias}
 
 
+def _observation_primitive_contract() -> dict[str, Any]:
+    """Expose the factory perceptual primitive without treating vision as a fact write."""
+    concept = next(item for item in FACTORY_EVENT_CONCEPT_UNITS if item["concept_id"] == "factory_event_observe")
+    effect_contract = concept["concept_kernel"]["effect_contract"]
+    return {
+        "concept_id": concept["concept_id"],
+        "operator": concept["concept_kernel"]["operator"],
+        "target_role": "perceivable_entity",
+        "requires": deepcopy(effect_contract["requires"]),
+        "produces": deepcopy(effect_contract["produces"]),
+        "verification": deepcopy(effect_contract["verification"]),
+        "evidence_boundary": "visual_observation_candidate_not_runtime_fact",
+    }
+
+
 def _answer_object_presence_query(session: dict[str, Any], text: str) -> dict[str, Any]:
     """Answer a present-world query without inventing an event or task contract."""
     observation = build_open_world_observation(_scene_for_session(session), session)
@@ -763,6 +778,7 @@ def _answer_object_presence_query(session: dict[str, Any], text: str) -> dict[st
             "sensor_frame": "head_rgbd",
             "scene_truth_read_directly": False,
         },
+        "factory_perceptual_primitive": _observation_primitive_contract(),
         "active_perception_trace": [
             {"viewpoint": deepcopy(viewpoint), "status": "observation_candidate_collected"}
             for viewpoint in observation.get("scan_viewpoints", [])
@@ -806,6 +822,7 @@ def _answer_observation_query(session: dict[str, Any], text: str) -> dict[str, A
         "viewpoints": deepcopy(observation.get("scan_viewpoints", [])),
         "scene_truth_read_directly": False,
     }
+    observation["factory_perceptual_primitive"] = _observation_primitive_contract()
     observation["active_perception_trace"] = [
         {"viewpoint": deepcopy(viewpoint), "status": "observation_candidate_collected"}
         for viewpoint in observation.get("scan_viewpoints", [])

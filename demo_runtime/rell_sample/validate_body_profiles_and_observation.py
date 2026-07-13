@@ -39,6 +39,12 @@ def main() -> None:
     require(variant["status"] == "observation_candidate_confirmation_required", f"看得到 variant did not enter observe concept: {variant}")
     abbreviated = execute_command(wheeled["session_id"], "你看的杯子吗")
     require(abbreviated["status"] == "observation_candidate_confirmation_required", f"abbreviated visual question did not enter observe concept: {abbreviated}")
+    apple_seen = execute_command(wheeled["session_id"], "看到苹果了吗")
+    require(apple_seen["status"] == "observation_candidate_confirmation_required", f"directed apple observation did not enter observe concept: {apple_seen}")
+    require(len(apple_seen["directed_matches"]) == 1 and apple_seen["directed_matches"][0]["concept_id"] == "concept_edible_apple", f"apple visual candidate was not observed: {apple_seen}")
+    primitive = apple_seen["factory_perceptual_primitive"]
+    require(primitive["concept_id"] == "factory_event_observe" and primitive["operator"] == "observe_entity", f"observe primitive was not exposed: {apple_seen}")
+    require(primitive["evidence_boundary"] == "visual_observation_candidate_not_runtime_fact", f"observe primitive overclaimed visual evidence: {apple_seen}")
     presence_session = start_session(scene_id="home_semantic_3d_b", executor_profile_id="home_humanoid")
     apple_presence = begin_motion_command(presence_session["session_id"], "房间里有没有苹果")["immediate_result"]
     require(apple_presence["status"] == "object_presence_observed", f"object presence query entered event-gap reasoning: {apple_presence}")
