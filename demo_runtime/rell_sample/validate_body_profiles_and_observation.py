@@ -147,6 +147,27 @@ def main() -> None:
         and apple_transfer_placed["result"]["long_horizon_intent"]["lifecycle"] == "completed",
         f"apple transfer did not complete the generic placement stage: {apple_transfer_placed}",
     )
+    co_location_session = start_session(scene_id="home_semantic_3d_a", executor_profile_id="home_humanoid")
+    co_location_first = begin_motion_command(co_location_session["session_id"], "去把苹果拿过来，和杯子一起放在桌子上")
+    co_location_intent = co_location_first["immediate_result"]["long_horizon_intent"]
+    require(
+        co_location_first["status"] == "requires_human_confirmation"
+        and co_location_intent["goal_fact"] == "objects_co_supported_at_destination"
+        and co_location_intent["role_bindings"] == {"theme": "apple_a", "destination": "counter_a", "companions": ["cup_a"]},
+        f"co-location request did not bind a theme, reference object, and destination: {co_location_first}",
+    )
+    co_location_grasped = drain_motion(begin_motion_command(co_location_session["session_id"], "确认"))
+    co_location_placed = drain_motion(begin_motion_command(co_location_session["session_id"], "确认"))
+    co_location_objects = {item["entity_id"]: item for item in co_location_placed["result"]["runtime_objects"]}
+    apple_position = co_location_objects["apple_a"]["position"]
+    cup_position = co_location_objects["cup_a"]["position"]
+    require(
+        co_location_placed["result"]["long_horizon_intent"]["lifecycle"] == "completed"
+        and co_location_objects["apple_a"]["support_ref"] == co_location_objects["cup_a"]["support_ref"] == "counter_a"
+        and apple_position != cup_position
+        and co_location_placed["result"]["verification_evidence"]["support_occupancy"]["non_overlapping"],
+        f"co-location placement did not establish distinct support poses: {co_location_placed}",
+    )
     relocate_wording_session = start_session(scene_id="home_semantic_3d_a", executor_profile_id="home_humanoid")
     relocate_wording = begin_motion_command(relocate_wording_session["session_id"], "把苹果移到桌子上")
     require(

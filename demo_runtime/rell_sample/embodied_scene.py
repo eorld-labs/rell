@@ -184,6 +184,15 @@ def _create_transfer_intent(session: dict[str, Any], utterance: str) -> dict[str
     ]
     if not destination_concepts and len(explicit_destination_entities) == 1:
         destination_concepts = [next(concept for concept in concepts if "support_object" in concept.get("functional_affordances", []))]
+    acquisition_positions = [normalized.find(token) for token in ("拿过来", "拿来", "拿起", "拿", "取", "抓") if token in normalized]
+    acquisition_position = min(acquisition_positions) if acquisition_positions else None
+    if len(theme_concepts) > 1 and acquisition_position is not None:
+        preceding = [
+            concept for concept in theme_concepts
+            if any(normalized.find(alias) >= 0 and normalized.find(alias) < acquisition_position for alias in concept.get("aliases", []))
+        ]
+        if len(preceding) == 1:
+            theme_concepts = preceding
     if not theme_concepts and held_theme and (deictic_theme_requested or restore_requested):
         theme_candidates = [held_theme]
     elif len(theme_concepts) == 1:
@@ -210,6 +219,20 @@ def _create_transfer_intent(session: dict[str, Any], utterance: str) -> dict[str
     theme, destination = theme_candidates[0], destinations[0]
     if destination["entity_id"] == theme.get("support_ref"):
         return None
+    companion_concepts = [concept for concept in theme_concepts if concept["concept_id"] != next((item["concept_id"] for item in theme_concepts if theme["kind"] in item.get("compatible_kinds", [])), None)]
+    # Keep every additional mentioned graspable object as a configuration
+    # reference when the utterance explicitly requests co-location.
+    if "一起" in normalized:
+        companion_concepts = [
+            concept for concept in mentioned
+            if concept["concept_id"] != next((item["concept_id"] for item in mentioned if theme["kind"] in item.get("compatible_kinds", [])), None)
+            and "graspable" in concept.get("functional_affordances", [])
+        ]
+    companion_refs = []
+    for concept in companion_concepts:
+        candidates = [item for item in session["runtime_objects"] if item.get("active") is not False and item.get("kind") in concept.get("compatible_kinds", [])]
+        if len(candidates) == 1:
+            companion_refs.append(candidates[0]["entity_id"])
     intent_id = "intent_" + hashlib.sha1(
         f"{session['session_id']}|{theme['entity_id']}|{destination['entity_id']}|{session['world_revision']}".encode("utf-8")
     ).hexdigest()[:12]
@@ -217,12 +240,16 @@ def _create_transfer_intent(session: dict[str, Any], utterance: str) -> dict[str
         "intent_id": intent_id,
         "intent_type": "verified_object_transfer",
         "source_utterance": utterance,
-        "goal_fact": "object_supported_at_destination",
-        "role_bindings": {"theme": theme["entity_id"], "destination": destination["entity_id"]},
+        "goal_fact": "objects_co_supported_at_destination" if companion_refs else "object_supported_at_destination",
+        "role_bindings": {
+            "theme": theme["entity_id"],
+            "destination": destination["entity_id"],
+            **({"companions": companion_refs} if companion_refs else {}),
+        },
         "goal_contract": {
             "requires": ["theme_object_grounded", "destination_grounded"],
-            "produces": ["object_supported_at_destination"],
-            "verification": ["projection_inside_support_boundary", "support_contact_stable", "gripper_released"],
+            "produces": ["object_supported_at_destination", "objects_co_supported_at_destination"] if companion_refs else ["object_supported_at_destination"],
+            "verification": ["projection_inside_support_boundary", "support_contact_stable", "gripper_released", "support_occupancy_non_overlapping"] if companion_refs else ["projection_inside_support_boundary", "support_contact_stable", "gripper_released"],
         },
         "dependency_graph": {
             "root": "object_supported_at_destination",
@@ -251,8 +278,13 @@ def _derive_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) -
     if not theme or not destination:
         return {"status": "rebind_required", "reason": "long_intent_role_binding_no_longer_present"}
     theme_reference = _conceptual_reference_for_entity(theme)
+    companion_refs = intent["role_bindings"].get("companions", [])
+    companions = [item for item in session["runtime_objects"] if item.get("entity_id") in companion_refs]
+    companions_ready = all(item.get("support_ref") == destination_ref and not item.get("attached_to_executor") for item in companions)
     if theme.get("support_ref") == destination_ref and session["state"].get("holding") != theme_ref:
-        return {"status": "completed", "verified_fact": "object_supported_at_destination"}
+        if companions_ready:
+            return {"status": "completed", "verified_fact": intent["goal_fact"]}
+        return {"status": "rebind_required", "reason": "co_location_reference_not_supported_at_destination"}
     if session["state"].get("holding") == theme_ref:
         return {
             "status": "stage_ready",
@@ -275,7 +307,7 @@ def _prepare_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) 
     stage = _derive_long_intent_stage(session, intent)
     if stage["status"] == "completed":
         intent["lifecycle"] = "completed"
-        intent["verified_facts"] = ["object_supported_at_destination"]
+        intent["verified_facts"] = [intent["goal_fact"]]
         intent["current_stage"] = None
         if session.get("active_intent_id") == intent["intent_id"]:
             session["active_intent_id"] = None
@@ -1874,14 +1906,53 @@ def _apply_verified_place(session: dict[str, Any], object_ref: str, destination_
             "prompt": "当前物体的投影不能完整落入目标承载面，无法形成稳定放置事实。",
             "frames": [],
         }
-    placement_position = [float(destination["position"][0]), float(destination["position"][1])]
+    occupied = [
+        item for item in session["runtime_objects"]
+        if item.get("entity_id") != object_ref and item.get("support_ref") == destination_ref and not item.get("attached_to_executor")
+    ]
+    center_x, center_y = map(float, destination["position"])
+    offset_x, offset_y = margin_x * 0.68, margin_y * 0.68
+    placement_candidates = [
+        [center_x, center_y],
+        [center_x - offset_x, center_y], [center_x + offset_x, center_y],
+        [center_x, center_y - offset_y], [center_x, center_y + offset_y],
+        [center_x - offset_x, center_y - offset_y], [center_x + offset_x, center_y + offset_y],
+    ]
+    if occupied:
+        placement_candidates.sort(
+            key=lambda candidate: min(math.dist(candidate, item["position"]) for item in occupied),
+            reverse=True,
+        )
+    placement_position = None
+    for candidate in placement_candidates:
+        collision = any(
+            abs(candidate[0] - float(item["position"][0])) < (float(held_object["size"][0]) + float(item["size"][0])) / 2 + 0.03
+            and abs(candidate[1] - float(item["position"][1])) < (float(held_object["size"][1]) + float(item["size"][1])) / 2 + 0.03
+            for item in occupied
+        )
+        if not collision:
+            placement_position = candidate
+            break
+    if placement_position is None:
+        return {
+            "status": "placement_blocked",
+            "reason": "destination_has_no_non_overlapping_placement_pose",
+            "prompt": "目标承载面没有可供当前物体稳定放置且不与已有物体重叠的位置。",
+            "occupied_object_refs": [item["entity_id"] for item in occupied],
+            "frames": [],
+        }
     projection_inside = (
         abs(placement_position[0] - destination["position"][0]) <= margin_x
         and abs(placement_position[1] - destination["position"][1]) <= margin_y
     )
     support_contact = True
     release_feasible = session["state"].get("holding") == object_ref
-    verified = projection_inside and support_contact and release_feasible
+    non_overlapping = all(
+        abs(placement_position[0] - float(item["position"][0])) >= (float(held_object["size"][0]) + float(item["size"][0])) / 2 + 0.03
+        or abs(placement_position[1] - float(item["position"][1])) >= (float(held_object["size"][1]) + float(item["size"][1])) / 2 + 0.03
+        for item in occupied
+    )
+    verified = projection_inside and support_contact and release_feasible and non_overlapping
     if not verified:
         return {"status": "placement_verification_failed", "reason": "stable_support_relation_not_established", "frames": []}
     # Commit the state transition only after both predicted verification
@@ -1899,11 +1970,12 @@ def _apply_verified_place(session: dict[str, Any], object_ref: str, destination_
         "terminal_fact": "object_supported_at_destination",
         "terminal_fact_binding": {"object_ref": object_ref, "destination_ref": destination_ref},
         "verification_evidence": {
-            "first_channel": {"source": "simulated_support_contact_and_projection", "established": projection_inside and support_contact},
+            "first_channel": {"source": "simulated_support_contact_projection_and_occupancy", "established": projection_inside and support_contact and non_overlapping},
             "second_channel": {"source": "simulated_gripper_release_and_object_stationarity", "established": release_feasible and session["state"].get("holding") is None},
             "final_fact": "object_supported_at_destination",
             "final_fact_established": True,
             "verification_boundary": "P016_multi_channel_fact_verification",
+            "support_occupancy": {"occupied_object_refs": [item["entity_id"] for item in occupied], "non_overlapping": non_overlapping},
         },
         "effect_contract_committed": {
             "produces": ["object_at_destination", "object_supported_at_destination", "gripper_empty"],
