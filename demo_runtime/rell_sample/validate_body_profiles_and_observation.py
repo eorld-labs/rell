@@ -45,6 +45,12 @@ def main() -> None:
     primitive = apple_seen["factory_perceptual_primitive"]
     require(primitive["concept_id"] == "factory_event_observe" and primitive["operator"] == "observe_entity", f"observe primitive was not exposed: {apple_seen}")
     require(primitive["evidence_boundary"] == "visual_observation_candidate_not_runtime_fact", f"observe primitive overclaimed visual evidence: {apple_seen}")
+    seen_variant = execute_command(wheeled["session_id"], "你看见苹果了吗")
+    peek_variant = execute_command(wheeled["session_id"], "你瞧见苹果没")
+    require(seen_variant["status"] == "observation_candidate_confirmation_required" and len(seen_variant["directed_matches"]) == 1, f"see variant did not normalize to directed observation: {seen_variant}")
+    require(peek_variant["status"] == "observation_candidate_confirmation_required" and len(peek_variant["directed_matches"]) == 1, f"peek variant did not normalize to directed observation: {peek_variant}")
+    apple_location = execute_command(wheeled["session_id"], "苹果在哪儿")
+    require(apple_location["status"] == "object_location_state_answered", f"colloquial location query did not enter world-state answering: {apple_location}")
     presence_session = start_session(scene_id="home_semantic_3d_b", executor_profile_id="home_humanoid")
     apple_presence = begin_motion_command(presence_session["session_id"], "房间里有没有苹果")["immediate_result"]
     require(apple_presence["status"] == "object_presence_observed", f"object presence query entered event-gap reasoning: {apple_presence}")
@@ -140,6 +146,23 @@ def main() -> None:
         apple_transfer_placed["result"]["terminal_fact"] == "object_supported_at_destination"
         and apple_transfer_placed["result"]["long_horizon_intent"]["lifecycle"] == "completed",
         f"apple transfer did not complete the generic placement stage: {apple_transfer_placed}",
+    )
+    relocate_wording_session = start_session(scene_id="home_semantic_3d_a", executor_profile_id="home_humanoid")
+    relocate_wording = begin_motion_command(relocate_wording_session["session_id"], "把苹果移到桌子上")
+    require(
+        relocate_wording["status"] == "requires_human_confirmation"
+        and relocate_wording["immediate_result"]["long_horizon_intent"]["role_bindings"] == {"theme": "apple_a", "destination": "counter_a"},
+        f"relocate wording did not reuse object-transfer contract: {relocate_wording}",
+    )
+    restore_gap_session = start_session(scene_id="home_semantic_3d_a", executor_profile_id="home_humanoid")
+    restore_grasp = begin_motion_command(restore_gap_session["session_id"], "拿起苹果")
+    require(restore_grasp["status"] == "requires_human_confirmation", f"restore setup could not grasp apple: {restore_grasp}")
+    drain_motion(begin_motion_command(restore_gap_session["session_id"], "确认"))
+    restore_gap = begin_motion_command(restore_gap_session["session_id"], "放回去")["immediate_result"]
+    require(
+        restore_gap["status"] == "restore_destination_clarification_required"
+        and restore_gap["missing_causal_slots"] == ["destination", "placement_verification"],
+        f"restore without an origin did not expose its real causal gap: {restore_gap}",
     )
     direct_take_session = start_session(scene_id="home_semantic_3d_b", executor_profile_id="home_humanoid")
     direct_take = begin_motion_command(direct_take_session["session_id"], "去拿杯子")

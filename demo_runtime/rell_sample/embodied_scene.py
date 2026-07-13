@@ -167,29 +167,43 @@ def _conceptual_reference_for_entity(entity: dict[str, Any]) -> str:
 
 def _create_transfer_intent(session: dict[str, Any], utterance: str) -> dict[str, Any] | None:
     normalized = re.sub(r"[，。！？、,.!?\s]+", "", utterance)
-    if not any(token in normalized for token in ("放到", "放在", "摆到", "摆在")):
+    transfer_tokens = ("放到", "放在", "摆到", "摆在", "搁到", "搁在", "移到", "搬到", "挪到")
+    restore_requested = any(token in normalized for token in ("放回", "放回去", "放回原处", "还回去"))
+    if not restore_requested and not any(token in normalized for token in transfer_tokens):
         return None
     concepts = load_object_concepts()["concepts"]
     mentioned = [concept for concept in concepts if any(alias and alias in normalized for alias in concept.get("aliases", []))]
     theme_concepts = [concept for concept in mentioned if "graspable" in concept.get("functional_affordances", [])]
     destination_concepts = [concept for concept in mentioned if "support_object" in concept.get("functional_affordances", [])]
+    held_ref = session["state"].get("holding")
+    held_theme = next((item for item in session["runtime_objects"] if item.get("entity_id") == held_ref), None)
+    deictic_theme_requested = any(token in normalized for token in ("它", "这个", "那个", "这东西", "那东西"))
     explicit_destination_entities = [
         item for item in session["runtime_objects"]
         if item.get("active") is not False and item.get("kind") == "operation_surface" and item.get("label") in normalized
     ]
     if not destination_concepts and len(explicit_destination_entities) == 1:
         destination_concepts = [next(concept for concept in concepts if "support_object" in concept.get("functional_affordances", []))]
-    if len(theme_concepts) != 1 or len(destination_concepts) != 1:
+    if not theme_concepts and held_theme and (deictic_theme_requested or restore_requested):
+        theme_candidates = [held_theme]
+    elif len(theme_concepts) == 1:
+        theme_candidates = [
+            item for item in session["runtime_objects"]
+            if item.get("active") is not False and item.get("kind") in theme_concepts[0].get("compatible_kinds", [])
+        ]
+    else:
         return None
-    theme_candidates = [
-        item for item in session["runtime_objects"]
-        if item.get("active") is not False and item.get("kind") in theme_concepts[0].get("compatible_kinds", [])
-    ]
-    destinations = [
-        item for item in session["runtime_objects"]
-        if item.get("active") is not False and item.get("kind") in destination_concepts[0].get("compatible_kinds", [])
-    ]
-    if len(explicit_destination_entities) == 1:
+    if restore_requested:
+        previous_support_ref = theme_candidates[0].get("last_support_ref") if len(theme_candidates) == 1 else None
+        destinations = [item for item in session["runtime_objects"] if item.get("entity_id") == previous_support_ref]
+    elif len(destination_concepts) == 1:
+        destinations = [
+            item for item in session["runtime_objects"]
+            if item.get("active") is not False and item.get("kind") in destination_concepts[0].get("compatible_kinds", [])
+        ]
+    else:
+        return None
+    if len(explicit_destination_entities) == 1 and not restore_requested:
         destinations = explicit_destination_entities
     if len(theme_candidates) != 1 or len(destinations) != 1:
         return None
@@ -618,7 +632,10 @@ def build_visual_concept_pack_catalog() -> dict[str, Any]:
 
 
 def _is_holding_state_query(text: str) -> bool:
-    return any(pattern in text for pattern in ("拿着什么", "手里有什么", "手上有什么", "手上拿着什么", "握着什么", "持有什么"))
+    return any(pattern in text for pattern in (
+        "拿着什么", "手里有什么", "手上有什么", "手上拿着什么", "手上拿的什么",
+        "你拿着什么", "你拿了什么", "你手上有什么", "握着什么", "持有什么",
+    ))
 
 
 def _answer_holding_state_query(session: dict[str, Any]) -> dict[str, Any]:
@@ -648,10 +665,39 @@ def _answer_holding_state_query(session: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _is_restore_request(text: str) -> bool:
+    return any(token in text for token in ("放回", "放回去", "放回原处", "还回去"))
+
+
+def _answer_restore_destination_gap(session: dict[str, Any]) -> dict[str, Any] | None:
+    holding_ref = session.get("state", {}).get("holding")
+    held = next((item for item in session.get("runtime_objects", []) if item.get("entity_id") == holding_ref), None)
+    if not held or held.get("last_support_ref"):
+        return None
+    return {
+        "status": "restore_destination_clarification_required",
+        "reason": "held_object_has_no_verified_previous_support_relation",
+        "prompt": (
+            f"我知道当前手里拿着{held.get('label', holding_ref)}，但它没有已验真的上一承载面，"
+            "所以“放回去”还不能唯一决定目的地。请告诉我放到哪里，以及看到什么才算放稳。"
+        ),
+        "known_state": {"held_object": holding_ref, "previous_support_relation": None},
+        "missing_causal_slots": ["destination", "placement_verification"],
+        "post_action": {
+            "action": "continue_language_teaching_with_destination_and_verification",
+            "teaching_available": True,
+            "clarification_required": True,
+        },
+        "candidate_only": True,
+        "direct_execution_allowed": False,
+        "session": get_session(session["session_id"]),
+    }
+
+
 def _is_object_location_query(text: str) -> bool:
     return (
         _directed_observation_concept(text) is not None
-        and any(pattern in text for pattern in ("在哪里", "在哪", "什么位置", "哪个区域"))
+        and any(pattern in text for pattern in ("在哪里", "在哪", "在哪儿", "什么位置", "哪个区域"))
     )
 
 
@@ -730,13 +776,16 @@ def _answer_object_location_query(session: dict[str, Any], text: str) -> dict[st
 
 def _is_open_world_observation_query(text: str) -> bool:
     broad = any(pattern in text for pattern in ("看到什么", "看到了什么", "有什么东西", "有哪些东西", "周围有什么"))
-    directed = any(pattern in text for pattern in ("看得到", "看的到", "能看到", "能看见", "看得见", "有没有看到", "看到吗", "看见吗"))
+    directed = any(pattern in text for pattern in (
+        "看得到", "看的到", "能看到", "能看见", "看得见", "有没有看到", "看到吗", "看见吗",
+        "看见没", "看到没", "瞧见", "瞧得到", "能不能看到", "能不能看见",
+    ))
     # Natural confirmations such as “看到杯子没有” omit the usual question
     # prefix. Keep them on the observation path when a known object concept is
     # present, instead of sending them into task/event parsing.
     colloquial_directed = (
         _directed_observation_concept(text) is not None
-        and re.search(r"看到.{0,12}(?:没有|吗|么|没)", text) is not None
+        and re.search(r"(?:看到|看见|瞧见).{0,12}(?:没有|吗|么|没)", text) is not None
     )
     # Treat omitted-result forms such as “你看的杯子吗” as the same visual
     # operator. The object concept and interrogative tail provide the semantic
@@ -2184,6 +2233,10 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
     text = utterance.strip()
     if _is_holding_state_query(text):
         return _answer_holding_state_query(session)
+    if _is_restore_request(text):
+        restore_gap = _answer_restore_destination_gap(session)
+        if restore_gap:
+            return restore_gap
     if _is_object_location_query(text):
         return _answer_object_location_query(session, text)
     if _is_object_presence_query(text):
