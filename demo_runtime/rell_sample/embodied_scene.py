@@ -2129,7 +2129,7 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
     target = [start[0] + math.cos(yaw) * distance, start[1] + math.sin(yaw) * distance]
     rotation_frames = _rotation_frames(start, body_yaw, final_yaw) if final_yaw != body_yaw else []
     planning_radius = effective_constraints["body_radius_m"] + effective_constraints["minimum_avoidance_distance_m"]
-    motion_plan = _plan_verified_motion(session, start, target, planning_radius)
+    motion_plan = _plan_verified_motion(session, start, target, planning_radius, preserve_terminal_goal=False)
     collision = motion_plan.get("blocking_collision")
     obstacle = collision["obstacle"] if collision else None
     frames: list[dict[str, Any]] = []
@@ -2307,6 +2307,8 @@ def begin_motion_command(session_id: str, utterance: str, scoped_authorization: 
         "next_frame_index": 0,
         "terminal_result": result,
         "post_completion": deepcopy(result.get("post_completion")),
+        "execution_intent": _post_completion_signature(result.get("post_completion")),
+        "continuation_authorized": _authorization_is_current(before, utterance, scoped_authorization),
         "execution_collision_radius_m": (
             result.get("effective_execution_envelope", {}).get("effective_constraints", {}).get("body_radius_m", 0.0)
             + result.get("effective_execution_envelope", {}).get("effective_constraints", {}).get("minimum_avoidance_distance_m", 0.0)
@@ -2403,6 +2405,73 @@ def confirm_pending_motion(session_id: str, confirmation_id: str, approved: bool
     return result
 
 
+def _post_completion_signature(post_completion: dict[str, Any] | None) -> dict[str, Any]:
+    post_completion = post_completion or {}
+    action = post_completion.get("action")
+    if action == "grasp":
+        return {"action": action, "target_entity_ref": post_completion.get("target_entity_ref")}
+    if action == "place":
+        return {
+            "action": action,
+            "object_ref": post_completion.get("object_ref"),
+            "destination_ref": post_completion.get("destination_ref"),
+        }
+    return {"action": action}
+
+
+def _resume_after_local_path_change(job: dict[str, Any], session: dict[str, Any], reason: str, obstacle: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Replan geometry while preserving a verified task intent, never a stale trajectory."""
+    original_intent = deepcopy(job.get("execution_intent") or _post_completion_signature(job.get("post_completion")))
+    if not job.get("continuation_authorized") or not original_intent.get("action"):
+        replacement = begin_motion_command(job["session_id"], job["utterance"])
+        return {
+            "status": "path_invalidated_and_replanned",
+            "reason": reason,
+            "old_job_id": job["job_id"],
+            "blocking_obstacle": obstacle,
+            "replacement": replacement,
+            "continuation_status": "confirmation_required_for_new_execution_intent",
+        }
+
+    continuation_authorization = {
+        "status": "authorized",
+        "authorization_id": f"continuation_{job['job_id']}",
+        "command_hash": _command_hash(job["utterance"]),
+        "authorized_world_revision": session["world_revision"],
+        "policy_binding": _policy_binding(session),
+        "scope": "same_verified_intent_after_local_path_replan",
+        "original_execution_intent": original_intent,
+    }
+    replacement = begin_motion_command(job["session_id"], job["utterance"], continuation_authorization)
+    replacement_job = MOTION_JOBS.get(replacement.get("job_id", ""))
+    replacement_intent = _post_completion_signature((replacement_job or {}).get("post_completion"))
+    if replacement_job and replacement_intent == original_intent:
+        replacement["continuation_status"] = "same_intent_reobserved_and_replanned"
+        replacement["preserved_execution_intent"] = original_intent
+        return {
+            "status": "path_invalidated_and_replanned",
+            "reason": reason,
+            "old_job_id": job["job_id"],
+            "blocking_obstacle": obstacle,
+            "replacement": replacement,
+            "continuation_status": "same_intent_reobserved_and_replanned",
+        }
+
+    if replacement_job:
+        MOTION_JOBS.pop(replacement_job["job_id"], None)
+    immediate = replacement.get("immediate_result") or replacement
+    return {
+        "status": "task_intent_reconfirmation_required",
+        "reason": "local_path_changed_and_execution_intent_could_not_be_preserved",
+        "old_job_id": job["job_id"],
+        "blocking_obstacle": obstacle,
+        "original_execution_intent": original_intent,
+        "replacement_candidate": immediate,
+        "prompt": "局部路径已经变化，但重新观察后无法确认目标对象和原已确认意图仍一致，因此没有继续执行，请确认新的候选计划。",
+        "session": get_session(job["session_id"]),
+    }
+
+
 def step_motion_command(job_id: str) -> dict[str, Any]:
     job = MOTION_JOBS.get(job_id)
     if not job:
@@ -2424,8 +2493,10 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
                 "session": get_session(job["session_id"]),
             }
             return {"status": "motion_completed", "job_id": job_id, "result": result, "session": get_session(job["session_id"])}
-        replacement = begin_motion_command(job["session_id"], job["utterance"])
         reason = "runtime_policy_revision_changed" if session["policy_revision"] != job["planned_policy_revision"] else "runtime_world_revision_changed"
+        if session["policy_revision"] == job["planned_policy_revision"]:
+            return _resume_after_local_path_change(job, session, reason)
+        replacement = begin_motion_command(job["session_id"], job["utterance"])
         return {
             "status": "path_invalidated_and_replanned",
             "reason": reason,
@@ -2454,14 +2525,7 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
                 "session": get_session(job["session_id"]),
             }
             return {"status": "motion_completed", "job_id": job_id, "result": result, "session": get_session(job["session_id"])}
-        replacement = begin_motion_command(job["session_id"], job["utterance"])
-        return {
-            "status": "path_invalidated_and_replanned",
-            "reason": "next_frame_swept_body_not_clear",
-            "old_job_id": job_id,
-            "blocking_obstacle": collider,
-            "replacement": replacement,
-        }
+        return _resume_after_local_path_change(job, session, "next_frame_swept_body_not_clear", collider)
     session["state"]["executor_position"] = list(frame["position"])
     if frame.get("yaw_deg") is not None:
         session["state"]["executor_yaw_deg"] = frame["yaw_deg"]
@@ -2600,6 +2664,7 @@ def _plan_verified_motion(
     start: list[float],
     target: list[float],
     radius: float,
+    preserve_terminal_goal: bool = True,
 ) -> dict[str, Any]:
     safety_contract = {
         "planner_world_revision": session["world_revision"],
@@ -2618,7 +2683,7 @@ def _plan_verified_motion(
     candidates: list[dict[str, Any]] = []
     rejected: list[dict[str, Any]] = []
     for side_name, side_sign in (("left", 1.0), ("right", -1.0)):
-        waypoints = _detour_candidate(start, target, obstacle, radius, side_sign)
+        waypoints = _detour_candidate(start, target, obstacle, radius, side_sign, preserve_terminal_goal)
         segment_start = start
         rejection = None
         for segment_index, waypoint in enumerate(waypoints):
@@ -2686,6 +2751,7 @@ def _detour_candidate(
     obstacle: dict[str, Any],
     radius: float,
     side_sign: float,
+    preserve_terminal_goal: bool,
 ) -> list[list[float]]:
     ox, oy = obstacle["position"]
     dx, dy = target[0] - start[0], target[1] - start[1]
@@ -2697,7 +2763,10 @@ def _detour_candidate(
     before = [ox - forward[0] * longitudinal_clearance + side[0] * lateral_clearance, oy - forward[1] * longitudinal_clearance + side[1] * lateral_clearance]
     after_side = [ox + forward[0] * longitudinal_clearance + side[0] * lateral_clearance, oy + forward[1] * longitudinal_clearance + side[1] * lateral_clearance]
     after_axis = [ox + forward[0] * longitudinal_clearance, oy + forward[1] * longitudinal_clearance]
-    return [before, after_side, after_axis]
+    # For a goal-directed task, clearing an obstacle is only an intermediate
+    # safety condition and the final waypoint remains the original goal. A
+    # bare relative-motion request has no external task goal beyond clearance.
+    return [before, after_side, after_axis, list(target)] if preserve_terminal_goal else [before, after_side, after_axis]
 
 
 def _interpolate(start: list[float], target: list[float], count: int) -> list[dict[str, Any]]:

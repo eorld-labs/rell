@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from embodied_scene import begin_motion_command, execute_command, start_session, step_motion_command
+from embodied_scene import begin_motion_command, execute_command, set_stool, start_session, step_motion_command
 
 
 def require(condition: bool, message: str) -> None:
@@ -82,6 +82,17 @@ def main() -> None:
     require(bare_take["status"] == "requires_human_confirmation", f"bare take verb stopped at perception instead of planning: {bare_take}")
     require(bare_take_result["operator_candidate"] == "grasp_object", f"earlier navigation token displaced the final grasp goal: {bare_take}")
     require(bare_take_result["candidate_execution_plan"]["role_bindings"] == {"target": "cup_b", "support": "counter_b"}, f"bare take did not jointly ground explicit support and target: {bare_take}")
+    obstacle_continuation_session = start_session(scene_id="home_semantic_3d_b", executor_profile_id="home_humanoid")
+    obstacle_plan = begin_motion_command(obstacle_continuation_session["session_id"], "去桌子上拿杯子")
+    obstacle_started = begin_motion_command(obstacle_continuation_session["session_id"], "确认")
+    require(obstacle_started["status"] == "motion_started", f"confirmed grasp did not start before obstacle test: {obstacle_started}")
+    require(step_motion_command(obstacle_started["job_id"])["status"] == "frame_verified_and_committed", "grasp did not enter active motion before obstacle insertion")
+    set_stool(obstacle_continuation_session["session_id"], "ahead")
+    obstacle_replanned = step_motion_command(obstacle_started["job_id"])
+    require(obstacle_replanned["status"] == "path_invalidated_and_replanned", f"obstacle did not invalidate stale geometry path: {obstacle_replanned}")
+    require(obstacle_replanned["continuation_status"] == "same_intent_reobserved_and_replanned", f"local detour lost the confirmed grasp intent: {obstacle_replanned}")
+    obstacle_completed = drain_motion(obstacle_replanned["replacement"])
+    require(obstacle_completed["result"]["terminal_fact"] == "target_object_in_gripper", f"detour cleared obstacle but failed to complete the original grasp goal: {obstacle_completed}")
     direct_take_session = start_session(scene_id="home_semantic_3d_b", executor_profile_id="home_humanoid")
     direct_take = begin_motion_command(direct_take_session["session_id"], "去拿杯子")
     require(direct_take["status"] == "requires_human_confirmation" and direct_take["immediate_result"]["operator_candidate"] == "grasp_object", f"short bare take did not use the same terminal-goal paradigm: {direct_take}")
