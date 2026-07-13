@@ -3177,7 +3177,8 @@ def _plan_verified_motion(
     candidates: list[dict[str, Any]] = []
     rejected: list[dict[str, Any]] = []
     for side_name, side_sign in (("left", 1.0), ("right", -1.0)):
-        waypoints = _detour_candidate(start, target, obstacle, radius, side_sign, preserve_terminal_goal)
+        template_waypoints = _detour_candidate(start, target, obstacle, radius, side_sign, preserve_terminal_goal)
+        waypoints = _simplify_collision_free_waypoints(session, start, template_waypoints, radius)
         segment_start = start
         rejection = None
         for segment_index, waypoint in enumerate(waypoints):
@@ -3193,7 +3194,13 @@ def _plan_verified_motion(
             rejected.append({"side": side_name, "reason": "terminal_pose_not_clear"})
             continue
         route_length = sum(math.dist(a, b) for a, b in zip([start] + waypoints[:-1], waypoints))
-        candidates.append({"side": side_name, "waypoints": waypoints, "route_length": route_length})
+        candidates.append({
+            "side": side_name,
+            "waypoints": waypoints,
+            "route_length": route_length,
+            "template_waypoint_count": len(template_waypoints),
+            "simplified_waypoint_count": len(waypoints),
+        })
     if not candidates:
         return {
             "outcome": "blocked",
@@ -3209,6 +3216,8 @@ def _plan_verified_motion(
         "route_kind": "local_detour",
         "waypoints": selected["waypoints"],
         "selected_detour_side": selected["side"],
+        "template_waypoint_count": selected["template_waypoint_count"],
+        "simplified_waypoint_count": selected["simplified_waypoint_count"],
         "rejected_alternatives": rejected,
         "blocking_collision": direct_collision,
         "safety_contract": safety_contract,
@@ -3261,6 +3270,30 @@ def _detour_candidate(
     # safety condition and the final waypoint remains the original goal. A
     # bare relative-motion request has no external task goal beyond clearance.
     return [before, after_side, after_axis, list(target)] if preserve_terminal_goal else [before, after_side, after_axis]
+
+
+def _simplify_collision_free_waypoints(
+    session: dict[str, Any],
+    start: list[float],
+    template_waypoints: list[list[float]],
+    radius: float,
+) -> list[list[float]]:
+    """Retain only detour corners that cannot be replaced by a direct safe segment."""
+    simplified: list[list[float]] = []
+    anchor = list(start)
+    index = 0
+    while index < len(template_waypoints):
+        furthest = index
+        for candidate_index in range(len(template_waypoints) - 1, index - 1, -1):
+            candidate = template_waypoints[candidate_index]
+            if _first_collision(session, anchor, candidate, radius) is None:
+                furthest = candidate_index
+                break
+        waypoint = list(template_waypoints[furthest])
+        simplified.append(waypoint)
+        anchor = waypoint
+        index = furthest + 1
+    return simplified
 
 
 def _interpolate(start: list[float], target: list[float], count: int) -> list[dict[str, Any]]:
