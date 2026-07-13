@@ -101,6 +101,36 @@ def _scene_for_session(session: dict[str, Any]) -> dict[str, Any]:
     return load_scene(str(session.get("scene_id") or "home_semantic_3d_a"))
 
 
+def _manipulator_channels(session: dict[str, Any]) -> list[dict[str, Any]]:
+    channels = session.get("executor_profile", {}).get("manipulator_channels", [])
+    return channels or [{"channel_id": "primary_gripper", "side": "center"}]
+
+
+def _holding_by_effector(session: dict[str, Any]) -> dict[str, str | None]:
+    state = session["state"]
+    holding = state.setdefault("holding_by_effector", {item["channel_id"]: None for item in _manipulator_channels(session)})
+    for item in _manipulator_channels(session):
+        holding.setdefault(item["channel_id"], None)
+    return holding
+
+
+def _sync_primary_holding(session: dict[str, Any]) -> None:
+    holding = _holding_by_effector(session)
+    session["state"]["holding"] = next((ref for ref in holding.values() if ref), None)
+
+
+def _held_effector(session: dict[str, Any], object_ref: str) -> str | None:
+    return next((channel for channel, ref in _holding_by_effector(session).items() if ref == object_ref), None)
+
+
+def _is_held(session: dict[str, Any], object_ref: str) -> bool:
+    return _held_effector(session, object_ref) is not None
+
+
+def _available_effector(session: dict[str, Any]) -> str | None:
+    return next((channel for channel, ref in _holding_by_effector(session).items() if ref is None), None)
+
+
 def start_session(executor_profile_id: str = "home_mobile_manipulator", scene_id: str = "home_semantic_3d_a") -> dict[str, Any]:
     try:
         scene = load_scene(scene_id)
@@ -137,6 +167,8 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator", scene_id
         "active_intent_id": None,
         "intent_activation_stack": [],
     }
+    _holding_by_effector(session)
+    _sync_primary_holding(session)
     SESSIONS[session_id] = session
     return deepcopy(session)
 
@@ -281,11 +313,11 @@ def _derive_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) -
     companion_refs = intent["role_bindings"].get("companions", [])
     companions = [item for item in session["runtime_objects"] if item.get("entity_id") in companion_refs]
     companions_ready = all(item.get("support_ref") == destination_ref and not item.get("attached_to_executor") for item in companions)
-    if theme.get("support_ref") == destination_ref and session["state"].get("holding") != theme_ref:
+    if theme.get("support_ref") == destination_ref and not _is_held(session, theme_ref):
         if companions_ready:
             return {"status": "completed", "verified_fact": intent["goal_fact"]}
         return {"status": "rebind_required", "reason": "co_location_reference_not_supported_at_destination"}
-    if session["state"].get("holding") == theme_ref:
+    if _is_held(session, theme_ref):
         return {
             "status": "stage_ready",
             "stage_id": "place_at_destination",
@@ -359,7 +391,7 @@ def _suspend_active_intent(session: dict[str, Any]) -> dict[str, Any] | None:
         "role_bindings": deepcopy(intent["role_bindings"]),
         "world_revision": session["world_revision"],
         "policy_revision": session["policy_revision"],
-        "current_holding": session["state"].get("holding"),
+        "current_holding": deepcopy(_holding_by_effector(session)),
         "old_path_discarded": True,
     }
     return {
@@ -671,10 +703,13 @@ def _is_holding_state_query(text: str) -> bool:
 
 
 def _answer_holding_state_query(session: dict[str, Any]) -> dict[str, Any]:
-    holding_ref = session.get("state", {}).get("holding")
-    entity = next((item for item in session.get("runtime_objects", []) if item.get("entity_id") == holding_ref), None)
-    if entity:
-        prompt = f"我当前拿着{entity.get('label', holding_ref)}。这个回答来自刚刚通过抓取验真建立的当前持有事实。"
+    holding = _holding_by_effector(session)
+    held = [
+        (channel, ref, next((item for item in session.get("runtime_objects", []) if item.get("entity_id") == ref), None))
+        for channel, ref in holding.items() if ref
+    ]
+    if held:
+        prompt = "我当前持有：" + "；".join(f"{channel}拿着{entity.get('label', ref) if entity else ref}" for channel, ref, entity in held) + "。这些是经过抓取验真建立的当前持有事实。"
         fact = "object_in_gripper"
     else:
         prompt = "我当前没有拿着东西。这个回答来自当前执行体的持有状态。"
@@ -684,8 +719,8 @@ def _answer_holding_state_query(session: dict[str, Any]) -> dict[str, Any]:
         "query_type": "holding_state",
         "prompt": prompt,
         "runtime_fact": fact,
-        "holding_entity_ref": holding_ref,
-        "holding_entity": deepcopy(entity),
+        "holding_by_effector": deepcopy(holding),
+        "holding_entities": [{"effector": channel, "entity": deepcopy(entity)} for channel, _, entity in held],
         "state_evidence": {
             "source": "current_executor_holding_state",
             "world_revision": session["world_revision"],
@@ -766,7 +801,7 @@ def _answer_object_location_query(session: dict[str, Any], text: str) -> dict[st
     match = matches[0]
     entity_ref = match["spatial_entity_candidate_ref"]
     runtime_entity = next((item for item in session["runtime_objects"] if item.get("entity_id") == entity_ref), None)
-    if session.get("state", {}).get("holding") == entity_ref:
+    if _is_held(session, entity_ref):
         location = {"relation": "held_by_executor", "executor_ref": session["executor_profile_id"]}
         prompt = f"{runtime_entity.get('label', directed['matched_alias'])}当前在我手里。这个位置关系来自已经验真的持有事实。"
         evidence_status = "runtime_verified"
@@ -1836,17 +1871,21 @@ def _apply_verified_grasp(session: dict[str, Any], target_ref: str, source: str)
             },
             "frames": [],
         }
-    if session["state"].get("holding") not in {None, target_ref}:
+    effector = _held_effector(session, target_ref) or _available_effector(session)
+    if not effector:
         return {"status": "grasp_blocked", "reason": "gripper_already_holding_incompatible_object", "frames": []}
     previous_support_ref = target.pop("support_ref", None)
     if previous_support_ref:
         target["last_support_ref"] = previous_support_ref
-    session["state"]["holding"] = target_ref
+    _holding_by_effector(session)[effector] = target_ref
+    _sync_primary_holding(session)
     target["attached_to_executor"] = True
+    target["held_by_effector"] = effector
     target["position"] = deepcopy(executor_position)
     target["elevation_m"] = 0.86
     verification = {
         "target_entity_ref": target_ref,
+        "effector": effector,
         "first_channel": {"source": "simulated_gripper_aperture_and_contact", "established": True},
         "second_channel": {"source": "simulated_visual_target_follows_end_effector", "established": True},
         "final_fact": "target_object_in_gripper",
@@ -1856,7 +1895,7 @@ def _apply_verified_grasp(session: dict[str, Any], target_ref: str, source: str)
     return {
         "status": "fact_established",
         "reason": "verified_grasp_completed",
-        "prompt": "夹爪接触与目标随动观测一致，已经验真目标对象在夹爪中。",
+        "prompt": f"{effector}接触与目标随动观测一致，已经验真目标对象在该末端执行器中。",
         "terminal_fact": "target_object_in_gripper",
         "verification_evidence": verification,
         "control_source": source,
@@ -1871,7 +1910,8 @@ def _apply_verified_place(session: dict[str, Any], object_ref: str, destination_
     destination = objects.get(destination_ref)
     if not held_object or not destination:
         return {"status": "placement_blocked", "reason": "theme_or_destination_not_available", "frames": []}
-    if session["state"].get("holding") != object_ref:
+    effector = _held_effector(session, object_ref)
+    if not effector:
         return {"status": "placement_blocked", "reason": "theme_is_not_currently_held", "frames": []}
     destination_profile = build_functional_profile(destination, load_object_concepts()["concepts"])
     compatibility = evaluate_role_compatibility(destination_profile, "support_or_container")
@@ -1946,7 +1986,7 @@ def _apply_verified_place(session: dict[str, Any], object_ref: str, destination_
         and abs(placement_position[1] - destination["position"][1]) <= margin_y
     )
     support_contact = True
-    release_feasible = session["state"].get("holding") == object_ref
+    release_feasible = _is_held(session, object_ref)
     non_overlapping = all(
         abs(placement_position[0] - float(item["position"][0])) >= (float(held_object["size"][0]) + float(item["size"][0])) / 2 + 0.03
         or abs(placement_position[1] - float(item["position"][1])) >= (float(held_object["size"][1]) + float(item["size"][1])) / 2 + 0.03
@@ -1962,7 +2002,9 @@ def _apply_verified_place(session: dict[str, Any], object_ref: str, destination_
     held_object["support_ref"] = destination_ref
     held_object["last_support_ref"] = destination_ref
     held_object["attached_to_executor"] = False
-    session["state"]["holding"] = None
+    held_object.pop("held_by_effector", None)
+    _holding_by_effector(session)[effector] = None
+    _sync_primary_holding(session)
     return {
         "status": "fact_established",
         "reason": "verified_placement_completed",
@@ -1971,7 +2013,7 @@ def _apply_verified_place(session: dict[str, Any], object_ref: str, destination_
         "terminal_fact_binding": {"object_ref": object_ref, "destination_ref": destination_ref},
         "verification_evidence": {
             "first_channel": {"source": "simulated_support_contact_projection_and_occupancy", "established": projection_inside and support_contact and non_overlapping},
-            "second_channel": {"source": "simulated_gripper_release_and_object_stationarity", "established": release_feasible and session["state"].get("holding") is None},
+            "second_channel": {"source": "simulated_effector_release_and_object_stationarity", "effector": effector, "established": release_feasible and not _is_held(session, object_ref)},
             "final_fact": "object_supported_at_destination",
             "final_fact_established": True,
             "verification_boundary": "P016_multi_channel_fact_verification",

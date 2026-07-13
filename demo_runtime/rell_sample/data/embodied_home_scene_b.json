@@ -41,6 +41,7 @@
       "body_reference_frame": {"forward_axis": "+x", "left_axis": "+y", "yaw_positive": "counterclockwise"},
       "sensor_frames": {"head_rgbd": {"pan_range_deg": [-55, 55], "active_scan_viewpoints": [{"viewpoint_id": "head_left_scan", "yaw_offset_deg": 28.0}, {"viewpoint_id": "head_right_scan", "yaw_offset_deg": -28.0}]}},
       "sensor_capabilities": ["rgbd", "visual_tracking"],
+      "manipulator_channels": [{"channel_id": "primary_gripper", "side": "center", "max_holding_count": 1}],
       "arm_reach_m": 0.72,
       "gripper_span_m": 0.11,
       "supported_actions": ["relative_move", "navigate_to_region", "local_obstacle_avoidance", "grasp_object", "place_object", "fill_container", "request_human_confirmation"]
@@ -58,6 +59,7 @@
       "body_reference_frame": {"forward_axis": "+x", "left_axis": "+y", "yaw_positive": "counterclockwise"},
       "sensor_frames": {"head_rgbd": {"pan_range_deg": [-70, 70], "active_scan_viewpoints": [{"viewpoint_id": "head_left_scan", "yaw_offset_deg": 32.0}, {"viewpoint_id": "head_right_scan", "yaw_offset_deg": -32.0}]}},
       "sensor_capabilities": ["rgbd", "visual_tracking"],
+      "manipulator_channels": [{"channel_id": "left_hand", "side": "left", "max_holding_count": 1}, {"channel_id": "right_hand", "side": "right", "max_holding_count": 1}],
       "arm_reach_m": 0.78,
       "gripper_span_m": 0.12,
       "supported_actions": ["relative_move", "navigate_to_region", "local_obstacle_avoidance", "grasp_object", "place_object", "fill_container", "request_human_confirmation"]

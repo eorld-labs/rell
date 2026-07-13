@@ -185,6 +185,20 @@ def main() -> None:
         and restore_gap["missing_causal_slots"] == ["destination", "placement_verification"],
         f"restore without an origin did not expose its real causal gap: {restore_gap}",
     )
+    dual_hand_session = start_session(scene_id="home_semantic_3d_a", executor_profile_id="home_humanoid")
+    require(begin_motion_command(dual_hand_session["session_id"], "拿起杯子")["status"] == "requires_human_confirmation", "dual-hand setup could not plan cup grasp")
+    drain_motion(begin_motion_command(dual_hand_session["session_id"], "确认"))
+    require(begin_motion_command(dual_hand_session["session_id"], "拿起苹果")["status"] == "requires_human_confirmation", "occupied first hand blocked a second available hand")
+    drain_motion(begin_motion_command(dual_hand_session["session_id"], "确认"))
+    dual_holding = execute_command(dual_hand_session["session_id"], "你手上拿的什么")
+    require(
+        dual_holding["holding_by_effector"] == {"left_hand": "cup_a", "right_hand": "apple_a"},
+        f"humanoid did not preserve independent hand occupancy: {dual_holding}",
+    )
+    require(
+        start_session(scene_id="home_semantic_3d_a", executor_profile_id="home_mobile_manipulator")["state"]["holding_by_effector"] == {"primary_gripper": None},
+        "wheeled body did not retain its single-effector execution boundary",
+    )
     direct_take_session = start_session(scene_id="home_semantic_3d_b", executor_profile_id="home_humanoid")
     direct_take = begin_motion_command(direct_take_session["session_id"], "去拿杯子")
     require(direct_take["status"] == "requires_human_confirmation" and direct_take["immediate_result"]["operator_candidate"] == "grasp_object", f"short bare take did not use the same terminal-goal paradigm: {direct_take}")
