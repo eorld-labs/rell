@@ -1,0 +1,29 @@
+{
+  "schema_version": "1.0.0",
+  "calibration_id": "loopback_mobile_manipulator_v1",
+  "calibration_status": "loopback_verified",
+  "source_scope": "loopback_only",
+  "body_profile": "loopback_mobile_manipulator",
+  "frame_graph": [
+    {"parent_frame": "map", "child_frame": "base_link", "translation_m": [0.0, 0.0, 0.0], "rotation_xyzw": [0.0, 0.0, 0.0, 1.0], "transform_source": "loopback"},
+    {"parent_frame": "base_link", "child_frame": "camera_front", "translation_m": [0.18, 0.0, 1.12], "rotation_xyzw": [0.0, 0.0, 0.0, 1.0], "transform_source": "loopback"},
+    {"parent_frame": "base_link", "child_frame": "gripper_link", "translation_m": [0.52, 0.0, 0.82], "rotation_xyzw": [0.0, 0.0, 0.0, 1.0], "transform_source": "loopback"}
+  ],
+  "body_envelope": {"radius_m": 0.32, "height_m": 1.35},
+  "reachable_workspace": {
+    "frame_id": "base_link",
+    "shape": "axis_aligned_bounds",
+    "bounds_m": {"x": [0.2, 0.72], "y": [-0.45, 0.45], "z": [0.35, 1.2]}
+  },
+  "payload_limit_kg": 1.0,
+  "motion_limits": {
+    "max_linear_speed_mps": 0.25,
+    "max_angular_speed_rps": 0.5,
+    "max_contact_force_n": 12.0
+  },
+  "sensor_frames": ["camera_front"],
+  "end_effector_frames": ["gripper_link"],
+  "end_effector_type": "parallel_gripper",
+  "mobility_constraints": {"turning_radius_m": 0.42, "can_translate_laterally": false},
+  "physical_evidence_admissible": false
+}

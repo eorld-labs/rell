@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0.0",
+  "calibration_id": "replace_with_real_robot_calibration_id",
+  "calibration_status": "unverified",
+  "source_scope": "real_robot",
+  "body_profile": "replace_with_real_body_profile",
+  "frame_graph": [],
+  "body_envelope": {"radius_m": null, "height_m": null},
+  "reachable_workspace": {"frame_id": "base_link", "shape": "measured_bounds", "bounds_m": null},
+  "payload_limit_kg": null,
+  "motion_limits": {
+    "max_linear_speed_mps": null,
+    "max_angular_speed_rps": null,
+    "max_contact_force_n": null
+  },
+  "sensor_frames": [],
+  "end_effector_frames": [],
+  "end_effector_type": "replace_with_real_end_effector",
+  "mobility_constraints": {},
+  "required_before_hardware_arm": [
+    "replace_all_null_measurements",
+    "measure_frame_graph_on_real_robot",
+    "verify_emergency_stop_on_real_robot",
+    "set_calibration_status_to_hardware_verified_after_human_acceptance"
+  ]
+}

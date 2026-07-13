@@ -396,9 +396,17 @@ def run_http_smoke() -> None:
             raise AssertionError(f"visual image API candidate bypassed calibration: {visual_candidate}")
         if visual_pipeline.get("requests", [])[0].get("provider_id") != "deterministic_test_image_provider":
             raise AssertionError(f"client-controlled provider endpoint affected adapter selection: {visual_pipeline}")
-        if visual_batch_result.get("status") != "candidates_compiled" or visual_batch_result.get("generation_request_count") != 5:
+        generation_count = visual_batch_result.get("generation_request_count", 0)
+        concept_gap_count = visual_batch_result.get("concept_gap_count", 0)
+        if visual_batch_result.get("status") != "candidates_compiled":
             raise AssertionError(f"visual batch endpoint failed: {visual_batch_result}")
-        if visual_batch_result.get("concept_gap_count") != 5 or visual_batch_result.get("runtime_visible"):
+        if visual_batch_result.get("item_count") != generation_count + concept_gap_count:
+            raise AssertionError(f"visual batch lost known concepts or concept gaps: {visual_batch_result}")
+        if len(visual_batch_result.get("results", [])) != generation_count or any(
+            item.get("status") != "candidate_compiled" for item in visual_batch_result.get("results", [])
+        ):
+            raise AssertionError(f"visual batch did not compile every known concept candidate: {visual_batch_result}")
+        if visual_batch_result.get("runtime_visible"):
             raise AssertionError(f"visual batch blurred concept gaps or runtime boundary: {visual_batch_result}")
         if bowl_kernel.get("status") != "awaiting_human_kernel_review" or bowl_kernel.get("image_generation_allowed"):
             raise AssertionError(f"external concept kernel proposal bypassed human review: {bowl_kernel}")
@@ -560,6 +568,7 @@ def main() -> None:
     run_python("validate_stage_zero.py")
     run_python("validate_digital_space.py")
     run_python("validate_adapter_contract.py")
+    run_python("validate_real_robot_readiness.py")
     run_python("validate_runtime_sample.py")
     run_python("validate_simulated_robot_sample.py")
     run_python("validate_api_sample.py")

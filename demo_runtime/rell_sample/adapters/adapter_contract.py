@@ -26,6 +26,25 @@ OPTIONAL_CAPABILITIES = {
 }
 
 
+GENERAL_EMBODIED_CAPABILITIES = {
+    "observe_target",
+    "navigate_to_target",
+    "align_end_effector",
+    "grasp_target",
+    "verify_target_in_gripper",
+    "navigate_to_destination",
+    "place_target",
+    "verify_target_supported",
+    "handover_target",
+    "request_human_confirmation",
+    "cancel_motion",
+    "emergency_stop",
+}
+
+
+REAL_ROBOT_OPERATING_MODES = {"shadow", "dry_run", "armed"}
+
+
 RUNTIME_EVENT_TYPES = {
     "stage_started",
     "state_update",
@@ -107,3 +126,25 @@ class RellRobotAdapter(Protocol):
 
     def request_human_confirmation(self, prompt: str, callback=None) -> None:
         """Request human confirmation without blocking the Runtime event loop."""
+
+
+@runtime_checkable
+class RellRobotTransport(Protocol):
+    """Narrow vendor SDK/ROS2 boundary used by RealRobotSafetyGateway."""
+
+    transport_kind: str
+
+    def connect(self, config: dict[str, Any]) -> dict[str, Any]:
+        """Connect to vendor control and telemetry services."""
+
+    def report_capabilities(self) -> list[str]:
+        """Report only operations the bound hardware transport can execute."""
+
+    def send_command(self, command: dict[str, Any]) -> dict[str, Any]:
+        """Send one admitted command and return its receipt and telemetry."""
+
+    def cancel(self, command_id: str, reason: str) -> dict[str, Any]:
+        """Cancel one active vendor command."""
+
+    def emergency_stop(self, reason: str) -> dict[str, Any]:
+        """Invoke the vendor emergency-stop path."""

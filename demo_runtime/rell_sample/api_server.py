@@ -78,6 +78,16 @@ from concept_core.concept_teaching_station import (
     get_concept_teaching_session,
     start_concept_teaching_session,
 )
+from real_robot_service import (
+    build_real_robot_readiness_catalog,
+    dispatch_real_robot_stage,
+    emergency_stop_real_robot_session,
+    get_real_robot_session,
+    heartbeat_real_robot_session,
+    reset_real_robot_emergency_stop,
+    set_real_robot_session_mode,
+    start_real_robot_session,
+)
 
 
 ROOT = Path(__file__).resolve().parent
@@ -8433,6 +8443,14 @@ class RellSampleHandler(BaseHTTPRequestHandler):
             result = get_execution_dispatch(dispatch_id)
             self._send_json(result, status=404 if "error" in result else 200)
             return
+        if path == "/real-robot/readiness":
+            self._send_json(build_real_robot_readiness_catalog())
+            return
+        if path.startswith("/real-robot/session/"):
+            session_id = path.removeprefix("/real-robot/session/")
+            result = get_real_robot_session(session_id)
+            self._send_json(result, status=404 if "error" in result else 200)
+            return
         if path.startswith("/physics/session/"):
             session_id = path.removeprefix("/physics/session/")
             result = get_physics_session(session_id)
@@ -8624,6 +8642,57 @@ class RellSampleHandler(BaseHTTPRequestHandler):
                 payload,
                 body.get("executor_type", "digital_executor"),
                 body.get("executor_options", {}),
+            )
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/real-robot/session/start":
+            result = start_real_robot_session(
+                transport_type=str(body.get("transport_type", "loopback_preflight")),
+                vendor_id=str(body.get("vendor_id", "")),
+                calibration=body.get("calibration") if isinstance(body.get("calibration"), dict) else None,
+            )
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/real-robot/session/heartbeat":
+            result = heartbeat_real_robot_session(
+                str(body.get("session_id", "")),
+                body.get("telemetry") if isinstance(body.get("telemetry"), dict) else None,
+            )
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/real-robot/session/mode":
+            result = set_real_robot_session_mode(
+                str(body.get("session_id", "")),
+                str(body.get("mode", "shadow")),
+                human_authorized=bool(body.get("human_authorized", False)),
+            )
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/real-robot/session/dispatch":
+            stage = body.get("stage")
+            world_revision = body.get("world_revision")
+            if not isinstance(world_revision, int) or isinstance(world_revision, bool):
+                self._send_json({"error": "valid_world_revision_required"}, status=400)
+                return
+            result = dispatch_real_robot_stage(
+                str(body.get("session_id", "")),
+                stage if isinstance(stage, dict) else {},
+                process_instance_id=str(body.get("process_instance_id", "")),
+                world_revision=world_revision,
+            )
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/real-robot/session/emergency-stop":
+            result = emergency_stop_real_robot_session(
+                str(body.get("session_id", "")),
+                str(body.get("reason", "operator_emergency_stop")),
+            )
+            self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/real-robot/session/reset-stop":
+            result = reset_real_robot_emergency_stop(
+                str(body.get("session_id", "")),
+                human_authorized=bool(body.get("human_authorized", False)),
             )
             self._send_json(result, status=400 if "error" in result else 200)
             return
