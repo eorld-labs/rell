@@ -133,9 +133,176 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator", scene_id
         "concept_gap_dialogue": None,
         "open_world_observation": None,
         "confirmed_visual_bindings": [],
+        "long_horizon_intents": {},
+        "active_intent_id": None,
+        "intent_activation_stack": [],
     }
     SESSIONS[session_id] = session
     return deepcopy(session)
+
+
+def _long_intent_view(intent: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "intent_id": intent["intent_id"],
+        "goal_fact": intent["goal_fact"],
+        "role_bindings": deepcopy(intent["role_bindings"]),
+        "lifecycle": intent["lifecycle"],
+        "verified_facts": list(intent["verified_facts"]),
+        "current_stage": deepcopy(intent.get("current_stage")),
+        "resume_envelope": deepcopy(intent.get("resume_envelope")),
+        "trajectory_persisted": False,
+    }
+
+
+def _create_transfer_intent(session: dict[str, Any], utterance: str) -> dict[str, Any] | None:
+    normalized = re.sub(r"[，。！？、,.!?\s]+", "", utterance)
+    if not any(token in normalized for token in ("放到", "放在", "摆到", "摆在")):
+        return None
+    if "杯" not in normalized:
+        return None
+    cups = [item for item in session["runtime_objects"] if item.get("kind") == "graspable_container"]
+    destinations = [
+        item for item in session["runtime_objects"]
+        if item.get("kind") == "operation_surface" and item.get("label") and item["label"] in normalized
+    ]
+    if len(cups) != 1 or len(destinations) != 1:
+        return None
+    cup, destination = cups[0], destinations[0]
+    if destination["entity_id"] == cup.get("support_ref"):
+        return None
+    intent_id = "intent_" + hashlib.sha1(
+        f"{session['session_id']}|{cup['entity_id']}|{destination['entity_id']}|{session['world_revision']}".encode("utf-8")
+    ).hexdigest()[:12]
+    intent = {
+        "intent_id": intent_id,
+        "intent_type": "verified_object_transfer",
+        "source_utterance": utterance,
+        "goal_fact": "object_supported_at_destination",
+        "role_bindings": {"theme": cup["entity_id"], "destination": destination["entity_id"]},
+        "goal_contract": {
+            "requires": ["theme_object_grounded", "destination_grounded"],
+            "produces": ["object_supported_at_destination"],
+            "verification": ["projection_inside_support_boundary", "support_contact_stable", "gripper_released"],
+        },
+        "dependency_graph": {
+            "root": "object_supported_at_destination",
+            "nodes": [
+                {"stage_id": "acquire_theme", "produces": "object_in_gripper"},
+                {"stage_id": "place_at_destination", "requires": "object_in_gripper", "produces": "object_supported_at_destination"},
+            ],
+        },
+        "lifecycle": "active",
+        "verified_facts": [],
+        "current_stage": None,
+        "resume_envelope": None,
+        "created_world_revision": session["world_revision"],
+    }
+    session["long_horizon_intents"][intent_id] = intent
+    session["active_intent_id"] = intent_id
+    session["intent_activation_stack"] = [intent_id]
+    return intent
+
+
+def _derive_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) -> dict[str, Any]:
+    theme_ref = intent["role_bindings"]["theme"]
+    destination_ref = intent["role_bindings"]["destination"]
+    theme = next((item for item in session["runtime_objects"] if item["entity_id"] == theme_ref), None)
+    destination = next((item for item in session["runtime_objects"] if item["entity_id"] == destination_ref), None)
+    if not theme or not destination:
+        return {"status": "rebind_required", "reason": "long_intent_role_binding_no_longer_present"}
+    if theme.get("support_ref") == destination_ref and session["state"].get("holding") != theme_ref:
+        return {"status": "completed", "verified_fact": "object_supported_at_destination"}
+    if session["state"].get("holding") == theme_ref:
+        return {
+            "status": "stage_ready",
+            "stage_id": "place_at_destination",
+            "utterance": f"把杯子放到{destination['label']}上",
+            "required_fact": "object_in_gripper",
+            "target_fact": "object_supported_at_destination",
+        }
+    return {
+        "status": "stage_ready",
+        "stage_id": "acquire_theme",
+        "utterance": "拿起杯子",
+        "required_fact": "theme_object_grounded",
+        "target_fact": "object_in_gripper",
+    }
+
+
+def _prepare_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) -> dict[str, Any]:
+    intent_id = intent["intent_id"]
+    stage = _derive_long_intent_stage(session, intent)
+    if stage["status"] == "completed":
+        intent["lifecycle"] = "completed"
+        intent["verified_facts"] = ["object_supported_at_destination"]
+        intent["current_stage"] = None
+        if session.get("active_intent_id") == intent["intent_id"]:
+            session["active_intent_id"] = None
+            session["intent_activation_stack"] = []
+        return {"status": "long_intent_completed", "long_horizon_intent": _long_intent_view(intent)}
+    if stage["status"] != "stage_ready":
+        intent["lifecycle"] = "awaiting_rebinding"
+        return {
+            "status": "long_intent_rebinding_required",
+            "reason": stage["reason"],
+            "long_horizon_intent": _long_intent_view(intent),
+        }
+    intent["lifecycle"] = "active"
+    intent["current_stage"] = deepcopy(stage)
+    started = begin_motion_command(session["session_id"], stage["utterance"], internal_stage=True)
+    # Candidate generation rolls the short-task session back to avoid committing
+    # unverified facts. Continue from the restored live session, not the stale
+    # object reference retained by this long-intent helper.
+    live_session = SESSIONS[session["session_id"]]
+    intent = live_session["long_horizon_intents"][intent_id]
+    intent["lifecycle"] = "active"
+    intent["current_stage"] = deepcopy(stage)
+    immediate = started.get("immediate_result") or {}
+    pending = live_session.get("pending_confirmation")
+    if pending:
+        pending["long_intent_id"] = intent_id
+        pending["long_stage_id"] = stage["stage_id"]
+        immediate["pending_confirmation"] = deepcopy(pending)
+    immediate["long_horizon_intent"] = _long_intent_view(intent)
+    immediate["long_stage"] = deepcopy(stage)
+    immediate["prompt"] = (
+        f"长程目标保持为“将对象放到目标承载面”。当前根据最新世界状态需要先完成阶段：{stage['stage_id']}。"
+        + (immediate.get("prompt") or "")
+    )
+    return {**started, "immediate_result": immediate, "long_horizon_intent": _long_intent_view(intent)}
+
+
+def _suspend_active_intent(session: dict[str, Any]) -> dict[str, Any] | None:
+    intent_id = session.get("active_intent_id")
+    intent = (session.get("long_horizon_intents") or {}).get(intent_id)
+    if not intent or intent.get("lifecycle") != "active":
+        return None
+    _revoke_pending_confirmation(session, "long_intent_suspended")
+    intent["lifecycle"] = "suspended"
+    intent["resume_envelope"] = {
+        "goal_fact": intent["goal_fact"],
+        "unresolved_goal": intent["goal_fact"],
+        "verified_facts": list(intent["verified_facts"]),
+        "role_bindings": deepcopy(intent["role_bindings"]),
+        "world_revision": session["world_revision"],
+        "policy_revision": session["policy_revision"],
+        "current_holding": session["state"].get("holding"),
+        "old_path_discarded": True,
+    }
+    return {
+        "status": "long_intent_suspended",
+        "prompt": "已挂起当前长程意图并丢弃未执行路径。恢复时我会重新观察对象、持有和承载事实，再推导下一阶段。",
+        "long_horizon_intent": _long_intent_view(intent),
+        "session": get_session(session["session_id"]),
+    }
+
+
+def _resume_active_intent(session: dict[str, Any]) -> dict[str, Any] | None:
+    intent_id = session.get("active_intent_id")
+    intent = (session.get("long_horizon_intents") or {}).get(intent_id)
+    if not intent or intent.get("lifecycle") != "suspended":
+        return None
+    return _prepare_long_intent_stage(session, intent)
 
 
 def get_session(session_id: str) -> dict[str, Any]:
@@ -2320,10 +2487,25 @@ def _context_confirmation_value(utterance: str) -> bool | None:
     return None
 
 
-def begin_motion_command(session_id: str, utterance: str, scoped_authorization: dict[str, Any] | None = None) -> dict[str, Any]:
+def begin_motion_command(
+    session_id: str,
+    utterance: str,
+    scoped_authorization: dict[str, Any] | None = None,
+    internal_stage: bool = False,
+) -> dict[str, Any]:
     session = SESSIONS.get(session_id)
     if not session:
         return {"error": "embodied_session_not_found", "session_id": session_id}
+    text = utterance.strip()
+    if text in {"暂停当前任务", "暂停任务", "先别做了"}:
+        suspended = _suspend_active_intent(session)
+        if suspended:
+            return {"status": suspended["status"], "immediate_result": suspended, "session": suspended["session"]}
+    if text in {"继续当前任务", "继续任务", "恢复任务"}:
+        resumed = _resume_active_intent(session)
+        if resumed:
+            resumed["immediate_result"]["session"] = get_session(session_id)
+            return resumed
     pending = session.get("pending_confirmation")
     confirmation_value = _context_confirmation_value(utterance)
     if pending and confirmation_value is not None and not scoped_authorization:
@@ -2331,6 +2513,11 @@ def begin_motion_command(session_id: str, utterance: str, scoped_authorization: 
         if confirmed.get("status") == "observation_candidate_confirmed":
             return {"status": confirmed["status"], "immediate_result": confirmed, "session": confirmed.get("session")}
         return confirmed
+    long_intent = None if internal_stage or scoped_authorization else _create_transfer_intent(session, text)
+    if long_intent:
+        prepared = _prepare_long_intent_stage(session, long_intent)
+        prepared["immediate_result"]["session"] = get_session(session_id)
+        return prepared
     factory_groundable_task = activate_task_perception(utterance) is not None
     if (
         not factory_groundable_task
@@ -2461,6 +2648,11 @@ def confirm_pending_motion(session_id: str, confirmation_id: str, approved: bool
     }
     result = begin_motion_command(session_id, pending["utterance"], authorization)
     session = SESSIONS[session_id]
+    if result.get("job_id") and pending.get("long_intent_id"):
+        job = MOTION_JOBS.get(result["job_id"])
+        if job:
+            job["long_intent_id"] = pending["long_intent_id"]
+            job["long_stage_id"] = pending.get("long_stage_id")
     session["pending_confirmation"] = None
     consumed = {**authorization, "status": "consumed", "consumed_by": result.get("job_id") or "immediate_execution_attempt"}
     session["authorization_history"].append(consumed)
@@ -2706,6 +2898,25 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
                 if result.get("status") == "fact_established"
                 else "自主复做没有建立目标事实，需要重新教学或纠正。"
             )
+    intent = (session.get("long_horizon_intents") or {}).get(job.get("long_intent_id"))
+    if intent:
+        if result.get("status") == "fact_established":
+            stage_outcome = _prepare_long_intent_stage(session, intent)
+            result["long_horizon_intent"] = stage_outcome.get("long_horizon_intent", _long_intent_view(intent))
+            if stage_outcome.get("status") == "long_intent_completed":
+                result["prompt"] = "当前阶段已验真，长程目标的终止事实也已成立。"
+            else:
+                next_candidate = stage_outcome.get("immediate_result") or {}
+                result["next_stage_candidate"] = deepcopy(next_candidate)
+                result["candidate_execution_plan"] = deepcopy(next_candidate.get("candidate_execution_plan"))
+                result["pending_confirmation"] = deepcopy(next_candidate.get("pending_confirmation"))
+                result["prompt"] = (
+                    "当前阶段已通过物理验真；长程目标尚未完成。"
+                    + (next_candidate.get("prompt") or "我已根据当前状态生成下一阶段候选。")
+                )
+        else:
+            intent["lifecycle"] = "awaiting_correction"
+            result["long_horizon_intent"] = _long_intent_view(intent)
     result["session"] = get_session(job["session_id"])
     session["event_history"].append({"utterance": job["utterance"], "result": result.get("status"), "route_kind": result.get("route_kind")})
     return {"status": "motion_completed", "job_id": job_id, "frame": frame, "result": result, "session": get_session(job["session_id"])}
