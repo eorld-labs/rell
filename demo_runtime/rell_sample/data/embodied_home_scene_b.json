@@ -15,10 +15,13 @@
   ],
   "objects": [
     {"entity_id": "counter_b", "label": "岛台", "kind": "operation_surface", "region_id": "kitchen", "position": [3.35, 1.35], "size": [1.7, 0.75, 0.95], "color": "#7d695d", "visual_observation_signature": {"features": ["stable_horizontal_surface", "ground_supported_structure"], "color_family": "wood"}, "fixed": true},
-    {"entity_id": "dispenser_b", "label": "水龙头", "kind": "water_source", "region_id": "kitchen", "position": [4.15, -1.25], "size": [0.55, 0.5, 1.2], "color": "#b8c8cf", "fixed": true},
-    {"entity_id": "cup_b", "label": "蓝色陶瓷杯", "kind": "graspable_container", "region_id": "kitchen", "position": [3.0, 1.35], "elevation_m": 0.95, "support_ref": "counter_b", "size": [0.22, 0.22, 0.3], "color": "#5e91b7", "perceptual_attributes": {"color": "blue", "material": "ceramic"}, "visual_observation_signature": {"features": ["open_top", "bounded_inner_volume", "graspable_body"], "color_family": "blue"}, "fixed": false},
+    {"entity_id": "dispenser_b", "label": "水龙头", "kind": "water_source", "region_id": "kitchen", "position": [4.15, -1.25], "size": [0.55, 0.5, 1.2], "color": "#b8c8cf", "outlet_available": true, "fixed": true},
+    {"entity_id": "cup_b", "label": "蓝色陶瓷杯", "kind": "graspable_container", "region_id": "kitchen", "position": [3.0, 1.35], "elevation_m": 0.95, "support_ref": "counter_b", "liquid_state": "empty", "fill_level": 0.0, "size": [0.22, 0.22, 0.3], "color": "#5e91b7", "perceptual_attributes": {"color": "blue", "material": "ceramic"}, "visual_observation_signature": {"features": ["open_top", "bounded_inner_volume", "graspable_body"], "color_family": "blue"}, "fixed": false},
     {"entity_id": "apple_b", "label": "青苹果", "kind": "graspable_object", "region_id": "living_room", "position": [-2.1, -1.55], "size": [0.28, 0.28, 0.28], "color": "#83a84d", "fixed": false, "visual_observation_signature": {"features": ["compact_round_body", "fruit_surface"], "color_family": "green"}},
     {"entity_id": "sofa_b", "label": "布艺沙发", "kind": "large_furniture", "concept_id": "concept_sofa", "region_id": "living_room", "position": [-4.0, 0.85], "size": [0.9, 1.8, 0.9], "color": "#667f82", "fixed": true},
+    {"entity_id": "sofa_route_b1", "label": "双人沙发", "kind": "large_furniture", "concept_id": "concept_sofa", "region_id": "corridor", "position": [-0.2, -1.25], "size": [0.72, 1.3, 0.86], "color": "#8e7c73", "fixed": true},
+    {"entity_id": "sofa_route_b2", "label": "单人沙发", "kind": "large_furniture", "concept_id": "concept_sofa", "region_id": "kitchen", "position": [1.25, 1.25], "size": [0.68, 1.05, 0.82], "color": "#607b70", "fixed": true},
+    {"entity_id": "human_b", "label": "家人", "kind": "human_recipient", "region_id": "living_room", "position": [-4.25, -1.45], "size": [0.5, 0.5, 1.65], "color": "#8b5d74", "handover_ready": true, "received_object_refs": [], "fixed": true},
     {"entity_id": "dining_table_b", "label": "餐桌", "kind": "operation_surface", "region_id": "living_room", "position": [-2.65, 0.35], "size": [0.95, 1.25, 0.8], "color": "#9a7353", "visual_observation_signature": {"features": ["stable_horizontal_surface", "ground_supported_structure"], "color_family": "wood"}, "fixed": true},
     {"entity_id": "chair_b", "label": "餐椅", "kind": "movable_obstacle", "region_id": "living_room", "position": [-1.65, 0.35], "size": [0.55, 0.55, 0.85], "color": "#8c6045", "fixed": false, "active": true},
     {"entity_id": "stool_dynamic", "label": "凳子", "kind": "movable_obstacle", "region_id": "corridor", "position": [0.0, 0.0], "size": [0.7, 0.7, 0.55], "color": "#a46f42", "fixed": false, "active": false}
@@ -44,7 +47,7 @@
       "manipulator_channels": [{"channel_id": "primary_gripper", "side": "center", "max_holding_count": 1}],
       "arm_reach_m": 0.72,
       "gripper_span_m": 0.11,
-      "supported_actions": ["relative_move", "navigate_to_region", "local_obstacle_avoidance", "grasp_object", "place_object", "fill_container", "request_human_confirmation"]
+      "supported_actions": ["relative_move", "navigate_to_region", "local_obstacle_avoidance", "grasp_object", "place_object", "fill_container", "handover_container", "request_human_confirmation"]
     },
     "home_humanoid": {
       "executor_type": "humanoid_robot",
@@ -62,7 +65,7 @@
       "manipulator_channels": [{"channel_id": "left_hand", "side": "left", "max_holding_count": 1}, {"channel_id": "right_hand", "side": "right", "max_holding_count": 1}],
       "arm_reach_m": 0.78,
       "gripper_span_m": 0.12,
-      "supported_actions": ["relative_move", "navigate_to_region", "local_obstacle_avoidance", "grasp_object", "place_object", "fill_container", "request_human_confirmation"]
+      "supported_actions": ["relative_move", "navigate_to_region", "local_obstacle_avoidance", "grasp_object", "place_object", "fill_container", "handover_container", "request_human_confirmation"]
     }
   },
   "initial_state": {"executor_position": [-3.65, -1.75], "executor_yaw_deg": 0.0, "active_region": "living_room", "holding": null}

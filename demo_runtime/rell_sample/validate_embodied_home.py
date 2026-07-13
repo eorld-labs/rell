@@ -84,8 +84,8 @@ def main() -> None:
     role_session = start_session()
     role_session_id = role_session["session_id"]
     avoid_sofa = execute_command(role_session_id, "绕开沙发")
-    require(avoid_sofa["active_role"] == "navigation_obstacle" and avoid_sofa["status"] == "contextual_spatial_motion_blocked", f"sofa did not rebind as a geometry-constrained obstacle: {avoid_sofa}")
-    require(not avoid_sofa["frames"] and avoid_sofa["reason"] == "no_collision_free_object_relative_terminal_pose", f"unsafe sofa detour entered motion: {avoid_sofa}")
+    require(avoid_sofa["active_role"] == "navigation_obstacle" and avoid_sofa["status"] == "fact_established", f"sofa did not rebind as a geometry-constrained obstacle: {avoid_sofa}")
+    require(avoid_sofa["frames"] and avoid_sofa["terminal_fact"] == "executor_cleared_object", f"current-map sofa detour was not verified: {avoid_sofa}")
     sit_sofa = execute_command(role_session_id, "坐到沙发上")
     require(not sit_sofa["available"] and any(item["condition"] == "sit_down_on_support" for item in sit_sofa["missing_conditions"]), f"wheeled body pretended it could sit: {sit_sofa}")
     move_sofa = execute_command(role_session_id, "搬开沙发")

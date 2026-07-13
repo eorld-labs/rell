@@ -92,6 +92,8 @@ def compile_demonstration_experience(
     has_translation = any(item.get("action_class") == "body_relative_translation" for item in successful)
     has_rotation = any(item.get("action_class") == "body_relative_rotation" for item in successful)
     has_grasp = any(item.get("action_class") == "grasp_target" for item in successful)
+    has_fill = any(item.get("action_class") == "fill_container" for item in successful)
+    has_handover = any(item.get("action_class") == "handover_filled_container" for item in successful)
     process = []
     if has_translation:
         process.append("navigate_until_target_within_reach")
@@ -99,6 +101,10 @@ def compile_demonstration_experience(
         process.append("orient_executor_within_body_constraints")
     if has_grasp:
         process.extend(["grasp_bound_target", "verify_target_in_gripper"])
+    if has_fill:
+        process.extend(["navigate_to_bound_water_source", "fill_bound_container", "verify_container_filled"])
+    if has_handover:
+        process.extend(["navigate_to_bound_recipient", "handover_bound_container", "verify_recipient_possession"])
     task_goal = (source_concept_contract or {}).get("effect_contract", {}).get("canonical_goal_fact") or {}
     goal_fact = task_goal.get("fact") or "target_object_in_gripper"
     experience_id = "teleop_exp_" + hashlib.sha1(
@@ -131,10 +137,18 @@ def compile_demonstration_experience(
         "source_concept_contract": deepcopy(source_concept_contract),
         "process_chain": process,
         "effect_contract": {
-            "requires": ["target_object_spatially_grounded", "target_object_within_reach", "gripper_available"],
-            "produces": ["target_object_in_gripper"],
-            "destroys": ["gripper_empty", "target_object_on_support"],
-            "verification": ["gripper_closed_around_target", "target_follows_end_effector"],
+            "requires": (
+                ["container_spatially_grounded", "water_source_spatially_grounded", "recipient_spatially_grounded"]
+                if goal_fact == "human_received_filled_container"
+                else ["target_object_spatially_grounded", "target_object_within_reach", "gripper_available"]
+            ),
+            "produces": [goal_fact],
+            "destroys": ["container_empty", "container_in_effector"] if goal_fact == "human_received_filled_container" else ["gripper_empty", "target_object_on_support"],
+            "verification": (
+                ["container_fill_independently_verified", "effector_release_verified", "recipient_possession_verified"]
+                if goal_fact == "human_received_filled_container"
+                else ["gripper_closed_around_target", "target_follows_end_effector"]
+            ),
         },
         "applicability_constraints": {
             "negative_constraints": infeasibility_summaries,
@@ -142,16 +156,27 @@ def compile_demonstration_experience(
         },
         "invariant_contract": {
             "storage_policy": "store_invariants_not_concrete_teleoperation_parameters",
-            "topology_invariants": [
-                "executor_navigates_until_bound_target_is_within_reach",
-                "target_object_transitions_from_support_to_executor_gripper",
-            ],
+            "topology_invariants": (
+                [
+                    "bind_current_container_source_and_recipient_roles",
+                    "container_transitions_from_support_to_effector_to_filled_to_recipient",
+                    "replan_each_stage_from_current_world_state",
+                ]
+                if goal_fact == "human_received_filled_container"
+                else [
+                    "executor_navigates_until_bound_target_is_within_reach",
+                    "target_object_transitions_from_support_to_executor_gripper",
+                ]
+            ),
             "direction_and_physical_constraints": [
                 "motion_realization_must_follow_current_executor_profile",
                 "every_motion_increment_must_pass_current_collision_and_policy_checks",
                 "grasp_must_remain_inside_current_reachable_workspace",
             ],
-            "fact_termination_conditions": ["target_object_in_gripper_verified_by_independent_channels"],
+            "fact_termination_conditions": [
+                "human_received_filled_container_verified_by_independent_channels"
+                if goal_fact == "human_received_filled_container" else "target_object_in_gripper_verified_by_independent_channels"
+            ],
             "binding_slots": [
                 {"slot_id": "TARGET_OBJECT", "required_concept": target_concept_id},
                 {"slot_id": "EXECUTOR", "required_capability": "grasp_object"},

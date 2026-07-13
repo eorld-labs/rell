@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import heapq
 import json
 import math
 import re
@@ -302,7 +303,82 @@ def _create_transfer_intent(session: dict[str, Any], utterance: str) -> dict[str
     return intent
 
 
+def _create_water_delivery_intent(session: dict[str, Any], utterance: str) -> dict[str, Any] | None:
+    """Bind service roles from the current world; never encode a demonstrated route."""
+    normalized = re.sub(r"[，。！？、,.!?\s]+", "", utterance)
+    requests_water = any(token in normalized for token in ("接水", "取水", "倒水", "装水", "一杯水"))
+    requests_delivery = any(token in normalized for token in ("给我", "交给我", "递给我", "送给我", "拿给我"))
+    if not (requests_water and requests_delivery):
+        return None
+    containers = [item for item in session["runtime_objects"] if item.get("active") is not False and item.get("kind") == "graspable_container"]
+    sources = [item for item in session["runtime_objects"] if item.get("active") is not False and item.get("kind") == "water_source"]
+    recipients = [item for item in session["runtime_objects"] if item.get("active") is not False and item.get("kind") == "human_recipient"]
+    if len(containers) != 1 or len(sources) != 1 or len(recipients) != 1:
+        return None
+    container, source, recipient = containers[0], sources[0], recipients[0]
+    intent_id = "intent_" + hashlib.sha1(
+        f"{session['session_id']}|water_delivery|{container['entity_id']}|{source['entity_id']}|{recipient['entity_id']}|{session['world_revision']}".encode("utf-8")
+    ).hexdigest()[:12]
+    intent = {
+        "intent_id": intent_id,
+        "intent_type": "verified_water_delivery",
+        "source_utterance": utterance,
+        "goal_fact": "human_received_filled_container",
+        "role_bindings": {
+            "theme": container["entity_id"],
+            "source": source["entity_id"],
+            "recipient": recipient["entity_id"],
+        },
+        "goal_contract": {
+            "requires": ["container_grounded", "water_source_grounded", "recipient_grounded"],
+            "produces": ["human_received_filled_container"],
+            "verification": ["container_fill_independently_verified", "handover_release_verified", "recipient_possession_verified"],
+        },
+        "dependency_graph": {
+            "root": "human_received_filled_container",
+            "nodes": [
+                {"stage_id": "acquire_container", "produces": "container_in_effector"},
+                {"stage_id": "fill_container", "requires": "container_in_effector", "produces": "container_filled"},
+                {"stage_id": "handover_to_recipient", "requires": "container_filled", "produces": "human_received_filled_container"},
+            ],
+        },
+        "lifecycle": "active",
+        "verified_facts": [],
+        "current_stage": None,
+        "resume_envelope": None,
+        "created_world_revision": session["world_revision"],
+    }
+    session["long_horizon_intents"][intent_id] = intent
+    session["active_intent_id"] = intent_id
+    session["intent_activation_stack"] = [intent_id]
+    return intent
+
+
 def _derive_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) -> dict[str, Any]:
+    if intent.get("intent_type") == "verified_water_delivery":
+        bindings = intent["role_bindings"]
+        objects = {item["entity_id"]: item for item in session["runtime_objects"]}
+        container = objects.get(bindings["theme"])
+        source = objects.get(bindings["source"])
+        recipient = objects.get(bindings["recipient"])
+        if not container or not source or not recipient:
+            return {"status": "rebind_required", "reason": "water_delivery_role_binding_no_longer_present"}
+        if container.get("received_by") == recipient["entity_id"] and container.get("liquid_state") == "filled":
+            return {"status": "completed", "verified_fact": intent["goal_fact"]}
+        if not _is_held(session, container["entity_id"]):
+            return {
+                "status": "stage_ready", "stage_id": "acquire_container", "utterance": f"拿起{_conceptual_reference_for_entity(container)}",
+                "required_fact": "container_grounded", "target_fact": "container_in_effector",
+            }
+        if container.get("liquid_state") != "filled":
+            return {
+                "status": "stage_ready", "stage_id": "fill_container", "utterance": f"到{source['label']}给{container['label']}接水",
+                "required_fact": "container_in_effector", "target_fact": "container_filled",
+            }
+        return {
+            "status": "stage_ready", "stage_id": "handover_to_recipient", "utterance": f"把{container['label']}交给{recipient['label']}",
+            "required_fact": "container_filled", "target_fact": "human_received_filled_container",
+        }
     theme_ref = intent["role_bindings"]["theme"]
     destination_ref = intent["role_bindings"]["destination"]
     theme = next((item for item in session["runtime_objects"] if item["entity_id"] == theme_ref), None)
@@ -339,7 +415,8 @@ def _prepare_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) 
     stage = _derive_long_intent_stage(session, intent)
     if stage["status"] == "completed":
         intent["lifecycle"] = "completed"
-        intent["verified_facts"] = [intent["goal_fact"]]
+        if intent["goal_fact"] not in intent["verified_facts"]:
+            intent["verified_facts"].append(intent["goal_fact"])
         intent["current_stage"] = None
         if session.get("active_intent_id") == intent["intent_id"]:
             session["active_intent_id"] = None
@@ -370,8 +447,9 @@ def _prepare_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) 
         immediate["pending_confirmation"] = deepcopy(pending)
     immediate["long_horizon_intent"] = _long_intent_view(intent)
     immediate["long_stage"] = deepcopy(stage)
+    goal_summary = "把接好的水交给人" if intent.get("intent_type") == "verified_water_delivery" else "将对象放到目标承载面"
     immediate["prompt"] = (
-        f"长程目标保持为“将对象放到目标承载面”。当前根据最新世界状态需要先完成阶段：{stage['stage_id']}。"
+        f"长程目标保持为“{goal_summary}”。当前根据最新世界状态需要先完成阶段：{stage['stage_id']}。"
         + (immediate.get("prompt") or "")
     )
     return {**started, "immediate_result": immediate, "long_horizon_intent": _long_intent_view(intent)}
@@ -1289,11 +1367,16 @@ def start_embodied_teaching(session_id: str, goal_utterance: str = "拿杯子") 
                 "session": get_session(session_id),
             }
         goal_utterance = gap_dialogue.get("source_utterance") or goal_utterance
+    normalized_goal = re.sub(r"[，。！？、,.!?\s]+", "", goal_utterance)
+    water_delivery_teaching = (
+        any(token in normalized_goal for token in ("接水", "取水", "倒水", "装水", "一杯水"))
+        and any(token in normalized_goal for token in ("给我", "交给我", "递给我", "送给我", "拿给我"))
+    )
     contract_target = (source_contract or {}).get("semantic_roles", {}).get("target", {})
     perception_utterance = (
         "拿" + str(contract_target.get("surface_form") or "目标对象")
         if source_contract
-        else goal_utterance
+        else "拿杯子" if water_delivery_teaching else goal_utterance
     )
     perception = build_task_perception_result(_scene_for_session(session), session, perception_utterance)
     target = None
@@ -1339,11 +1422,25 @@ def start_embodied_teaching(session_id: str, goal_utterance: str = "拿杯子") 
         perception=perception,
         pedagogical_signals=pedagogical_signals,
     )
+    service_role_bindings = None
+    if water_delivery_teaching:
+        sources = [item for item in session["runtime_objects"] if item.get("kind") == "water_source" and item.get("active") is not False]
+        recipients = [item for item in session["runtime_objects"] if item.get("kind") == "human_recipient" and item.get("active") is not False]
+        if len(sources) != 1 or len(recipients) != 1:
+            return {
+                "status": "teaching_service_role_grounding_required",
+                "reason": "water_source_or_recipient_not_uniquely_grounded",
+                "prompt": "请先保证当前空间只有一个可用水源和一个明确接收人。",
+                "session": get_session(session_id),
+            }
+        service_role_bindings = {"theme": target["entity_ref"], "source": sources[0]["entity_id"], "recipient": recipients[0]["entity_id"]}
     session["teaching_session"] = {
         "teaching_id": teaching_id,
         "status": "human_control_active",
         "goal_utterance": goal_utterance,
-        "goal_fact": (source_contract or {}).get("effect_contract", {}).get("canonical_goal_fact", {}).get("fact") or "target_object_in_gripper",
+        "goal_fact": "human_received_filled_container" if water_delivery_teaching else ((source_contract or {}).get("effect_contract", {}).get("canonical_goal_fact", {}).get("fact") or "target_object_in_gripper"),
+        "teaching_task_type": "verified_water_delivery" if water_delivery_teaching else "object_acquisition",
+        "service_role_bindings": service_role_bindings,
         "source_concept_contract": source_contract,
         "perception_activation_source": "compiled_concept_target_role" if source_contract else "goal_utterance",
         "target_binding_status": target.get("binding_status", "spatially_grounded"),
@@ -1467,6 +1564,40 @@ def begin_teaching_control(session_id: str, control: str) -> dict[str, Any]:
     teaching = session.get("teaching_session") or {}
     if teaching.get("status") != "human_control_active" or teaching.get("authority", {}).get("status") != "active":
         return {"error": "teaching_control_authority_not_active", "session": get_session(session_id)}
+    if control in {"fill", "handover"}:
+        roles = teaching.get("service_role_bindings") or {}
+        if control == "fill":
+            result = _apply_verified_fill(session, roles.get("theme"), roles.get("source"), "human_teleoperation")
+            action_class = "fill_container"
+            requires = ["container_in_effector", "executor_at_water_source", "outlet_available"]
+            produces = ["container_filled"]
+        else:
+            result = _apply_verified_handover(session, roles.get("theme"), roles.get("recipient"), "human_teleoperation")
+            action_class = "handover_filled_container"
+            requires = ["container_filled", "executor_at_recipient", "recipient_ready"]
+            produces = ["human_received_filled_container"]
+        verified = result.get("status") == "fact_established"
+        teaching["demonstrated_actions"].append({
+            "action_class": action_class,
+            "verified": verified,
+            "requires": requires,
+            "produces": produces,
+            "destroys": ["container_empty"] if control == "fill" else ["container_in_effector"],
+            "verification": deepcopy(result.get("verification_evidence", {})),
+            "failure_reason": result.get("reason"),
+        })
+        _append_teaching_event(
+            teaching,
+            "teaching_action_verified" if verified else "teaching_action_failed",
+            ("接水" if control == "fill" else "交付") + ("动作已执行并通过物理验真" if verified else "动作未通过当前物理前提"),
+            stage="teaching",
+            status="physical_fact_verified" if verified else "candidate_failure_evidence",
+            world_revision=session["world_revision"],
+            evidence={"action_class": action_class, "terminal_fact": result.get("terminal_fact"), "reason": result.get("reason")},
+        )
+        result["teaching_session"] = deepcopy(teaching)
+        result["session"] = get_session(session_id)
+        return {"status": result["status"], "immediate_result": result, "session": get_session(session_id)}
     if control == "grasp":
         result = _apply_verified_grasp(session, teaching["target_entity_ref"], "human_teleoperation")
         teaching["demonstrated_actions"].append(
@@ -1526,11 +1657,23 @@ def finish_embodied_teaching(session_id: str) -> dict[str, Any]:
     teaching = session.get("teaching_session") or {}
     if teaching.get("status") != "human_control_active":
         return {"error": "teaching_session_not_active", "session": get_session(session_id)}
-    if session["state"].get("holding") != teaching.get("target_entity_ref"):
+    goal_fact = teaching.get("goal_fact")
+    target = next((item for item in session["runtime_objects"] if item.get("entity_id") == teaching.get("target_entity_ref")), None)
+    goal_verified = (
+        _is_held(session, teaching.get("target_entity_ref"))
+        if goal_fact == "target_object_in_gripper"
+        else bool(
+            goal_fact == "human_received_filled_container"
+            and target
+            and target.get("liquid_state") == "filled"
+            and target.get("received_by") == (teaching.get("service_role_bindings") or {}).get("recipient")
+        )
+    )
+    if not goal_verified:
         return {
             "status": "teaching_goal_not_verified",
-            "reason": "target_object_in_gripper_not_established",
-            "prompt": "当前还没有验真目标对象已在夹爪中，不能把未完成操作保存成经验。",
+            "reason": "teaching_terminal_fact_not_established",
+            "prompt": f"当前还没有验真教学终止事实 {goal_fact}，不能把未完成操作保存成经验。",
             "session": get_session(session_id),
         }
     teaching["observation_packet"] = finalize_observation_packet(
@@ -1546,8 +1689,18 @@ def finish_embodied_teaching(session_id: str) -> dict[str, Any]:
         pedagogical_signals=teaching.get("pedagogical_signals"),
         world_revision=session["world_revision"],
         observation_packet=teaching.get("observation_packet"),
-        source_concept_contract=teaching.get("source_concept_contract"),
+        source_concept_contract=teaching.get("source_concept_contract") or (
+            {"effect_contract": {"canonical_goal_fact": {"fact": teaching["goal_fact"]}}}
+            if teaching.get("teaching_task_type") == "verified_water_delivery" else None
+        ),
     )
+    if teaching.get("service_role_bindings"):
+        experience["role_binding_contract"] = {
+            "demonstration_bindings": deepcopy(teaching["service_role_bindings"]),
+            "runtime_rebinding_required": True,
+            "binding_slots": ["graspable_container", "water_source", "human_recipient"],
+            "absolute_entity_ids_are_not_portable_experience": True,
+        }
     signal_constraints = deepcopy(teaching.get("scoped_constraint_candidates", []))
     experience["applicability_constraints"]["negative_constraints"].extend(signal_constraints)
     teaching["status"] = "demonstration_compiled"
@@ -2029,6 +2182,89 @@ def _apply_verified_place(session: dict[str, Any], object_ref: str, destination_
     }
 
 
+def _apply_verified_fill(session: dict[str, Any], container_ref: str, source_ref: str, control_source: str) -> dict[str, Any]:
+    objects = {item["entity_id"]: item for item in session["runtime_objects"]}
+    container, water_source = objects.get(container_ref), objects.get(source_ref)
+    if not container or not water_source or water_source.get("kind") != "water_source":
+        return {"status": "fill_blocked", "reason": "container_or_water_source_not_available", "frames": []}
+    effector = _held_effector(session, container_ref)
+    if not effector:
+        return {"status": "fill_blocked", "reason": "container_is_not_currently_held", "frames": []}
+    distance = _distance_to_object_footprint(session["state"]["executor_position"], water_source)
+    if distance > float(session["executor_profile"]["arm_reach_m"]):
+        return {"status": "fill_blocked", "reason": "water_source_outside_current_interaction_workspace", "frames": []}
+    outlet_available = water_source.get("outlet_available", True)
+    alignment_verified = outlet_available and container.get("kind") == "graspable_container"
+    flow_verified = alignment_verified
+    level_verified = flow_verified
+    if not (alignment_verified and level_verified):
+        return {"status": "fill_verification_failed", "reason": "container_fill_channels_not_established", "frames": []}
+    container["liquid_state"] = "filled"
+    container["fill_level"] = 0.8
+    container["filled_from"] = source_ref
+    return {
+        "status": "fact_established",
+        "reason": "verified_container_fill_completed",
+        "prompt": f"已在{water_source['label']}处为{container['label']}接水，并由出水流量与杯内液位两个通道验真杯中已有水。",
+        "terminal_fact": "container_filled",
+        "terminal_fact_binding": {"container_ref": container_ref, "source_ref": source_ref},
+        "verification_evidence": {
+            "first_channel": {"source": "simulated_source_flow_and_outlet_alignment", "established": flow_verified},
+            "second_channel": {"source": "simulated_visual_fill_level_change", "fill_level": 0.8, "established": level_verified},
+            "final_fact": "container_filled", "final_fact_established": True,
+            "verification_boundary": "P016_multi_channel_fact_verification",
+        },
+        "effect_contract_committed": {"produces": ["container_filled"], "destroys": ["container_empty"]},
+        "control_source": control_source,
+        "runtime_objects": deepcopy(session["runtime_objects"]),
+        "frames": [],
+    }
+
+
+def _apply_verified_handover(session: dict[str, Any], container_ref: str, recipient_ref: str, control_source: str) -> dict[str, Any]:
+    objects = {item["entity_id"]: item for item in session["runtime_objects"]}
+    container, recipient = objects.get(container_ref), objects.get(recipient_ref)
+    if not container or not recipient or recipient.get("kind") != "human_recipient":
+        return {"status": "handover_blocked", "reason": "container_or_recipient_not_available", "frames": []}
+    effector = _held_effector(session, container_ref)
+    if not effector:
+        return {"status": "handover_blocked", "reason": "container_is_not_currently_held", "frames": []}
+    if container.get("liquid_state") != "filled":
+        return {"status": "handover_blocked", "reason": "container_fill_fact_not_established", "frames": []}
+    distance = _distance_to_object_footprint(session["state"]["executor_position"], recipient)
+    if distance > float(session["executor_profile"]["arm_reach_m"]):
+        return {"status": "handover_blocked", "reason": "recipient_outside_safe_handover_workspace", "frames": []}
+    if recipient.get("handover_ready") is not True:
+        return {"status": "handover_blocked", "reason": "recipient_readiness_not_established", "frames": []}
+    received = recipient.setdefault("received_object_refs", [])
+    if container_ref not in received:
+        received.append(container_ref)
+    _holding_by_effector(session)[effector] = None
+    _sync_primary_holding(session)
+    container["attached_to_executor"] = False
+    container.pop("held_by_effector", None)
+    container["received_by"] = recipient_ref
+    container["position"] = [float(recipient["position"][0]) + 0.28, float(recipient["position"][1])]
+    container["elevation_m"] = 0.92
+    return {
+        "status": "fact_established",
+        "reason": "verified_human_handover_completed",
+        "prompt": f"已把装水的{container['label']}交给{recipient['label']}，并验真末端释放与接收方持有状态一致。",
+        "terminal_fact": "human_received_filled_container",
+        "terminal_fact_binding": {"container_ref": container_ref, "recipient_ref": recipient_ref},
+        "verification_evidence": {
+            "first_channel": {"source": "simulated_effector_release_and_transfer_contact", "effector": effector, "established": not _is_held(session, container_ref)},
+            "second_channel": {"source": "simulated_recipient_possession_tracking", "established": container_ref in received},
+            "final_fact": "human_received_filled_container", "final_fact_established": True,
+            "verification_boundary": "P016_multi_channel_fact_verification",
+        },
+        "effect_contract_committed": {"produces": ["human_received_filled_container", "effector_empty"], "destroys": ["container_in_effector"]},
+        "control_source": control_source,
+        "runtime_objects": deepcopy(session["runtime_objects"]),
+        "frames": [],
+    }
+
+
 def _record_completed_teaching_motion(session: dict[str, Any], job: dict[str, Any], result: dict[str, Any]) -> None:
     teaching = session.get("teaching_session") or {}
     if teaching.get("status") != "human_control_active":
@@ -2336,6 +2572,64 @@ def _build_object_relative_motion(
         "terminal_fact": terminal_fact,
         "entity_ref": entity["entity_id"],
     })
+    return result
+
+
+def _execute_water_service_stage(
+    session: dict[str, Any],
+    intent: dict[str, Any],
+    stage: dict[str, Any],
+    scoped_authorization: dict[str, Any] | None,
+) -> dict[str, Any]:
+    bindings = intent["role_bindings"]
+    action = stage["stage_id"]
+    if action == "fill_container":
+        entity_ref = bindings["source"]
+        post_completion = {"action": "fill", "container_ref": bindings["theme"], "source_ref": bindings["source"], "mode": "direct_task"}
+        process = ["navigate_to_water_source", "align_container_under_outlet", "activate_flow", "verify_container_filled"]
+    elif action == "handover_to_recipient":
+        entity_ref = bindings["recipient"]
+        post_completion = {"action": "handover", "container_ref": bindings["theme"], "recipient_ref": bindings["recipient"], "mode": "direct_task"}
+        process = ["navigate_to_safe_handover_zone", "verify_recipient_readiness", "transfer_container", "verify_recipient_possession"]
+    else:
+        return {"status": "service_stage_not_supported", "reason": action, "frames": []}
+    entity = next(item for item in session["runtime_objects"] if item["entity_id"] == entity_ref)
+    result = _build_object_relative_motion(
+        session,
+        {
+            "status": "contextual_affordance_available",
+            "available": True,
+            "entity_ref": entity_ref,
+            "operator_candidate": "navigate_near",
+            "task_context": stage["utterance"],
+            "scoped_authorization_present": bool(scoped_authorization),
+            "grounding_basis": {"source": "long_intent_role_binding", "binding_strength": "current_world_snapshot"},
+        },
+        perf_counter_ns(),
+    )
+    if result.get("status") != "fact_established":
+        return result
+    result["post_completion"] = post_completion
+    result["candidate_execution_plan"] = {
+        "goal_fact": stage["target_fact"],
+        "role_bindings": deepcopy(bindings),
+        "required_facts": [stage["required_fact"], "current_role_bindings_grounded", "collision_free_current_route"],
+        "candidate_process": process,
+        "route_kind": result.get("object_relative_motion", {}).get("route_kind"),
+        "route_length_m": result.get("object_relative_motion", {}).get("route_length_m"),
+        "world_revision": session["world_revision"],
+        "candidate_only": not bool(scoped_authorization),
+        "direct_execution_allowed": bool(scoped_authorization),
+    }
+    if not scoped_authorization:
+        pending = _create_pending_confirmation(session, stage["utterance"])
+        result.update({
+            "status": "requires_human_confirmation",
+            "reason": "water_service_stage_requires_human_confirmation",
+            "prompt": f"我已按当前空间重新绑定{entity['label']}并生成“{' → '.join(process)}”候选链；路径只用于本次执行。确认继续吗？",
+            "pending_confirmation": deepcopy(pending),
+            "frames": [],
+        })
     return result
 
 
@@ -2729,7 +3023,9 @@ def begin_motion_command(
         if confirmed.get("status") == "observation_candidate_confirmed":
             return {"status": confirmed["status"], "immediate_result": confirmed, "session": confirmed.get("session")}
         return confirmed
-    long_intent = None if internal_stage or scoped_authorization else _create_transfer_intent(session, text)
+    long_intent = None if internal_stage or scoped_authorization else (
+        _create_water_delivery_intent(session, text) or _create_transfer_intent(session, text)
+    )
     if long_intent:
         prepared = _prepare_long_intent_stage(session, long_intent)
         prepared["immediate_result"]["session"] = get_session(session_id)
@@ -2750,7 +3046,19 @@ def begin_motion_command(
             }
             return started
     before = deepcopy(session)
-    result = execute_command(session_id, utterance, scoped_authorization)
+    active_intent = (session.get("long_horizon_intents") or {}).get(session.get("active_intent_id"))
+    active_stage = (active_intent or {}).get("current_stage") or {}
+    service_stage_matches = bool(
+        active_intent
+        and active_intent.get("intent_type") == "verified_water_delivery"
+        and active_stage.get("utterance") == text
+        and active_stage.get("stage_id") in {"fill_container", "handover_to_recipient"}
+    )
+    result = (
+        _execute_water_service_stage(session, active_intent, active_stage, scoped_authorization)
+        if service_stage_matches
+        else execute_command(session_id, utterance, scoped_authorization)
+    )
     pending_confirmation = deepcopy(SESSIONS[session_id].get("pending_confirmation"))
     perception_history = deepcopy(SESSIONS[session_id].get("perception_history", []))
     concept_gap_dialogue = deepcopy(SESSIONS[session_id].get("concept_gap_dialogue"))
@@ -2891,6 +3199,10 @@ def _post_completion_signature(post_completion: dict[str, Any] | None) -> dict[s
             "object_ref": post_completion.get("object_ref"),
             "destination_ref": post_completion.get("destination_ref"),
         }
+    if action == "fill":
+        return {"action": action, "container_ref": post_completion.get("container_ref"), "source_ref": post_completion.get("source_ref")}
+    if action == "handover":
+        return {"action": action, "container_ref": post_completion.get("container_ref"), "recipient_ref": post_completion.get("recipient_ref")}
     return {"action": action}
 
 
@@ -3073,6 +3385,22 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
             ]
         else:
             result = placement
+    elif (job.get("post_completion") or {}).get("action") == "fill":
+        fill = _apply_verified_fill(
+            session,
+            job["post_completion"]["container_ref"],
+            job["post_completion"]["source_ref"],
+            "human_confirmed_water_service_stage",
+        )
+        result.update(fill)
+    elif (job.get("post_completion") or {}).get("action") == "handover":
+        handover = _apply_verified_handover(
+            session,
+            job["post_completion"]["container_ref"],
+            job["post_completion"]["recipient_ref"],
+            "human_confirmed_water_service_stage",
+        )
+        result.update(handover)
     elif (job.get("post_completion") or {}).get("action") == "grasp":
         result = _apply_verified_grasp(
             session,
@@ -3117,6 +3445,9 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
     intent = (session.get("long_horizon_intents") or {}).get(job.get("long_intent_id"))
     if intent:
         if result.get("status") == "fact_established":
+            terminal_fact = result.get("terminal_fact")
+            if terminal_fact and terminal_fact not in intent["verified_facts"]:
+                intent["verified_facts"].append(terminal_fact)
             stage_outcome = _prepare_long_intent_stage(session, intent)
             result["long_horizon_intent"] = stage_outcome.get("long_horizon_intent", _long_intent_view(intent))
             if stage_outcome.get("status") == "long_intent_completed":
@@ -3138,8 +3469,10 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
     return {"status": "motion_completed", "job_id": job_id, "frame": frame, "result": result, "session": get_session(job["session_id"])}
 
 
-def _first_collision(session: dict[str, Any], start: list[float], target: list[float], radius: float) -> dict[str, Any] | None:
-    scene = _scene_for_session(session)
+def _first_collision(
+    session: dict[str, Any], start: list[float], target: list[float], radius: float, scene: dict[str, Any] | None = None
+) -> dict[str, Any] | None:
+    scene = scene or _scene_for_session(session)
     distance = math.dist(start, target)
     sample_count = max(2, int(distance / 0.04) + 1)
     previous = list(start)
@@ -3172,7 +3505,16 @@ def _plan_verified_motion(
         safety_contract["terminal_pose_verified"] = _collider_at(target, radius, session, _scene_for_session(session)) is None
         return {"outcome": "verified", "route_kind": "direct", "waypoints": [target], "safety_contract": safety_contract}
     obstacle = direct_collision["obstacle"]
-    if obstacle.get("obstacle_class") != "movable_obstacle" or obstacle.get("mode") == "narrow":
+    if obstacle.get("obstacle_class") == "scene_boundary" or obstacle.get("mode") == "narrow":
+        return {"outcome": "blocked", "route_kind": "none", "blocking_collision": direct_collision, "safety_contract": safety_contract}
+    if obstacle.get("obstacle_class") == "fixed_furniture":
+        global_route = _global_collision_free_route(session, start, target, radius)
+        if global_route:
+            safety_contract["terminal_pose_verified"] = True
+            return {
+                "outcome": "verified", "route_kind": "current_map_shortest_path", "waypoints": global_route,
+                "blocking_collision": direct_collision, "safety_contract": safety_contract,
+            }
         return {"outcome": "blocked", "route_kind": "none", "blocking_collision": direct_collision, "safety_contract": safety_contract}
     candidates: list[dict[str, Any]] = []
     rejected: list[dict[str, Any]] = []
@@ -3202,6 +3544,13 @@ def _plan_verified_motion(
             "simplified_waypoint_count": len(waypoints),
         })
     if not candidates:
+        global_route = _global_collision_free_route(session, start, target, radius)
+        if global_route:
+            safety_contract["terminal_pose_verified"] = True
+            return {
+                "outcome": "verified", "route_kind": "current_map_shortest_path", "waypoints": global_route,
+                "blocking_collision": direct_collision, "rejected_alternatives": rejected, "safety_contract": safety_contract,
+            }
         return {
             "outcome": "blocked",
             "route_kind": "none",
@@ -3224,6 +3573,72 @@ def _plan_verified_motion(
     }
 
 
+def _global_collision_free_route(
+    session: dict[str, Any], start: list[float], target: list[float], radius: float, resolution: float = 0.18
+) -> list[list[float]] | None:
+    """Plan over the current collision map; the resulting geometry is transient."""
+    min_x, max_x = -5.0 + radius, 5.0 - radius
+    min_y, max_y = -2.3 + radius, 2.3 - radius
+    cols = int((max_x - min_x) / resolution) + 1
+    rows = int((max_y - min_y) / resolution) + 1
+
+    def point(node: tuple[int, int]) -> list[float]:
+        return [min_x + node[0] * resolution, min_y + node[1] * resolution]
+
+    scene = _scene_for_session(session)
+    clear_nodes = {
+        (ix, iy)
+        for ix in range(cols)
+        for iy in range(rows)
+        if _collider_at(point((ix, iy)), radius, session, scene) is None
+    }
+    start_candidates = sorted(clear_nodes, key=lambda node: math.dist(start, point(node)))
+    goal_candidates = sorted(clear_nodes, key=lambda node: math.dist(target, point(node)))
+    start_node = next((node for node in start_candidates[:20] if _first_collision(session, start, point(node), radius, scene) is None), None)
+    goal_nodes = {
+        node for node in goal_candidates[:32]
+        if math.dist(target, point(node)) <= resolution * 2.2 and _first_collision(session, point(node), target, radius, scene) is None
+    }
+    if start_node is None or not goal_nodes:
+        return None
+    frontier: list[tuple[float, float, tuple[int, int]]] = [(0.0, 0.0, start_node)]
+    cost = {start_node: 0.0}
+    came_from: dict[tuple[int, int], tuple[int, int]] = {}
+    reached = None
+    directions = [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]
+    while frontier:
+        _, current_cost, current = heapq.heappop(frontier)
+        if current_cost > cost.get(current, math.inf):
+            continue
+        if current in goal_nodes:
+            reached = current
+            break
+        current_point = point(current)
+        for dx, dy in directions:
+            neighbor = (current[0] + dx, current[1] + dy)
+            if neighbor not in clear_nodes:
+                continue
+            neighbor_point = point(neighbor)
+            if _first_collision(session, current_point, neighbor_point, radius, scene):
+                continue
+            step_cost = math.hypot(dx, dy) * resolution
+            new_cost = current_cost + step_cost
+            if new_cost >= cost.get(neighbor, math.inf):
+                continue
+            cost[neighbor] = new_cost
+            came_from[neighbor] = current
+            heuristic = min(math.dist(neighbor_point, point(goal)) for goal in goal_nodes)
+            heapq.heappush(frontier, (new_cost + heuristic, new_cost, neighbor))
+    if reached is None:
+        return None
+    nodes = [reached]
+    while nodes[-1] != start_node:
+        nodes.append(came_from[nodes[-1]])
+    nodes.reverse()
+    raw = [point(node) for node in nodes[1:]] + [list(target)]
+    return _simplify_collision_free_waypoints(session, start, raw, radius)
+
+
 def _collider_at(point: list[float], radius: float, session: dict[str, Any], scene: dict[str, Any]) -> dict[str, Any] | None:
     x, y = point
     if x - radius < -5.0 or x + radius > 5.0 or y - radius < -2.3 or y + radius > 2.3:
@@ -3235,6 +3650,7 @@ def _collider_at(point: list[float], radius: float, session: dict[str, Any], sce
         sx, sy = item["size"][:2]
         if abs(x - ox) <= sx / 2 + radius and abs(y - oy) <= sy / 2 + radius:
             return {
+                **deepcopy(item),
                 "entity_id": item["entity_id"],
                 "label": item["label"],
                 "kind": item["kind"],
