@@ -91,33 +91,28 @@ def verify_teaching_actions() -> dict:
 def verify_repeated_obstacle_replanning() -> dict:
     session = start_session("home_humanoid", "home_semantic_3d_a")
     session_id = session["session_id"]
-    first = begin_motion_command(session_id, "给我接一杯水")
-    require(first.get("status") == "motion_started", f"service command was not treated as task-level authorization: {first}")
-    active = first
-    first_frame = step_motion_command(active["job_id"])
-    require(first_frame.get("status") == "frame_verified_and_committed", f"service did not enter motion: {first_frame}")
+    active = begin_motion_command(session_id, "给我接一杯水")
+    require(active.get("status") == "motion_started", f"service command was not treated as task-level authorization: {active}")
+    replan_statuses = []
+    for index in range(10):
+        frame = step_motion_command(active["job_id"])
+        require(frame.get("status") == "frame_verified_and_committed", f"replan {index + 1} did not enter motion: {frame}")
+        set_stool(session_id, "ahead")
+        replanned = step_motion_command(active["job_id"])
+        require(replanned.get("continuation_status") == "same_intent_reobserved_and_replanned", f"replan {index + 1} lost execution intent: {replanned}")
+        replacement = replanned["replacement"]
+        require(replacement.get("preserved_long_horizon_context", {}).get("long_stage_id") == "acquire_container", f"replan {index + 1} lost long stage: {replanned}")
+        replan_statuses.append(replanned["continuation_status"])
+        active = replacement
 
-    set_stool(session_id, "ahead")
-    first_replan = step_motion_command(active["job_id"])
-    require(first_replan.get("continuation_status") == "same_intent_reobserved_and_replanned", f"first replan lost execution intent: {first_replan}")
-    require(first_replan["replacement"].get("preserved_long_horizon_context", {}).get("long_stage_id") == "acquire_container", f"first replan lost long stage: {first_replan}")
-
-    replacement = first_replan["replacement"]
-    replacement_frame = step_motion_command(replacement["job_id"])
-    require(replacement_frame.get("status") == "frame_verified_and_committed", f"replacement did not enter motion: {replacement_frame}")
-    set_stool(session_id, "ahead")
-    second_replan = step_motion_command(replacement["job_id"])
-    require(second_replan.get("continuation_status") == "same_intent_reobserved_and_replanned", f"second replan lost execution intent: {second_replan}")
-    require(second_replan["replacement"].get("preserved_long_horizon_context", {}).get("long_stage_id") == "acquire_container", f"second replan lost long stage: {second_replan}")
-
-    grasped = drain(second_replan["replacement"])
+    grasped = drain(active)
     require(grasped.get("terminal_fact") == "target_object_in_gripper", f"replanned acquisition did not finish: {grasped}")
     require(grasped.get("next_stage_started", {}).get("long_stage", {}).get("stage_id") == "fill_container", f"service stopped after replanned grasp: {grasped}")
     drain_service(grasped["next_stage_started"])
     live = get_session(session_id)
     container = next(item for item in live["runtime_objects"] if item["kind"] == "graspable_container")
     require(container.get("received_by") == "human_a", f"service did not survive repeated replans: {container}")
-    return {"first_replan": first_replan["continuation_status"], "second_replan": second_replan["continuation_status"], "terminal_fact": "human_received_filled_container"}
+    return {"replan_count": len(replan_statuses), "all_preserved": len(set(replan_statuses)) == 1, "terminal_fact": "human_received_filled_container"}
 
 
 def main() -> None:
