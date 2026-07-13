@@ -22,7 +22,7 @@ TASK_OPERATORS = {
         "candidate_chain": ("bind_confirmed_target", "plan_route_to_reach_pose", "grasp_and_verify_target_in_gripper"),
     },
     "place_object": {
-        "tokens": ("放到", "放在", "摆到", "摆在", "搁到", "搁在"),
+        "tokens": ("放到", "放在", "放下", "摆到", "摆在", "搁到", "搁在"),
         "role": "placement_destination",
         "required_body_actions": ("place_object",),
         "required_object_claims": ("support_object",),
@@ -83,15 +83,77 @@ def resolve_contextual_affordance_request(
         (item.get("entity_ref") for item in (perception_bindings or []) if item.get("role") == "target"),
         None,
     )
-    entity = next(
-        (
-            item
-            for item in entities
-            if item.get("label") and item["label"] in utterance
-        ),
-        None,
-    )
-    if not entity and any(token in utterance for token in ("拿起", "抓取", "拾起", "拿住", "放到", "放在", "摆到", "摆在", "搁到", "搁在")):
+    operator = _operator(utterance)
+    if not operator:
+        return None
+    held_ref = runtime_state.get("holding")
+    held_entity = next((item for item in entities if item.get("entity_id") == held_ref), None)
+    destination_binding = None
+    if operator == "place_object":
+        support_concepts = [
+            concept for concept in object_concepts
+            if "support_object" in concept.get("functional_affordances", [])
+            or "receive_object" in concept.get("functional_affordances", [])
+        ]
+        compatible_kinds = {kind for concept in support_concepts for kind in concept.get("compatible_kinds", [])}
+        support_entities = [item for item in entities if item.get("kind") in compatible_kinds]
+        mentioned_destination_candidates: list[tuple[int, dict[str, Any]]] = []
+        for concept in object_concepts:
+            mention_positions = [utterance.rfind(alias) for alias in concept.get("aliases", []) if alias and alias in utterance]
+            if not mention_positions:
+                continue
+            for candidate in entities:
+                if candidate.get("entity_id") == held_ref or candidate.get("kind") not in concept.get("compatible_kinds", []):
+                    continue
+                mentioned_destination_candidates.append((max(mention_positions), candidate))
+        for candidate in entities:
+            if candidate.get("entity_id") != held_ref and candidate.get("label") and candidate["label"] in utterance:
+                mentioned_destination_candidates.append((utterance.rfind(candidate["label"]), candidate))
+        explicit_destination = max(mentioned_destination_candidates, key=lambda item: item[0])[1] if mentioned_destination_candidates else None
+        explicitly_mentioned = [
+            item for item in support_entities
+            if (item.get("label") and item["label"] in utterance)
+            or any(
+                alias in utterance
+                for concept in support_concepts
+                if item.get("kind") in concept.get("compatible_kinds", [])
+                for alias in concept.get("aliases", [])
+            )
+        ]
+        prior_support_ref = (held_entity or {}).get("last_support_ref") or (held_entity or {}).get("support_ref")
+        prior_support = next((item for item in support_entities if item.get("entity_id") == prior_support_ref), None)
+        if explicit_destination:
+            entity = explicit_destination
+            destination_binding = (
+                "explicit_compatible_destination"
+                if explicit_destination in support_entities
+                else "explicit_incompatible_destination_candidate"
+            )
+        elif prior_support:
+            entity = prior_support
+            destination_binding = "implicit_previous_verified_support"
+        elif support_entities:
+            executor_position = runtime_state.get("executor_position") or [0.0, 0.0]
+            entity = min(
+                support_entities,
+                key=lambda item: (
+                    (float(item["position"][0]) - float(executor_position[0])) ** 2
+                    + (float(item["position"][1]) - float(executor_position[1])) ** 2
+                ),
+            )
+            destination_binding = "implicit_nearest_compatible_support_candidate"
+        else:
+            entity = None
+    else:
+        entity = next(
+            (
+                item
+                for item in entities
+                if item.get("label") and item["label"] in utterance
+            ),
+            None,
+        )
+    if not entity and operator != "place_object" and any(token in utterance for token in ("拿起", "抓取", "拾起", "拿住")):
         for concept in object_concepts:
             if any(alias and alias in utterance for alias in concept.get("aliases", [])):
                 compatible = [item for item in entities if item.get("kind") in concept.get("compatible_kinds", [])]
@@ -105,15 +167,12 @@ def resolve_contextual_affordance_request(
                     break
     if not entity:
         return None
-    operator = _operator(utterance)
-    if not operator:
-        return None
     contract = TASK_OPERATORS[operator]
     concept = next(
         (item for item in object_concepts if item["concept_id"] == entity.get("concept_id")),
         None,
     )
-    if not concept and entity.get("entity_id") in confirmed_refs.union(perceived_refs):
+    if not concept and (operator == "place_object" or entity.get("entity_id") in confirmed_refs.union(perceived_refs)):
         concept = next((item for item in object_concepts if entity.get("kind") in item.get("compatible_kinds", [])), None)
     if not concept and entity.get("kind") == "graspable_container":
         concept = next((item for item in object_concepts if item["concept_id"] == "concept_fillable_container"), None)
@@ -137,7 +196,6 @@ def resolve_contextual_affordance_request(
             missing.append({"kind": "object_claim", "condition": claim, "reason": "object_claim_not_physically_verified"})
     if operator == "relocate" and entity.get("fixed"):
         missing.append({"kind": "runtime_object_state", "condition": "current_instance_fixed", "reason": "current_instance_is_bound_as_fixed_furniture"})
-    held_ref = runtime_state.get("holding")
     if operator == "place_object" and not held_ref:
         missing.append({"kind": "runtime_object_state", "condition": "no_object_currently_held", "reason": "place_requires_currently_held_theme"})
     governance_gate = contract["governance"]
@@ -174,9 +232,11 @@ def resolve_contextual_affordance_request(
             "collision_size_available": isinstance(entity.get("size"), list),
         },
         "grounding_basis": {
-            "source": "task_conditioned_active_perception" if entity.get("entity_id") in perceived_refs else "confirmed_or_unique_runtime_binding",
+            "source": destination_binding or ("task_conditioned_active_perception" if entity.get("entity_id") in perceived_refs else "confirmed_or_unique_runtime_binding"),
             "target_entity_ref": entity["entity_id"],
             "perception_bindings": deepcopy(perception_bindings or []),
+            "binding_strength": "implicit" if destination_binding and destination_binding.startswith("implicit_") else "explicit_or_verified",
+            "requires_confirmation": bool(destination_binding and destination_binding.startswith("implicit_")),
         },
         "governance_gate": governance_gate,
         "scoped_authorization_present": bool(scoped_authorization),

@@ -192,11 +192,10 @@ def main() -> None:
     require(set(fixed_incompatibility["missing_affordances"]) == {"graspable", "movable"}, f"grasp role missing affordances not explained: {fixed_asset_gap}")
 
     support_gap = execute_command(zero_id, "把杯子放到苹果上")
-    require(support_gap["factory_concept"]["reason_code"] == "entity_not_compatible_with_semantic_role", f"apple was accepted as support surface: {support_gap}")
-    destination_gap = next(item for item in support_gap["factory_concept"]["incompatible_roles"] if item["role"] == "destination")
-    require("support_object" in destination_gap["missing_affordances"], f"support affordance gap not exposed: {support_gap}")
-    require(all(item["entity_ref"] != "apple_a" for item in support_gap["factory_concept"]["incompatible_roles"] if item["role"] == "object"), f"destination was incorrectly rebound as moved object: {support_gap}")
-    require(support_gap["causal_candidate"]["candidate_process_chain"] == ["navigate_until_target_within_reach", "grasp_object", "compute_current_body_placement_candidate", "place_object"], f"geometric placement mechanism missing from causal chain: {support_gap}")
+    require(support_gap["status"] == "contextual_affordance_blocked" and support_gap["entity_ref"] == "apple_a", f"explicit incompatible destination was silently replaced: {support_gap}")
+    require(any(item["condition"] == "support_object" for item in support_gap["missing_conditions"]), f"support affordance gap not exposed: {support_gap}")
+    require(support_gap["grounding_basis"]["source"] == "explicit_incompatible_destination_candidate", f"explicit destination evidence was not preserved for diagnosis: {support_gap}")
+    require(support_gap["candidate_process_chain"] == ["bind_currently_held_theme", "bind_compatible_destination", "compute_current_body_placement_candidate", "place_and_verify_support_relation"], f"generic placement mechanism missing from causal contract: {support_gap}")
 
     body_gap = execute_command(zero_id, "擦操作台")
     require(body_gap["factory_concept"]["reason_code"] == "executor_capability_not_available", f"missing body capability was not explained: {body_gap}")

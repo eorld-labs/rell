@@ -1399,6 +1399,9 @@ def _apply_verified_grasp(session: dict[str, Any], target_ref: str, source: str)
         }
     if session["state"].get("holding") not in {None, target_ref}:
         return {"status": "grasp_blocked", "reason": "gripper_already_holding_incompatible_object", "frames": []}
+    previous_support_ref = target.pop("support_ref", None)
+    if previous_support_ref:
+        target["last_support_ref"] = previous_support_ref
     session["state"]["holding"] = target_ref
     target["attached_to_executor"] = True
     target["position"] = deepcopy(executor_position)
@@ -1479,6 +1482,7 @@ def _apply_verified_place(session: dict[str, Any], object_ref: str, destination_
     held_object["position"] = placement_position
     held_object["elevation_m"] = float(destination["size"][2])
     held_object["support_ref"] = destination_ref
+    held_object["last_support_ref"] = destination_ref
     held_object["attached_to_executor"] = False
     session["state"]["holding"] = None
     return {
@@ -1749,6 +1753,7 @@ def _build_object_relative_motion(
                 },
             })
     elif operator == "place_object":
+        destination_grounding = contextual_affordance.get("grounding_basis", {})
         result["post_completion"] = {
             "action": "place",
             "object_ref": contextual_affordance["theme_entity_ref"],
@@ -1769,12 +1774,30 @@ def _build_object_relative_motion(
             result.update({
                 "status": "requires_human_confirmation",
                 "reason": "candidate_route_and_placement_require_human_confirmation",
-                "prompt": f"我已把当前持有物绑定为被放置对象，把{entity['label']}绑定为承载目标，并按当前本体可达范围和承载面几何生成了移动与放置候选。可以执行并验真稳定支撑关系吗？",
+                "prompt": (
+                    f"我已根据当前持有事实把{next((item['label'] for item in session['runtime_objects'] if item['entity_id'] == contextual_affordance['theme_entity_ref']), '当前物体')}绑定为被放置对象。"
+                    + (
+                        f"你没有明说目的地；我根据它抓取前最后成立的承载关系，将{entity['label']}弱绑定为放置目标。"
+                        if destination_grounding.get("source") == "implicit_previous_verified_support"
+                        else f"你没有明说目的地；我按当前空间中最近且功能兼容的承载面，将{entity['label']}弱绑定为放置目标。"
+                        if destination_grounding.get("source") == "implicit_nearest_compatible_support_candidate"
+                        else f"我把明确提及的{entity['label']}绑定为承载目标。"
+                    )
+                    + "我已按当前本体可达范围和承载面几何生成移动与稳定放置候选。确认执行吗？"
+                ),
                 "pending_confirmation": deepcopy(pending),
                 "frames": [],
                 "candidate_execution_plan": {
                     "goal_fact": "object_supported_at_destination",
                     "roles": {"theme": contextual_affordance["theme_entity_ref"], "destination": entity["entity_id"]},
+                    "role_grounding": {
+                        "theme": {"source": "current_verified_holding_fact", "binding_strength": "verified"},
+                        "destination": {
+                            "source": destination_grounding.get("source"),
+                            "binding_strength": destination_grounding.get("binding_strength"),
+                            "requires_confirmation": destination_grounding.get("requires_confirmation", False),
+                        },
+                    },
                     "preconditions": ["object_in_gripper", "destination_grounded", "placement_pose_feasible"],
                     "route_kind": selected["plan"]["route_kind"],
                     "route_length_m": selected["route_length_m"],
@@ -1805,6 +1828,38 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
         session["open_world_observation"] = deepcopy(observation)
         observation["session"] = get_session(session_id)
         return observation
+    active_gap_dialogue = session.get("concept_gap_dialogue") or {}
+    if active_gap_dialogue.get("status") == "collecting_minimum_causal_contract":
+        continued = continue_concept_gap_dialogue(
+            active_gap_dialogue,
+            answer=text,
+            runtime_objects=session["runtime_objects"],
+            object_concepts=load_object_concepts()["concepts"],
+            current_world_revision=session["world_revision"],
+        )
+        session["concept_gap_dialogue"] = continued["dialogue"]
+        teaching_available = continued.get("knowledge_self_report", {}).get("next_safe_route") == "offer_embodied_teaching"
+        return {
+            "status": "temporary_effect_contract_compiled" if continued.get("compiled_contract") else "concept_gap_clarification_required",
+            "reason": "unknown_event_multi_turn_causal_analysis",
+            "prompt": continued["prompt"],
+            "knowledge_self_report": continued.get("knowledge_self_report"),
+            "concept_gap_analysis": {
+                "dialogue_id": continued["dialogue"]["dialogue_id"],
+                "slots": deepcopy(continued["dialogue"]["slots"]),
+                "pending_slot": continued["dialogue"].get("pending_slot"),
+                "analysis_ms": continued.get("analysis_ms"),
+            },
+            "temporary_effect_contract": continued.get("compiled_contract"),
+            "post_action": {
+                "action": "offer_embodied_teaching" if teaching_available else (
+                    "await_teaching_goal_verification_adapter" if continued.get("compiled_contract") else "await_clarification_answer"
+                ),
+                "teaching_available": teaching_available,
+                "clarification_required": not continued.get("compiled_contract"),
+            },
+            "session": get_session(session_id),
+        }
     relocation_preview = _build_observed_relocation_preview(session, text)
     if relocation_preview:
         return relocation_preview
@@ -1847,38 +1902,6 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
         return {
             **contextual_affordance,
             "prompt": contextual_affordance["explanation"],
-            "session": get_session(session_id),
-        }
-    active_gap_dialogue = session.get("concept_gap_dialogue") or {}
-    if active_gap_dialogue.get("status") == "collecting_minimum_causal_contract":
-        continued = continue_concept_gap_dialogue(
-            active_gap_dialogue,
-            answer=text,
-            runtime_objects=session["runtime_objects"],
-            object_concepts=load_object_concepts()["concepts"],
-            current_world_revision=session["world_revision"],
-        )
-        session["concept_gap_dialogue"] = continued["dialogue"]
-        teaching_available = continued.get("knowledge_self_report", {}).get("next_safe_route") == "offer_embodied_teaching"
-        return {
-            "status": "temporary_effect_contract_compiled" if continued.get("compiled_contract") else "concept_gap_clarification_required",
-            "reason": "unknown_event_multi_turn_causal_analysis",
-            "prompt": continued["prompt"],
-            "knowledge_self_report": continued.get("knowledge_self_report"),
-            "concept_gap_analysis": {
-                "dialogue_id": continued["dialogue"]["dialogue_id"],
-                "slots": deepcopy(continued["dialogue"]["slots"]),
-                "pending_slot": continued["dialogue"].get("pending_slot"),
-                "analysis_ms": continued.get("analysis_ms"),
-            },
-            "temporary_effect_contract": continued.get("compiled_contract"),
-            "post_action": {
-                "action": "offer_embodied_teaching" if teaching_available else (
-                    "await_teaching_goal_verification_adapter" if continued.get("compiled_contract") else "await_clarification_answer"
-                ),
-                "teaching_available": teaching_available,
-                "clarification_required": not continued.get("compiled_contract"),
-            },
             "session": get_session(session_id),
         }
     perception_result = build_task_perception_result(_scene_for_session(session), session, text)

@@ -8,6 +8,15 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
+def drain_motion(started: dict) -> dict:
+    require(started.get("status") == "motion_started" and started.get("job_id"), f"expected motion job: {started}")
+    for _ in range(240):
+        completed = step_motion_command(started["job_id"])
+        if completed.get("status") == "motion_completed":
+            return completed
+    raise AssertionError(f"motion did not complete: {started}")
+
+
 def main() -> None:
     humanoid = start_session(scene_id="home_semantic_3d_b", executor_profile_id="home_humanoid")
     wheeled = start_session(scene_id="home_semantic_3d_b", executor_profile_id="home_mobile_manipulator")
@@ -40,6 +49,17 @@ def main() -> None:
     require(implicit_plan["candidate_process"] == ["navigate_to_support", "align_end_effector", "grasp_target", "verify_target_in_gripper"], f"missing facts did not compile a causal candidate chain: {implicit_support}")
     require(implicit_result["concept_grounding"]["relation_evidence"]["relation"] == "on_top_of", f"support binding lacked visual-topological evidence: {implicit_support}")
     require(not implicit_support.get("experience_recall"), f"language-to-experience recall bypassed concept and state grounding: {implicit_support}")
+    implicit_grasp_done = drain_motion(begin_motion_command(implicit_support_session["session_id"], "确认"))
+    grasped_cup = next(item for item in implicit_grasp_done["session"]["runtime_objects"] if item["entity_id"] == "cup_b")
+    require(grasped_cup.get("support_ref") is None and grasped_cup.get("last_support_ref") == "counter_b", f"grasp did not destroy current support while preserving provenance: {implicit_grasp_done}")
+    put_down = begin_motion_command(implicit_support_session["session_id"], "放下杯子")
+    put_down_result = put_down["immediate_result"]
+    require(put_down["status"] == "requires_human_confirmation", f"implicit destination placement bypassed arbitration: {put_down}")
+    require(put_down_result["candidate_execution_plan"]["roles"] == {"theme": "cup_b", "destination": "counter_b"}, f"held object and prior support were not rebound by role contract: {put_down}")
+    require(put_down_result["grounding_basis"]["source"] == "implicit_previous_verified_support", f"implicit destination did not preserve its inference basis: {put_down}")
+    require(put_down_result["candidate_execution_plan"]["role_grounding"]["destination"]["binding_strength"] == "implicit", f"implicit destination was overclaimed as explicit: {put_down}")
+    put_down_done = drain_motion(begin_motion_command(implicit_support_session["session_id"], "确认"))
+    require(put_down_done["result"]["terminal_fact"] == "object_supported_at_destination" and put_down_done["session"]["state"]["holding"] is None, f"put-down did not establish stable support and destroy holding: {put_down_done}")
     explicit_support_session = start_session(scene_id="home_semantic_3d_b", executor_profile_id="home_humanoid")
     explicit_support = begin_motion_command(explicit_support_session["session_id"], "走到桌子上拿起杯子")
     explicit_plan = explicit_support["immediate_result"]["candidate_execution_plan"]
@@ -50,6 +70,12 @@ def main() -> None:
     apple_plan = apple_candidate["immediate_result"]["candidate_execution_plan"]
     require(apple_plan["role_bindings"] == {"target": "apple_b", "support": None}, f"grasp paradigm did not generalize to apple: {apple_candidate}")
     require(apple_plan["candidate_process"][0] == "navigate_to_bound_target", f"unsupported apple relation was invented: {apple_candidate}")
+    apple_grasp_done = drain_motion(begin_motion_command(apple_session["session_id"], "确认"))
+    require(apple_grasp_done["result"]["terminal_fact"] == "target_object_in_gripper", f"apple grasp prerequisite failed: {apple_grasp_done}")
+    apple_down = begin_motion_command(apple_session["session_id"], "放下苹果")
+    apple_down_result = apple_down["immediate_result"]
+    require(apple_down_result["grounding_basis"]["source"] == "implicit_nearest_compatible_support_candidate", f"missing prior support did not fall back to compatible spatial candidate: {apple_down}")
+    require(apple_down_result["candidate_execution_plan"]["roles"] == {"theme": "apple_b", "destination": "dining_table_b"}, f"put-down mechanism did not generalize beyond cups: {apple_down}")
     contextual = start_session(scene_id="home_semantic_3d_b", executor_profile_id="home_humanoid")
     first = begin_motion_command(contextual["session_id"], "你看得到空间里的杯子吗")["immediate_result"]
     accepted = begin_motion_command(contextual["session_id"], "对")
