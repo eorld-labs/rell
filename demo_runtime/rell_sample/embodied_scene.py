@@ -3233,8 +3233,19 @@ def _resume_after_local_path_change(job: dict[str, Any], session: dict[str, Any]
     replacement_job = MOTION_JOBS.get(replacement.get("job_id", ""))
     replacement_intent = _post_completion_signature((replacement_job or {}).get("post_completion"))
     if replacement_job and replacement_intent == original_intent:
+        # A route is disposable, but its membership in a verified long-horizon
+        # stage is not. Preserve only symbolic ownership; no stale geometry or
+        # frame is copied into the replacement job.
+        for context_key in ("long_intent_id", "long_stage_id"):
+            if job.get(context_key):
+                replacement_job[context_key] = job[context_key]
         replacement["continuation_status"] = "same_intent_reobserved_and_replanned"
         replacement["preserved_execution_intent"] = original_intent
+        replacement["preserved_long_horizon_context"] = {
+            "long_intent_id": replacement_job.get("long_intent_id"),
+            "long_stage_id": replacement_job.get("long_stage_id"),
+            "trajectory_preserved": False,
+        }
         return {
             "status": "path_invalidated_and_replanned",
             "reason": reason,
