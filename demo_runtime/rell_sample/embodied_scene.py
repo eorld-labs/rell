@@ -15,7 +15,7 @@ from concept_core.contextual_affordance import resolve_contextual_affordance_req
 from concept_core.functional_object_reasoning import build_functional_object_catalog, build_functional_profile, evaluate_role_compatibility
 from concept_core.factory_state_facts import build_factory_state_catalog, derive_runtime_fact_snapshot, explain_prerequisite_gaps
 from concept_core.lightweight_orchestrator import build_lightweight_causal_candidate, build_lightweight_orchestrator_catalog
-from concept_core.perceptual_grounding import build_open_world_observation, build_task_perception_result, load_object_concepts
+from concept_core.perceptual_grounding import activate_task_perception, build_open_world_observation, build_task_perception_result, load_object_concepts
 from concept_core.visual_concept_packs import build_visual_pack_catalog
 from embodied_teaching import (
     append_validation_result,
@@ -1559,10 +1559,14 @@ def _build_object_relative_motion(
         if item["entity_id"] == contextual_affordance["entity_ref"]
     )
     operator = contextual_affordance["operator_candidate"]
+    task_perception = contextual_affordance.get("task_perception") or {}
+    perception_bindings = task_perception.get("concept_grounding", {}).get("candidate_bindings", [])
+    support_binding = next((item for item in perception_bindings if item.get("role") == "support"), None)
     planning_entity = entity
-    if operator == "grasp_object" and entity.get("support_ref"):
+    if operator == "grasp_object" and (support_binding or entity.get("support_ref")):
+        support_ref = (support_binding or {}).get("entity_ref") or entity.get("support_ref")
         planning_entity = next(
-            (item for item in session["runtime_objects"] if item.get("entity_id") == entity.get("support_ref")),
+            (item for item in session["runtime_objects"] if item.get("entity_id") == support_ref),
             entity,
         )
     start = list(session["state"]["executor_position"])
@@ -1690,19 +1694,53 @@ def _build_object_relative_motion(
         },
         "session": get_session(session["session_id"]),
     }
+    if task_perception:
+        result.update({
+            "task_perception_frame": deepcopy(task_perception.get("task_perception_frame")),
+            "active_perception_trace": deepcopy(task_perception.get("active_perception_trace", [])),
+            "concept_grounding": deepcopy(task_perception.get("concept_grounding")),
+            "perception_observation": deepcopy(task_perception.get("perception_observation")),
+        })
     if operator == "grasp_object":
         result["post_completion"] = {"action": "grasp", "target_entity_ref": entity["entity_id"], "mode": "direct_task"}
         if not contextual_affordance.get("scoped_authorization_present"):
             pending = _create_pending_confirmation(session, contextual_affordance["task_context"])
+            pending["candidate_role_bindings"] = deepcopy(perception_bindings)
+            pending["perception_evidence_ref"] = task_perception.get("perception_observation", {}).get("observation_id")
+            support_text = f"{planning_entity['label']}上的" if planning_entity is not entity else "当前空间中的"
+            center_distance = math.dist(start, entity["position"])
+            reachable_distance = float(session["executor_profile"]["body_envelope"]["radius_m"]) + float(session["executor_profile"]["arm_reach_m"])
+            reach_gap = center_distance > reachable_distance
             result.update({
                 "status": "requires_human_confirmation",
                 "reason": "candidate_route_requires_human_confirmation_before_motion_and_grasp",
-                "prompt": f"我已确认{entity['label']}的空间候选，并规划了到达其可抓取范围的无碰撞路径。可以先直接移动到{entity['label']}前再拿起吗？",
+                "prompt": (
+                    f"我先按抓取目标主动观察，识别到{support_text}{entity['label']}，并把该空间关系绑定到当前世界快照。"
+                    + (f"它距当前本体中心约{center_distance:.2f}米，超出当前可达边界{reachable_distance:.2f}米，因此需要先移动到其可抓取范围。" if reach_gap else "它已处于当前本体可达范围。")
+                    + f"我已生成无碰撞路径、对准、抓取和末态验真的候选计划。确认执行吗？"
+                ),
                 "pending_confirmation": deepcopy(pending),
                 "frames": [],
                 "candidate_execution_plan": {
                     "goal_fact": "target_object_in_gripper",
-                    "missing_precondition": "executor_within_grasp_reach",
+                    "goal_operator": "grasp_object",
+                    "role_bindings": {
+                        "target": entity["entity_id"],
+                        "support": planning_entity["entity_id"] if planning_entity is not entity else None,
+                    },
+                    "observed_relation": "target_on_top_of_support" if planning_entity is not entity else "target_spatially_grounded",
+                    "required_facts": ["target_object_spatially_grounded", "target_object_within_reach", "gripper_available"],
+                    "satisfied_facts": ["target_object_spatially_grounded", "gripper_available"],
+                    "missing_precondition": "executor_within_grasp_reach" if reach_gap else None,
+                    "candidate_process": (
+                        (["navigate_to_support"] if planning_entity is not entity else ["navigate_to_bound_target"])
+                        if reach_gap else []
+                    ) + ["align_end_effector", "grasp_target", "verify_target_in_gripper"],
+                    "body_constraint_basis": {
+                        "executor_profile_ref": session["executor_profile_id"],
+                        "target_center_distance_m": round(center_distance, 3),
+                        "reachable_distance_m": round(reachable_distance, 3),
+                    },
                     "route_kind": selected["plan"]["route_kind"],
                     "route_length_m": selected["route_length_m"],
                     "world_revision": session["world_revision"],
@@ -1770,6 +1808,26 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
     relocation_preview = _build_observed_relocation_preview(session, text)
     if relocation_preview:
         return relocation_preview
+    task_perception = build_task_perception_result(_scene_for_session(session), session, text)
+    perception_bindings = (
+        task_perception.get("concept_grounding", {}).get("candidate_bindings", [])
+        if task_perception else []
+    )
+    if task_perception and task_perception.get("concept_grounding", {}).get("grounding_status") != "spatially_grounded":
+        task_perception["session"] = get_session(session_id)
+        return task_perception
+    if task_perception:
+        _invalidate_perception_history(session, "superseded_by_new_goal_directed_observation")
+        session["perception_history"].append({
+            "utterance": text,
+            "observation_id": task_perception["perception_observation"]["observation_id"],
+            "grounding_status": task_perception["concept_grounding"]["grounding_status"],
+            "candidate_bindings": deepcopy(perception_bindings),
+            "relation_evidence": deepcopy(task_perception["concept_grounding"].get("relation_evidence")),
+            "world_revision": session["world_revision"],
+            "runtime_fact_committed": False,
+            "current_use_status": "current_candidate",
+        })
     contextual_affordance = resolve_contextual_affordance_request(
         text,
         entities=session["runtime_objects"],
@@ -1779,8 +1837,11 @@ def execute_command(session_id: str, utterance: str, scoped_authorization: dict[
         governance_overlay=session.get("protection_policy_overlay"),
         scoped_authorization=scoped_authorization,
         confirmed_bindings=session.get("confirmed_visual_bindings", []),
+        perception_bindings=perception_bindings,
     )
     if contextual_affordance:
+        if task_perception:
+            contextual_affordance["task_perception"] = task_perception
         if contextual_affordance["available"] and contextual_affordance["operator_candidate"] in {"navigate_near", "avoid", "grasp_object", "place_object"}:
             return _build_object_relative_motion(session, contextual_affordance, decision_started_ns)
         return {
@@ -2095,7 +2156,11 @@ def begin_motion_command(session_id: str, utterance: str, scoped_authorization: 
         if confirmed.get("status") == "observation_candidate_confirmed":
             return {"status": confirmed["status"], "immediate_result": confirmed, "session": confirmed.get("session")}
         return confirmed
-    if not (session.get("concept_gap_dialogue") or {}).get("status") == "collecting_minimum_causal_contract":
+    factory_groundable_task = activate_task_perception(utterance) is not None
+    if (
+        not factory_groundable_task
+        and not (session.get("concept_gap_dialogue") or {}).get("status") == "collecting_minimum_causal_contract"
+    ):
         recalled = _recall_trusted_experience(utterance)
         if recalled:
             started = begin_persisted_experience_replay(session_id, recalled["experience_id"])

@@ -35,8 +35,12 @@ def activate_task_perception(utterance: str) -> dict[str, Any] | None:
         return None
     target = target_candidates[0]
     supports = [item for item in matched if "support_object" in item.get("functional_affordances", [])]
-    support = supports[0] if supports else None
-    activated = [target] + ([support] if support else [])
+    explicit_support = supports[0] if supports else None
+    support = explicit_support or next(
+        (item for item in library["concepts"] if "support_object" in item.get("functional_affordances", [])),
+        None,
+    )
+    activated = [target] + ([support] if support and support["concept_id"] != target["concept_id"] else [])
     color_constraint = next(
         (color for color, aliases in COLOR_ALIASES.items() if any(alias in text for alias in aliases)),
         None,
@@ -46,8 +50,9 @@ def activate_task_perception(utterance: str) -> dict[str, Any] | None:
         "action_concept": "concept_pick_up_object",
         "target_concept_id": target["concept_id"],
         "support_concept_id": support["concept_id"] if support else None,
+        "support_binding_mode": "explicit_constraint" if explicit_support else "infer_from_observed_relation",
         "activated_concepts": activated,
-        "requested_relations": ["target_on_top_of_support"] if support else [],
+        "requested_relations": ["target_on_top_of_support"] if explicit_support else [],
         "target_constraints": {"color": color_constraint} if color_constraint else {},
         "safety_channels_always_on": deepcopy(library["safety_channels_always_on"]),
         "candidate_only": True,
@@ -169,39 +174,41 @@ def ground_task_observations(activation: dict[str, Any], observation: dict[str, 
         if all(item.get("observed_attributes", {}).get(key) == value for key, value in target_constraints.items())
     ]
     support_candidates = by_concept.get(activation.get("support_concept_id"), []) if activation.get("support_concept_id") else []
-    support_required = bool(activation.get("support_concept_id"))
-    ambiguity = len(target_candidates) != 1 or (support_required and len(support_candidates) != 1)
+    support_required = activation.get("support_binding_mode") == "explicit_constraint"
+    related_supports: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    if len(target_candidates) == 1:
+        target_track = target_candidates[0]["track_id"]
+        support_by_track = {item["track_id"]: item for item in support_candidates}
+        for relation in observation["relation_candidates"]:
+            support_candidate = support_by_track.get(relation.get("object_track_id"))
+            if (
+                relation.get("subject_track_id") == target_track
+                and relation.get("relation") == "on_top_of"
+                and support_candidate
+            ):
+                related_supports.append((support_candidate, relation))
+    ambiguity = len(target_candidates) != 1 or (support_required and len(related_supports) != 1)
     if len(target_candidates) > 1:
         ambiguity_reason = "multiple_target_candidates"
     elif not target_candidates:
         ambiguity_reason = "target_not_observed"
-    elif support_required and len(support_candidates) > 1:
+    elif support_required and len(related_supports) > 1:
         ambiguity_reason = "multiple_support_candidates"
-    elif support_required and not support_candidates:
+    elif support_required and not related_supports:
         ambiguity_reason = "support_not_observed"
     else:
         ambiguity_reason = None
     relation_evidence = None
-    if not ambiguity and support_candidates:
-        target_track = target_candidates[0]["track_id"]
-        support_track = support_candidates[0]["track_id"]
-        relation_evidence = next(
-            (
-                item
-                for item in observation["relation_candidates"]
-                if item["subject_track_id"] == target_track
-                and item["object_track_id"] == support_track
-                and item["relation"] == "on_top_of"
-            ),
-            None,
-        )
+    selected_support = related_supports[0][0] if len(related_supports) == 1 else None
+    if not ambiguity and selected_support:
+        relation_evidence = related_supports[0][1]
     relation_satisfied = not activation["requested_relations"] or relation_evidence is not None
     grounded = bool(not ambiguity and target_candidates and relation_satisfied)
     bindings = []
     if grounded:
         bindings.append(_binding("target", target_candidates[0], observation["observation_id"]))
-        if support_candidates:
-            bindings.append(_binding("support", support_candidates[0], observation["observation_id"]))
+        if selected_support:
+            bindings.append(_binding("support", selected_support, observation["observation_id"]))
     return {
         "grounding_status": "spatially_grounded" if grounded else "perceptual_candidate",
         "candidate_bindings": bindings,
@@ -212,6 +219,7 @@ def ground_task_observations(activation: dict[str, Any], observation: dict[str, 
             "detected_target_count": len(raw_target_candidates),
             "target_count": len(target_candidates),
             "support_count": len(support_candidates),
+            "related_support_count": len(related_supports),
         },
         "candidate_options": [
             {
@@ -255,13 +263,21 @@ def build_task_perception_result(scene: dict[str, Any], session: dict[str, Any],
             "ambiguity_reason": grounding["ambiguity_reason"],
         }
     ]
-    occluded_target = any(
-        item["candidate_concept_id"] == activation["target_concept_id"]
-        for item in observation.get("occluded_candidates", [])
-    )
-    if grounding["ambiguity_reason"] == "target_not_observed" and occluded_target:
+    if grounding["ambiguity_reason"] == "target_not_observed":
         sensor_profile = session.get("executor_profile", {}).get("sensor_frames", {}).get("head_rgbd", {})
-        for viewpoint in sensor_profile.get("active_scan_viewpoints", []):
+        scan_viewpoints = list(sensor_profile.get("active_scan_viewpoints", []))
+        pan_range = sensor_profile.get("pan_range_deg", [])
+        if len(pan_range) == 2:
+            scan_viewpoints.extend([
+                {"viewpoint_id": "head_pan_left_limit", "yaw_offset_deg": float(pan_range[1])},
+                {"viewpoint_id": "head_pan_right_limit", "yaw_offset_deg": float(pan_range[0])},
+            ])
+        seen_offsets: set[float] = set()
+        for viewpoint in scan_viewpoints:
+            offset = float(viewpoint.get("yaw_offset_deg", 0.0))
+            if offset in seen_offsets:
+                continue
+            seen_offsets.add(offset)
             observation = simulate_task_conditioned_observation(scene, session, activation, viewpoint)
             observations.append(observation)
             grounding = ground_task_observations(activation, observation)

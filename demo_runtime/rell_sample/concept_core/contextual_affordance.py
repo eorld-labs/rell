@@ -75,8 +75,14 @@ def resolve_contextual_affordance_request(
     governance_overlay: dict[str, Any] | None,
     scoped_authorization: dict[str, Any] | None,
     confirmed_bindings: list[dict[str, Any]] | None = None,
+    perception_bindings: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
     confirmed_refs = {item.get("entity_ref") for item in (confirmed_bindings or [])}
+    perceived_refs = {item.get("entity_ref") for item in (perception_bindings or [])}
+    perceived_target_ref = next(
+        (item.get("entity_ref") for item in (perception_bindings or []) if item.get("role") == "target"),
+        None,
+    )
     entity = next(
         (
             item
@@ -90,6 +96,7 @@ def resolve_contextual_affordance_request(
             if any(alias and alias in utterance for alias in concept.get("aliases", [])):
                 compatible = [item for item in entities if item.get("kind") in concept.get("compatible_kinds", [])]
                 entity = next((item for item in compatible if item.get("entity_id") in confirmed_refs), None)
+                entity = entity or next((item for item in compatible if item.get("entity_id") == perceived_target_ref), None)
                 entity = entity or next((item for item in compatible if item.get("concept_id") == concept["concept_id"]), None)
                 entity = entity or (compatible[0] if len(compatible) == 1 else None)
                 if not entity and concept["concept_id"] == "concept_fillable_container":
@@ -106,7 +113,7 @@ def resolve_contextual_affordance_request(
         (item for item in object_concepts if item["concept_id"] == entity.get("concept_id")),
         None,
     )
-    if not concept and entity.get("entity_id") in confirmed_refs:
+    if not concept and entity.get("entity_id") in confirmed_refs.union(perceived_refs):
         concept = next((item for item in object_concepts if entity.get("kind") in item.get("compatible_kinds", [])), None)
     if not concept and entity.get("kind") == "graspable_container":
         concept = next((item for item in object_concepts if item["concept_id"] == "concept_fillable_container"), None)
@@ -166,6 +173,11 @@ def resolve_contextual_affordance_request(
             "position_available": isinstance(entity.get("position"), list),
             "collision_size_available": isinstance(entity.get("size"), list),
         },
+        "grounding_basis": {
+            "source": "task_conditioned_active_perception" if entity.get("entity_id") in perceived_refs else "confirmed_or_unique_runtime_binding",
+            "target_entity_ref": entity["entity_id"],
+            "perception_bindings": deepcopy(perception_bindings or []),
+        },
         "governance_gate": governance_gate,
         "scoped_authorization_present": bool(scoped_authorization),
         "available": available,
@@ -190,10 +202,13 @@ def resolve_contextual_affordance_request(
 def _operator(utterance: str) -> str | None:
     matches = []
     for order, (name, contract) in enumerate(TASK_OPERATORS.items()):
-        matched = [token for token in contract["tokens"] if token in utterance]
-        if matched:
-            matches.append((max(map(len, matched)), -order, name))
-    return max(matches)[2] if matches else None
+        for token in contract["tokens"]:
+            position = utterance.rfind(token)
+            if position >= 0:
+                matches.append((position, len(token), -order, name))
+    # In a compositional instruction, the last stated operator defines the
+    # terminal goal; earlier operators become candidate prerequisite steps.
+    return max(matches)[3] if matches else None
 
 
 def _explanation(label: str, operator: str, available: bool, missing: list[dict[str, str]]) -> str:

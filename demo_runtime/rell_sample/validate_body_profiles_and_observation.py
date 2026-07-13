@@ -30,6 +30,26 @@ def main() -> None:
     require(variant["status"] == "observation_candidate_confirmation_required", f"看得到 variant did not enter observe concept: {variant}")
     abbreviated = execute_command(wheeled["session_id"], "你看的杯子吗")
     require(abbreviated["status"] == "observation_candidate_confirmation_required", f"abbreviated visual question did not enter observe concept: {abbreviated}")
+    implicit_support_session = start_session(scene_id="home_semantic_3d_b", executor_profile_id="home_humanoid")
+    implicit_support = begin_motion_command(implicit_support_session["session_id"], "拿起杯子")
+    require(implicit_support["status"] == "requires_human_confirmation", f"goal-driven grasp did not reach arbitration: {implicit_support}")
+    implicit_result = implicit_support["immediate_result"]
+    implicit_plan = implicit_result["candidate_execution_plan"]
+    require(implicit_plan["goal_operator"] == "grasp_object" and implicit_plan["goal_fact"] == "target_object_in_gripper", f"grasp goal was not extracted before planning: {implicit_support}")
+    require(implicit_plan["role_bindings"] == {"target": "cup_b", "support": "counter_b"}, f"support relation was not inferred from active perception: {implicit_support}")
+    require(implicit_plan["candidate_process"] == ["navigate_to_support", "align_end_effector", "grasp_target", "verify_target_in_gripper"], f"missing facts did not compile a causal candidate chain: {implicit_support}")
+    require(implicit_result["concept_grounding"]["relation_evidence"]["relation"] == "on_top_of", f"support binding lacked visual-topological evidence: {implicit_support}")
+    require(not implicit_support.get("experience_recall"), f"language-to-experience recall bypassed concept and state grounding: {implicit_support}")
+    explicit_support_session = start_session(scene_id="home_semantic_3d_b", executor_profile_id="home_humanoid")
+    explicit_support = begin_motion_command(explicit_support_session["session_id"], "走到桌子上拿起杯子")
+    explicit_plan = explicit_support["immediate_result"]["candidate_execution_plan"]
+    require(explicit_support["status"] == "requires_human_confirmation" and explicit_plan["goal_operator"] == "grasp_object", f"last causal operator was not selected as the terminal goal: {explicit_support}")
+    require(explicit_plan["role_bindings"] == {"target": "cup_b", "support": "counter_b"}, f"explicit support and target were not jointly grounded: {explicit_support}")
+    apple_session = start_session(scene_id="home_semantic_3d_b", executor_profile_id="home_humanoid")
+    apple_candidate = begin_motion_command(apple_session["session_id"], "拿起苹果")
+    apple_plan = apple_candidate["immediate_result"]["candidate_execution_plan"]
+    require(apple_plan["role_bindings"] == {"target": "apple_b", "support": None}, f"grasp paradigm did not generalize to apple: {apple_candidate}")
+    require(apple_plan["candidate_process"][0] == "navigate_to_bound_target", f"unsupported apple relation was invented: {apple_candidate}")
     contextual = start_session(scene_id="home_semantic_3d_b", executor_profile_id="home_humanoid")
     first = begin_motion_command(contextual["session_id"], "你看得到空间里的杯子吗")["immediate_result"]
     accepted = begin_motion_command(contextual["session_id"], "对")

@@ -177,37 +177,13 @@ def main() -> None:
     zero_id = zero_experience_session["session_id"]
     SESSIONS[zero_id]["available_local_experiences"] = []
     understood_without_experience = execute_command(zero_id, "拿起苹果")
-    require(understood_without_experience["status"] == "factory_concept_recognized_execution_gap", f"zero-experience robot did not recognize basic event: {understood_without_experience}")
-    grasp_diagnosis = understood_without_experience["factory_concept"]
-    require(grasp_diagnosis["concept_id"] == "factory_event_grasp", f"wrong factory concept selected: {understood_without_experience}")
-    require(grasp_diagnosis["reason_code"] == "execution_experience_not_available", f"experience absence was not distinguished: {understood_without_experience}")
-    require(grasp_diagnosis["executor_capability_available"] and not grasp_diagnosis["applicable_experience_available"], f"body capability and experience were conflated: {understood_without_experience}")
-    require(understood_without_experience["post_action"]["teaching_available"], f"recoverable gap did not offer teaching: {understood_without_experience}")
-    require(not grasp_diagnosis["direct_execution_allowed"], f"factory semantics directly executed without experience: {understood_without_experience}")
-    apple_gaps = understood_without_experience["prerequisite_analysis"]
-    reach_gap = next(item for item in apple_gaps["gaps"] if item["fact"] == "object_within_reach")
-    require(reach_gap["truth_status"] == "verified_false" and reach_gap["producer"] == "navigate_until_target_within_reach", f"out-of-reach object did not generate navigation subgoal: {understood_without_experience}")
-    require("object_grounded" in understood_without_experience["runtime_fact_snapshot"]["established_facts"], f"grounded target missing from runtime facts: {understood_without_experience}")
-    zero_candidate = understood_without_experience["causal_candidate"]
-    require(zero_candidate["candidate_process_chain"] == ["navigate_until_target_within_reach", "grasp_object"], f"fact-gap backward chain is incorrect: {zero_candidate}")
-    require(zero_candidate["nodes"][0]["gate"] == "candidate_ready_for_orchestration", f"available navigation subgoal was blocked: {zero_candidate}")
-    require(zero_candidate["nodes"][1]["gate"] == "blocked_by_missing_experience", f"missing grasp experience was not gated: {zero_candidate}")
-    require(zero_candidate["candidate_only"] and not zero_candidate["direct_execution_allowed"] and not zero_candidate["runtime_fact_committed"], f"candidate plan bypassed runtime verification: {zero_candidate}")
-    require(not zero_candidate["cycles"] and not zero_candidate["unresolved_facts"], f"basic grasp chain is structurally incomplete: {zero_candidate}")
-    require(zero_candidate["planner_type"] == "contract_compiled_backward_causal_search", f"legacy enumerated solver is still active: {zero_candidate}")
-    require(zero_candidate["search_metrics"]["total_solver_ms"] >= 0, f"solver latency audit missing: {zero_candidate}")
-    require(zero_candidate["decision_latency"]["input_to_candidate_decision_ms"] >= zero_candidate["search_metrics"]["total_solver_ms"], f"end-to-end decision latency is inconsistent: {zero_candidate}")
-    second_zero_result = execute_command(zero_id, "拿起苹果")
-    require(second_zero_result["causal_candidate"]["search_metrics"]["registry_cache_hit"], f"unchanged concept and experience contracts were recompiled: {second_zero_result}")
-
-    experienced_session = start_session()
-    experienced_result = execute_command(experienced_session["session_id"], "拿起苹果")
-    experienced_candidate = experienced_result["causal_candidate"]
-    require(experienced_candidate["candidate_process_chain"] == zero_candidate["candidate_process_chain"], f"experience changed causal structure instead of gate state: {experienced_candidate}")
-    if experienced_session["available_local_experiences"]:
-        require(experienced_candidate["nodes"][-1]["gate"] == "candidate_ready_for_orchestration", f"trusted grasp experience did not unlock candidate gate: {experienced_candidate}")
-        require(experienced_candidate["candidate_status"] == "candidate_ready_for_runtime_arbitration", f"fully supported candidate did not reenter arbitration: {experienced_candidate}")
-        require(not experienced_candidate["direct_execution_allowed"], f"trusted experience directly executed from concept planner: {experienced_candidate}")
+    require(understood_without_experience["status"] == "requires_human_confirmation", f"factory grasp primitive did not form a safe candidate without experience: {understood_without_experience}")
+    apple_plan = understood_without_experience["candidate_execution_plan"]
+    require(apple_plan["goal_fact"] == "target_object_in_gripper" and apple_plan["role_bindings"]["target"] == "apple_a", f"apple goal and role were not grounded: {understood_without_experience}")
+    require(apple_plan["missing_precondition"] == "executor_within_grasp_reach", f"body reach gap was not derived from current state: {understood_without_experience}")
+    require(apple_plan["candidate_process"] == ["navigate_to_bound_target", "align_end_effector", "grasp_target", "verify_target_in_gripper"], f"zero-experience grasp was not compiled from primitive contracts: {understood_without_experience}")
+    require(understood_without_experience["concept_grounding"]["candidate_bindings"][0]["entity_ref"] == "apple_a", f"apple was not actively observed before planning: {understood_without_experience}")
+    require(understood_without_experience["candidate_only"] and not understood_without_experience["direct_execution_allowed"], f"candidate plan bypassed human arbitration: {understood_without_experience}")
 
     fixed_asset_gap = execute_command(zero_id, "拿起饮水机")
     require(fixed_asset_gap["factory_concept"]["reason_code"] == "entity_not_compatible_with_semantic_role", f"fixed asset was treated as graspable: {fixed_asset_gap}")
