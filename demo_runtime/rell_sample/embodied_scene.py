@@ -347,6 +347,14 @@ def _create_water_delivery_intent(session: dict[str, Any], utterance: str) -> di
         "current_stage": None,
         "resume_envelope": None,
         "created_world_revision": session["world_revision"],
+        "task_level_authorization": {
+            "source": "explicit_human_imperative",
+            "scope": "ordinary_water_delivery_goal_and_necessary_causal_stages",
+            "goal_fact": "human_received_filled_container",
+            "role_bindings": {"theme": container["entity_id"], "source": source["entity_id"], "recipient": recipient["entity_id"]},
+            "stage_by_stage_reconfirmation_required": False,
+            "revocation_conditions": ["role_binding_ambiguity", "goal_change", "known_safety_conflict", "policy_requires_confirmation"],
+        },
     }
     session["long_horizon_intents"][intent_id] = intent
     session["active_intent_id"] = intent_id
@@ -431,7 +439,21 @@ def _prepare_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) 
         }
     intent["lifecycle"] = "active"
     intent["current_stage"] = deepcopy(stage)
-    started = begin_motion_command(session["session_id"], stage["utterance"], internal_stage=True)
+    stage_authorization = None
+    if intent.get("task_level_authorization", {}).get("stage_by_stage_reconfirmation_required") is False:
+        stage_authorization = {
+            "status": "authorized",
+            "authorization_id": f"task_goal_{intent_id}_{stage['stage_id']}",
+            "command_hash": _command_hash(stage["utterance"]),
+            "authorized_world_revision": session["world_revision"],
+            "policy_binding": _policy_binding(session),
+            "scope": "necessary_stage_of_explicitly_authorized_long_horizon_goal",
+            "long_intent_id": intent_id,
+            "long_stage_id": stage["stage_id"],
+        }
+    started = begin_motion_command(
+        session["session_id"], stage["utterance"], scoped_authorization=stage_authorization, internal_stage=True
+    )
     # Candidate generation rolls the short-task session back to avoid committing
     # unverified facts. Continue from the restored live session, not the stale
     # object reference retained by this long-intent helper.
@@ -439,6 +461,11 @@ def _prepare_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) 
     intent = live_session["long_horizon_intents"][intent_id]
     intent["lifecycle"] = "active"
     intent["current_stage"] = deepcopy(stage)
+    if started.get("job_id"):
+        job = MOTION_JOBS.get(started["job_id"])
+        if job:
+            job["long_intent_id"] = intent_id
+            job["long_stage_id"] = stage["stage_id"]
     immediate = started.get("immediate_result") or {}
     pending = live_session.get("pending_confirmation")
     if pending:
@@ -452,7 +479,9 @@ def _prepare_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) 
         f"长程目标保持为“{goal_summary}”。当前根据最新世界状态需要先完成阶段：{stage['stage_id']}。"
         + (immediate.get("prompt") or "")
     )
-    return {**started, "immediate_result": immediate, "long_horizon_intent": _long_intent_view(intent)}
+    if started.get("immediate_result") is not None:
+        return {**started, "immediate_result": immediate, "long_horizon_intent": _long_intent_view(intent)}
+    return {**started, "long_horizon_intent": _long_intent_view(intent), "long_stage": deepcopy(stage)}
 
 
 def _suspend_active_intent(session: dict[str, Any]) -> dict[str, Any] | None:
@@ -3028,7 +3057,9 @@ def begin_motion_command(
     )
     if long_intent:
         prepared = _prepare_long_intent_stage(session, long_intent)
-        prepared["immediate_result"]["session"] = get_session(session_id)
+        if prepared.get("immediate_result"):
+            prepared["immediate_result"]["session"] = get_session(session_id)
+        prepared["session"] = get_session(session_id)
         return prepared
     factory_groundable_task = activate_task_perception(utterance) is not None
     if (
@@ -3463,6 +3494,17 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
             result["long_horizon_intent"] = stage_outcome.get("long_horizon_intent", _long_intent_view(intent))
             if stage_outcome.get("status") == "long_intent_completed":
                 result["prompt"] = "当前阶段已验真，长程目标的终止事实也已成立。"
+            elif stage_outcome.get("job_id"):
+                result["next_stage_started"] = {
+                    "status": stage_outcome.get("status"),
+                    "job_id": stage_outcome["job_id"],
+                    "frame_count": stage_outcome.get("frame_count"),
+                    "long_stage": deepcopy(stage_outcome.get("long_stage")),
+                    "long_horizon_intent": deepcopy(stage_outcome.get("long_horizon_intent")),
+                }
+                result["prompt"] = (
+                    "当前阶段已通过物理验真；原任务级授权仍然有效，我已按最新世界状态直接开始下一阶段。"
+                )
             else:
                 next_candidate = stage_outcome.get("immediate_result") or {}
                 result["next_stage_candidate"] = deepcopy(next_candidate)

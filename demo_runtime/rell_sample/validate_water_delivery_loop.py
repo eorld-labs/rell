@@ -3,7 +3,6 @@ from __future__ import annotations
 from embodied_scene import (
     begin_motion_command,
     begin_teaching_control,
-    confirm_pending_motion,
     finish_embodied_teaching,
     get_session,
     start_embodied_teaching,
@@ -30,23 +29,24 @@ def drain(started: dict) -> dict:
         require(step.get("status") == "frame_verified_and_committed", f"motion failed: {step}")
 
 
-def complete_confirmed_service(scene_id: str) -> dict:
+def drain_service(started: dict) -> list[dict]:
+    outcomes = []
+    current = started
+    while current:
+        outcome = drain(current)
+        outcomes.append(outcome)
+        current = outcome.get("next_stage_started")
+    return outcomes
+
+
+def complete_authorized_service(scene_id: str) -> dict:
     session = start_session("home_humanoid", scene_id)
     session_id = session["session_id"]
     started = begin_motion_command(session_id, "给我接一杯水")
-    require(started.get("status") == "requires_human_confirmation", f"service intent not formed: {started}")
-    stage_facts = []
-    route_kinds = []
-    for _ in range(4):
-        live = get_session(session_id)
-        pending = live.get("pending_confirmation")
-        if not pending:
-            break
-        completed = drain(confirm_pending_motion(session_id, pending["confirmation_id"], True))
-        stage_facts.append(completed.get("terminal_fact"))
-        route = completed.get("object_relative_motion", {}).get("route_kind")
-        if route:
-            route_kinds.append(route)
+    require(started.get("status") == "motion_started", f"explicit service command did not authorize execution: {started}")
+    outcomes = drain_service(started)
+    stage_facts = [item.get("terminal_fact") for item in outcomes]
+    route_kinds = [item.get("object_relative_motion", {}).get("route_kind") for item in outcomes if item.get("object_relative_motion", {}).get("route_kind")]
     live = get_session(session_id)
     container = next(item for item in live["runtime_objects"] if item["kind"] == "graspable_container")
     recipient = next(item for item in live["runtime_objects"] if item["kind"] == "human_recipient")
@@ -92,8 +92,8 @@ def verify_repeated_obstacle_replanning() -> dict:
     session = start_session("home_humanoid", "home_semantic_3d_a")
     session_id = session["session_id"]
     first = begin_motion_command(session_id, "给我接一杯水")
-    pending = first["immediate_result"]["pending_confirmation"]
-    active = confirm_pending_motion(session_id, pending["confirmation_id"], True)
+    require(first.get("status") == "motion_started", f"service command was not treated as task-level authorization: {first}")
+    active = first
     first_frame = step_motion_command(active["job_id"])
     require(first_frame.get("status") == "frame_verified_and_committed", f"service did not enter motion: {first_frame}")
 
@@ -112,13 +112,8 @@ def verify_repeated_obstacle_replanning() -> dict:
 
     grasped = drain(second_replan["replacement"])
     require(grasped.get("terminal_fact") == "target_object_in_gripper", f"replanned acquisition did not finish: {grasped}")
-    require(grasped.get("pending_confirmation", {}).get("long_stage_id") == "fill_container", f"service stopped after replanned grasp: {grasped}")
-    for _ in range(3):
-        live = get_session(session_id)
-        next_pending = live.get("pending_confirmation")
-        if not next_pending:
-            break
-        drain(confirm_pending_motion(session_id, next_pending["confirmation_id"], True))
+    require(grasped.get("next_stage_started", {}).get("long_stage", {}).get("stage_id") == "fill_container", f"service stopped after replanned grasp: {grasped}")
+    drain_service(grasped["next_stage_started"])
     live = get_session(session_id)
     container = next(item for item in live["runtime_objects"] if item["kind"] == "graspable_container")
     require(container.get("received_by") == "human_a", f"service did not survive repeated replans: {container}")
@@ -127,8 +122,8 @@ def verify_repeated_obstacle_replanning() -> dict:
 
 def main() -> None:
     report = {
-        "scene_a": complete_confirmed_service("home_semantic_3d_a"),
-        "scene_b": complete_confirmed_service("home_semantic_3d_b"),
+        "scene_a": complete_authorized_service("home_semantic_3d_a"),
+        "scene_b": complete_authorized_service("home_semantic_3d_b"),
         "teaching": verify_teaching_actions(),
         "repeated_obstacle_replanning": verify_repeated_obstacle_replanning(),
     }
