@@ -1,0 +1,27 @@
+{
+  "schema_version": "2.0.0",
+  "pack_id": "home_spatial_structures_v1",
+  "domain_id": "home",
+  "category": "spatial_structures",
+  "concepts": [
+    {
+      "concept_id": "concept_openable_door",
+      "display_name": "可开闭通道边界",
+      "aliases": ["门", "房门", "门扇"],
+      "compatible_kinds": ["openable_transition"],
+      "perceptual_invariants": ["vertical_boundary_panel", "passage_boundary_attachment", "hinge_or_sliding_guidance"],
+      "variable_features": ["color", "material", "panel_count", "handle_style", "opening_direction"],
+      "functional_affordances": ["openable_candidate", "closable_candidate", "spatial_transition_candidate"],
+      "physical_properties": ["ground_or_frame_attached", "moving_swept_volume_requires_clearance"],
+      "state_variables": ["open", "closed", "partially_open", "locked_unknown"],
+      "expected_relations": ["between_regions", "blocks_or_allows_passage_candidate"],
+      "perception_adapter_refs": ["visual_pack_openable_door_home_v1"],
+      "runtime_verification_policy": {
+        "identity_candidate_checks": ["door_visual_invariants_observed"],
+        "functional_checks": ["opening_mechanism_verified", "swept_volume_clear", "lock_state_verified"]
+      },
+      "load_policy": "domain_resident",
+      "direct_execution_allowed": false
+    }
+  ]
+}

@@ -2,18 +2,25 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 
 PACK_DIR = Path(__file__).resolve().parents[1] / "data" / "visual_concept_packs"
+RESIDENT_LOAD_POLICIES = {"factory_resident", "home_resident"}
 
 
 def load_visual_concept_packs(*, include_on_demand: bool = False) -> list[dict[str, Any]]:
+    return deepcopy(_load_visual_concept_packs_cached(include_on_demand))
+
+
+@lru_cache(maxsize=2)
+def _load_visual_concept_packs_cached(include_on_demand: bool) -> list[dict[str, Any]]:
     packs = [json.loads(path.read_text(encoding="utf-8")) for path in sorted(PACK_DIR.glob("*.json"))]
     if include_on_demand:
         return packs
-    return [item for item in packs if item.get("load_policy") == "factory_resident"]
+    return [item for item in packs if item.get("load_policy") in RESIDENT_LOAD_POLICIES]
 
 
 def match_visual_concept_candidates(
@@ -51,7 +58,7 @@ def build_visual_pack_catalog() -> dict[str, Any]:
     return {
         "schema_version": "1.0.0",
         "packs": deepcopy(packs),
-        "resident_pack_ids": [item["pack_id"] for item in packs if item.get("load_policy") == "factory_resident"],
+        "resident_pack_ids": [item["pack_id"] for item in packs if item.get("load_policy") in RESIDENT_LOAD_POLICIES],
         "boundary": {
             "visual_pack_is_not_action_experience": True,
             "visual_pack_does_not_replace_object_concept_kernel": True,

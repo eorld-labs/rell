@@ -8,10 +8,10 @@
     {"item_id": "water_dispenser", "display_name": "饮水机", "concept_id": "concept_water_source_asset", "priority": "resident"},
     {"item_id": "stool", "display_name": "凳子", "concept_id": "concept_movable_stool_obstacle", "priority": "resident"},
     {"item_id": "bowl", "display_name": "碗", "concept_id": null, "priority": "on_demand", "proposed_roles": ["container", "supportable_object"]},
-    {"item_id": "bottle", "display_name": "瓶子", "concept_id": null, "priority": "on_demand", "proposed_roles": ["container", "liquid_source_or_destination"]},
-    {"item_id": "door", "display_name": "门", "concept_id": null, "priority": "on_demand", "proposed_roles": ["openable_object", "spatial_transition"]},
+    {"item_id": "bottle", "display_name": "瓶子", "concept_id": "concept_portable_bottle", "priority": "home_resident_trial"},
+    {"item_id": "door", "display_name": "门", "concept_id": "concept_openable_door", "priority": "home_resident_trial"},
     {"item_id": "trash_bin", "display_name": "垃圾桶", "concept_id": null, "priority": "on_demand", "proposed_roles": ["container", "waste_destination"]},
-    {"item_id": "refrigerator", "display_name": "冰箱", "concept_id": null, "priority": "on_demand", "proposed_roles": ["openable_object", "storage_appliance"]}
+    {"item_id": "refrigerator", "display_name": "冰箱", "concept_id": "concept_refrigerator", "priority": "home_resident_trial"}
   ],
   "boundary": {
     "image_generation_cannot_create_object_concept_kernel": true,

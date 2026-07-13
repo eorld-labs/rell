@@ -1,0 +1,40 @@
+{
+  "schema_version": "2.0.0",
+  "pack_id": "home_appliances_resources_v1",
+  "domain_id": "home",
+  "category": "appliances_resources",
+  "concepts": [
+    {
+      "concept_id": "concept_water_source_asset",
+      "display_name": "固定水源资产",
+      "aliases": ["饮水机", "水龙头", "水源"],
+      "compatible_kinds": ["water_source"],
+      "perceptual_invariants": ["fixed_vertical_asset", "liquid_outlet"],
+      "variable_features": ["color", "size", "outlet_height"],
+      "functional_affordances": ["provide_water"],
+      "physical_properties": ["fixed_asset", "liquid_source"],
+      "expected_relations": ["fixed_in_operation_region"],
+      "load_policy": "domain_resident",
+      "direct_execution_allowed": false
+    },
+    {
+      "concept_id": "concept_refrigerator",
+      "display_name": "冷藏存储家电",
+      "aliases": ["冰箱", "电冰箱"],
+      "compatible_kinds": ["storage_appliance"],
+      "perceptual_invariants": ["large_upright_cabinet_body", "one_or_more_sealed_doors", "interior_storage_volume"],
+      "variable_features": ["color", "size", "door_count", "handle_style", "freezer_layout"],
+      "functional_affordances": ["openable_storage_candidate", "cold_storage_candidate", "contains_object_candidate"],
+      "physical_properties": ["fixed_or_heavy_asset", "electrical_appliance", "interior_temperature_not_visually_proven"],
+      "state_variables": ["door_open_or_closed", "powered_unknown", "contents_partially_observed"],
+      "expected_relations": ["fixed_in_kitchen_candidate", "contains_object_candidate", "door_part_of_appliance"],
+      "perception_adapter_refs": ["visual_pack_refrigerator_home_v1"],
+      "runtime_verification_policy": {
+        "identity_candidate_checks": ["refrigerator_visual_invariants_observed"],
+        "functional_checks": ["door_state_verified", "interior_object_observed", "electrical_safety_boundary_preserved"]
+      },
+      "load_policy": "domain_resident",
+      "direct_execution_allowed": false
+    }
+  ]
+}

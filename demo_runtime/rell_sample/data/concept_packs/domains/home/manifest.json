@@ -1,0 +1,20 @@
+{
+  "schema_version": "2.0.0",
+  "pack_id": "home_domain_concepts_v1",
+  "domain_id": "home",
+  "activation_policy": "load_when_runtime_domain_is_home",
+  "categories": [
+    {"category": "spatial_structures", "file": "spatial_structures.json"},
+    {"category": "furniture_storage", "file": "furniture_storage.json"},
+    {"category": "containers_tableware", "file": "containers_tableware.json"},
+    {"category": "appliances_resources", "file": "appliances_resources.json"},
+    {"category": "tools_daily_items", "file": "tools_daily_items.json"},
+    {"category": "consumables", "file": "consumables.json"},
+    {"category": "safety_entities", "file": "safety_entities.json"}
+  ],
+  "load_policy": {
+    "domain_resident": "load_concept_kernel_and_lightweight_visual_adapter",
+    "on_demand": "load_after_task_or_observation_activation",
+    "raw_images_resident": false
+  }
+}

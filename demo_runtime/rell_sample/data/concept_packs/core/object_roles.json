@@ -1,0 +1,20 @@
+{
+  "schema_version": "2.0.0",
+  "pack_id": "core_object_roles_v1",
+  "scope": "cross_domain",
+  "concepts": [],
+  "role_vocabulary": [
+    "physical_object", "support", "container", "resource_source", "openable_boundary",
+    "storage_asset", "navigation_obstacle", "human_recipient"
+  ],
+  "relation_vocabulary": [
+    "on_top_of", "inside", "contains", "near", "held_by_executor", "received_by_human", "blocks_motion"
+  ],
+  "shared_grounding_policy": {
+    "candidate_only": true,
+    "direct_execution_allowed": false,
+    "must_reenter_orchestration_layer": true,
+    "observation_states": ["unobserved", "perceptual_candidate", "spatially_grounded", "runtime_verified", "stale", "lost"]
+  },
+  "safety_channels_always_on": ["human", "collision_geometry", "dynamic_obstacle", "protection_policy"]
+}

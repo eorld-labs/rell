@@ -1,16 +1,14 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import math
 from copy import deepcopy
-from pathlib import Path
 from typing import Any
 
+from concept_core.concept_pack_registry import load_concept_pack_registry
 from concept_core.visual_concept_packs import load_visual_concept_packs, match_visual_concept_candidates
 
 
-CONCEPT_FILE = Path(__file__).resolve().parents[1] / "data" / "embodied_object_concepts.json"
 COLOR_ALIASES = {
     "white": ["白色", "白的"],
     "light_blue": ["浅蓝色", "浅蓝", "蓝色", "蓝的"],
@@ -18,7 +16,7 @@ COLOR_ALIASES = {
 
 
 def load_object_concepts() -> dict[str, Any]:
-    return json.loads(CONCEPT_FILE.read_text(encoding="utf-8"))
+    return load_concept_pack_registry(active_domains=("home",))
 
 
 def activate_task_perception(utterance: str) -> dict[str, Any] | None:

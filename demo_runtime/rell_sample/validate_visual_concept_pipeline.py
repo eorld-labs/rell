@@ -90,13 +90,13 @@ def main() -> None:
 
     batch = create_production_batch(sample_count_per_concept=4)
     require(batch["item_count"] == 10, f"daily-life manifest size changed unexpectedly: {batch}")
-    require(batch["generation_request_count"] == 5 and batch["concept_gap_count"] == 5, f"known concepts and concept gaps were conflated: {batch}")
+    require(batch["generation_request_count"] == 8 and batch["concept_gap_count"] == 2, f"known concepts and concept gaps were conflated: {batch}")
     state_before_batch_execution = get_pipeline_state()
     cup_request = next(item for item in state_before_batch_execution["requests"] if item.get("subject_profile", {}).get("item_id") == "cup")
     require(cup_request["subject_profile"]["concrete_label"] == "杯子" and cup_request["subject_profile"]["parent_functional_concept"] == "可盛装容器", f"concrete item and parent concept were conflated: {cup_request}")
     require("杯子" in cup_request["prompt_specs"][0]["prompt"], f"batch provider prompt used only abstract concept name: {cup_request}")
     gaps = state_before_batch_execution["concept_gap_candidates"]
-    require({item["display_name"] for item in gaps} == {"碗", "瓶子", "门", "垃圾桶", "冰箱"}, f"concept gap queue incorrect: {gaps}")
+    require({item["display_name"] for item in gaps} == {"碗", "垃圾桶"}, f"concept gap queue incorrect: {gaps}")
     require(all(not item["image_generation_allowed"] for item in gaps), f"images were generated before concept kernels existed: {gaps}")
 
     bowl_gap = next(item for item in gaps if item["display_name"] == "碗")
@@ -245,7 +245,7 @@ def main() -> None:
     completed_batch = execute_production_batch(batch["batch_id"], OneRequestFailureProvider())
     require(completed_batch["status"] == "completed_with_failures", f"partial failure was hidden: {completed_batch}")
     require(sum(item["status"] == "provider_failed" for item in completed_batch["results"]) == 1, f"failure isolation count incorrect: {completed_batch}")
-    require(sum(item["status"] == "candidate_compiled" for item in completed_batch["results"]) == 4, f"one failure aborted successful concepts: {completed_batch}")
+    require(sum(item["status"] == "candidate_compiled" for item in completed_batch["results"]) == 7, f"one failure aborted successful concepts: {completed_batch}")
     require(completed_batch["runtime_visible"] is False, f"batch became runtime-visible: {completed_batch}")
     final_state = get_pipeline_state()
     (OUTPUT / "pipeline_report.json").write_text(json.dumps(final_state, ensure_ascii=False, indent=2), encoding="utf-8")

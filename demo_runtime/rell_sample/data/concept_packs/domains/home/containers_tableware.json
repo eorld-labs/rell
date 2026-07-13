@@ -1,0 +1,41 @@
+{
+  "schema_version": "2.0.0",
+  "pack_id": "home_containers_tableware_v1",
+  "domain_id": "home",
+  "category": "containers_tableware",
+  "concepts": [
+    {
+      "concept_id": "concept_fillable_container",
+      "display_name": "可盛装容器",
+      "aliases": ["杯子", "水杯", "杯"],
+      "compatible_kinds": ["graspable_container"],
+      "perceptual_invariants": ["open_top", "bounded_inner_volume", "graspable_body"],
+      "variable_features": ["color", "size", "handle_presence"],
+      "functional_affordances": ["graspable", "receive_liquid"],
+      "physical_properties": ["bounded_volume", "open_top", "portable"],
+      "expected_relations": ["on_top_of_support", "held_by_executor"],
+      "perception_adapter_refs": ["visual_pack_fillable_container_factory_v1"],
+      "load_policy": "domain_resident",
+      "direct_execution_allowed": false
+    },
+    {
+      "concept_id": "concept_portable_bottle",
+      "display_name": "瓶状便携容器",
+      "aliases": ["瓶子", "水瓶", "饮料瓶"],
+      "compatible_kinds": ["graspable_bottle"],
+      "perceptual_invariants": ["elongated_bounded_body", "narrow_neck_or_closure", "portable_container_body"],
+      "variable_features": ["color", "material", "size", "cap_style", "transparency"],
+      "functional_affordances": ["graspable_candidate", "contain_liquid_candidate", "pour_source_candidate"],
+      "physical_properties": ["portable", "bounded_volume_candidate", "closure_state_requires_observation"],
+      "state_variables": ["open_or_closed", "empty_or_filled", "upright_or_tilted"],
+      "expected_relations": ["on_top_of_support", "held_by_executor", "contains_liquid_candidate"],
+      "perception_adapter_refs": ["visual_pack_portable_bottle_home_v1"],
+      "runtime_verification_policy": {
+        "identity_candidate_checks": ["bottle_visual_invariants_observed"],
+        "functional_checks": ["closure_state_verified", "liquid_retention_verified_before_transport"]
+      },
+      "load_policy": "domain_resident",
+      "direct_execution_allowed": false
+    }
+  ]
+}

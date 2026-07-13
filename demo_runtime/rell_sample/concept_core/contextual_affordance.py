@@ -154,6 +154,10 @@ def resolve_contextual_affordance_request(
             None,
         )
     if not entity and operator != "place_object" and any(token in utterance for token in ("拿起", "抓取", "拾起", "拿住", "拿")):
+        # Task-conditioned perception owns the target role. Concept file order
+        # must never let an earlier support mention displace that grounded theme.
+        entity = next((item for item in entities if item.get("entity_id") == perceived_target_ref), None)
+    if not entity and operator != "place_object" and any(token in utterance for token in ("拿起", "抓取", "拾起", "拿住", "拿")):
         for concept in object_concepts:
             if any(alias and alias in utterance for alias in concept.get("aliases", [])):
                 compatible = [item for item in entities if item.get("kind") in concept.get("compatible_kinds", [])]

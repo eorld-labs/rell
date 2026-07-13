@@ -1,0 +1,22 @@
+{
+  "schema_version": "2.0.0",
+  "pack_id": "home_consumables_v1",
+  "domain_id": "home",
+  "category": "consumables",
+  "concepts": [
+    {
+      "concept_id": "concept_edible_apple",
+      "display_name": "苹果",
+      "aliases": ["苹果"],
+      "compatible_kinds": ["graspable_object"],
+      "perceptual_invariants": ["compact_round_body", "fruit_surface"],
+      "variable_features": ["color", "size", "ripeness"],
+      "functional_affordances": ["graspable", "movable"],
+      "physical_properties": ["portable", "deformable_below_damage_threshold"],
+      "expected_relations": ["on_top_of_support", "held_by_executor"],
+      "perception_adapter_refs": ["visual_pack_edible_apple_factory_v1"],
+      "load_policy": "domain_resident",
+      "direct_execution_allowed": false
+    }
+  ]
+}

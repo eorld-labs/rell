@@ -1,0 +1,35 @@
+{
+  "schema_version": "2.0.0",
+  "pack_id": "home_furniture_storage_v1",
+  "domain_id": "home",
+  "category": "furniture_storage",
+  "concepts": [
+    {
+      "concept_id": "concept_support_surface",
+      "display_name": "支撑操作面",
+      "aliases": ["桌子", "桌面", "操作台", "台面"],
+      "compatible_kinds": ["operation_surface"],
+      "perceptual_invariants": ["stable_horizontal_support_surface", "body_supported_from_ground"],
+      "variable_features": ["color", "material", "size"],
+      "functional_affordances": ["support_object", "operation_workspace", "cleanable_surface"],
+      "physical_properties": ["stable", "rigid", "fixed_asset", "cleanable_surface"],
+      "expected_relations": ["supports_object"],
+      "perception_adapter_refs": ["visual_pack_support_surface_factory_v1"],
+      "load_policy": "domain_resident",
+      "direct_execution_allowed": false
+    },
+    {
+      "concept_id": "concept_sofa",
+      "display_name": "沙发",
+      "aliases": ["沙发"],
+      "compatible_kinds": ["large_furniture"],
+      "perceptual_invariants": ["ground_supported_large_horizontal_furniture", "one_or_more_seating_surfaces", "back_support_structure"],
+      "variable_features": ["color", "cover_material", "seat_count", "armrest_presence", "headrest_presence", "cushions"],
+      "functional_affordances": ["support_human_sitting_candidate", "soft_or_buffered_surface_material"],
+      "physical_properties": ["ground_supported", "load_capacity_requires_physical_verification", "movable_requires_physical_verification", "force_limit_requires_physical_verification"],
+      "expected_relations": ["on_floor_candidate", "occupies_navigation_space_candidate", "near_wall_or_room_center_variable"],
+      "load_policy": "domain_resident",
+      "direct_execution_allowed": false
+    }
+  ]
+}

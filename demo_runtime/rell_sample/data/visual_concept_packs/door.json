@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0.0",
+  "pack_id": "visual_pack_openable_door_home_v1",
+  "concept_id": "concept_openable_door",
+  "load_policy": "home_resident",
+  "recognition_adapter": {
+    "adapter_type": "visual_descriptor_candidate_matcher",
+    "required_observed_features": ["vertical_boundary_panel", "passage_boundary_attachment", "hinge_or_sliding_guidance"],
+    "supporting_color_families": ["white", "gray", "wood", "black"],
+    "minimum_match_score": 0.7
+  },
+  "reference_samples": [],
+  "reference_sample_policy": {
+    "accepted_sources": ["user_provided_real_image", "current_robot_camera_verified_crop", "licensed_dataset_sample"],
+    "synthetic_sample_allowed_for_testing_only": true,
+    "single_image_can_define_concept": false,
+    "image_bytes_loaded_on_demand": true,
+    "store_content_digest_and_provenance": true
+  },
+  "boundary": {
+    "appearance_match_is_candidate_only": true,
+    "appearance_does_not_prove_opening_mechanism_or_lock_state": true,
+    "direct_execution_allowed": false,
+    "must_bind_current_observation_and_world_revision": true
+  }
+}

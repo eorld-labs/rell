@@ -1,0 +1,15 @@
+{
+  "schema_version": "2.0.0",
+  "registry_id": "rell_edge_concept_pack_registry_v1",
+  "core_pack_files": ["core/object_roles.json"],
+  "domain_packs": [
+    {"domain_id": "home", "manifest": "domains/home/manifest.json", "activation": "runtime_domain_profile"}
+  ],
+  "storage_boundary": {
+    "concept_kernel_is_not_visual_sample": true,
+    "concept_kernel_is_not_scene_instance": true,
+    "concept_kernel_is_not_action_experience": true,
+    "functional_claim_requires_runtime_verification": true,
+    "direct_execution_allowed": false
+  }
+}

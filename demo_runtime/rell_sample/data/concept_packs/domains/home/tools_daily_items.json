@@ -1,0 +1,21 @@
+{
+  "schema_version": "2.0.0",
+  "pack_id": "home_tools_daily_items_v1",
+  "domain_id": "home",
+  "category": "tools_daily_items",
+  "concepts": [
+    {
+      "concept_id": "concept_movable_stool_obstacle",
+      "display_name": "可移动凳子障碍",
+      "aliases": ["凳子", "椅子"],
+      "compatible_kinds": ["movable_obstacle"],
+      "perceptual_invariants": ["ground_supported_body", "occupies_navigation_space"],
+      "variable_features": ["color", "size", "leg_count"],
+      "functional_affordances": ["movable", "blocks_motion"],
+      "physical_properties": ["ground_supported", "rigid"],
+      "expected_relations": ["inside_navigation_space"],
+      "load_policy": "domain_resident",
+      "direct_execution_allowed": false
+    }
+  ]
+}
