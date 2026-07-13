@@ -124,6 +124,23 @@ def main() -> None:
     long_intent_completed = drain_motion(long_intent_place_started)
     require(long_intent_completed["result"]["terminal_fact"] == "object_supported_at_destination", f"long intent root fact was not verified: {long_intent_completed}")
     require(long_intent_completed["result"]["long_horizon_intent"]["lifecycle"] == "completed", f"long intent was not released after root fact verification: {long_intent_completed}")
+    apple_transfer_session = start_session(scene_id="home_semantic_3d_a", executor_profile_id="home_humanoid")
+    apple_transfer_first = begin_motion_command(apple_transfer_session["session_id"], "把苹果拿起来放到桌子上")
+    apple_transfer_plan = apple_transfer_first["immediate_result"]
+    require(
+        apple_transfer_first["status"] == "requires_human_confirmation"
+        and apple_transfer_plan["long_horizon_intent"]["role_bindings"] == {"theme": "apple_a", "destination": "counter_a"},
+        f"object transfer remained cup-specific: {apple_transfer_first}",
+    )
+    require(apple_transfer_plan["concept_grounding"]["grounding_status"] == "spatially_grounded", f"transfer did not actively observe an off-axis apple: {apple_transfer_first}")
+    apple_transfer_grasped = drain_motion(begin_motion_command(apple_transfer_session["session_id"], "确认"))
+    require(apple_transfer_grasped["result"]["pending_confirmation"]["long_stage_id"] == "place_at_destination", f"apple transfer did not advance after verified grasp: {apple_transfer_grasped}")
+    apple_transfer_placed = drain_motion(begin_motion_command(apple_transfer_session["session_id"], "确认"))
+    require(
+        apple_transfer_placed["result"]["terminal_fact"] == "object_supported_at_destination"
+        and apple_transfer_placed["result"]["long_horizon_intent"]["lifecycle"] == "completed",
+        f"apple transfer did not complete the generic placement stage: {apple_transfer_placed}",
+    )
     direct_take_session = start_session(scene_id="home_semantic_3d_b", executor_profile_id="home_humanoid")
     direct_take = begin_motion_command(direct_take_session["session_id"], "去拿杯子")
     require(direct_take["status"] == "requires_human_confirmation" and direct_take["immediate_result"]["operator_candidate"] == "grasp_object", f"short bare take did not use the same terminal-goal paradigm: {direct_take}")

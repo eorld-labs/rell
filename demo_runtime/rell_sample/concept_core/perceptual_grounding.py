@@ -25,6 +25,7 @@ def activate_task_perception(utterance: str) -> dict[str, Any] | None:
     text = utterance.strip()
     library = load_object_concepts()
     pickup_requested = any(token in text for token in ("拿", "取", "抓"))
+    placement_requested = any(token in text for token in ("放到", "放在", "摆到", "摆在"))
     matched = []
     for concept in library["concepts"]:
         aliases = [alias for alias in concept["aliases"] if alias in text]
@@ -47,12 +48,18 @@ def activate_task_perception(utterance: str) -> dict[str, Any] | None:
     )
     return {
         "task_utterance": text,
-        "action_concept": "concept_pick_up_object",
+        "action_concept": "concept_relocate_object" if placement_requested else "concept_pick_up_object",
         "target_concept_id": target["concept_id"],
         "support_concept_id": support["concept_id"] if support else None,
-        "support_binding_mode": "explicit_constraint" if explicit_support else "infer_from_observed_relation",
+        # A mentioned support in a transfer request is the destination role,
+        # not evidence that the theme is already on that support.
+        "support_binding_mode": (
+            "explicit_destination" if explicit_support and placement_requested
+            else "explicit_constraint" if explicit_support
+            else "infer_from_observed_relation"
+        ),
         "activated_concepts": activated,
-        "requested_relations": ["target_on_top_of_support"] if explicit_support else [],
+        "requested_relations": ["target_on_top_of_support"] if explicit_support and not placement_requested else [],
         "target_constraints": {"color": color_constraint} if color_constraint else {},
         "safety_channels_always_on": deepcopy(library["safety_channels_always_on"]),
         "candidate_only": True,
@@ -174,7 +181,8 @@ def ground_task_observations(activation: dict[str, Any], observation: dict[str, 
         if all(item.get("observed_attributes", {}).get(key) == value for key, value in target_constraints.items())
     ]
     support_candidates = by_concept.get(activation.get("support_concept_id"), []) if activation.get("support_concept_id") else []
-    support_required = activation.get("support_binding_mode") == "explicit_constraint"
+    support_binding_mode = activation.get("support_binding_mode")
+    support_required = support_binding_mode in {"explicit_constraint", "explicit_destination"}
     related_supports: list[tuple[dict[str, Any], dict[str, Any]]] = []
     if len(target_candidates) == 1:
         target_track = target_candidates[0]["track_id"]
@@ -187,6 +195,13 @@ def ground_task_observations(activation: dict[str, Any], observation: dict[str, 
                 and support_candidate
             ):
                 related_supports.append((support_candidate, relation))
+    if support_binding_mode == "explicit_destination" and len(support_candidates) == 1:
+        related_supports = [(support_candidates[0], {
+            "relation": "destination_binding",
+            "subject_track_id": target_candidates[0]["track_id"] if target_candidates else None,
+            "object_track_id": support_candidates[0]["track_id"],
+            "evidence_scope": "current_visual_candidate",
+        })]
     ambiguity = len(target_candidates) != 1 or (support_required and len(related_supports) != 1)
     if len(target_candidates) > 1:
         ambiguity_reason = "multiple_target_candidates"
@@ -272,6 +287,13 @@ def build_task_perception_result(scene: dict[str, Any], session: dict[str, Any],
                 {"viewpoint_id": "head_pan_left_limit", "yaw_offset_deg": float(pan_range[1])},
                 {"viewpoint_id": "head_pan_right_limit", "yaw_offset_deg": float(pan_range[0])},
             ])
+        # A task target can be outside the head pan range. Candidate generation
+        # therefore plans body-and-head coverage before claiming it is absent.
+        scan_viewpoints.extend([
+            {"viewpoint_id": "body_scan_left", "yaw_offset_deg": 110.0},
+            {"viewpoint_id": "body_scan_right", "yaw_offset_deg": -110.0},
+            {"viewpoint_id": "body_scan_rear", "yaw_offset_deg": 180.0},
+        ])
         seen_offsets: set[float] = set()
         for viewpoint in scan_viewpoints:
             offset = float(viewpoint.get("yaw_offset_deg", 0.0))
@@ -294,7 +316,13 @@ def build_task_perception_result(scene: dict[str, Any], session: dict[str, Any],
     grounded = grounding["grounding_status"] == "spatially_grounded"
     target = next((item for item in grounding["candidate_bindings"] if item["role"] == "target"), None)
     support = next((item for item in grounding["candidate_bindings"] if item["role"] == "support"), None)
-    if grounded and target and support and len(active_perception_trace) > 1:
+    destination_bound = activation.get("support_binding_mode") == "explicit_destination"
+    if grounded and target and support and destination_bound:
+        prompt = (
+            f"我已通过主动观察找到{target['label_hint']}，并把{support['label_hint']}绑定为放置目的地。"
+            "当前只建立候选角色绑定；下一步将按抓取、移动、放置和验真编排。"
+        )
+    elif grounded and target and support and len(active_perception_trace) > 1:
         prompt = (
             f"正面视角中的{target['label_hint']}被遮挡，我转动头部换了观察角度；"
             f"现在已观察到{support['label_hint']}上的{target['label_hint']}。这仍是候选，执行后还要验真。"
@@ -344,10 +372,11 @@ def build_task_perception_result(scene: dict[str, Any], session: dict[str, Any],
                 "target_object_within_reach",
             ],
             "candidate_process": [
-                "navigate_to_support" if support else "navigate_to_bound_target",
-                "align_end_effector",
-                "grasp_target",
-                "verify_target_in_gripper",
+            *(
+                ["navigate_to_target", "align_end_effector", "grasp_target", "verify_target_in_gripper", "navigate_to_destination", "place_target", "verify_target_supported"]
+                if destination_bound else
+                ["navigate_to_support" if support else "navigate_to_bound_target", "align_end_effector", "grasp_target", "verify_target_in_gripper"]
+            ),
             ],
             "planning_is_established_fact": False,
         },

@@ -154,31 +154,57 @@ def _long_intent_view(intent: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _conceptual_reference_for_entity(entity: dict[str, Any]) -> str:
+    """Use a concept alias in derived stages, never an incidental visual label."""
+    for concept in load_object_concepts()["concepts"]:
+        if entity.get("kind") not in concept.get("compatible_kinds", []):
+            continue
+        aliases = sorted((alias for alias in concept.get("aliases", []) if len(alias) > 1), key=len, reverse=True)
+        if aliases:
+            return aliases[0]
+    return str(entity.get("label") or "目标对象")
+
+
 def _create_transfer_intent(session: dict[str, Any], utterance: str) -> dict[str, Any] | None:
     normalized = re.sub(r"[，。！？、,.!?\s]+", "", utterance)
     if not any(token in normalized for token in ("放到", "放在", "摆到", "摆在")):
         return None
-    if "杯" not in normalized:
+    concepts = load_object_concepts()["concepts"]
+    mentioned = [concept for concept in concepts if any(alias and alias in normalized for alias in concept.get("aliases", []))]
+    theme_concepts = [concept for concept in mentioned if "graspable" in concept.get("functional_affordances", [])]
+    destination_concepts = [concept for concept in mentioned if "support_object" in concept.get("functional_affordances", [])]
+    explicit_destination_entities = [
+        item for item in session["runtime_objects"]
+        if item.get("active") is not False and item.get("kind") == "operation_surface" and item.get("label") in normalized
+    ]
+    if not destination_concepts and len(explicit_destination_entities) == 1:
+        destination_concepts = [next(concept for concept in concepts if "support_object" in concept.get("functional_affordances", []))]
+    if len(theme_concepts) != 1 or len(destination_concepts) != 1:
         return None
-    cups = [item for item in session["runtime_objects"] if item.get("kind") == "graspable_container"]
+    theme_candidates = [
+        item for item in session["runtime_objects"]
+        if item.get("active") is not False and item.get("kind") in theme_concepts[0].get("compatible_kinds", [])
+    ]
     destinations = [
         item for item in session["runtime_objects"]
-        if item.get("kind") == "operation_surface" and item.get("label") and item["label"] in normalized
+        if item.get("active") is not False and item.get("kind") in destination_concepts[0].get("compatible_kinds", [])
     ]
-    if len(cups) != 1 or len(destinations) != 1:
+    if len(explicit_destination_entities) == 1:
+        destinations = explicit_destination_entities
+    if len(theme_candidates) != 1 or len(destinations) != 1:
         return None
-    cup, destination = cups[0], destinations[0]
-    if destination["entity_id"] == cup.get("support_ref"):
+    theme, destination = theme_candidates[0], destinations[0]
+    if destination["entity_id"] == theme.get("support_ref"):
         return None
     intent_id = "intent_" + hashlib.sha1(
-        f"{session['session_id']}|{cup['entity_id']}|{destination['entity_id']}|{session['world_revision']}".encode("utf-8")
+        f"{session['session_id']}|{theme['entity_id']}|{destination['entity_id']}|{session['world_revision']}".encode("utf-8")
     ).hexdigest()[:12]
     intent = {
         "intent_id": intent_id,
         "intent_type": "verified_object_transfer",
         "source_utterance": utterance,
         "goal_fact": "object_supported_at_destination",
-        "role_bindings": {"theme": cup["entity_id"], "destination": destination["entity_id"]},
+        "role_bindings": {"theme": theme["entity_id"], "destination": destination["entity_id"]},
         "goal_contract": {
             "requires": ["theme_object_grounded", "destination_grounded"],
             "produces": ["object_supported_at_destination"],
@@ -210,20 +236,21 @@ def _derive_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) -
     destination = next((item for item in session["runtime_objects"] if item["entity_id"] == destination_ref), None)
     if not theme or not destination:
         return {"status": "rebind_required", "reason": "long_intent_role_binding_no_longer_present"}
+    theme_reference = _conceptual_reference_for_entity(theme)
     if theme.get("support_ref") == destination_ref and session["state"].get("holding") != theme_ref:
         return {"status": "completed", "verified_fact": "object_supported_at_destination"}
     if session["state"].get("holding") == theme_ref:
         return {
             "status": "stage_ready",
             "stage_id": "place_at_destination",
-            "utterance": f"把杯子放到{destination['label']}上",
+            "utterance": f"把{theme_reference}放到{destination['label']}上",
             "required_fact": "object_in_gripper",
             "target_fact": "object_supported_at_destination",
         }
     return {
         "status": "stage_ready",
         "stage_id": "acquire_theme",
-        "utterance": "拿起杯子",
+        "utterance": f"拿起{theme_reference}",
         "required_fact": "theme_object_grounded",
         "target_fact": "object_in_gripper",
     }
@@ -881,6 +908,11 @@ def _answer_observation_query(session: dict[str, Any], text: str) -> dict[str, A
 def _build_observed_relocation_preview(session: dict[str, Any], text: str) -> dict[str, Any] | None:
     relocation_match = re.search(r"(?:把|将)?苹果(?:从.+?)?(?:放到|放在|摆到|摆在)(?:桌子|桌面|操作台|台面)(?:上|上面)?", text)
     if not relocation_match:
+        return None
+    # This legacy preview is only useful before a transfer starts. Once P016
+    # has verified the object in hand, P018 must continue through the generic
+    # placement stage rather than being intercepted by an apple-specific demo.
+    if session["state"].get("holding"):
         return None
     observation = session.get("open_world_observation")
     if not observation or observation.get("world_revision") != session["world_revision"]:
