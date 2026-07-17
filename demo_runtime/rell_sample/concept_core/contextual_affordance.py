@@ -9,7 +9,7 @@ TASK_OPERATORS = {
         "tokens": ("走到", "走向", "靠近", "去", "旁边"),
         "role": "spatial_target",
         "required_body_actions": ("navigate_to_region",),
-        "required_object_claims": ("ground_supported_large_horizontal_furniture",),
+        "required_object_claims": (),
         "governance": "ordinary_navigation",
         "candidate_chain": ("ground_target_instance", "plan_route_to_standoff_pose", "navigate_and_verify_near_relation"),
     },
@@ -89,6 +89,8 @@ def resolve_contextual_affordance_request(
     held_ref = runtime_state.get("holding")
     held_entity = next((item for item in entities if item.get("entity_id") == held_ref), None)
     destination_binding = None
+    ambiguous_entities: list[dict[str, Any]] = []
+    matched_entity_concept: dict[str, Any] | None = None
     if operator == "place_object":
         support_concepts = [
             concept for concept in object_concepts
@@ -153,6 +155,36 @@ def resolve_contextual_affordance_request(
             ),
             None,
         )
+        if not entity and operator == "navigate_near":
+            for candidate_concept in object_concepts:
+                if not any(alias and alias in utterance for alias in candidate_concept.get("aliases", [])):
+                    continue
+                compatible = [
+                    item for item in entities
+                    if item.get("active") is not False and item.get("kind") in candidate_concept.get("compatible_kinds", [])
+                ]
+                confirmed = [item for item in compatible if item.get("entity_id") in confirmed_refs]
+                if len(confirmed) == 1:
+                    entity = confirmed[0]
+                    matched_entity_concept = candidate_concept
+                    break
+                if len(compatible) == 1:
+                    entity = compatible[0]
+                    matched_entity_concept = candidate_concept
+                    break
+                if len(compatible) > 1:
+                    ambiguous_entities = compatible
+                    break
+        # A task-conditioned semantic role outranks incidental entity mentions.
+        # For example, in "take the cup from the person", the person is the
+        # source holder while the perceived target remains the grasp theme.
+        if operator == "grasp_object" and perceived_target_ref:
+            grounded_target = next(
+                (item for item in entities if item.get("entity_id") == perceived_target_ref),
+                None,
+            )
+            if grounded_target:
+                entity = grounded_target
     if not entity and operator != "place_object" and any(token in utterance for token in ("拿起", "抓取", "拾起", "拿住", "拿")):
         # Task-conditioned perception owns the target role. Concept file order
         # must never let an earlier support mention displace that grounded theme.
@@ -169,13 +201,31 @@ def resolve_contextual_affordance_request(
                     entity = next((item for item in entities if item.get("kind") == "graspable_container"), None)
                 if entity:
                     break
+    if not entity and ambiguous_entities:
+        labels = [item.get("label") for item in ambiguous_entities]
+        return {
+            "status": "contextual_affordance_disambiguation_required",
+            "available": False,
+            "operator_candidate": operator,
+            "active_role": TASK_OPERATORS[operator]["role"],
+            "task_context": utterance,
+            "candidate_options": [
+                {"entity_ref": item.get("entity_id"), "label": item.get("label"), "kind": item.get("kind")}
+                for item in ambiguous_entities
+            ],
+            "missing_conditions": [{"kind": "role_binding", "condition": "target_instance_not_unique", "reason": "multiple_runtime_entities_satisfy_concept_role"}],
+            "explanation": f"我理解要建立对象相对空间关系，但当前有多个实例都符合：{'、'.join(labels)}。请说具体名称。",
+            "candidate_only": True,
+            "direct_execution_allowed": False,
+            "must_reenter_orchestration_layer": True,
+        }
     if not entity:
         return None
     contract = TASK_OPERATORS[operator]
     concept = next(
         (item for item in object_concepts if item["concept_id"] == entity.get("concept_id")),
         None,
-    )
+    ) or matched_entity_concept
     if not concept and (operator == "place_object" or entity.get("entity_id") in confirmed_refs.union(perceived_refs)):
         concept = next((item for item in object_concepts if entity.get("kind") in item.get("compatible_kinds", [])), None)
     if not concept and entity.get("kind") == "graspable_container":
@@ -269,6 +319,8 @@ def _operator(utterance: str) -> str | None:
         for token in contract["tokens"]:
             position = utterance.rfind(token)
             if position >= 0:
+                if name == "navigate_near" and token == "去" and position > 0 and utterance[position - 1] in "上下回过进出":
+                    continue
                 matches.append((position, len(token), -order, name))
     # In a compositional instruction, the last stated operator defines the
     # terminal goal; earlier operators become candidate prerequisite steps.

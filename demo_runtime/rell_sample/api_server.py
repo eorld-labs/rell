@@ -11,11 +11,14 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from concept_core import (
+    FACTORY_EVENT_CONCEPT_UNITS,
     build_cloud_recall_packet,
     build_concept_evidence_packet,
     build_concept_lifecycle_view,
     build_gap_evidence_packet,
     build_teaching_frame,
+    compose_language_concepts,
+    load_object_concepts,
     resolve_action_concepts,
     build_released_runtime_query_result,
     build_runtime_state_query_result,
@@ -692,12 +695,22 @@ def build_activation_constraint(text: str) -> dict[str, Any]:
 
 
 def build_intent_frame(text: str, cognitive_model: dict[str, Any]) -> dict[str, Any]:
-    detected_steps = detect_process_chain(text)
-    goal_fact = infer_goal_fact(text)
+    language_composition = compose_language_concepts(
+        text,
+        event_concepts=FACTORY_EVENT_CONCEPT_UNITS,
+        object_concepts=load_object_concepts()["concepts"],
+    )
+    interpretation_text = (
+        language_composition.get("canonical_utterance")
+        if language_composition.get("decision") == "route_canonical_semantics" and language_composition.get("canonical_utterance")
+        else text
+    )
+    detected_steps = detect_process_chain(interpretation_text)
+    goal_fact = infer_goal_fact(interpretation_text)
     spatial_constraints = extract_spatial_constraints(text, cognitive_model)
     object_constraints = extract_object_constraints(text, cognitive_model)
     action_concepts = resolve_action_concepts(
-        text,
+        interpretation_text,
         detected_steps,
         normalize_text_fn=normalize_text,
         object_constraints=object_constraints,
@@ -710,6 +723,8 @@ def build_intent_frame(text: str, cognitive_model: dict[str, Any]) -> dict[str, 
         "schema_version": "1.0.0",
         "translation_mode": "p012_concept_bridge_v1",
         "utterance": text,
+        "language_composition": language_composition,
+        "interpretation_text": interpretation_text,
         "goal_fact": goal_fact,
         "activation_constraint": build_activation_constraint(text),
         "explicit_process_chain": detected_steps,

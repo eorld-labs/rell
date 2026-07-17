@@ -38,6 +38,7 @@ from .lightweight_orchestrator import (
     build_lightweight_orchestrator_catalog,
     compile_causal_operator_registry,
 )
+from .language_concept_composer import compose_language_concepts, normalize_language_text
 from .concept_units import (
     STATE_CONCEPT_UNITS,
     build_supported_runtime_questions,
@@ -84,6 +85,8 @@ __all__ = [
     "build_lightweight_causal_candidate",
     "build_lightweight_orchestrator_catalog",
     "compile_causal_operator_registry",
+    "compose_language_concepts",
+    "normalize_language_text",
     "infer_local_concept_gap",
     "request_cloud_concept_support",
     "resolve_action_concepts",
