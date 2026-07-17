@@ -1244,6 +1244,108 @@ def _replace_last_alias(text: str, aliases: list[str], replacement: str) -> str:
     return text[:position] + replacement + text[position + len(alias):]
 
 
+def _historical_destination_role_choice(
+    session: dict[str, Any], dialogue: dict[str, Any], utterance: str
+) -> tuple[dict[str, Any], dict[str, Any]] | None:
+    if dialogue.get("role") != "destination":
+        return None
+    normalized = re.sub(r"[\s，。！？、,.!?]+", "", utterance)
+    if not any(marker in normalized for marker in ("原来的位置", "原来位置", "原处", "放回", "刚才", "刚刚", "之前", "先前")):
+        return None
+    source_analysis = _compose_session_language(session, dialogue.get("source_utterance", ""))
+    theme_role = source_analysis.get("role_bindings", {}).get("theme") or source_analysis.get("role_bindings", {}).get("target") or {}
+    theme_concept = next(
+        (item for item in load_object_concepts()["concepts"] if item.get("concept_id") == theme_role.get("concept_id")),
+        None,
+    )
+    theme_candidates = [
+        item for item in session.get("runtime_objects", [])
+        if theme_concept and item.get("kind") in theme_concept.get("compatible_kinds", [])
+    ]
+    held_refs = {ref for ref in _holding_by_effector(session).values() if ref}
+    focused = [
+        item for item in theme_candidates
+        if item.get("entity_id") in held_refs or item.get("received_by") or item.get("last_support_ref")
+    ]
+    if len(focused) == 1:
+        theme_candidates = focused
+    if len(theme_candidates) != 1:
+        return None
+    theme = theme_candidates[0]
+    support_ref = theme.get("last_support_ref")
+    evidence_ref = None
+    for episode in reversed(session.get("episodic_fact_memory", [])):
+        participants = episode.get("participants", {})
+        if participants.get("theme") != theme.get("entity_id"):
+            continue
+        episode_support = participants.get("source_support")
+        if not episode_support:
+            episode_support = next(
+                (
+                    fact.get("object")
+                    for fact in episode.get("before_facts", [])
+                    if fact.get("predicate") == "supported_by" and fact.get("subject") == theme.get("entity_id")
+                ),
+                None,
+            )
+        if episode_support:
+            support_ref = episode_support
+            evidence_ref = episode.get("episode_id")
+            break
+    choice = next(
+        (item for item in dialogue.get("candidate_options", []) if item.get("entity_ref") == support_ref),
+        None,
+    )
+    if not choice:
+        return None
+    return choice, {
+        "kind": "most_recent_verified_source_support",
+        "theme_entity_ref": theme.get("entity_id"),
+        "support_entity_ref": support_ref,
+        "episode_ref": evidence_ref,
+        "temporal_expression": utterance,
+    }
+
+
+def _resume_role_clarification_choice(
+    session: dict[str, Any],
+    dialogue: dict[str, Any],
+    choice: dict[str, Any],
+    *,
+    evidence: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    label = choice.get("label") or choice.get("label_hint")
+    concept = next(
+        (item for item in load_object_concepts()["concepts"] if item.get("concept_id") == dialogue.get("concept_id")),
+        None,
+    )
+    aliases = list((concept or {}).get("aliases", []))
+    resolved_utterance = _replace_last_alias(dialogue["source_utterance"], aliases, label)
+    session["role_clarification_dialogue"] = None
+    resumed = begin_motion_command(session["session_id"], resolved_utterance)
+    resolution = {
+        "status": "role_clarification_resolved",
+        "role": dialogue["role"],
+        "entity_ref": choice.get("entity_ref"),
+        "label": label,
+        "source_utterance": dialogue["source_utterance"],
+        "resolved_utterance": resolved_utterance,
+        "evidence": deepcopy(evidence),
+        "physical_fact_committed": False,
+    }
+    resumed["role_clarification_resolution"] = deepcopy(resolution)
+    if resumed.get("immediate_result"):
+        resumed["immediate_result"]["role_clarification_resolution"] = deepcopy(resolution)
+        evidence_prompt = (
+            f"我根据对象最近一次已验真的来源承载关系，把你说的原来位置解析为“{label}”；"
+            if evidence else f"已将你回答的“{label}”填入上一轮的{dialogue['role']}角色；"
+        )
+        resumed["immediate_result"]["prompt"] = (
+            evidence_prompt + "我会继续按当前物理状态规划。" + resumed["immediate_result"].get("prompt", "")
+        )
+    return resumed
+
+
 def _continue_role_clarification(session: dict[str, Any], utterance: str) -> dict[str, Any] | None:
     dialogue = session.get("role_clarification_dialogue")
     if not dialogue or dialogue.get("status") != "awaiting_role_value":
@@ -1253,35 +1355,19 @@ def _continue_role_clarification(session: dict[str, Any], utterance: str) -> dic
         return None
     normalized = re.sub(r"[，。！？、,.!?\s]+", "", utterance)
     options = dialogue.get("candidate_options", [])
-    selected = [item for item in options if item.get("label") == normalized or item.get("label_hint") == normalized]
+    selected = [
+        item for item in options
+        if item.get("label") == normalized
+        or item.get("label_hint") == normalized
+        or (item.get("label") and item.get("label") in normalized)
+        or (item.get("label_hint") and item.get("label_hint") in normalized)
+    ]
     if len(selected) == 1:
-        choice = selected[0]
-        label = choice.get("label") or choice.get("label_hint")
-        concept = next(
-            (item for item in load_object_concepts()["concepts"] if item.get("concept_id") == dialogue.get("concept_id")),
-            None,
-        )
-        aliases = list((concept or {}).get("aliases", []))
-        resolved_utterance = _replace_last_alias(dialogue["source_utterance"], aliases, label)
-        session["role_clarification_dialogue"] = None
-        resumed = begin_motion_command(session["session_id"], resolved_utterance)
-        resolution = {
-            "status": "role_clarification_resolved",
-            "role": dialogue["role"],
-            "entity_ref": choice.get("entity_ref"),
-            "label": label,
-            "source_utterance": dialogue["source_utterance"],
-            "resolved_utterance": resolved_utterance,
-            "physical_fact_committed": False,
-        }
-        resumed["role_clarification_resolution"] = deepcopy(resolution)
-        if resumed.get("immediate_result"):
-            resumed["immediate_result"]["role_clarification_resolution"] = deepcopy(resolution)
-            resumed["immediate_result"]["prompt"] = (
-                f"已将你回答的“{label}”填入上一轮的{dialogue['role']}角色；我会继续按当前物理状态规划。"
-                + resumed["immediate_result"].get("prompt", "")
-            )
-        return resumed
+        return _resume_role_clarification_choice(session, dialogue, selected[0])
+    historical_choice = _historical_destination_role_choice(session, dialogue, utterance)
+    if historical_choice:
+        choice, evidence = historical_choice
+        return _resume_role_clarification_choice(session, dialogue, choice, evidence=evidence)
     if find_factory_event_concepts_by_text(_normalize_factory_text(utterance)):
         session["role_clarification_dialogue"] = None
         return None
@@ -1297,6 +1383,26 @@ def _continue_role_clarification(session: dict[str, Any], utterance: str) -> dic
                 "status": "role_clarification_required",
                 "reason": "role_value_still_not_unique",
                 "prompt": f"“{normalized}”仍然对应多个候选：{'、'.join(labels)}。请说其中一个具体名称。",
+                "known_task": dialogue["source_utterance"],
+                "pending_role": dialogue["role"],
+                "candidate_options": deepcopy(options),
+                "candidate_only": True,
+                "runtime_fact_committed": False,
+                "session": get_session(session["session_id"]),
+            },
+            "session": get_session(session["session_id"]),
+        }
+    if any(marker in normalized for marker in ("不是", "不对", "是刚才", "原来的", "原处", "之前", "先前")):
+        labels = [item.get("label") or item.get("label_hint") for item in options]
+        return {
+            "status": "role_clarification_required",
+            "immediate_result": {
+                "status": "role_clarification_required",
+                "reason": "correction_retained_in_current_question_under_discussion",
+                "prompt": (
+                    f"我理解你正在纠正上一轮的{dialogue['role']}，没有把它当成新任务。"
+                    f"但当前说明还不能唯一对应这些候选：{'、'.join(labels)}；请再补充一个可观察名称、位置或与刚才事件的关系。"
+                ),
                 "known_task": dialogue["source_utterance"],
                 "pending_role": dialogue["role"],
                 "candidate_options": deepcopy(options),

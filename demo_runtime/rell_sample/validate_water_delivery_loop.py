@@ -156,10 +156,25 @@ def verify_post_handover_reacquisition_and_support_disambiguation() -> dict:
     require(reported_intent.get("role_bindings", {}).get("source_holder") == "human_b" and reported_intent.get("role_bindings", {}).get("destination") == "counter_b", f"verified holder and confirmed support were not used by the long-horizon solver: {reported_transfer}")
     report_candidates = get_session(confirmed_id).get("human_reported_fact_candidates", [])
     require(report_candidates and report_candidates[-1].get("possible_derived_fact") == "container_empty" and report_candidates[-1].get("runtime_fact_committed") is False, f"drink completion was not retained as a bounded human-reported state candidate: {report_candidates}")
+
+    correction_session = start_session("home_humanoid", "home_semantic_3d_b")
+    correction_id = correction_session["session_id"]
+    drain_service(begin_motion_command(correction_id, "给我接一杯水"))
+    ambiguous_return = begin_motion_command(correction_id, "好了我喝完了，把杯子放到桌子上去")
+    ambiguous_result = ambiguous_return.get("immediate_result") or ambiguous_return
+    require(ambiguous_result.get("status") == "perception_disambiguation_required", f"generic return destination did not preserve a role question: {ambiguous_return}")
+    corrected_return = begin_motion_command(correction_id, "不是这个桌子，是刚才你倒水的时候原来的位置")
+    corrected_result = corrected_return.get("immediate_result") or corrected_return
+    resolution = corrected_return.get("role_clarification_resolution", {})
+    require(corrected_result.get("status") == "requires_human_confirmation", f"relational correction did not resume the suspended task: {corrected_return}")
+    require(resolution.get("entity_ref") == "counter_b" and resolution.get("evidence", {}).get("kind") == "most_recent_verified_source_support", f"original location was not grounded from verified episodic support evidence: {corrected_return}")
+    require(corrected_return.get("long_horizon_intent", {}).get("role_bindings", {}).get("source_holder") == "human_b", f"corrected return lost the current holder precondition: {corrected_return}")
+    require(get_session(correction_id).get("concept_gap_dialogue") is None, f"role correction incorrectly opened a new concept-gap task: {get_session(correction_id).get('concept_gap_dialogue')}")
     return {
         "navigation_candidates": ["counter_b", "dining_table_b"],
         "reacquired_fact": grasp_completed.get("terminal_fact"),
         "reported_drink_state": "candidate_requires_physical_verification",
+        "historical_destination_correction": "counter_b",
     }
 
 
