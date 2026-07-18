@@ -7,7 +7,7 @@ from typing import Any
 
 EVENT_LEXICAL_PRIMITIVES: tuple[dict[str, Any], ...] = (
     {"operator": "observe_entity", "concept_id": "factory_event_observe", "heads": ("观察", "瞧", "看", "找"), "canonical": "观察"},
-    {"operator": "navigate_to", "concept_id": "factory_event_navigate", "heads": ("前往", "靠近", "走", "去"), "canonical": "走到"},
+    {"operator": "navigate_to", "concept_id": "factory_event_navigate", "heads": ("返回到", "回到", "返回", "前往", "靠近", "走", "去"), "canonical": "走到"},
     {"operator": "orient_executor", "concept_id": "factory_event_orient", "heads": ("转向", "面向", "朝向", "转"), "canonical": "转向"},
     {"operator": "grasp_object", "concept_id": "factory_event_grasp", "heads": ("捡", "拾", "抓", "取", "拿"), "canonical": "拿起"},
     {"operator": "release_object", "concept_id": "factory_event_release", "heads": ("释放", "撒手", "松开", "放开"), "canonical": "放开"},
@@ -221,14 +221,60 @@ def _roles(
         restores_prior_relation = "回" in surface
         before = [item for item in objects if item.get("end", 0) <= place_event["start"]]
         after = [item for item in objects if item.get("start", 0) >= place_event["end"]]
+        prior_acquisition = next(
+            (
+                item for item in reversed(events)
+                if item.get("start", 0) < place_event["start"]
+                and item.get("operator") in {"grasp_object", "transport_object"}
+            ),
+            None,
+        )
+        acquired_theme = None
+        if prior_acquisition:
+            event_index = events.index(prior_acquisition)
+            previous_event_end = events[event_index - 1]["end"] if event_index > 0 else 0
+            following_event_start = events[event_index + 1]["start"] if event_index + 1 < len(events) else len(text)
+            local_before = [
+                item for item in movable
+                if item.get("end", 0) <= prior_acquisition["start"]
+                and item.get("start", 0) >= previous_event_end
+            ]
+            local_after = [
+                item for item in movable
+                if item.get("start", 0) >= prior_acquisition["end"]
+                and item.get("end", len(text)) <= following_event_start
+            ]
+            acquisition_prefix = text[previous_event_end:prior_acquisition["start"]]
+            if local_before and "把" in acquisition_prefix:
+                acquired_theme = local_before[-1]
+            elif local_after:
+                acquired_theme = local_after[0]
+            elif local_before:
+                acquired_theme = local_before[-1]
+
+        companion_mentions = []
+        for item in before:
+            if item is acquired_theme:
+                continue
+            start, end = int(item.get("start", 0)), int(item.get("end", 0))
+            relation_prefix = text[max(0, start - 2):start]
+            relation_suffix = text[end:place_event["start"]]
+            if relation_prefix.endswith(("和", "与", "同")) and "一起" in relation_suffix:
+                companion_mentions.append(item)
         if (has_destination_connector or restores_prior_relation) and after:
             roles["destination"] = deepcopy(after[-1])
-            if before:
-                roles["theme"] = deepcopy(before[-1])
+            if acquired_theme:
+                roles["theme"] = deepcopy(acquired_theme)
+            elif before:
+                primary_before = [item for item in before if item not in companion_mentions]
+                roles["theme"] = deepcopy((primary_before or before)[-1])
         elif surface == "放下" and after:
             roles["theme"] = deepcopy(after[0])
         elif movable:
-            roles["theme"] = deepcopy(movable[0])
+            roles["theme"] = deepcopy(acquired_theme or movable[0])
+        if companion_mentions:
+            roles["companion"] = deepcopy(companion_mentions[0])
+            roles["companion"]["semantic_relation"] = "co_located_with_theme_at_destination"
         if "theme" not in roles and len(held) == 1:
             roles["theme"] = {**deepcopy(held[0]), "binding_source": "implicit_unique_verified_holding_fact"}
     else:

@@ -46,6 +46,7 @@ from embodied_scene import confirm_pending_motion as confirm_embodied_motion
 from embodied_scene import evaluate_learned_replay as evaluate_embodied_learned_replay
 from embodied_scene import finish_embodied_teaching as finish_embodied_teaching_session
 from embodied_scene import get_session as get_embodied_session
+from embodied_scene import get_hospitality_task_graph
 from embodied_scene import list_embodied_scenes, load_scene as load_embodied_scene
 from embodied_scene import set_stool as set_embodied_stool
 from embodied_scene import set_protection_policy as set_embodied_protection_policy
@@ -1236,6 +1237,20 @@ def step_already_satisfied_in_runtime_world_state(
     meta: dict[str, Any],
 ) -> bool:
     facts = set(runtime_world_state.get("established_facts", []))
+    facts.update(
+        fact_id for fact_id, state in (runtime_world_state.get("final_facts") or {}).items()
+        if state in {"established", "true", True}
+    )
+    facts.update(runtime_world_state.get("verified_facts", []))
+    # Embodied long-horizon facts and the generic process registry use
+    # different names for the same causal milestones. Normalize them before
+    # deciding whether an experience step is already satisfied.
+    holding_established = bool({"target_object_in_gripper", "container_in_effector", "object_in_gripper"} & facts)
+    filled_established = bool({"container_filled", "cup_contains_water", "filled_container"} & facts)
+    if step in {"navigate_to_container", "navigate_until_target_within_reach", "grasp_container", "grasp_target", "pick_up_cup"} and holding_established:
+        return True
+    if step in {"fill_container", "fill_cup_at_water_source"} and filled_established:
+        return True
     produced_fact = meta.get("produces_fact")
     if produced_fact and produced_fact not in facts:
         return False
@@ -1261,6 +1276,21 @@ def project_process_chain_against_runtime_world_state(
     skipped_steps: list[dict[str, Any]] = []
     for step in process_chain:
         meta = STEP_LIBRARY.get(step, {})
+        facts = set(runtime_world_state.get("established_facts", []))
+        facts.update(
+            fact_id for fact_id, state in (runtime_world_state.get("final_facts") or {}).items()
+            if state in {"established", "true", True}
+        )
+        facts.update(runtime_world_state.get("verified_facts", []))
+        holding_established = bool({"target_object_in_gripper", "container_in_effector", "object_in_gripper"} & facts)
+        filled_established = bool({"container_filled", "cup_contains_water", "filled_container"} & facts)
+        alias_satisfied = (
+            (step in {"navigate_to_container", "navigate_until_target_within_reach", "grasp_container", "grasp_target", "pick_up_cup"} and holding_established)
+            or (step in {"fill_container", "fill_cup_at_water_source"} and filled_established)
+        )
+        if alias_satisfied:
+            skipped_steps.append({"step": step, "produces_fact": meta.get("produces_fact"), "skip_reason": "verified_embodied_fact"})
+            continue
         if not meta:
             remaining_steps.append(step)
             continue
@@ -8474,6 +8504,11 @@ class RellSampleHandler(BaseHTTPRequestHandler):
         if path.startswith("/embodied/session/"):
             session_id = path.removeprefix("/embodied/session/")
             result = get_embodied_session(session_id)
+            self._send_json(result, status=404 if "error" in result else 200)
+            return
+        if path.startswith("/embodied/task-graph/"):
+            session_id = path.removeprefix("/embodied/task-graph/")
+            result = get_hospitality_task_graph(session_id)
             self._send_json(result, status=404 if "error" in result else 200)
             return
         if path.startswith("/teaching/session/"):

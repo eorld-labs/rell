@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import math
+import colorsys
 from copy import deepcopy
 from typing import Any
 
@@ -32,6 +33,47 @@ COLOR_NAMES = {
     "gray": "灰色",
     "brown": "棕色",
 }
+
+
+def _color_family_from_rgb_hex(value: Any) -> str | None:
+    if not isinstance(value, str) or not value.startswith("#") or len(value) != 7:
+        return None
+    try:
+        red, green, blue = (int(value[index:index + 2], 16) / 255.0 for index in (1, 3, 5))
+    except ValueError:
+        return None
+    hue, saturation, brightness = colorsys.rgb_to_hsv(red, green, blue)
+    hue_deg = hue * 360.0
+    if brightness >= 0.86 and saturation <= 0.12:
+        return "white"
+    if brightness <= 0.2:
+        return "black"
+    if saturation <= 0.16:
+        return "gray"
+    if hue_deg < 15 or hue_deg >= 345:
+        return "red"
+    if hue_deg < 48:
+        return "brown" if brightness < 0.72 else "yellow"
+    if hue_deg < 75:
+        return "yellow"
+    if hue_deg < 170:
+        return "green"
+    if hue_deg < 260:
+        return "light_blue" if brightness >= 0.72 and saturation <= 0.45 else "blue"
+    return "red" if hue_deg >= 320 else None
+
+
+def observed_perceptual_attributes(entity: dict[str, Any]) -> dict[str, Any]:
+    """Return the single sensor-facing attribute view used by all grounding paths."""
+    attributes = deepcopy(entity.get("perceptual_attributes", {}))
+    signature = entity.get("visual_observation_signature") or {}
+    color_family = attributes.get("color") or signature.get("color_family") or _color_family_from_rgb_hex(entity.get("color"))
+    if color_family:
+        attributes["color"] = color_family
+    for key in ("material", "transparency", "shape", "container_form", "handle_presence"):
+        if key not in attributes and entity.get(key) is not None:
+            attributes[key] = entity[key]
+    return attributes
 
 
 def load_object_concepts() -> dict[str, Any]:
@@ -157,7 +199,7 @@ def simulate_task_conditioned_observation(
                 "estimated_base_elevation_m": float(item.get("elevation_m", 0.0)),
                 "estimated_size": deepcopy(item["size"]),
                 "observed_invariants": deepcopy(concept["perceptual_invariants"]),
-                "observed_attributes": deepcopy(item.get("perceptual_attributes", {})),
+                "observed_attributes": observed_perceptual_attributes(item),
                 "observation_source": "simulated_rgbd_adapter_without_reasoner_scene_access",
             }
         )
@@ -199,6 +241,7 @@ def ground_task_observations(activation: dict[str, Any], observation: dict[str, 
     for item in observation["semantic_candidates"]:
         by_concept.setdefault(item["candidate_concept_id"], []).append(item)
     verified_target = activation.get("verified_target_binding")
+    verified_support = activation.get("verified_support_binding")
     raw_target_candidates = by_concept.get(activation["target_concept_id"], [])
     target_constraints = activation.get("target_constraints", {})
     target_candidates = [
@@ -210,7 +253,14 @@ def ground_task_observations(activation: dict[str, Any], observation: dict[str, 
     support_binding_mode = activation.get("support_binding_mode")
     support_required = support_binding_mode in {"explicit_constraint", "explicit_destination"}
     related_supports: list[tuple[dict[str, Any], dict[str, Any]]] = []
-    if len(target_candidates) == 1 and not verified_target:
+    if verified_support:
+        related_supports = [(verified_support, {
+            "relation": "destination_binding",
+            "subject_track_id": (verified_target or {}).get("entity_ref"),
+            "object_track_id": verified_support.get("entity_ref"),
+            "evidence_scope": "current_task_role_binding_revalidated_in_world_snapshot",
+        })]
+    elif len(target_candidates) == 1 and not verified_target:
         target_track = target_candidates[0]["track_id"]
         support_by_track = {item["track_id"]: item for item in support_candidates}
         for relation in observation["relation_candidates"]:
@@ -221,7 +271,7 @@ def ground_task_observations(activation: dict[str, Any], observation: dict[str, 
                 and support_candidate
             ):
                 related_supports.append((support_candidate, relation))
-    if support_binding_mode == "explicit_destination" and len(support_candidates) == 1:
+    if not verified_support and support_binding_mode == "explicit_destination" and len(support_candidates) == 1:
         related_supports = [(support_candidates[0], {
             "relation": "destination_binding",
             "subject_track_id": target_candidates[0]["track_id"] if target_candidates else None,
@@ -234,7 +284,7 @@ def ground_task_observations(activation: dict[str, Any], observation: dict[str, 
         ambiguity_reason = "multiple_target_candidates"
     elif not target_grounded:
         ambiguity_reason = "target_not_observed"
-    elif support_binding_mode == "explicit_destination" and len(support_candidates) > 1:
+    elif not verified_support and support_binding_mode == "explicit_destination" and len(support_candidates) > 1:
         ambiguity_reason = "multiple_support_candidates"
     elif support_required and len(related_supports) > 1:
         ambiguity_reason = "multiple_support_candidates"
@@ -252,7 +302,7 @@ def ground_task_observations(activation: dict[str, Any], observation: dict[str, 
     if grounded:
         bindings.append(deepcopy(verified_target) if verified_target else _binding("target", target_candidates[0], observation["observation_id"]))
         if selected_support:
-            bindings.append(_binding("support", selected_support, observation["observation_id"]))
+            bindings.append(deepcopy(selected_support) if verified_support else _binding("support", selected_support, observation["observation_id"]))
     return {
         "grounding_status": "spatially_grounded" if grounded else "perceptual_candidate",
         "candidate_bindings": bindings,
@@ -312,7 +362,12 @@ def ground_task_observations(activation: dict[str, Any], observation: dict[str, 
     }
 
 
-def build_task_perception_result(scene: dict[str, Any], session: dict[str, Any], utterance: str) -> dict[str, Any] | None:
+def build_task_perception_result(
+    scene: dict[str, Any],
+    session: dict[str, Any],
+    utterance: str,
+    grounded_role_bindings: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
     activation = activate_task_perception(utterance)
     if not activation:
         return None
@@ -337,8 +392,50 @@ def build_task_perception_result(scene: dict[str, Any], session: dict[str, Any],
                     "evidence_ref": f"world_revision:{session['world_revision']}:holding",
                     "state": "runtime_verified",
                     "estimated_position": deepcopy(held["position"]),
-                    "observed_attributes": deepcopy(held.get("perceptual_attributes", {})),
+                    "observed_attributes": observed_perceptual_attributes(held),
                 }
+    grounded_role_bindings = grounded_role_bindings or {}
+    target_ref = grounded_role_bindings.get("theme")
+    destination_ref = grounded_role_bindings.get("destination")
+    target_concept = next(
+        (item for item in activation["activated_concepts"] if item.get("concept_id") == activation["target_concept_id"]),
+        None,
+    )
+    target_entity = next((item for item in session.get("runtime_objects", []) if item.get("entity_id") == target_ref), None)
+    if target_entity and target_concept and target_entity.get("kind") in target_concept.get("compatible_kinds", []):
+        activation["verified_target_binding"] = {
+            "role": "target",
+            "entity_ref": target_entity["entity_id"],
+            "concept_id": activation["target_concept_id"],
+            "label_hint": target_entity["label"],
+            "binding_strength": "current_task_role_binding",
+            "evidence_ref": f"world_revision:{session['world_revision']}:theme_role",
+            "state": "runtime_revalidated",
+            "estimated_position": deepcopy(target_entity["position"]),
+            "observed_attributes": observed_perceptual_attributes(target_entity),
+        }
+    support_concept = next(
+        (item for item in activation["activated_concepts"] if item.get("concept_id") == activation.get("support_concept_id")),
+        None,
+    )
+    destination_entity = next((item for item in session.get("runtime_objects", []) if item.get("entity_id") == destination_ref), None)
+    if (
+        activation.get("support_binding_mode") == "explicit_destination"
+        and destination_entity
+        and support_concept
+        and destination_entity.get("kind") in support_concept.get("compatible_kinds", [])
+    ):
+        activation["verified_support_binding"] = {
+            "role": "support",
+            "entity_ref": destination_entity["entity_id"],
+            "concept_id": activation.get("support_concept_id"),
+            "label_hint": destination_entity["label"],
+            "binding_strength": "current_task_role_binding",
+            "evidence_ref": f"world_revision:{session['world_revision']}:destination_role",
+            "state": "runtime_revalidated",
+            "estimated_position": deepcopy(destination_entity["position"]),
+            "observed_attributes": observed_perceptual_attributes(destination_entity),
+        }
     observation = simulate_task_conditioned_observation(scene, session, activation)
     observations = [observation]
     grounding = ground_task_observations(activation, observation)

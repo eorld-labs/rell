@@ -6,14 +6,14 @@
   "concepts": [
     {
       "concept_id": "concept_water_source_asset",
-      "display_name": "固定水源资产",
-      "aliases": ["饮水机", "水龙头", "水源"],
+      "display_name": "供水对象",
+      "aliases": ["饮水机", "水龙头", "水源", "保温壶", "水壶", "热水壶"],
       "compatible_kinds": ["water_source"],
-      "perceptual_invariants": ["fixed_vertical_asset", "liquid_outlet"],
-      "variable_features": ["color", "size", "outlet_height"],
+      "perceptual_invariants": ["liquid_reservoir_or_supply_connection", "controllable_or_pourable_outlet"],
+      "variable_features": ["color", "size", "outlet_height", "fixed_or_portable", "temperature", "source_kind"],
       "functional_affordances": ["provide_water"],
-      "physical_properties": ["fixed_asset", "liquid_source"],
-      "expected_relations": ["fixed_in_operation_region"],
+      "physical_properties": ["liquid_source"],
+      "expected_relations": ["supported_or_fixed_in_operation_region"],
       "load_policy": "domain_resident",
       "direct_execution_allowed": false
     },

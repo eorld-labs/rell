@@ -1,16 +1,21 @@
 from __future__ import annotations
 
+import math
+
 from embodied_scene import (
+    MOTION_JOBS,
     SESSIONS,
     begin_motion_command,
     begin_teaching_control,
     finish_embodied_teaching,
+    confirm_pending_motion,
     get_session,
     start_embodied_teaching,
     start_session,
     step_motion_command,
     set_stool,
 )
+from embodied_scene import _apply_verified_place, _holding_by_effector, _sync_primary_holding
 
 
 def require(condition: bool, message: str) -> None:
@@ -37,6 +42,26 @@ def drain_service(started: dict) -> list[dict]:
         outcome = drain(current)
         outcomes.append(outcome)
         current = outcome.get("next_stage_started")
+    return outcomes
+
+
+def drain_service_with_confirmations(session_id: str, started: dict) -> list[dict]:
+    outcomes = []
+    current = started
+    while current:
+        immediate = current.get("immediate_result")
+        if immediate and immediate.get("status") == "requires_human_confirmation":
+            current = begin_motion_command(session_id, "确认")
+            continue
+        outcome = drain(current)
+        outcomes.append(outcome)
+        current = outcome.get("next_stage_started")
+        if (
+            not current
+            and outcome.get("pending_confirmation")
+            and (outcome.get("long_horizon_intent") or {}).get("lifecycle") == "active"
+        ):
+            current = begin_motion_command(session_id, "确认")
     return outcomes
 
 
@@ -106,6 +131,59 @@ def verify_water_then_place_composition() -> dict:
     return {"accepted_forms": results, "goal_fact": "filled_container_supported_at_destination"}
 
 
+def verify_completed_snapshot_release_and_physical_reacquisition() -> dict:
+    session = start_session("home_humanoid", "home_semantic_3d_a")
+    session_id = session["session_id"]
+    drain_service(begin_motion_command(session_id, "给我接一杯水"))
+
+    placed_outcomes = drain_service_with_confirmations(
+        session_id,
+        begin_motion_command(session_id, "我喝完了，把杯子放到操作台上去"),
+    )
+    after_place = get_session(session_id)
+    cup = next(item for item in after_place["runtime_objects"] if item["entity_id"] == "cup_a")
+    placed_archive = after_place.get("completed_intent_archive", [])[-1]
+    reachable_distance = (
+        float(after_place["executor_profile"]["body_envelope"]["radius_m"])
+        + float(after_place["executor_profile"]["arm_reach_m"])
+    )
+    require(placed_outcomes[-1].get("terminal_fact") == "object_supported_at_destination", f"post-drink placement did not complete: {placed_outcomes}")
+    require(after_place.get("active_intent_id") is None and not after_place.get("long_horizon_intents"), f"completed placement snapshot remained arbitration-eligible: {after_place.get('long_horizon_intents')}")
+    require(placed_archive.get("snapshot_state") == "released_from_active_arbitration" and placed_archive.get("arbitration_eligible") is False, f"completed placement was not released into historical scope: {placed_archive}")
+    require(math.dist(after_place["state"]["executor_position"], cup["position"]) <= reachable_distance, f"placement committed an effect pose that the executing effector could not have reached: {cup}")
+
+    restarted = begin_motion_command(session_id, "给我接一杯水")
+    restarted_intent = restarted.get("long_horizon_intent", {})
+    require(restarted.get("status") == "motion_started", f"new service task treated a producible reach precondition as human correction: {restarted}")
+    require(restarted_intent.get("intent_id") != placed_archive.get("intent_id") and restarted_intent.get("verified_facts") == [], f"new task inherited completed snapshot facts: {restarted_intent}")
+    restarted_outcomes = drain_service(restarted)
+    require(any(item.get("terminal_fact") == "container_filled" for item in restarted_outcomes), f"new water task reused a prior fill observation instead of establishing a task-scoped fill fact: {restarted_outcomes}")
+    require(restarted_outcomes[-1].get("terminal_fact") == "human_received_filled_container", f"new task did not reacquire the physically placed cup and complete: {restarted_outcomes}")
+    return {
+        "released_intent": placed_archive.get("intent_id"),
+        "new_intent": restarted_intent.get("intent_id"),
+        "placement_reachable": True,
+        "terminal_fact": restarted_outcomes[-1].get("terminal_fact"),
+    }
+
+
+def verify_shared_support_footprint_recovery() -> dict:
+    session = start_session("home_humanoid", "home_semantic_3d_b")
+    live = SESSIONS[session["session_id"]]
+    live["state"]["executor_position"] = [-3.2, 0.35]
+    cup = next(item for item in live["runtime_objects"] if item["entity_id"] == "cup_b")
+    apple = next(item for item in live["runtime_objects"] if item["entity_id"] == "apple_b")
+    cup.update({"position": [-2.8982, 0.35], "support_ref": "dining_table_b", "attached_to_executor": False})
+    apple.update({"position": [-3.2, 0.35], "attached_to_executor": True, "held_by_effector": "left_hand"})
+    _holding_by_effector(live)["left_hand"] = "apple_b"
+    _sync_primary_holding(live)
+    result = _apply_verified_place(live, "apple_b", "dining_table_b", "shared_support_footprint_test")
+    evidence = result.get("verification_evidence", {}).get("support_occupancy", {})
+    require(result.get("status") == "fact_established", f"occupied table footprint rejected a valid second placement: {result}")
+    require("cup_b" in evidence.get("occupied_object_refs", []) and evidence.get("available_footprint_m2", 0) >= evidence.get("required_footprint_m2", 1), f"placement did not expose reusable support-footprint evidence: {result}")
+    return {"status": result["status"], "occupied": evidence.get("occupied_object_refs"), "placement_space": evidence}
+
+
 def verify_post_handover_reacquisition_and_support_disambiguation() -> dict:
     session = start_session("home_humanoid", "home_semantic_3d_b")
     session_id = session["session_id"]
@@ -118,18 +196,18 @@ def verify_post_handover_reacquisition_and_support_disambiguation() -> dict:
 
     generic_transfer = begin_motion_command(session_id, "从人类手上拿杯子放到桌子上去")
     generic_transfer_result = generic_transfer.get("immediate_result") or generic_transfer
-    require(generic_transfer_result.get("status") == "perception_disambiguation_required", f"cross-view transfer did not ask only for the ambiguous support: {generic_transfer}")
-    require(generic_transfer_result.get("concept_grounding", {}).get("ambiguity_reason") == "multiple_support_candidates", f"cup visibility was incorrectly reported as missing: {generic_transfer}")
+    require(generic_transfer_result.get("status") == "process_slot_clarification_required", f"cross-view transfer did not route the ambiguous support through the unified gap resolver: {generic_transfer}")
+    require(generic_transfer_result.get("pending_slot") == "destination", f"cup visibility was incorrectly reported as the missing slot: {generic_transfer}")
 
     still_generic = begin_motion_command(session_id, "桌子")
     still_generic_result = still_generic.get("immediate_result") or still_generic
-    require(still_generic_result.get("status") == "role_clarification_required", f"generic fragment was mistaken for a new concept-gap task: {still_generic}")
-    require(still_generic_result.get("pending_role") == "destination", f"clarification lost its question-under-discussion role: {still_generic}")
+    require(still_generic_result.get("status") == "process_slot_clarification_required", f"generic fragment escaped the active process gap: {still_generic}")
+    require(still_generic_result.get("pending_slot") == "destination", f"clarification lost its question-under-discussion slot: {still_generic}")
 
     exact_transfer = begin_motion_command(session_id, "餐桌")
     exact_result = exact_transfer.get("immediate_result") or exact_transfer
     require(exact_result.get("status") == "requires_human_confirmation", f"exact destination did not enter causal acquisition planning: {exact_transfer}")
-    require(exact_transfer.get("role_clarification_resolution", {}).get("entity_ref") == "dining_table_b", f"fragment answer did not fill the pending destination role: {exact_transfer}")
+    require(exact_transfer.get("long_horizon_intent", {}).get("role_bindings", {}).get("destination") == "dining_table_b", f"fragment answer did not fill the pending destination slot: {exact_transfer}")
     require(exact_transfer.get("long_horizon_intent", {}).get("role_bindings", {}).get("destination") == "dining_table_b", f"explicit dining table was not bound: {exact_transfer}")
     grasp_started = begin_motion_command(session_id, "确认")
     grasp_completed = drain(grasp_started)
@@ -203,12 +281,12 @@ def verify_post_handover_reacquisition_and_support_disambiguation() -> dict:
     drain_service(begin_motion_command(correction_id, "给我接一杯水"))
     ambiguous_return = begin_motion_command(correction_id, "好了我喝完了，把杯子放到桌子上去")
     ambiguous_result = ambiguous_return.get("immediate_result") or ambiguous_return
-    require(ambiguous_result.get("status") == "perception_disambiguation_required", f"generic return destination did not preserve a role question: {ambiguous_return}")
+    require(ambiguous_result.get("status") == "process_slot_clarification_required", f"generic return destination did not preserve a process-slot question: {ambiguous_return}")
     corrected_return = begin_motion_command(correction_id, "不是这个桌子，是刚才你倒水的时候原来的位置")
     corrected_result = corrected_return.get("immediate_result") or corrected_return
-    resolution = corrected_return.get("role_clarification_resolution", {})
+    resolution = corrected_return.get("process_gap_resolution", {})
     require(corrected_result.get("status") == "requires_human_confirmation", f"relational correction did not resume the suspended task: {corrected_return}")
-    require(resolution.get("entity_ref") == "counter_b" and resolution.get("evidence", {}).get("kind") == "most_recent_verified_source_support", f"original location was not grounded from verified episodic support evidence: {corrected_return}")
+    require(resolution.get("value_ref") == "counter_b" and resolution.get("evidence", {}).get("kind") == "most_recent_verified_source_support", f"original location was not grounded from verified episodic support evidence: {corrected_return}")
     require(corrected_return.get("long_horizon_intent", {}).get("role_bindings", {}).get("source_holder") == "human_b", f"corrected return lost the current holder precondition: {corrected_return}")
     require(get_session(correction_id).get("concept_gap_dialogue") is None, f"role correction incorrectly opened a new concept-gap task: {get_session(correction_id).get('concept_gap_dialogue')}")
     return {
@@ -224,16 +302,17 @@ def verify_contrastive_evidence_gap_dialogue() -> dict:
     session_id = session["session_id"]
     missing = begin_motion_command(session_id, "把黑色的杯子放到餐桌上")
     missing_result = missing.get("immediate_result") or missing
-    require(missing_result.get("status") == "evidence_gap_clarification_required", f"attribute mismatch did not become a solvable evidence gap: {missing}")
+    require(missing_result.get("status") == "process_grounding_clarification_required", f"attribute mismatch did not enter the unified requirement-gap resolver: {missing}")
     require("没有发现符合“黑色”约束" in missing_result.get("prompt", "") and "蓝色陶瓷杯" in missing_result.get("prompt", ""), f"clarification did not contrast requested and observed facts: {missing}")
-    dialogue = get_session(session_id).get("evidence_gap_dialogue", {})
-    require(dialogue.get("goal", {}).get("goal_fact") == "target_object_in_gripper" and len(dialogue.get("candidate_options", [])) == 1, f"evidence gap lost the original goal or minimum substitute: {dialogue}")
+    dialogue = get_session(session_id).get("process_gap_dialogue", {})
+    resolution = dialogue.get("resolution", {})
+    require(resolution.get("goal_fact") == "object_supported_at_destination" and len((resolution.get("next_gap") or {}).get("candidates", [])) == 1, f"unified gap lost the original goal or minimum substitute: {dialogue}")
 
     resumed = begin_motion_command(session_id, "对")
     resumed_result = resumed.get("immediate_result") or resumed
     require(resumed_result.get("status") == "requires_human_confirmation", f"confirmed substitute did not resume causal planning: {resumed}")
-    resolution = resumed.get("evidence_gap_resolution", {})
-    require(resolution.get("human_confirmed_substitution") and resolution.get("entity_ref") == "cup_b", f"human confirmation did not fill only the missing role binding: {resumed}")
+    resolution = resumed.get("process_gap_resolution", {})
+    require(resolution.get("human_confirmed_substitution") and resolution.get("value_ref") == "cup_b", f"human confirmation did not fill only the missing slot binding: {resumed}")
     intent = resumed.get("long_horizon_intent", {})
     require(intent.get("role_bindings", {}).get("theme") == "cup_b" and intent.get("role_bindings", {}).get("destination") == "dining_table_b", f"resumed task changed its object or destination goal: {resumed}")
     return {
@@ -319,6 +398,129 @@ def verify_repeated_obstacle_replanning() -> dict:
     return {"replan_count": len(replan_statuses), "all_preserved": len(set(replan_statuses)) == 1, "terminal_fact": "human_received_filled_container"}
 
 
+def verify_internal_stage_start_does_not_reenter_recovery() -> dict:
+    """An internally authorized next stage must bypass external retry recovery."""
+    session = start_session("home_humanoid", "home_semantic_3d_a")
+    session_id = session["session_id"]
+    started = begin_motion_command(session_id, "\u7ed9\u6211\u63a5\u4e00\u676f\u6c34")
+    outcomes = drain_service(started)
+    facts = [item.get("terminal_fact") for item in outcomes]
+    require(facts == ["target_object_in_gripper", "container_filled", "human_received_filled_container"], f"internal stage re-entered recovery or regressed: {outcomes}")
+    require(get_session(session_id).get("active_intent_id") is None, f"internal stage chain did not close: {get_session(session_id).get('long_horizon_intents')}")
+    return {"stage_facts": facts, "recursion_guard": "external_retry_only"}
+
+
+def verify_hospitality_container_selection_service_chain() -> dict:
+    session = start_session("home_humanoid", "hospitality_guest")
+    session_id = session["session_id"]
+    clarification = begin_motion_command(session_id, "\u7ed9\u6211\u63a5\u4e00\u676f\u6c34")
+    require(clarification.get("status") == "role_clarification_required", f"hospitality container selection was not requested: {clarification}")
+    outcomes = drain_service(begin_motion_command(session_id, "\u767d\u8272\u676f\u5b50"))
+    facts = [item.get("terminal_fact") for item in outcomes]
+    require(facts == ["target_object_in_gripper", "container_filled", "human_received_filled_container"], f"selected hospitality cup did not complete the existing service intent: {outcomes}")
+    require(outcomes[0].get("candidate_execution_plan", {}).get("goal_fact") == "container_filled", f"UI projection retained the completed acquire plan: {outcomes[0]}")
+    require(outcomes[1].get("candidate_execution_plan", {}).get("goal_fact") == "human_received_filled_container", f"internal handover was replaced by a scene-level intent: {outcomes[1]}")
+    return {"stage_facts": facts, "selected_container": "mug_white"}
+
+
+def verify_explicit_container_binding_precedes_ambiguity() -> dict:
+    explicit_session = start_session("home_humanoid", "hospitality_guest")
+    explicit = begin_motion_command(explicit_session["session_id"], "\u7528\u767d\u8272\u9a6c\u514b\u676f\u7ed9\u6211\u63a5\u4e00\u676f\u6c34")
+    explicit_intent = explicit.get("long_horizon_intent") or {}
+    require(explicit.get("status") != "role_clarification_required", f"explicit current container was discarded before ambiguity arbitration: {explicit}")
+    require(explicit_intent.get("role_bindings", {}).get("theme") == "mug_white", f"explicit container did not become the structured theme binding: {explicit}")
+    require((explicit_intent.get("current_stage") or {}).get("stage_id") == "acquire_container", f"explicit water service did not enter container acquisition: {explicit}")
+
+    attribute_session = start_session("home_humanoid", "hospitality_guest")
+    attribute = begin_motion_command(attribute_session["session_id"], "\u7528\u767d\u8272\u676f\u5b50\u7ed9\u6211\u63a5\u4e00\u676f\u6c34")
+    attribute_intent = attribute.get("long_horizon_intent") or {}
+    require(attribute.get("status") != "role_clarification_required" and attribute_intent.get("role_bindings", {}).get("theme") == "mug_white", f"unique observable role evidence did not resolve the current instance: {attribute}")
+
+    generic_session = start_session("home_humanoid", "hospitality_guest")
+    generic = begin_motion_command(generic_session["session_id"], "\u7ed9\u6211\u63a5\u4e00\u676f\u6c34")
+    require(generic.get("status") == "role_clarification_required", f"generic request bypassed a genuinely ambiguous current role: {generic}")
+    require({item.get("entity_ref") for item in generic.get("candidate_options", [])} == {"mug_white", "glass_tall"}, f"generic clarification did not expose current compatible candidates: {generic}")
+    return {"explicit": "mug_white", "attribute": "mug_white", "generic": "role_clarification_required"}
+
+
+def verify_terminal_relation_gates_effect_commit() -> dict:
+    session = start_session("home_humanoid", "hospitality_guest")
+    session_id = session["session_id"]
+    begin_motion_command(session_id, "\u7ed9\u6211\u63a5\u4e00\u676f\u6c34")
+    started = begin_motion_command(session_id, "\u767d\u8272\u676f\u5b50")
+    job = MOTION_JOBS[started["job_id"]]
+    job["terminal_result"]["terminal_verification"]["maximum_near_distance_m"] = -1.0
+    outcome = drain(started)
+    live = get_session(session_id)
+    require(outcome.get("status") == "terminal_fact_verification_failed", f"forced terminal-relation failure was overwritten by an action effect: {outcome}")
+    require(live["state"].get("holding") is None, f"grasp effect committed despite failed terminal relation: {live['state']}")
+    require(outcome.get("effect_contract_committed") is False, f"failed terminal relation did not expose its effect gate: {outcome}")
+    return {"status": outcome["status"], "effect_contract_committed": False}
+
+
+def verify_role_scoped_transfer_after_handover() -> dict:
+    session = start_session("home_humanoid", "hospitality_guest")
+    session_id = session["session_id"]
+    begin_motion_command(session_id, "\u7ed9\u6211\u63a5\u4e00\u676f\u6c34")
+    drain_service(begin_motion_command(session_id, "\u767d\u8272\u676f\u5b50"))
+    destination_gap = begin_motion_command(session_id, "\u628a\u676f\u5b50\u62ff\u8fc7\u6765\u653e\u5230\u684c\u5b50\u4e0a")
+    require(destination_gap.get("status") == "process_slot_clarification_required", f"transfer did not ask only for its missing destination: {destination_gap}")
+    prepared = begin_motion_command(session_id, "\u64cd\u4f5c\u53f0A")
+    immediate = prepared.get("immediate_result") or prepared
+    intent = prepared.get("long_horizon_intent") or {}
+    require(immediate.get("status") == "requires_human_confirmation", f"resolved roles reopened an evidence or object gap: {prepared}")
+    require(intent.get("role_bindings", {}).get("theme") == "mug_white" and intent.get("role_bindings", {}).get("destination") == "hospitality_counter_a", f"resolved transfer roles were not preserved: {intent}")
+    require(get_session(session_id).get("evidence_gap_dialogue") is None, f"white visual evidence split from the selected mug: {get_session(session_id).get('evidence_gap_dialogue')}")
+
+    pending = get_session(session_id)["pending_confirmation"]
+    acquired = drain(confirm_pending_motion(session_id, pending["confirmation_id"], True))
+    require(acquired.get("terminal_fact") == "target_object_in_gripper", f"confirmed acquire lost its role context: {acquired}")
+    pending = get_session(session_id)["pending_confirmation"]
+    placed = drain(confirm_pending_motion(session_id, pending["confirmation_id"], True))
+    require(placed.get("terminal_fact") == "object_supported_at_destination", f"confirmed placement lost its destination context: {placed}")
+    mug = next(item for item in get_session(session_id)["runtime_objects"] if item["entity_id"] == "mug_white")
+    require(mug.get("support_ref") == "hospitality_counter_a" and mug.get("received_by") is None, f"transfer effects contradict the verified terminal relation: {mug}")
+    return {"theme": "mug_white", "destination": "hospitality_counter_a", "terminal_fact": placed["terminal_fact"]}
+
+
+def verify_historical_event_return_replans_current_route() -> dict:
+    session = start_session("home_humanoid", "hospitality_guest")
+    session_id = session["session_id"]
+    begin_motion_command(session_id, "\u7ed9\u6211\u63a5\u4e00\u676f\u6c34")
+    drain_service(begin_motion_command(session_id, "\u767d\u8272\u9a6c\u514b\u676f"))
+    started = begin_motion_command(session_id, "\u56de\u5230\u521a\u624d\u53d6\u676f\u5b50\u7684\u5730\u65b9")
+    require(started.get("status") == "motion_started" and started.get("job_id"), f"historical source location did not create fresh navigation: {started}")
+    reference = started.get("historical_reference") or {}
+    require(reference.get("source_support_ref") == "hospitality_counter_a", f"recent grasp source was not resolved generically: {started}")
+    require(reference.get("current_target_revalidated") is True and reference.get("old_trajectory_reused") is False, f"historical binding bypassed current-world replanning: {started}")
+    terminal = MOTION_JOBS[started["job_id"]]["terminal_result"]
+    require(terminal.get("terminal_fact_binding", {}).get("entity_ref") == "hospitality_counter_a", f"return navigation was reparsed as cup acquisition: {terminal}")
+    completed = drain(started)
+    require(completed.get("terminal_fact") == "executor_near_object", f"fresh historical return route did not verify proximity: {completed}")
+    return {"source_support_ref": reference["source_support_ref"], "old_trajectory_reused": False}
+
+
+def verify_generic_movable_asset_transfer_binding() -> dict:
+    session = start_session("home_humanoid", "hospitality_guest")
+    session_id = session["session_id"]
+    started = begin_motion_command(
+        session_id,
+        "\u628a\u64cd\u4f5c\u53f0A\u7684\u4fdd\u6e29\u58f6\u653e\u5230\u64cd\u4f5c\u53f0B\u4e0a",
+    )
+    intent = started.get("long_horizon_intent") or (started.get("immediate_result") or {}).get("long_horizon_intent") or {}
+    require(started.get("status") == "requires_human_confirmation", f"movable functional asset did not enter ordinary transfer planning: {started}")
+    require(intent.get("role_bindings") == {"theme": "thermos_room_temp", "destination": "hospitality_counter_b"}, f"source and destination mentions displaced the transfer theme or target: {started}")
+    pending = get_session(session_id)["pending_confirmation"]
+    acquired = drain(confirm_pending_motion(session_id, pending["confirmation_id"], True))
+    require(acquired.get("terminal_fact") == "target_object_in_gripper", f"movable asset acquisition did not verify holding: {acquired}")
+    placement_pending = get_session(session_id)["pending_confirmation"]
+    require(placement_pending.get("utterance") == "\u628a\u5e38\u6e29\u4fdd\u6e29\u58f6\u653e\u5230\u64cd\u4f5c\u53f0B", f"exact destination instance was replaced by its generic concept: {placement_pending}")
+    blocked = drain(confirm_pending_motion(session_id, placement_pending["confirmation_id"], True))
+    require(blocked.get("status") == "placement_blocked", f"occupied destination did not reach the shared footprint gate: {blocked}")
+    require(get_session(session_id)["state"].get("holding") == "thermos_room_temp", f"failed placement incorrectly committed release: {get_session(session_id)['state']}")
+    return {"theme": "thermos_room_temp", "destination": "hospitality_counter_b", "blocked_by_current_footprint": True}
+
+
 def main() -> None:
     report = {
         "scene_a": complete_authorized_service("home_semantic_3d_a"),
@@ -327,9 +529,18 @@ def main() -> None:
         "repeated_obstacle_replanning": verify_repeated_obstacle_replanning(),
         "compositional_service_language": verify_compositional_service_language(),
         "water_then_place_composition": verify_water_then_place_composition(),
+        "snapshot_release_and_reacquisition": verify_completed_snapshot_release_and_physical_reacquisition(),
+        "shared_support_footprint_recovery": verify_shared_support_footprint_recovery(),
         "post_handover_reacquisition": verify_post_handover_reacquisition_and_support_disambiguation(),
         "contrastive_evidence_gap_dialogue": verify_contrastive_evidence_gap_dialogue(),
         "generic_object_handover": verify_generic_object_handover(),
+        "internal_stage_recovery_guard": verify_internal_stage_start_does_not_reenter_recovery(),
+        "hospitality_selected_container_service": verify_hospitality_container_selection_service_chain(),
+        "explicit_container_precedes_ambiguity": verify_explicit_container_binding_precedes_ambiguity(),
+        "terminal_relation_effect_gate": verify_terminal_relation_gates_effect_commit(),
+        "role_scoped_transfer_after_handover": verify_role_scoped_transfer_after_handover(),
+        "historical_event_return": verify_historical_event_return_replans_current_route(),
+        "generic_movable_asset_transfer": verify_generic_movable_asset_transfer_binding(),
     }
     print(report)
 

@@ -1,0 +1,48 @@
+{
+  "schema_version": "1.0.0",
+  "scene_id": "hospitality_guest",
+  "display_name": "招待客人长程任务场景",
+  "scene_role": "hospitality_long_horizon_test",
+  "coordinate_contract": {
+    "semantic_ground_frame": {"forward_axis": "+x", "left_axis": "+y", "up_axis": "+z", "yaw_positive": "counterclockwise"},
+    "screen_direction_is_not_a_body_direction": true
+  },
+  "semantic_regions": [
+    {"region_id": "kitchen", "label": "厨房", "center": [3.0, 0.0], "size": [4.0, 4.5], "color": "#dce4ee", "affordances": ["navigate", "prepare", "fill_container"]},
+    {"region_id": "hallway", "label": "连接通道", "center": [0.0, 0.0], "size": [2.0, 1.6], "color": "#c7d0d2", "affordances": ["navigate", "open_transition"]},
+    {"region_id": "living_room", "label": "客厅", "center": [-3.0, 0.0], "size": [4.0, 4.5], "color": "#d8e8df", "affordances": ["navigate", "human_interaction"]}
+  ],
+  "objects": [
+    {"entity_id": "hospitality_counter_a", "label": "操作台A", "kind": "operation_surface", "region_id": "kitchen", "position": [2.8, -0.9], "size": [1.8, 1.0, 0.9], "stable": true, "available_footprint_m2": 1.8, "affordances": ["support_object", "receive_object", "operation_workspace"], "fixed": true},
+    {"entity_id": "hospitality_counter_b", "label": "操作台B", "kind": "operation_surface", "region_id": "kitchen", "position": [2.8, 1.0], "size": [0.9, 0.7, 0.9], "stable": true, "available_footprint_m2": 0.63, "affordances": ["support_object", "receive_object", "operation_workspace"], "fixed": true},
+    {"entity_id": "mug_white", "label": "白色马克杯", "kind": "graspable_container", "region_id": "kitchen", "position": [2.4, -0.9], "elevation_m": 0.72, "support_ref": "hospitality_counter_a", "size": [0.18, 0.18, 0.22], "color": "#f4f5f2", "container_form": "mug", "handle_presence": true, "transparency": "opaque", "capacity_l": 0.35, "liquid_state": "empty", "fill_level": 0.0, "temperature_c": 20, "material": "ceramic", "fragility": "ordinary", "tea_suitable": true, "fixed": false},
+    {"entity_id": "glass_tall", "label": "透明高脚玻璃杯", "kind": "graspable_container", "region_id": "kitchen", "position": [2.8, -0.9], "elevation_m": 0.72, "support_ref": "hospitality_counter_a", "size": [0.16, 0.16, 0.28], "color": "#9fc4cf", "container_form": "stemmed_glass", "handle_presence": false, "transparency": "transparent", "capacity_l": 0.3, "liquid_state": "empty", "fill_level": 0.0, "temperature_c": 20, "material": "glass", "fragility": "high", "tea_suitable": false, "fixed": false},
+    {"entity_id": "thermos_room_temp", "label": "常温保温壶", "kind": "water_source", "region_id": "kitchen", "position": [3.2, -0.9], "elevation_m": 0.72, "support_ref": "hospitality_counter_a", "size": [0.25, 0.25, 0.4], "color": "#8f9da2", "capacity_l": 1.0, "liquid_state": "filled", "fill_level": 0.8, "temperature_c": 20, "outlet_available": true, "source_kind": "thermos", "affordances": ["graspable", "movable", "pourable", "provide_water"], "fixed": false},
+    {"entity_id": "tea_box", "label": "茶包盒", "kind": "tea_inventory", "region_id": "kitchen", "position": [3.6, -0.9], "elevation_m": 0.72, "support_ref": "hospitality_counter_a", "size": [0.3, 0.2, 0.25], "color": "#a33b35", "inventory": {"black_tea": 3, "green_tea": 2}, "fixed": false},
+    {"entity_id": "wooden_tray", "label": "木质托盘", "kind": "graspable_tray", "region_id": "kitchen", "position": [2.0, -0.9], "elevation_m": 0.72, "support_ref": "hospitality_counter_a", "size": [0.3, 0.4, 0.05], "color": "#9b6841", "usable_footprint_m2": 0.12, "load_capacity_kg": 3.0, "fixed": false},
+    {"entity_id": "newspaper_a", "label": "旧报纸一", "kind": "discardable_object", "region_id": "kitchen", "position": [2.65, 1.0], "elevation_m": 0.72, "support_ref": "hospitality_counter_b", "size": [0.35, 0.25, 0.01], "color": "#d6d0bb", "discardable": true, "fixed": false},
+    {"entity_id": "newspaper_b", "label": "旧报纸二", "kind": "discardable_object", "region_id": "kitchen", "position": [2.95, 1.0], "elevation_m": 0.73, "support_ref": "hospitality_counter_b", "size": [0.3, 0.22, 0.01], "color": "#bbb49d", "discardable": true, "fixed": false},
+    {"entity_id": "trash_bin_hospitality", "label": "垃圾桶", "kind": "discard_bin", "region_id": "kitchen", "position": [2.8, -1.65], "size": [0.45, 0.45, 0.7], "accepts_discardable": true, "fixed": true},
+    {"entity_id": "service_station", "label": "服务台", "kind": "handover_zone", "region_id": "living_room", "position": [-1.2, 0.0], "size": [0.8, 0.8, 0.8], "stable": false, "affordances": ["handover_zone", "recipient_accessible"], "fixed": true},
+    {"entity_id": "sofa_arm_service", "label": "沙发扶手", "kind": "unstable_surface", "region_id": "living_room", "position": [-0.7, 0.0], "size": [0.25, 0.55, 0.7], "stable": false, "affordances": ["handover_zone"], "fixed": true},
+    {"entity_id": "guest", "label": "客人", "kind": "human_recipient", "region_id": "living_room", "position": [-1.0, 0.15], "size": [0.5, 0.5, 1.7], "handover_ready": true, "received_object_refs": [], "fixed": true}
+  ],
+  "topology": [
+    {"from": "kitchen", "to": "hallway", "relation": "connected_by_open_transition"},
+    {"from": "hallway", "to": "living_room", "relation": "connected_by_open_transition"}
+  ],
+  "executor_profiles": {
+    "home_humanoid": {
+      "executor_type": "humanoid_robot", "body_profile": "humanoid_biped",
+      "body_envelope": {"radius_m": 0.28, "height_m": 1.7}, "turning_radius_m": 0.2,
+      "max_linear_speed_mps": 0.8, "max_contact_force_n": 45.0, "kinematic_model": "bipedal_walk",
+      "can_translate_laterally": false, "can_reverse_without_turning": true,
+      "body_reference_frame": {"forward_axis": "+x", "left_axis": "+y", "yaw_positive": "counterclockwise"},
+      "sensor_capabilities": ["rgbd", "visual_tracking"],
+      "manipulator_channels": [{"channel_id": "left_hand", "side": "left", "max_holding_count": 1}, {"channel_id": "right_hand", "side": "right", "max_holding_count": 1}],
+      "arm_reach_m": 0.78, "gripper_span_m": 0.12,
+      "supported_actions": ["relative_move", "navigate_to_region", "local_obstacle_avoidance", "grasp_object", "place_object", "fill_container", "handover_container", "handover_object", "request_human_confirmation"]
+    }
+  },
+  "initial_state": {"executor_position": [2.0, -1.9], "executor_yaw_deg": 90.0, "active_region": "kitchen", "holding": null}
+}

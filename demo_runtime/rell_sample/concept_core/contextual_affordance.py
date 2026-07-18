@@ -76,6 +76,7 @@ def resolve_contextual_affordance_request(
     scoped_authorization: dict[str, Any] | None,
     confirmed_bindings: list[dict[str, Any]] | None = None,
     perception_bindings: list[dict[str, Any]] | None = None,
+    role_binding_evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     confirmed_refs = {item.get("entity_ref") for item in (confirmed_bindings or [])}
     perceived_refs = {item.get("entity_ref") for item in (perception_bindings or [])}
@@ -99,7 +100,7 @@ def resolve_contextual_affordance_request(
         ]
         compatible_kinds = {kind for concept in support_concepts for kind in concept.get("compatible_kinds", [])}
         support_entities = [item for item in entities if item.get("kind") in compatible_kinds]
-        mentioned_destination_candidates: list[tuple[int, dict[str, Any]]] = []
+        mentioned_destination_candidates: list[tuple[int, int, int, dict[str, Any]]] = []
         for concept in object_concepts:
             mention_positions = [utterance.rfind(alias) for alias in concept.get("aliases", []) if alias and alias in utterance]
             if not mention_positions:
@@ -107,11 +108,15 @@ def resolve_contextual_affordance_request(
             for candidate in entities:
                 if candidate.get("entity_id") == held_ref or candidate.get("kind") not in concept.get("compatible_kinds", []):
                     continue
-                mentioned_destination_candidates.append((max(mention_positions), candidate))
+                longest_alias = max(
+                    (len(alias) for alias in concept.get("aliases", []) if alias and alias in utterance),
+                    default=0,
+                )
+                mentioned_destination_candidates.append((max(mention_positions), 0, longest_alias, candidate))
         for candidate in entities:
             if candidate.get("entity_id") != held_ref and candidate.get("label") and candidate["label"] in utterance:
-                mentioned_destination_candidates.append((utterance.rfind(candidate["label"]), candidate))
-        explicit_destination = max(mentioned_destination_candidates, key=lambda item: item[0])[1] if mentioned_destination_candidates else None
+                mentioned_destination_candidates.append((utterance.rfind(candidate["label"]), 1, len(candidate["label"]), candidate))
+        explicit_destination = max(mentioned_destination_candidates, key=lambda item: item[:3])[3] if mentioned_destination_candidates else None
         explicitly_mentioned = [
             item for item in support_entities
             if (item.get("label") and item["label"] in utterance)
@@ -146,6 +151,25 @@ def resolve_contextual_affordance_request(
             destination_binding = "implicit_nearest_compatible_support_candidate"
         else:
             entity = None
+        destination_evidence = (role_binding_evidence or {}).get("destination") or {}
+        authorized_destination_ref = destination_evidence.get("value_ref")
+        if (
+            entity
+            and authorized_destination_ref == entity.get("entity_id")
+            and not destination_evidence.get("explicit")
+        ):
+            destination_binding = (
+                destination_evidence.get("evidence")
+                or next(
+                    (
+                        item.get("binding_source")
+                        for item in destination_evidence.get("evidence_sources", [])
+                        if item.get("binding_source")
+                    ),
+                    None,
+                )
+                or "structured_inferred_destination_binding"
+            )
     else:
         entity = next(
             (
@@ -238,6 +262,11 @@ def resolve_contextual_affordance_request(
     object_claims.update(concept.get("functional_affordances", []))
     object_claims.update(concept.get("physical_properties", []))
     object_claims.update(concept.get("expected_relations", []))
+    object_claims.update(entity.get("affordances") or [])
+    if entity.get("fixed") is False:
+        object_claims.discard("fixed_asset")
+        object_claims.discard("fixed_in_operation_region")
+        object_claims.add("movable")
     missing = []
     for action in contract.get("required_body_actions", ()):
         if action not in supported_actions:

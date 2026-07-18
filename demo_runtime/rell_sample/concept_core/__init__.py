@@ -44,6 +44,7 @@ from .process_template_resolver import (
     ProcessTemplate,
     SlotSpec,
     build_process_template_catalog,
+    normalize_perception_gap,
     resolve_process_request,
 )
 from .concept_units import (
@@ -60,6 +61,13 @@ from .perceptual_grounding import (
     ground_task_observations,
     load_object_concepts,
     simulate_task_conditioned_observation,
+)
+from .semantic_grounding import (
+    build_grounded_intent_frame,
+    build_observation_evidence_set,
+    build_semantic_constraint_frame,
+    ground_semantic_role,
+    load_semantic_attribute_concepts,
 )
 
 __all__ = [
@@ -98,6 +106,7 @@ __all__ = [
     "ProcessTemplate",
     "SlotSpec",
     "build_process_template_catalog",
+    "normalize_perception_gap",
     "resolve_process_request",
     "infer_local_concept_gap",
     "request_cloud_concept_support",
@@ -110,4 +119,9 @@ __all__ = [
     "ground_task_observations",
     "load_object_concepts",
     "simulate_task_conditioned_observation",
+    "build_grounded_intent_frame",
+    "build_observation_evidence_set",
+    "build_semantic_constraint_frame",
+    "ground_semantic_role",
+    "load_semantic_attribute_concepts",
 ]

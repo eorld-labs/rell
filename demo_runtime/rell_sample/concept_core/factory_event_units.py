@@ -68,7 +68,7 @@ FACTORY_EVENT_CONCEPT_UNITS: list[dict[str, Any]] = [
         "factory_event_navigate",
         "趋近目标事件概念",
         "navigate_to",
-        ["走到", "走向", "去到", "前往", "靠近", "过去"],
+        ["走到", "走向", "去到", "前往", "靠近", "过去", "回到", "返回到", "返回"],
         "navigate_to_region",
         {"destination": {"role": "target", "entity_type": "spatial_target"}},
         ["destination_grounded", "route_feasible"],

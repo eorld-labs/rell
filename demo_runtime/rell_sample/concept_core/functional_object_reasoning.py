@@ -95,9 +95,13 @@ def build_functional_profile(entity: dict[str, Any], object_concepts: list[dict[
     for concept in matched:
         affordances.update(concept.get("functional_affordances", []))
         properties.update(concept.get("physical_properties", []))
-    if entity.get("fixed"):
+    if entity.get("fixed") is True:
         properties.add("fixed_asset")
-    else:
+    elif entity.get("fixed") is False:
+        # Type-level concepts describe typical assets. A current, physically
+        # verified instance state outranks that default for task-role binding.
+        properties.discard("fixed_asset")
+        properties.discard("fixed_in_operation_region")
         affordances.add("movable")
     if entity.get("kind") not in {"scene_boundary"}:
         affordances.add("interaction_target")

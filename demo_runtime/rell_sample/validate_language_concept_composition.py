@@ -57,6 +57,18 @@ def main() -> None:
     require(transfer["canonical_frame"]["goal_relation"] == "object_supported_at_destination", f"goal projection failed: {transfer}")
     require("桌子" in str(transfer["canonical_utterance"]), f"destination role was lost: {transfer}")
 
+    co_location = compose("去把苹果拿过来，和杯子一起放在桌子上")
+    require(
+        co_location["role_bindings"].get("theme", {}).get("concept_id") == "concept_edible_apple"
+        and co_location["role_bindings"].get("companion", {}).get("concept_id") == "concept_fillable_container"
+        and co_location["role_bindings"].get("destination", {}).get("concept_id") == "concept_support_surface",
+        f"event-local theme was overwritten by a co-location companion: {co_location}",
+    )
+    require(
+        co_location["role_bindings"]["companion"].get("semantic_relation") == "co_located_with_theme_at_destination",
+        f"co-location relation was not represented as a semantic role: {co_location}",
+    )
+
     transport_to_support = compose("嗯，把杯子拿到桌子上去")
     require(transport_to_support["canonical_frame"]["operators"] == ["transport_object"], f"transport surface was not recognized: {transport_to_support}")
     require(transport_to_support["role_bindings"].get("destination", {}).get("spatial_relation") == "on_support_surface", f"support topology was not extracted from the result complement: {transport_to_support}")
@@ -73,6 +85,9 @@ def main() -> None:
     require(restore_first["role_bindings"].get("theme", {}).get("matched_alias") == "杯子" and restore_first["role_bindings"].get("destination", {}).get("matched_alias") == "桌子", f"restore theme and destination were not separated: {restore_first}")
     require(restore_first["modifiers"].get("restore_prior_relation") is True and restore_first["canonical_frame"].get("destination_binding_policy") == "most_recent_verified_support_relation", f"restore did not retain its temporal relation constraint: {restore_first}")
     require(restore_first["confidence"] == restore_second["confidence"] and restore_first["role_bindings"] == restore_second["role_bindings"], f"identical language and context produced non-deterministic semantics: {restore_first}: {restore_second}")
+
+    historical_return = compose("回到刚才取杯子的地方")
+    require(historical_return["canonical_frame"]["operators"] == ["navigate_to", "grasp_object"], f"return motion and referenced past event were not composed together: {historical_return}")
 
     handover = compose("现在把苹果再递给人类")
     require(handover["speech_act"] == "task_request", f"object handover was not understood as a task: {handover}")
@@ -175,13 +190,26 @@ def main() -> None:
     require(grasp_memory.get("operator") == "grasp_object", f"verified grasp was not retained as an episodic event: {grasp_memory}")
     require(grasp_memory.get("before_facts", [{}])[0].get("predicate") == "supported_by" and grasp_memory.get("before_facts", [{}])[0].get("object") == "counter_a", f"grasp source support was not retained for temporal relation queries: {grasp_memory}")
 
+    current_inventory = immediate(begin_motion_command(session_id, "看看桌子上有什么"))
+    require(current_inventory.get("status") == "support_inventory_state_answered", f"support inventory query fell back to visual category observation: {current_inventory}")
+    require(any(group.get("support_entity_ref") == "counter_a" for group in current_inventory.get("inventory_groups", [])), f"current support facts were not grouped by surface: {current_inventory}")
+    historical_inventory = immediate(begin_motion_command(session_id, "看看刚才取杯子的桌子上还有什么"))
+    require(historical_inventory.get("status") == "support_inventory_state_answered", f"historical support inventory query was not answered: {historical_inventory}")
+    require([group.get("support_entity_ref") for group in historical_inventory.get("inventory_groups", [])] == ["counter_a"], f"recent grasp source did not select the support referent: {historical_inventory}")
+    require(historical_inventory.get("state_evidence", {}).get("historical_facts_used_as_current_state") is False, f"episodic state leaked into the current inventory answer: {historical_inventory}")
+
     placement = immediate(begin_motion_command(session_id, "放到桌子上去"))
     placement_language = placement.get("language_understanding", {})
-    require(placement_language.get("canonical_utterance") in {"把白色杯子放到桌子", "把杯子放到操作台"}, f"placement roles were not preserved through internal staging: {placement}")
+    require(placement_language.get("canonical_utterance") in {"把白色杯子放到桌子", "把杯子放到操作台", "把白色杯子放到操作台"}, f"placement roles were not preserved through internal staging: {placement}")
     require(placement.get("status") == "requires_human_confirmation", f"placement did not produce a grounded geometric candidate: {placement}")
     require(placement.get("candidate_execution_plan", {}).get("roles", {}).get("destination") == "counter_a", f"table was not bound as the placement destination: {placement}")
     require(placement.get("candidate_execution_plan", {}).get("role_grounding", {}).get("theme", {}).get("source") == "current_verified_holding_fact", f"execution theme did not come from current holding truth: {placement}")
     require(placement.get("task_perception", {}).get("concept_grounding", {}).get("grounding_status") == "spatially_grounded", f"destination was not actively observed before planning: {placement}")
+    pending_before_query = get_session(session_id).get("pending_confirmation", {}).get("confirmation_id")
+    query_during_confirmation = immediate(begin_motion_command(session_id, "看看刚才取杯子的桌子上还有什么"))
+    pending_after_query = get_session(session_id).get("pending_confirmation", {}).get("confirmation_id")
+    require(query_during_confirmation.get("status") == "support_inventory_state_answered", f"pending execution confirmation intercepted the state query: {query_during_confirmation}")
+    require(pending_before_query and pending_after_query == pending_before_query, f"read-only query consumed or replaced the pending task slot: {query_during_confirmation}")
 
     samples = []
     for _ in range(300):

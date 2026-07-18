@@ -5,7 +5,7 @@ from copy import deepcopy
 from concept_core.factory_event_units import FACTORY_EVENT_CONCEPT_UNITS
 from concept_core.language_concept_composer import compose_language_concepts
 from concept_core.perceptual_grounding import load_object_concepts
-from concept_core.process_template_resolver import build_process_template_catalog, resolve_process_request
+from concept_core.process_template_resolver import build_process_template_catalog, normalize_perception_gap, resolve_process_request
 from embodied_scene import SESSIONS, begin_motion_command, get_session, load_scene, start_session, step_motion_command
 
 
@@ -62,6 +62,30 @@ def main() -> None:
     require({item["template_id"] for item in catalog["templates"]} == {"grasp_object", "place_object", "handover_object", "transport_object"}, f"initial process template set incomplete: {catalog}")
     require(catalog["resolution_contract"]["templates_declare_slots_not_question_strings"], f"questions leaked into individual templates: {catalog}")
 
+    place_resolution = resolve("把杯子放到操作台", "home_semantic_3d_a")
+    normalized_support_gap = normalize_perception_gap(
+        place_resolution,
+        {
+            "prompt": "当前目标承载面尚未形成可验真的空间落地。",
+            "task_perception_frame": {"target_constraints": {}},
+            "perception_observation": {"observation_id": "test_support_gap"},
+            "concept_grounding": {
+                "grounding_status": "perceptual_candidate",
+                "ambiguity_reason": "support_not_observed",
+                "candidate_bindings": [{"role": "target", "entity_ref": "cup_a"}],
+                "candidate_options": [{"entity_ref": "cup_a", "label_hint": "白色杯子"}],
+                "support_candidate_options": [],
+            },
+        },
+    )
+    require(
+        normalized_support_gap
+        and normalized_support_gap.get("status") == "clarification_required"
+        and (normalized_support_gap.get("next_gap") or {}).get("slot_id") == "destination"
+        and (normalized_support_gap.get("next_gap") or {}).get("kind") == "grounding_evidence_slot",
+        f"support perception failure did not project onto the declared destination requirement: {normalized_support_gap}",
+    )
+
     unknown = resolve("把苹果捎给人类")
     require(unknown.get("status") == "template_confirmation_required", f"unknown relational verb did not form a bounded template candidate: {unknown}")
     require(unknown.get("template_id") == "handover_object" and unknown.get("template_candidate", {}).get("novel_surface") == "捎给", f"unknown surface was learned as a whole sentence or wrong template: {unknown}")
@@ -99,6 +123,12 @@ def main() -> None:
     unsafe = begin_motion_command(unsafe_session["session_id"], "拿起苹果")
     unsafe_result = unsafe.get("immediate_result") or unsafe
     require(unsafe_result.get("status") == "process_slot_clarification_required" and "白色杯子" in unsafe_result.get("prompt", ""), f"holding conflict did not become a structured unsafe-switch question: {unsafe}")
+
+    unresolved_session = start_session("home_humanoid", "home_semantic_3d_b")
+    unresolved = begin_motion_command(unresolved_session["session_id"], "把黑色的杯子放到餐桌上")
+    unresolved_result = unresolved.get("immediate_result") or unresolved
+    require(unresolved_result.get("status") == "process_grounding_clarification_required", f"perception gap bypassed the unified contract: {unresolved}")
+    require(not unresolved.get("loaded_from_persistent_store") and not unresolved_result.get("loaded_from_persistent_store"), f"unresolved requirement incorrectly triggered cold-start experience replay: {unresolved}")
 
     carry_session = start_session("home_humanoid", "home_semantic_3d_a")
     carry_outcomes = drain_chain(begin_motion_command(carry_session["session_id"], "把苹果带到厨房"))

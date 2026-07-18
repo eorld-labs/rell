@@ -5,6 +5,7 @@ import heapq
 import json
 import math
 import re
+from datetime import datetime, timezone
 from time import perf_counter_ns
 from copy import deepcopy
 from pathlib import Path
@@ -17,8 +18,14 @@ from concept_core.functional_object_reasoning import build_functional_object_cat
 from concept_core.factory_state_facts import build_factory_state_catalog, derive_runtime_fact_snapshot, explain_prerequisite_gaps
 from concept_core.lightweight_orchestrator import build_lightweight_causal_candidate, build_lightweight_orchestrator_catalog
 from concept_core.language_concept_composer import compose_language_concepts, normalize_language_text
-from concept_core.perceptual_grounding import COLOR_ALIASES, COLOR_NAMES, activate_task_perception, build_open_world_observation, build_task_perception_result, load_object_concepts
-from concept_core.process_template_resolver import resolve_process_request
+from concept_core.perceptual_grounding import COLOR_ALIASES, COLOR_NAMES, activate_task_perception, build_open_world_observation, build_task_perception_result, load_object_concepts, observed_perceptual_attributes
+from concept_core.process_template_resolver import normalize_perception_gap, resolve_process_request
+from concept_core.semantic_grounding import (
+    build_grounded_intent_frame,
+    build_observation_evidence_set,
+    build_semantic_constraint_frame,
+    ground_semantic_role,
+)
 from concept_core.situated_event_reasoning import (
     compile_situated_event_frame,
     create_hierarchical_intent_graph,
@@ -26,6 +33,11 @@ from concept_core.situated_event_reasoning import (
     record_verified_fact as record_intent_verified_fact,
 )
 from concept_core.visual_concept_packs import build_visual_pack_catalog
+from hospitality_task_graph import (
+    build_hospitality_orchestration_view,
+    build_hospitality_task_graph,
+    unresolved_hospitality_conditions,
+)
 from embodied_teaching import (
     append_validation_result,
     build_pedagogical_signals,
@@ -83,9 +95,82 @@ from execution_boundary import (
 SCENE_FILES = {
     "home_semantic_3d_a": Path(__file__).resolve().parent / "data" / "embodied_home_scene.json",
     "home_semantic_3d_b": Path(__file__).resolve().parent / "data" / "embodied_home_scene_b.json",
+    "hospitality_guest": Path(__file__).resolve().parent / "data" / "hospitality_guest_scene.json",
 }
 SESSIONS: dict[str, dict[str, Any]] = {}
 MOTION_JOBS: dict[str, dict[str, Any]] = {}
+RUNTIME_DEBUG_LOG = Path(__file__).resolve().parent / "runtime_debug.jsonl"
+
+
+def _debug_runtime(event: str, session: dict[str, Any], **details: Any) -> None:
+    """Append a compact server-side trace without changing task state."""
+    record = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "event": event,
+        "session_id": session.get("session_id"),
+        "active_intent_id": session.get("active_intent_id"),
+        "world_revision": session.get("world_revision"),
+        "role_dialogue": bool(session.get("role_clarification_dialogue")),
+        "details": details,
+    }
+    intent = (session.get("long_horizon_intents") or {}).get(session.get("active_intent_id"))
+    if intent:
+        record["intent"] = {
+            "lifecycle": intent.get("lifecycle"),
+            "stage": (intent.get("current_stage") or {}).get("stage_id"),
+            "verified_facts": list(intent.get("verified_facts", [])),
+            "role_bindings": deepcopy(intent.get("role_bindings", {})),
+        }
+    try:
+        with RUNTIME_DEBUG_LOG.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+
+
+def _attach_runtime_diagnostic(result: dict[str, Any], session: dict[str, Any], stage: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Promote any non-success stop into an explainable, recoverable event."""
+    status = str(result.get("status") or "")
+    if status in {"fact_established", "motion_completed", "stage_ready", "role_clarification_required"}:
+        return result
+    if result.get("runtime_diagnostic"):
+        return result
+    reason = result.get("reason") or result.get("error") or status or "unknown_failure"
+    category = "unknown_runtime_failure"
+    if "reach" in reason or "terminal_pose" in reason:
+        category = "capability_or_terminal_pose_boundary"
+    elif "collision" in reason or "blocked" in reason or "obstacle" in reason:
+        category = "route_or_collision_blocked"
+    elif "precondition" in reason or "ground" in reason:
+        category = "missing_causal_precondition"
+    elif "ambig" in reason or "candidate" in reason:
+        category = "role_or_perception_ambiguity"
+    diagnostic = {
+        "category": category,
+        "stage": (stage or {}).get("stage_id") or result.get("stage_id"),
+        "reason": reason,
+        "evidence": {
+            "entity_ref": result.get("entity_ref") or result.get("target_entity_ref"),
+            "blocking_entity": result.get("blocking_entity") or result.get("collider", {}).get("entity_id"),
+            "world_revision": session.get("world_revision"),
+            "rejected_candidates": (result.get("object_relative_motion") or {}).get("rejected_candidates", []),
+        },
+        "recovery_options": result.get("next_safe_actions") or [
+            "继续观察当前世界状态",
+            "改变目标或移除阻碍",
+            "向人类询问缺失的最小条件",
+        ],
+        "requires_human_input": category in {"capability_or_terminal_pose_boundary", "missing_causal_precondition", "unknown_runtime_failure"},
+    }
+    result["runtime_diagnostic"] = diagnostic
+    session["last_runtime_diagnostic"] = deepcopy(diagnostic)
+    if not result.get("prompt"):
+        result["prompt"] = (
+            f"当前阶段{diagnostic['stage'] or '未命名'}已暂停。"
+            f"原因：{reason}。"
+            f"下一步：{'；'.join(diagnostic['recovery_options'])}。"
+        )
+    return result
 _LANGUAGE_OBJECT_CONCEPT_CACHE: list[dict[str, Any]] | None = None
 
 
@@ -146,6 +231,13 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator", scene_id
         scene = load_scene(scene_id)
     except ValueError:
         return {"error": "embodied_scene_not_found", "scene_id": scene_id, "available_scenes": list_embodied_scenes()}
+    if executor_profile_id not in scene["executor_profiles"] and scene_id == "hospitality_guest":
+        # Scene transitions may preserve the previous page's body query. The
+        # hospitality scene has one declared embodiment, so bind it explicitly
+        # instead of returning an unusable session to the frontend.
+        available_profiles = list(scene["executor_profiles"])
+        if len(available_profiles) == 1:
+            executor_profile_id = available_profiles[0]
     if executor_profile_id not in scene["executor_profiles"]:
         return {"error": "executor_profile_not_found", "executor_profile_id": executor_profile_id}
     language_concepts = _language_object_concepts()
@@ -184,6 +276,9 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator", scene_id
         "language_interpretation_history": [],
         "dialogue_focus_entities": [],
         "last_language_understanding": None,
+        "current_observation_evidence": None,
+        "observation_evidence_ledger": [],
+        "grounded_intent_frame_history": [],
         "long_horizon_intents": {},
         "completed_intent_archive": [],
         "active_intent_id": None,
@@ -195,6 +290,12 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator", scene_id
         "process_gap_dialogue": None,
         "human_reported_fact_candidates": [],
     }
+    if scene_id == "hospitality_guest":
+        hospitality_graph = build_hospitality_task_graph(session["runtime_objects"])
+        session["task_graph"] = hospitality_graph
+        session["task_graph_unresolved_conditions"] = unresolved_hospitality_conditions(hospitality_graph)
+        session["task_graph_orchestration"] = build_hospitality_orchestration_view(hospitality_graph)
+        session["task_graph_state"] = "awaiting_condition_resolution" if session["task_graph_unresolved_conditions"] else "ready_for_orchestration"
     _holding_by_effector(session)
     _sync_primary_holding(session)
     SESSIONS[session_id] = session
@@ -233,6 +334,11 @@ def _conceptual_reference_for_entity(entity: dict[str, Any]) -> str:
     for concept in load_object_concepts()["concepts"]:
         if entity.get("kind") not in concept.get("compatible_kinds", []):
             continue
+        concept_properties = set(concept.get("physical_properties", []))
+        if entity.get("affordances") or (
+            entity.get("fixed") is False and "fixed_asset" in concept_properties
+        ):
+            return str(entity.get("label") or concept.get("display_name") or "目标对象")
         aliases = sorted((alias for alias in concept.get("aliases", []) if len(alias) > 1), key=len, reverse=True)
         if aliases:
             return aliases[0]
@@ -250,6 +356,26 @@ def _create_transfer_intent(
     concepts = load_object_concepts()["concepts"]
     process_resolution = (language_analysis or {}).get("process_template_resolution") or {}
     process_bindings = process_resolution.get("bindings", {}) if process_resolution.get("template_id") == "place_object" else {}
+    resolved_theme_binding = process_bindings.get("theme") or {}
+    resolved_destination_binding = process_bindings.get("destination") or {}
+    # Process bindings exist only after the shared grounder has reduced the
+    # current, version-matched candidate set to one entity. Their evidence
+    # strength describes how the referent was selected, not whether a
+    # candidate intent may be formed; execution authorization remains separate.
+    resolved_theme_ref = resolved_theme_binding.get("value_ref")
+    resolved_destination_ref = resolved_destination_binding.get("value_ref")
+    runtime_index = {item.get("entity_id"): item for item in session.get("runtime_objects", [])}
+    semantic_roles = ((language_analysis or {}).get("semantic_constraint_frame") or {}).get("roles", {})
+    for role_name, resolved_ref in (("theme", resolved_theme_ref), ("destination", resolved_destination_ref)):
+        if not resolved_ref:
+            continue
+        semantic_kinds = set((semantic_roles.get(role_name) or {}).get("compatible_kinds") or [])
+        resolved_entity = runtime_index.get(resolved_ref)
+        if semantic_kinds and (not resolved_entity or resolved_entity.get("kind") not in semantic_kinds):
+            if role_name == "theme":
+                resolved_theme_ref = None
+            else:
+                resolved_destination_ref = None
     mentioned = [concept for concept in concepts if any(alias and alias in normalized for alias in concept.get("aliases", []))]
     theme_concepts = [concept for concept in mentioned if "graspable" in concept.get("functional_affordances", [])]
     destination_concepts = [concept for concept in mentioned if "support_object" in concept.get("functional_affordances", [])]
@@ -271,7 +397,12 @@ def _create_transfer_intent(
         ]
         if len(preceding) == 1:
             theme_concepts = preceding
-    if not theme_concepts and held_theme and (deictic_theme_requested or restore_requested):
+    if resolved_theme_ref:
+        theme_candidates = [
+            item for item in session["runtime_objects"]
+            if item.get("active") is not False and item.get("entity_id") == resolved_theme_ref
+        ]
+    elif not theme_concepts and held_theme and (deictic_theme_requested or restore_requested):
         theme_candidates = [held_theme]
     elif len(theme_concepts) == 1:
         theme_candidates = [
@@ -283,11 +414,16 @@ def _create_transfer_intent(
         if target_constraints:
             theme_candidates = [
                 item for item in theme_candidates
-                if all(item.get("perceptual_attributes", {}).get(key) == value for key, value in target_constraints.items())
+                if all(observed_perceptual_attributes(item).get(key) == value for key, value in target_constraints.items())
             ]
     else:
         return None
-    if restore_requested:
+    if resolved_destination_ref and not restore_requested:
+        destinations = [
+            item for item in session["runtime_objects"]
+            if item.get("active") is not False and item.get("entity_id") == resolved_destination_ref
+        ]
+    elif restore_requested:
         previous_support_ref = theme_candidates[0].get("last_support_ref") if len(theme_candidates) == 1 else None
         destinations = [item for item in session["runtime_objects"] if item.get("entity_id") == previous_support_ref]
     elif len(destination_concepts) == 1:
@@ -297,7 +433,9 @@ def _create_transfer_intent(
         ]
     else:
         return None
-    if len(explicit_destination_entities) == 1 and not restore_requested:
+    if resolved_destination_ref:
+        pass
+    elif len(explicit_destination_entities) == 1 and not restore_requested:
         destinations = explicit_destination_entities
     elif not restore_requested and len(destinations) > 1:
         confirmed_destination_refs = {
@@ -312,8 +450,6 @@ def _create_transfer_intent(
         ]
         if len(confirmed_destinations) == 1:
             destinations = confirmed_destinations
-    resolved_theme_ref = (process_bindings.get("theme") or {}).get("value_ref")
-    resolved_destination_ref = (process_bindings.get("destination") or {}).get("value_ref")
     if resolved_theme_ref:
         theme_candidates = [item for item in theme_candidates if item.get("entity_id") == resolved_theme_ref]
     if resolved_destination_ref:
@@ -352,6 +488,7 @@ def _create_transfer_intent(
             **({"source_holder": source_holder_ref} if source_holder_ref else {}),
             **({"companions": companion_refs} if companion_refs else {}),
         },
+        "role_binding_evidence": deepcopy(process_bindings),
         "source_language_frame": {
             "utterance": utterance,
             "canonical_utterance": (language_analysis or {}).get("canonical_utterance"),
@@ -585,12 +722,98 @@ def _water_delivery_goal_semantics(session: dict[str, Any], utterance: str) -> d
     }
 
 
-def _create_water_delivery_intent(session: dict[str, Any], utterance: str) -> dict[str, Any] | None:
+def _resolve_current_role_binding(
+    session: dict[str, Any],
+    utterance: str,
+    candidates: list[dict[str, Any]],
+    *,
+    role: str,
+    language_analysis: dict[str, Any] | None = None,
+    confirmed_entity_ref: str | None = None,
+) -> dict[str, Any]:
+    """Compatibility facade over the single concept-to-instance grounder."""
+    current_candidates = [item for item in candidates if item.get("active") is not False]
+    analysis = language_analysis or {}
+    semantic_frame = analysis.get("semantic_constraint_frame") or build_semantic_constraint_frame(utterance, analysis)
+    observation_evidence = analysis.get("observation_evidence") or _current_observation_evidence(
+        session,
+        source="role_binding_current_world_grounding",
+        persist=True,
+    )
+    grounded = ground_semantic_role(
+        semantic_frame,
+        observation_evidence,
+        role,
+        candidate_entity_refs={item.get("entity_id") for item in current_candidates},
+        confirmed_entity_ref=confirmed_entity_ref,
+    )
+    binding = grounded.get("binding") or {}
+    current_by_ref = {item.get("entity_id"): item for item in current_candidates}
+    entity = current_by_ref.get(binding.get("entity_ref"))
+    return {
+        "status": "resolved" if grounded.get("status") == "resolved" else (
+            "ambiguous" if grounded.get("status") == "ambiguous" else "unresolved"
+        ),
+        "entity": entity,
+        "entity_ref": binding.get("entity_ref"),
+        "evidence": {
+            "basis": binding.get("binding_basis") or "no_unique_concept_grounding",
+            "strength": int(binding.get("evidence_strength") or 0),
+            "world_revision": grounded.get("world_revision"),
+            "observation_evidence_set_id": grounded.get("observation_evidence_set_id"),
+            "matched_constraints": deepcopy(binding.get("matched_constraints", [])),
+            "current_snapshot_revalidated": grounded.get("current_world_revalidated", False),
+        },
+        "compatible_candidates": deepcopy(current_candidates),
+        "grounded_role": grounded,
+    }
+
+
+def _create_water_delivery_intent(
+    session: dict[str, Any],
+    utterance: str,
+    language_analysis: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
     """Bind service roles from the current world; never encode a demonstrated route."""
+    existing = (session.get("long_horizon_intents") or {}).get(session.get("active_intent_id"))
+    if (
+        existing
+        and existing.get("goal_fact") == "human_received_filled_container"
+        and existing.get("lifecycle") in {"active", "awaiting_correction", "suspended"}
+        and (existing.get("role_bindings") or {}).get("theme")
+    ):
+        # A repeated utterance is a continuation of the same causal contract.
+        # Never replace it with a fresh intent whose verified_facts ledger is
+        # empty after a terminal-frame failure.
+        return existing
+    pending_container_ref = session.get("pending_water_container_ref")
     goal_semantics = _water_delivery_goal_semantics(session, utterance)
+    # During clarification recovery the original goal is already known. The
+    # answer may be classified as a generic grasp utterance, but that lexical
+    # downgrade must not erase the pending service-goal contract.
+    if pending_container_ref and goal_semantics["goal_fact"] is None:
+        goal_semantics = {
+            **goal_semantics,
+            "goal_fact": "human_received_filled_container",
+            "water_effect_requested": True,
+            "transfer_relation_requested": True,
+            "recipient_role_requested": True,
+        }
     if goal_semantics["goal_fact"] != "human_received_filled_container":
         return None
     containers = [item for item in session["runtime_objects"] if item.get("active") is not False and item.get("kind") == "graspable_container"]
+    # Role evidence is resolved and revalidated against the current snapshot
+    # before candidate cardinality is allowed to trigger clarification.
+    container_resolution = _resolve_current_role_binding(
+        session,
+        utterance,
+        containers,
+        role="theme",
+        language_analysis=language_analysis,
+        confirmed_entity_ref=pending_container_ref,
+    )
+    if container_resolution.get("entity"):
+        containers = [container_resolution["entity"]]
     sources = [item for item in session["runtime_objects"] if item.get("active") is not False and item.get("kind") == "water_source"]
     recipients = [item for item in session["runtime_objects"] if item.get("active") is not False and item.get("kind") == "human_recipient"]
     if goal_semantics["explicit_recipient_refs"]:
@@ -611,6 +834,18 @@ def _create_water_delivery_intent(session: dict[str, Any], utterance: str) -> di
             "theme": container["entity_id"],
             "source": source["entity_id"],
             "recipient": recipient["entity_id"],
+        },
+        "role_binding_evidence": {
+            "theme": deepcopy(container_resolution.get("evidence", {})),
+        },
+        "source_language_frame": {
+            "utterance": utterance,
+            "semantic_constraint_frame": deepcopy((language_analysis or {}).get("semantic_constraint_frame")),
+            "grounded_role_bindings": deepcopy(
+                ((language_analysis or {}).get("grounded_intent_frame") or {}).get("resolved_role_bindings", {})
+            ),
+            "world_revision": session.get("world_revision"),
+            "language_binds_constraints_not_physical_facts": True,
         },
         "goal_contract": {
             "requires": ["container_grounded", "water_source_grounded", "recipient_grounded"],
@@ -641,6 +876,38 @@ def _create_water_delivery_intent(session: dict[str, Any], utterance: str) -> di
     }
     _attach_hierarchical_intent_graph(intent)
     session["long_horizon_intents"][intent_id] = intent
+    session["active_intent_id"] = intent_id
+    session["intent_activation_stack"] = [intent_id]
+    if pending_container_ref:
+        session.pop("pending_water_container_ref", None)
+    return intent
+
+
+def _create_hospitality_intent(session: dict[str, Any], utterance: str) -> dict[str, Any] | None:
+    """Create the composite guest-service intent from the live task graph."""
+    if session.get("scene_id") != "hospitality_guest":
+        return None
+    if not any(token in utterance for token in ("客人", "红茶", "托盘", "报纸", "招待")):
+        return None
+    graph = build_hospitality_task_graph(session["runtime_objects"])
+    intent_id = "intent_hospitality_" + hashlib.sha1(
+        f"{session['session_id']}|{session['world_revision']}|{graph['goal_fact']}".encode("utf-8")
+    ).hexdigest()[:12]
+    intent = {
+        "intent_id": intent_id,
+        "intent_type": "hospitality_guest_service",
+        "source_utterance": utterance,
+        "goal_fact": graph["goal_fact"],
+        "role_bindings": deepcopy(graph.get("roles", {})),
+        "task_graph": graph,
+        "dependency_graph": {"nodes": deepcopy(graph.get("nodes", [])), "edges": deepcopy(graph.get("edges", [])), "join_nodes": deepcopy(graph.get("join_nodes", []))},
+        "lifecycle": "active",
+        "verified_facts": [],
+        "current_stage": None,
+        "created_world_revision": session["world_revision"],
+        "task_level_authorization": {"source": "explicit_human_imperative", "scope": "hospitality_guest_service"},
+    }
+    session.setdefault("long_horizon_intents", {})[intent_id] = intent
     session["active_intent_id"] = intent_id
     session["intent_activation_stack"] = [intent_id]
     return intent
@@ -779,16 +1046,47 @@ def _derive_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) -
         final_role = recipient if intent.get("intent_type") == "verified_water_delivery" else destination
         if not container or not source or not final_role:
             return {"status": "rebind_required", "reason": "water_delivery_role_binding_no_longer_present"}
-        if intent.get("intent_type") == "verified_water_delivery" and container.get("received_by") == recipient["entity_id"] and container.get("liquid_state") == "filled":
+        if intent.get("intent_type") == "verified_water_delivery" and intent.get("goal_fact") in intent.get("verified_facts", []):
             return {"status": "completed", "verified_fact": intent["goal_fact"]}
-        if intent.get("intent_type") == "verified_water_placement" and container.get("support_ref") == destination["entity_id"] and container.get("liquid_state") == "filled" and not _is_held(session, container["entity_id"]):
+        if intent.get("intent_type") == "verified_water_placement" and intent.get("goal_fact") in intent.get("verified_facts", []):
             return {"status": "completed", "verified_fact": intent["goal_fact"]}
+        # Once acquisition has been verified, a failed fill attempt must not
+        # regress to acquire_container. Keep the causal stage locked and ask
+        # for re-observation/retry if the live holding sensor is inconclusive.
+        if (
+            "container_in_effector" in intent.get("verified_facts", [])
+            and "container_filled" not in intent.get("verified_facts", [])
+        ):
+            return {
+                "status": "stage_ready",
+                "stage_id": "fill_container",
+                "utterance": "fill_container",
+                "required_fact": "container_in_effector",
+                "target_fact": "container_filled",
+                "stage_lock": "acquisition_verified_no_regression",
+            }
         if not _is_held(session, container["entity_id"]):
+            if "container_in_effector" in intent.get("verified_facts", []):
+                return {
+                    "status": "awaiting_correction",
+                    "reason": "verified_holding_fact_conflicts_with_current_physical_observation",
+                    "stage_id": "fill_container",
+                    "prompt": "任务记录显示杯子曾经已在执行器中，但当前物理观测无法确认仍由本体持有。我不会擅自重新抓取；请让我重新观察手部，或确认杯子是否仍在手中。",
+                    "fact_conflict": {
+                        "verified_fact": "container_in_effector",
+                        "current_observation": "container_not_confirmed_in_effector",
+                        "entity_ref": container["entity_id"],
+                    },
+                    "next_safe_actions": ["重新观察手部和杯子", "确认杯子是否仍在手中", "确认后再继续接水"],
+                }
             return {
                 "status": "stage_ready", "stage_id": "acquire_container", "utterance": f"拿起{_conceptual_reference_for_entity(container)}",
                 "required_fact": "container_grounded", "target_fact": "container_in_effector",
             }
-        if container.get("liquid_state") != "filled":
+        # A fill fact is task-scoped evidence. A container may still look full
+        # because of a prior task, but that observation cannot satisfy the new
+        # "fill water" stage until this task independently verifies it.
+        if "container_filled" not in intent.get("verified_facts", []):
             return {
                 "status": "stage_ready", "stage_id": "fill_container", "utterance": f"到{source['label']}给{container['label']}接水",
                 "required_fact": "container_in_effector", "target_fact": "container_filled",
@@ -844,7 +1142,49 @@ def _derive_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) -
 
 def _prepare_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) -> dict[str, Any]:
     intent_id = intent["intent_id"]
-    stage = _derive_long_intent_stage(session, intent)
+    if intent.get("intent_type") == "hospitality_guest_service":
+        graph = build_hospitality_task_graph(session["runtime_objects"])
+        intent["task_graph"] = graph
+        orchestration = build_hospitality_orchestration_view(graph)
+        unresolved = unresolved_hospitality_conditions(graph)
+        intent["lifecycle"] = "awaiting_next_stage" if unresolved else "active"
+        return {
+            "status": "hospitality_orchestration_pending" if unresolved else "hospitality_orchestration_ready",
+            "prompt": (
+                "招待客人复合任务已按当前世界事实重新编排。"
+                + ("当前红茶分支等待温度条件，其余可行分支可继续。" if unresolved else "所有起始分支均满足入口条件。")
+            ),
+            "long_horizon_intent": _long_intent_view(intent),
+            "task_graph": graph,
+            "task_graph_orchestration": orchestration,
+            "task_graph_unresolved_conditions": unresolved,
+            "session": get_session(session["session_id"]),
+        }
+    verified = set(intent.get("verified_facts", []))
+    # P018 step-6 pruning is mandatory on every resume/replan path, including
+    # experience replay. A completed acquisition fact removes both navigation
+    # and grasp from the candidate chain; recovery resumes at fill_container.
+    if (
+        intent.get("intent_type") == "verified_water_delivery"
+        and "container_in_effector" in verified
+        and "container_filled" not in verified
+    ):
+        bindings = intent.get("role_bindings") or {}
+        objects = {item.get("entity_id"): item for item in session.get("runtime_objects", [])}
+        source = objects.get(bindings.get("source"))
+        container = objects.get(bindings.get("theme"))
+        stage = {
+            "status": "stage_ready",
+            "stage_id": "fill_container",
+            "utterance": f"到{source.get('label', '水源')}给{container.get('label', '容器')}接水" if source and container else "fill_container",
+            "required_fact": "container_in_effector",
+            "target_fact": "container_filled",
+            "pruned_steps": ["navigate_to_container", "grasp_container"],
+            "resume_basis": "current_verified_task_facts",
+        }
+    else:
+        stage = _derive_long_intent_stage(session, intent)
+    _debug_runtime("stage_pruned", session, intent_id=intent_id, stage=stage.get("stage_id"), pruned_steps=stage.get("pruned_steps", []), resume_basis=stage.get("resume_basis"))
     if stage["status"] == "completed":
         intent["lifecycle"] = "completed"
         if intent["goal_fact"] not in intent["verified_facts"]:
@@ -890,9 +1230,20 @@ def _prepare_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) 
             "scope": "necessary_stage_of_explicitly_authorized_long_horizon_goal",
             "long_intent_id": intent_id,
             "long_stage_id": stage["stage_id"],
+            # Carry the resolved task roles into the internal stage command.
+            # The stage must not rediscover an already confirmed object.
+            "role_bindings": deepcopy(intent.get("role_bindings", {})),
+            "role_binding_evidence": deepcopy(intent.get("role_binding_evidence", {})),
         }
     started = begin_motion_command(
-        session["session_id"], stage["utterance"], scoped_authorization=stage_authorization, internal_stage=True
+        session["session_id"],
+        stage["utterance"],
+        scoped_authorization=stage_authorization,
+        internal_stage=True,
+        grounded_role_bindings={
+            **deepcopy(intent.get("role_bindings", {})),
+            "_evidence": deepcopy(intent.get("role_binding_evidence", {})),
+        },
     )
     # Candidate generation rolls the short-task session back to avoid committing
     # unverified facts. Continue from the restored live session, not the stale
@@ -906,16 +1257,49 @@ def _prepare_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) 
     if graph_node:
         graph_node["lifecycle"] = "active"
         graph["active_focus_node_id"] = graph_node["node_id"]
+    stage_execution_plan = None
     if started.get("job_id"):
         job = MOTION_JOBS.get(started["job_id"])
         if job:
             job["long_intent_id"] = intent_id
             job["long_stage_id"] = stage["stage_id"]
+            stage_execution_plan = deepcopy((job.get("terminal_result") or {}).get("candidate_execution_plan"))
+    if stage_execution_plan:
+        started["candidate_execution_plan"] = stage_execution_plan
     immediate = started.get("immediate_result") or {}
+    _attach_runtime_diagnostic(immediate, live_session, stage)
+    # The internal motion response may carry a plan for the motion primitive
+    # that just completed. Re-project it onto the newly selected long-horizon
+    # stage so the UI cannot display an obsolete acquire plan while the task
+    # is already in fill_container.
+    if stage.get("stage_id") == "fill_container":
+        immediate["candidate_execution_plan"] = {
+            "goal_fact": "container_filled",
+            "goal_operator": "fill_container",
+            "candidate_process": ["navigate_to_water_source", "align_container_under_outlet", "activate_flow", "verify_container_filled"],
+            "required_facts": ["container_in_effector"],
+            "satisfied_facts": ["container_in_effector"],
+            "missing_precondition": None,
+            "candidate_only": False,
+            "runtime_fact_committed": False,
+        }
+    elif stage.get("stage_id") == "acquire_container":
+        immediate["candidate_execution_plan"] = {
+            "goal_fact": "container_in_effector",
+            "goal_operator": "grasp_container",
+            "candidate_process": ["navigate_to_container", "align_end_effector", "grasp_container", "verify_container_in_effector"],
+            "required_facts": ["container_grounded"],
+            "satisfied_facts": [],
+            "missing_precondition": None,
+            "candidate_only": False,
+            "runtime_fact_committed": False,
+        }
     pending = live_session.get("pending_confirmation")
     if pending:
         pending["long_intent_id"] = intent_id
         pending["long_stage_id"] = stage["stage_id"]
+        pending["role_bindings"] = deepcopy(intent.get("role_bindings", {}))
+        pending["role_binding_evidence"] = deepcopy(intent.get("role_binding_evidence", {}))
         immediate["pending_confirmation"] = deepcopy(pending)
     immediate["long_horizon_intent"] = _long_intent_view(intent)
     immediate["long_stage"] = deepcopy(stage)
@@ -926,6 +1310,13 @@ def _prepare_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) 
         else "把指定对象运输到目标区域" if intent.get("intent_type") == "verified_object_transport"
         else "将对象放到目标承载面"
     )
+    immediate["runtime_trace"] = {
+        "session_id": session["session_id"],
+        "intent_id": intent_id,
+        "world_revision": session["world_revision"],
+        "theme_ref": (intent.get("role_bindings") or {}).get("theme"),
+        "role_clarification_active": bool(live_session.get("role_clarification_dialogue")),
+    }
     immediate["prompt"] = (
         f"长程目标保持为“{goal_summary}”。当前根据最新世界状态需要先完成阶段：{stage['stage_id']}。"
         + (immediate.get("prompt") or "")
@@ -969,7 +1360,37 @@ def _resume_active_intent(session: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def get_session(session_id: str) -> dict[str, Any]:
-    return deepcopy(SESSIONS.get(session_id) or {"error": "embodied_session_not_found", "session_id": session_id})
+    session = SESSIONS.get(session_id)
+    if not session:
+        return {"error": "embodied_session_not_found", "session_id": session_id}
+    if session.get("scene_id") == "hospitality_guest":
+        # Re-derive task prerequisites from the live world; never expose a stale
+        # planning snapshot after an object is moved, discarded, or filled.
+        graph = build_hospitality_task_graph(session["runtime_objects"])
+        session["task_graph"] = graph
+        session["task_graph_unresolved_conditions"] = unresolved_hospitality_conditions(graph)
+        session["task_graph_orchestration"] = build_hospitality_orchestration_view(graph)
+        session["task_graph_state"] = "awaiting_condition_resolution" if session["task_graph_unresolved_conditions"] else "ready_for_orchestration"
+    return deepcopy(session)
+
+
+def get_hospitality_task_graph(session_id: str) -> dict[str, Any]:
+    """Return the live hospitality graph and its minimum unresolved conditions."""
+    session = SESSIONS.get(session_id)
+    if not session:
+        return {"error": "embodied_session_not_found", "session_id": session_id}
+    if session.get("scene_id") != "hospitality_guest":
+        return {"error": "hospitality_task_graph_not_available", "scene_id": session.get("scene_id")}
+    live = get_session(session_id)
+    return {
+        "session_id": session_id,
+        "scene_id": live["scene_id"],
+        "goal_fact": live["task_graph"]["goal_fact"],
+        "task_graph": live["task_graph"],
+        "unresolved_conditions": live["task_graph_unresolved_conditions"],
+        "orchestration": live["task_graph_orchestration"],
+        "state": live["task_graph_state"],
+    }
 
 
 def _experience_catalog() -> list[dict[str, Any]]:
@@ -1015,23 +1436,32 @@ def _language_object_concepts() -> list[dict[str, Any]]:
 
 
 def _session_object_language_concepts(session: dict[str, Any]) -> list[dict[str, Any]]:
-    concepts = deepcopy(_language_object_concepts())
-    for entity in session.get("runtime_objects", []):
-        label = str(entity.get("label") or "").strip()
-        if not label:
-            continue
-        compatible = [item for item in concepts if entity.get("kind") in item.get("compatible_kinds", [])]
-        if len(compatible) != 1:
-            continue
-        aliases = compatible[0].setdefault("aliases", [])
-        if label not in aliases:
-            aliases.append(label)
-        compatible[0].setdefault("runtime_language_candidate_sources", []).append({
-            "surface_form": label,
-            "entity_ref": entity.get("entity_id"),
-            "evidence_boundary": "current_space_name_candidate_requires_visual_grounding",
-        })
-    return concepts
+    # Concepts contain reusable lexical and causal invariants only. Runtime
+    # entity names are reference evidence and must be resolved by grounding,
+    # never promoted into the concept lexicon.
+    return deepcopy(_language_object_concepts())
+
+
+def _current_observation_evidence(
+    session: dict[str, Any],
+    *,
+    source: str,
+    persist: bool,
+) -> dict[str, Any]:
+    evidence = build_observation_evidence_set(
+        session.get("runtime_objects", []),
+        _language_object_concepts(),
+        world_revision=int(session.get("world_revision", 0)),
+        source=source,
+    )
+    if persist:
+        session["current_observation_evidence"] = deepcopy(evidence)
+        ledger = session.setdefault("observation_evidence_ledger", [])
+        if not ledger or ledger[-1].get("evidence_set_id") != evidence.get("evidence_set_id"):
+            ledger.append(deepcopy(evidence))
+        if len(ledger) > 64:
+            del ledger[:-64]
+    return evidence
 
 
 def _language_context_entities(session: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1078,6 +1508,71 @@ def _language_context_entities(session: dict[str, Any]) -> list[dict[str, Any]]:
     return list(focused.values())
 
 
+def _project_resolved_process_roles(
+    session: dict[str, Any], analysis: dict[str, Any], resolution: dict[str, Any] | None
+) -> None:
+    if analysis.get("speech_act") != "task_request" or not resolution:
+        return
+    if resolution.get("status") not in {"resolved", "subgoals_required"}:
+        return
+    bindings = resolution.get("bindings") or {}
+    if not bindings:
+        return
+    concepts = load_object_concepts()["concepts"]
+    runtime_index = {item.get("entity_id"): item for item in session.get("runtime_objects", [])}
+    projected: dict[str, dict[str, Any]] = {}
+    for role_name, binding in bindings.items():
+        entity = runtime_index.get(binding.get("value_ref"))
+        if not entity:
+            continue
+        semantic_role = ((analysis.get("semantic_constraint_frame") or {}).get("roles") or {}).get(role_name) or {}
+        semantic_kinds = set(semantic_role.get("compatible_kinds") or [])
+        if semantic_kinds and entity.get("kind") not in semantic_kinds:
+            # Executability cannot replace an explicitly understood but
+            # incompatible role with another current-world entity.
+            continue
+        compatible = [concept for concept in concepts if entity.get("kind") in concept.get("compatible_kinds", [])]
+        concept = compatible[0] if len(compatible) == 1 else {}
+        affordances = set(concept.get("functional_affordances", []))
+        affordances.update(entity.get("affordances") or [])
+        if entity.get("fixed") is False:
+            affordances.add("movable")
+        projected[role_name] = {
+            "entity_ref": entity.get("entity_id"),
+            "concept_id": concept.get("concept_id"),
+            "display_name": entity.get("label") or concept.get("display_name"),
+            "matched_alias": entity.get("label"),
+            "compatible_kinds": [entity.get("kind")],
+            "functional_affordances": sorted(affordances),
+            "source": "resolved_process_instance_binding",
+            "binding_evidence": deepcopy(binding),
+        }
+    if not projected:
+        return
+    analysis.setdefault("role_bindings", {}).update(deepcopy(projected))
+    analysis.setdefault("canonical_frame", {}).setdefault("roles", {}).update(deepcopy(projected))
+    for role in projected.values():
+        if not any(item.get("entity_ref") == role.get("entity_ref") for item in analysis.get("entity_mentions", [])):
+            analysis.setdefault("entity_mentions", []).append(deepcopy(role))
+    historical_relation_policy = (
+        analysis.get("canonical_frame", {}).get("destination_binding_policy")
+        == "most_recent_verified_support_relation"
+    )
+    explicit_concept_mentions = [
+        item for item in analysis.get("entity_mentions", [])
+        if item.get("source") == "object_concept_language_adapter"
+    ]
+    process_projection_covers_explicit_roles = len(explicit_concept_mentions) <= len(bindings)
+    if (
+        len(projected) == len(bindings)
+        and process_projection_covers_explicit_roles
+        and resolution.get("canonical_utterance")
+        and not historical_relation_policy
+    ):
+        analysis["canonical_utterance"] = resolution["canonical_utterance"]
+        analysis["decision"] = "route_canonical_semantics"
+
+
 def _compose_session_language(session: dict[str, Any], utterance: str) -> dict[str, Any]:
     analysis = compose_language_concepts(
         utterance,
@@ -1086,6 +1581,16 @@ def _compose_session_language(session: dict[str, Any], utterance: str) -> dict[s
         context_entities=_language_context_entities(session),
         learned_adapters=session.get("language_adapters", []),
     )
+    semantic_frame = build_semantic_constraint_frame(utterance, analysis)
+    observation_evidence = _current_observation_evidence(
+        session,
+        source="input_triggered_current_world_grounding",
+        persist=True,
+    )
+    grounded_frame = build_grounded_intent_frame(semantic_frame, observation_evidence)
+    analysis["semantic_constraint_frame"] = semantic_frame
+    analysis["observation_evidence"] = observation_evidence
+    analysis["grounded_intent_frame"] = grounded_frame
     situated_frame = compile_situated_event_frame(
         utterance,
         analysis,
@@ -1103,7 +1608,18 @@ def _compose_session_language(session: dict[str, Any], utterance: str) -> dict[s
         semantic_regions=_scene_for_session(session).get("semantic_regions", []),
         executor_profile=session.get("executor_profile", {}),
         world_revision=session.get("world_revision", 0),
+        evidence_bindings=_process_slot_evidence_bindings(session, analysis),
     )
+    gap_dialogue_collecting = (
+        (session.get("concept_gap_dialogue") or {}).get("status")
+        == "collecting_minimum_causal_contract"
+    )
+    if not gap_dialogue_collecting:
+        _project_resolved_process_roles(session, analysis, analysis["process_template_resolution"])
+    grounded_history = session.setdefault("grounded_intent_frame_history", [])
+    grounded_history.append(deepcopy(grounded_frame))
+    if len(grounded_history) > 128:
+        del grounded_history[:-128]
     frame_history = session.setdefault("situated_event_frame_history", [])
     frame_history.append(deepcopy(situated_frame))
     if len(frame_history) > 128:
@@ -1116,8 +1632,34 @@ def _compose_session_language(session: dict[str, Any], utterance: str) -> dict[s
             "runtime_fact_committed": False,
         })
     session["last_language_understanding"] = deepcopy(analysis)
+    grounded_focus = [
+        result.get("binding")
+        for result in (grounded_frame.get("roles") or {}).values()
+        if result.get("status") == "resolved" and result.get("binding")
+    ]
     explicit_mentions = [item for item in analysis.get("entity_mentions", []) if item.get("source") == "object_concept_language_adapter"]
-    if explicit_mentions:
+    if grounded_focus:
+        session["dialogue_focus_entities"] = [
+            {
+                "entity_ref": item.get("entity_ref"),
+                "label": item.get("current_name_surface"),
+                "concept_id": next(
+                    (candidate.get("concept_id") for candidate in item.get("concept_candidates", [])),
+                    None,
+                ),
+                "display_name": item.get("current_name_surface"),
+                "compatible_kinds": [item.get("kind")],
+                "functional_affordances": sorted({
+                    affordance
+                    for candidate in item.get("concept_candidates", [])
+                    for affordance in candidate.get("functional_affordances", [])
+                }),
+                "focus_source": "current_grounded_intent_frame",
+                "world_revision": observation_evidence.get("world_revision"),
+            }
+            for item in grounded_focus
+        ]
+    elif explicit_mentions:
         session["dialogue_focus_entities"] = [
             {
                 "concept_id": item.get("concept_id"),
@@ -1152,6 +1694,8 @@ def _language_understanding_view(analysis: dict[str, Any]) -> dict[str, Any]:
         "runtime_fact_committed": False,
         "situated_event_frame": deepcopy(analysis.get("situated_event_frame")),
         "process_template_resolution": deepcopy(analysis.get("process_template_resolution")),
+        "semantic_constraint_frame": deepcopy(analysis.get("semantic_constraint_frame")),
+        "grounded_intent_frame": deepcopy(analysis.get("grounded_intent_frame")),
     }
 
 
@@ -1202,6 +1746,158 @@ def _query_recent_support_episode(session: dict[str, Any], object_ref: str) -> d
                     ),
                 }
     return None
+
+
+def _entity_matches_semantic_role(entity: dict[str, Any] | None, role: dict[str, Any] | None) -> bool:
+    if not entity or not role:
+        return False
+    compatible_kinds = set(role.get("compatible_kinds") or [])
+    return not compatible_kinds or entity.get("kind") in compatible_kinds
+
+
+def _resolve_recent_verified_event_referent(
+    session: dict[str, Any], analysis: dict[str, Any]
+) -> dict[str, Any] | None:
+    """Resolve discourse referents from verified episodes without reviving old world facts."""
+    frame = analysis.get("situated_event_frame") or {}
+    if frame.get("temporal_scope") not in {"most_recent_verified_past", "verified_past"}:
+        return None
+    requested_operators = {
+        operator for operator in frame.get("operators", [])
+        if operator not in {"observe_entity", "navigate_to"}
+    }
+    roles = frame.get("semantic_roles") or {}
+    referenced_role = roles.get("theme") or roles.get("target")
+    runtime_index = {
+        item.get("entity_id"): item for item in session.get("runtime_objects", [])
+        if item.get("entity_id")
+    }
+    for episode in reversed(session.get("episodic_fact_memory", [])):
+        if requested_operators and episode.get("operator") not in requested_operators:
+            continue
+        participants = episode.get("participants") or {}
+        theme_ref = participants.get("theme") or participants.get("target")
+        if referenced_role and not _entity_matches_semantic_role(runtime_index.get(theme_ref), referenced_role):
+            continue
+        source_support_ref = participants.get("source_support")
+        if not source_support_ref:
+            source_support_ref = next(
+                (
+                    fact.get("object")
+                    for fact in episode.get("before_facts", [])
+                    if fact.get("predicate") == "supported_by"
+                    and (not theme_ref or fact.get("subject") == theme_ref)
+                    and fact.get("object")
+                ),
+                None,
+            )
+        destination_support_ref = participants.get("destination")
+        if not destination_support_ref:
+            destination_support_ref = next(
+                (
+                    fact.get("object")
+                    for fact in episode.get("produces", [])
+                    if fact.get("predicate") == "supported_by"
+                    and (not theme_ref or fact.get("subject") == theme_ref)
+                    and fact.get("object")
+                ),
+                None,
+            )
+        related_support_ref = (
+            source_support_ref
+            if episode.get("operator") == "grasp_object"
+            else destination_support_ref
+            if episode.get("operator") == "place_object"
+            else source_support_ref or destination_support_ref
+        )
+        return {
+            "episode_id": episode.get("episode_id"),
+            "episode_operator": episode.get("operator"),
+            "theme_entity_ref": theme_ref,
+            "source_support_ref": source_support_ref,
+            "destination_support_ref": destination_support_ref,
+            "related_support_ref": related_support_ref,
+            "episode_world_revision": episode.get("world_revision"),
+            "resolution_basis": "most_recent_matching_verified_episode",
+            "historical_fact_reused_as_current": False,
+        }
+    return None
+
+
+def _process_slot_evidence_bindings(
+    session: dict[str, Any], analysis: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Expose evidence selected by semantic policy without asserting a new physical fact."""
+    evidence = deepcopy(session.get("confirmed_visual_bindings", []))
+    frame = analysis.get("canonical_frame") or {}
+    roles = analysis.get("role_bindings") or {}
+    if "place_object" in frame.get("operators", []) and not roles.get("destination"):
+        held_refs = [ref for ref in _holding_by_effector(session).values() if ref]
+        if len(set(held_refs)) == 1:
+            held = next(
+                (item for item in session.get("runtime_objects", []) if item.get("entity_id") == held_refs[0]),
+                None,
+            )
+            previous_support_ref = (held or {}).get("last_support_ref")
+            if previous_support_ref:
+                evidence.append({
+                    "entity_ref": previous_support_ref,
+                    "world_revision": session["world_revision"],
+                    "binding_source": "implicit_previous_verified_support",
+                    "evidence_strength": 475,
+                    "runtime_fact_committed": False,
+                })
+            else:
+                supports = [
+                    item for item in session.get("runtime_objects", [])
+                    if item.get("active") is not False and item.get("kind") == "operation_surface"
+                ]
+                executor_position = session.get("state", {}).get("executor_position") or [0.0, 0.0]
+                ranked = sorted(
+                    supports,
+                    key=lambda item: math.dist(executor_position, item.get("position") or executor_position),
+                )
+                if ranked and (
+                    len(ranked) == 1
+                    or math.dist(executor_position, ranked[0]["position"])
+                    < math.dist(executor_position, ranked[1]["position"])
+                ):
+                    evidence.append({
+                        "entity_ref": ranked[0]["entity_id"],
+                        "world_revision": session["world_revision"],
+                        "binding_source": "implicit_nearest_compatible_support_candidate",
+                        "evidence_strength": 300,
+                        "runtime_fact_committed": False,
+                    })
+    if frame.get("destination_binding_policy") != "most_recent_verified_support_relation":
+        return evidence
+    theme = (analysis.get("role_bindings") or {}).get("theme") or {}
+    compatible_kinds = set(theme.get("compatible_kinds", []))
+    candidates = [
+        item for item in session.get("runtime_objects", [])
+        if item.get("active") is not False
+        and (not compatible_kinds or item.get("kind") in compatible_kinds)
+    ]
+    current_relational = [
+        item for item in candidates
+        if session.get("state", {}).get("holding") == item.get("entity_id") or item.get("received_by")
+    ]
+    theme_candidates = current_relational or candidates
+    if len(theme_candidates) != 1:
+        return evidence
+    support_episode = _query_recent_support_episode(session, theme_candidates[0]["entity_id"])
+    destination_ref = (support_episode or {}).get("destination_ref") or theme_candidates[0].get("last_support_ref")
+    if not destination_ref:
+        return evidence
+    evidence.append({
+        "entity_ref": destination_ref,
+        "world_revision": session["world_revision"],
+        "binding_source": "semantically_requested_verified_historical_relation",
+        "evidence_strength": 475,
+        "episode_id": (support_episode or {}).get("episode_id"),
+        "runtime_fact_committed": False,
+    })
+    return evidence
 
 
 def _historical_support_reference_candidate(
@@ -1499,9 +2195,18 @@ def _start_process_gap_dialogue(
         "policy_revision": session["policy_revision"],
     }
     session["process_gap_dialogue"] = dialogue
+    grounding_gap = (resolution.get("next_gap") or {}).get("kind") == "grounding_evidence_slot"
     return {
-        "status": "process_template_confirmation_required" if phase == "awaiting_template_confirmation" else "process_slot_clarification_required",
-        "reason": "process_template_candidate_requires_human_confirmation" if phase == "awaiting_template_confirmation" else "required_process_slot_not_uniquely_bound",
+        "status": (
+            "process_template_confirmation_required" if phase == "awaiting_template_confirmation"
+            else "process_grounding_clarification_required" if grounding_gap
+            else "process_slot_clarification_required"
+        ),
+        "reason": (
+            "process_template_candidate_requires_human_confirmation" if phase == "awaiting_template_confirmation"
+            else "required_process_slot_lacks_current_grounding_evidence" if grounding_gap
+            else "required_process_slot_not_uniquely_bound"
+        ),
         "prompt": resolution.get("question"),
         "process_template_resolution": deepcopy(resolution),
         "known_goal": resolution.get("goal_fact"),
@@ -1601,6 +2306,25 @@ def _continue_process_gap_dialogue(session: dict[str, Any], utterance: str) -> d
     candidates = gap.get("candidates", [])
     normalized = re.sub(r"[\s，。！？、,.!?]+", "", utterance)
     matches = [item for item in candidates if item.get("label") and item["label"] in normalized]
+    if len(matches) != 1 and len(candidates) == 1 and _context_confirmation_value(utterance) is True:
+        matches = [candidates[0]]
+    historical_evidence = None
+    if len(matches) != 1 and gap.get("slot_id") == "destination":
+        historical_choice = _historical_destination_role_choice(
+            session,
+            {
+                "role": "destination",
+                "source_utterance": dialogue.get("source_utterance"),
+                "candidate_options": [
+                    {"entity_ref": item.get("value_ref"), "label": item.get("label")}
+                    for item in candidates
+                ],
+            },
+            utterance,
+        )
+        if historical_choice:
+            choice, historical_evidence = historical_choice
+            matches = [item for item in candidates if item.get("value_ref") == choice.get("entity_ref")]
     if len(matches) != 1:
         return {
             "status": "process_slot_clarification_required",
@@ -1627,6 +2351,7 @@ def _continue_process_gap_dialogue(session: dict[str, Any], utterance: str) -> d
         executor_profile=session.get("executor_profile", {}),
         world_revision=session["world_revision"],
         binding_overrides=dialogue["binding_overrides"],
+        evidence_bindings=_process_slot_evidence_bindings(session, source_analysis),
     )
     if not updated:
         session["process_gap_dialogue"] = None
@@ -1666,7 +2391,23 @@ def _continue_process_gap_dialogue(session: dict[str, Any], utterance: str) -> d
         }
     session["process_gap_dialogue"] = None
     canonical = updated.get("canonical_utterance")
-    return begin_motion_command(session["session_id"], canonical) if canonical else None
+    resumed = begin_motion_command(session["session_id"], canonical) if canonical else None
+    if resumed is not None and (historical_evidence or matches[0].get("constraint_mismatch")):
+        gap_resolution = {
+            "slot_id": gap.get("slot_id"),
+            "value_ref": matches[0].get("value_ref"),
+            "evidence": deepcopy(historical_evidence) if historical_evidence else {
+                "kind": "human_authorized_observed_constraint_substitute",
+                "constraint_mismatch": deepcopy(matches[0].get("constraint_mismatch")),
+                "observed_attributes": deepcopy(matches[0].get("observed_attributes", {})),
+            },
+            "human_confirmed_substitution": bool(matches[0].get("constraint_mismatch")),
+            "physical_fact_committed": False,
+        }
+        resumed["process_gap_resolution"] = deepcopy(gap_resolution)
+        if resumed.get("immediate_result"):
+            resumed["immediate_result"]["process_gap_resolution"] = deepcopy(gap_resolution)
+    return resumed
 
 
 def _replace_last_alias(text: str, aliases: list[str], replacement: str) -> str:
@@ -1754,8 +2495,41 @@ def _resume_role_clarification_choice(
     )
     aliases = list((concept or {}).get("aliases", []))
     resolved_utterance = _replace_last_alias(dialogue["source_utterance"], aliases, label)
+    if dialogue.get("role") == "theme" and dialogue.get("evidence_source") == "current_world_container_candidates":
+        session["pending_water_container_ref"] = choice.get("entity_ref")
+        # Preserve the original service-goal expression and append the selected
+        # slot value. Replacing the generic classifier in "一杯水" would destroy
+        # the already recognized water-delivery relation.
+        resolved_utterance = f"{dialogue['source_utterance']}，用{label}"
     session["role_clarification_dialogue"] = None
-    resumed = begin_motion_command(session["session_id"], resolved_utterance)
+    if dialogue.get("role") == "theme" and dialogue.get("evidence_source") == "current_world_container_candidates":
+        # The human-selected entity is a structured binding. Resume the
+        # already understood service goal without reparsing it as a new task.
+        intent = _create_water_delivery_intent(session, dialogue["source_utterance"])
+        if intent:
+            resumed = _prepare_long_intent_stage(session, intent)
+            resumed["session"] = get_session(session["session_id"])
+        else:
+            # Some clients keep an active service intent while presenting the
+            # slot answer. Rebind that intent directly; otherwise the answer
+            # would fall through to fresh lexical parsing and reopen ambiguity.
+            active = (session.get("long_horizon_intents") or {}).get(session.get("active_intent_id"))
+            entity_ref = choice.get("entity_ref")
+            if (
+                active
+                and active.get("goal_fact") == "human_received_filled_container"
+                and entity_ref
+                and any(item.get("entity_id") == entity_ref for item in session.get("runtime_objects", []))
+            ):
+                active.setdefault("role_bindings", {})["theme"] = entity_ref
+                active.setdefault("task_level_authorization", {}).setdefault("role_bindings", {})["theme"] = entity_ref
+                session.pop("pending_water_container_ref", None)
+                resumed = _prepare_long_intent_stage(session, active)
+                resumed["session"] = get_session(session["session_id"])
+            else:
+                resumed = begin_motion_command(session["session_id"], resolved_utterance)
+    else:
+        resumed = begin_motion_command(session["session_id"], resolved_utterance)
     resolution = {
         "status": "role_clarification_resolved",
         "role": dialogue["role"],
@@ -1797,6 +2571,16 @@ def _continue_role_clarification(session: dict[str, Any], utterance: str) -> dic
     ]
     if len(selected) == 1:
         return _resume_role_clarification_choice(session, dialogue, selected[0])
+    # Attribute-only answers such as "白色杯子" are valid role choices when
+    # exactly one candidate carries that attribute; do not require the full
+    # canonical label to be repeated by the user.
+    color_tokens = ("白色", "黑色", "透明", "红色", "绿色", "蓝色", "黄色", "灰色", "棕色")
+    attribute_selected = [
+        item for item in options
+        if any(token in normalized and token in str(item.get("label") or item.get("label_hint") or "") for token in color_tokens)
+    ]
+    if len(attribute_selected) == 1:
+        return _resume_role_clarification_choice(session, dialogue, attribute_selected[0])
     historical_choice = _historical_destination_role_choice(session, dialogue, utterance)
     if historical_choice:
         choice, evidence = historical_choice
@@ -2270,6 +3054,151 @@ def _answer_object_location_query(session: dict[str, Any], text: str) -> dict[st
     }
 
 
+def _is_support_inventory_state_query(text: str, analysis: dict[str, Any]) -> bool:
+    if analysis.get("speech_act") != "state_query":
+        return False
+    roles = (analysis.get("situated_event_frame") or {}).get("semantic_roles") or analysis.get("role_bindings") or {}
+    support_role = next(
+        (
+            role for role in roles.values()
+            if "support_object" in (role or {}).get("functional_affordances", [])
+        ),
+        None,
+    )
+    if not support_role:
+        return False
+    normalized = re.sub(r"[\s，。！？、,.!?]+", "", text)
+    return re.search(r"(?:上|上面)(?:都|还)?(?:有|放着|摆着)(?:什么|哪些|啥)", normalized) is not None
+
+
+def _support_role_from_analysis(analysis: dict[str, Any]) -> dict[str, Any] | None:
+    roles = (analysis.get("situated_event_frame") or {}).get("semantic_roles") or analysis.get("role_bindings") or {}
+    return next(
+        (
+            role for role in roles.values()
+            if "support_object" in (role or {}).get("functional_affordances", [])
+        ),
+        None,
+    )
+
+
+def _answer_support_inventory_state_query(
+    session: dict[str, Any], text: str, analysis: dict[str, Any]
+) -> dict[str, Any]:
+    """Read current supported-by facts; episodic memory may select a support but cannot supply its contents."""
+    analysis = deepcopy(analysis)
+    support_surface = (_support_role_from_analysis(analysis) or {}).get("matched_alias") or "承载面"
+    analysis["query_type"] = "support_inventory"
+    analysis["canonical_utterance"] = f"查看{support_surface}上的当前对象"
+    analysis["unresolved_slots"] = [
+        slot for slot in analysis.get("unresolved_slots", []) if slot != "query_relation_not_resolved"
+    ]
+    analysis["confidence"] = max(float(analysis.get("confidence") or 0.0), 0.92)
+    analysis["confidence_band"] = "high"
+    analysis["decision"] = "route_resolved_state_query"
+    analysis.setdefault("canonical_frame", {})["query_type"] = "support_inventory"
+    analysis["canonical_frame"]["operators"] = ["observe_entity"]
+    frame = analysis.get("situated_event_frame") or {}
+    support_role = _support_role_from_analysis(analysis) or {}
+    observation_evidence = _current_observation_evidence(
+        session,
+        source="support_inventory_active_observation",
+        persist=True,
+    )
+    runtime_objects = [item for item in session.get("runtime_objects", []) if item.get("active") is not False]
+    runtime_index = {item.get("entity_id"): item for item in runtime_objects}
+    historical = frame.get("temporal_scope") in {"most_recent_verified_past", "verified_past"}
+    event_reference = _resolve_recent_verified_event_referent(session, analysis) if historical else None
+
+    if historical:
+        support_ref = (event_reference or {}).get("related_support_ref")
+        support = runtime_index.get(support_ref)
+        if not event_reference or not support_ref:
+            return {
+                "status": "historical_support_reference_not_resolved",
+                "query_type": "support_inventory",
+                "prompt": "我没有找到与这句话匹配的最近一次已验真事件，因此不能确定你说的那个承载面。请补充是哪次动作或哪个位置。",
+                "historical_reference": deepcopy(event_reference),
+                "runtime_fact_committed": False,
+                "task_context_preserved": True,
+                "language_understanding": _language_understanding_view(analysis),
+                "session": get_session(session["session_id"]),
+            }
+        if not support or not _entity_matches_semantic_role(support, support_role):
+            return {
+                "status": "historical_support_not_currently_grounded",
+                "query_type": "support_inventory",
+                "prompt": "我找到了历史事件中的承载面指代，但它没有在当前任务期世界快照中重新落地，所以不能用旧记录回答现在上面有什么。",
+                "historical_reference": deepcopy(event_reference),
+                "support_entity_ref": support_ref,
+                "runtime_fact_committed": False,
+                "task_context_preserved": True,
+                "language_understanding": _language_understanding_view(analysis),
+                "session": get_session(session["session_id"]),
+            }
+        supports = [support]
+    else:
+        compatible_kinds = set(support_role.get("compatible_kinds") or [])
+        supports = [
+            item for item in runtime_objects
+            if not compatible_kinds or item.get("kind") in compatible_kinds
+        ]
+        explicitly_named = [item for item in supports if str(item.get("label") or "") in text]
+        if explicitly_named:
+            supports = explicitly_named
+
+    current_facts = facts_from_runtime_state(
+        session.get("runtime_objects", []), session.get("state", {}), session.get("world_revision", 0)
+    )
+    supported_by = [fact for fact in current_facts if fact.get("predicate") == "supported_by"]
+    groups = []
+    for support in supports:
+        entity_refs = [
+            fact.get("subject") for fact in supported_by
+            if fact.get("object") == support.get("entity_id") and fact.get("subject") in runtime_index
+        ]
+        entities = [runtime_index[entity_ref] for entity_ref in entity_refs]
+        groups.append({
+            "support_entity_ref": support.get("entity_id"),
+            "support_label": support.get("label") or support.get("entity_id"),
+            "entity_refs": entity_refs,
+            "labels": [item.get("label") or item.get("entity_id") for item in entities],
+        })
+
+    if not groups:
+        prompt = "当前任务期世界快照中没有与所述承载面概念匹配的实体，因此我不能回答其上方物品清单。"
+    else:
+        summaries = [
+            f"{group['support_label']}上有{'、'.join(group['labels'])}"
+            if group["labels"] else f"{group['support_label']}上当前没有已验真的承载物"
+            for group in groups
+        ]
+        prefix = "我把历史事件中的来源位置解析为当前的" if historical else "按当前任务期世界快照，"
+        prompt = prefix + "；".join(summaries) + "。"
+    return {
+        "status": "support_inventory_state_answered",
+        "query_type": "support_inventory",
+        "prompt": prompt,
+        "inventory_groups": groups,
+        "historical_reference": deepcopy(event_reference),
+        "state_evidence": {
+            "source": "current_task_period_world_snapshot",
+            "predicate": "supported_by",
+            "world_revision": session.get("world_revision"),
+            "observation_evidence_set_id": observation_evidence.get("evidence_set_id"),
+            "epistemic_evidence_refreshed_without_task_control_side_effect": True,
+            "historical_event_selects_referent_only": historical,
+            "historical_facts_used_as_current_state": False,
+        },
+        "runtime_fact_committed": False,
+        "task_context_preserved": True,
+        "preserved_pending_confirmation_id": (session.get("pending_confirmation") or {}).get("confirmation_id"),
+        "preserved_active_intent_id": session.get("active_intent_id"),
+        "language_understanding": _language_understanding_view(analysis),
+        "session": get_session(session["session_id"]),
+    }
+
+
 def _is_open_world_observation_query(text: str) -> bool:
     broad = any(pattern in text for pattern in ("看到什么", "看到了什么", "有什么东西", "有哪些东西", "周围有什么"))
     directed = any(pattern in text for pattern in (
@@ -2553,6 +3482,11 @@ def _invalidate_perception_history(session: dict[str, Any], reason: str) -> None
         if record.get("current_use_status") == "current_candidate":
             record["current_use_status"] = "stale"
             record["invalidation_reason"] = reason
+    for evidence in session.get("observation_evidence_ledger", []):
+        if evidence.get("current_use_status", "current") == "current":
+            evidence["current_use_status"] = "stale"
+            evidence["invalidation_reason"] = reason
+    session["current_observation_evidence"] = None
 
 
 def _revoke_teaching_authority(session: dict[str, Any], reason: str) -> None:
@@ -3429,6 +4363,60 @@ def _apply_verified_grasp(session: dict[str, Any], target_ref: str, source: str)
     }
 
 
+def _placement_space_evidence(
+    destination: dict[str, Any], held_object: dict[str, Any], occupied: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """Measure the usable support footprint after subtracting occupied projections."""
+    margin_x = (float(destination["size"][0]) - float(held_object["size"][0])) / 2
+    margin_y = (float(destination["size"][1]) - float(held_object["size"][1])) / 2
+    if margin_x <= 0 or margin_y <= 0:
+        return {
+            "available_footprint_m2": 0.0,
+            "required_footprint_m2": round(float(held_object["size"][0]) * float(held_object["size"][1]), 6),
+            "valid_center_region_m2": 0.0,
+            "occupied_projection_refs": [item["entity_id"] for item in occupied],
+        }
+    center_x, center_y = map(float, destination["position"])
+    x_min, x_max = center_x - margin_x, center_x + margin_x
+    y_min, y_max = center_y - margin_y, center_y + margin_y
+    expanded = []
+    for item in occupied:
+        half_x = (float(held_object["size"][0]) + float(item["size"][0])) / 2 + 0.03
+        half_y = (float(held_object["size"][1]) + float(item["size"][1])) / 2 + 0.03
+        left, right = max(x_min, float(item["position"][0]) - half_x), min(x_max, float(item["position"][0]) + half_x)
+        bottom, top = max(y_min, float(item["position"][1]) - half_y), min(y_max, float(item["position"][1]) + half_y)
+        if left < right and bottom < top:
+            expanded.append((left, right, bottom, top))
+    x_edges = sorted({x_min, x_max, *[edge for rect in expanded for edge in rect[:2]]})
+    occupied_area = 0.0
+    for left, right in zip(x_edges, x_edges[1:]):
+        if right <= left:
+            continue
+        x = (left + right) / 2
+        y_intervals = sorted((bottom, top) for l, r, bottom, top in expanded if l <= x <= r)
+        covered_y = 0.0
+        current_bottom = current_top = None
+        for bottom, top in y_intervals:
+            if current_bottom is None:
+                current_bottom, current_top = bottom, top
+            elif bottom > current_top:
+                covered_y += current_top - current_bottom
+                current_bottom, current_top = bottom, top
+            else:
+                current_top = max(current_top, top)
+        if current_bottom is not None:
+            covered_y += current_top - current_bottom
+        occupied_area += (right - left) * covered_y
+    valid_area = (x_max - x_min) * (y_max - y_min)
+    return {
+        "available_footprint_m2": round(max(0.0, valid_area - occupied_area), 6),
+        "required_footprint_m2": round(float(held_object["size"][0]) * float(held_object["size"][1]), 6),
+        "valid_center_region_m2": round(valid_area, 6),
+        "occupied_projection_refs": [item["entity_id"] for item in occupied],
+        "occupied_projection_m2": round(occupied_area, 6),
+    }
+
+
 def _apply_verified_place(session: dict[str, Any], object_ref: str, destination_ref: str, source: str) -> dict[str, Any]:
     objects = {item["entity_id"]: item for item in session["runtime_objects"]}
     held_object = objects.get(object_ref)
@@ -3483,11 +4471,43 @@ def _apply_verified_place(session: dict[str, Any], object_ref: str, destination_
         [center_x, center_y - offset_y], [center_x, center_y + offset_y],
         [center_x - offset_x, center_y - offset_y], [center_x + offset_x, center_y + offset_y],
     ]
-    if occupied:
-        placement_candidates.sort(
-            key=lambda candidate: min(math.dist(candidate, item["position"]) for item in occupied),
-            reverse=True,
+    # Add a geometry-derived interior lattice. The first candidates preserve
+    # the existing preference order; the lattice prevents a finite hand-picked
+    # set from mistaking a usable footprint for a full surface.
+    for index in range(1, 6):
+        ratio = index / 6
+        placement_candidates.extend([
+            [center_x - margin_x + 2 * margin_x * ratio, center_y - margin_y + 2 * margin_y * other / 6]
+            for other in range(1, 6)
+        ])
+    placement_candidates = list({
+        (round(candidate[0], 6), round(candidate[1], 6)): candidate
+        for candidate in placement_candidates
+    }.values())
+    manipulation_reach = (
+        float(session["executor_profile"]["body_envelope"]["radius_m"])
+        + float(session["executor_profile"]["arm_reach_m"])
+    )
+    placement_candidates = [
+        candidate for candidate in placement_candidates
+        if math.dist(executor_position, candidate) <= manipulation_reach
+    ]
+    placement_candidates.sort(
+        key=lambda candidate: (
+            -min((math.dist(candidate, item["position"]) for item in occupied), default=0.0),
+            math.dist(executor_position, candidate),
         )
+    )
+    placement_space = _placement_space_evidence(destination, held_object, occupied)
+    if not placement_candidates:
+        return {
+            "status": "placement_blocked",
+            "reason": "no_stable_support_pose_within_current_effector_workspace",
+            "prompt": "当前虽能接近承载面，但没有同时满足稳定支撑和执行器可达的放置位姿。",
+            "manipulation_reach_m": round(manipulation_reach, 3),
+            "placement_space": placement_space,
+            "frames": [],
+        }
     placement_position = None
     for candidate in placement_candidates:
         collision = any(
@@ -3499,11 +4519,19 @@ def _apply_verified_place(session: dict[str, Any], object_ref: str, destination_
             placement_position = candidate
             break
     if placement_position is None:
+        occupied_labels = [item.get("label") or item.get("entity_id") for item in occupied]
         return {
             "status": "placement_blocked",
             "reason": "destination_has_no_non_overlapping_placement_pose",
-            "prompt": "目标承载面没有可供当前物体稳定放置且不与已有物体重叠的位置。",
+            "prompt": (
+                f"{destination.get('label', '目标承载面')}没有可供{held_object.get('label', '当前物体')}稳定放置且不与已有物体重叠的位置。"
+                + (f"当前占用物是：{'、'.join(occupied_labels)}。" if occupied_labels else "")
+                + "可以先移开占用物、改用其他承载面，或调整目标约束后继续。"
+            ),
             "occupied_object_refs": [item["entity_id"] for item in occupied],
+            "occupied_object_labels": occupied_labels,
+            "placement_space": placement_space,
+            "recovery_options": ["先移开当前占用物", "改用其他兼容承载面", "调整放置目标约束"],
             "frames": [],
         }
     projection_inside = (
@@ -3558,7 +4586,7 @@ def _apply_verified_place(session: dict[str, Any], object_ref: str, destination_
             "final_fact": "object_supported_at_destination",
             "final_fact_established": True,
             "verification_boundary": "P016_multi_channel_fact_verification",
-            "support_occupancy": {"occupied_object_refs": [item["entity_id"] for item in occupied], "non_overlapping": non_overlapping},
+            "support_occupancy": {"occupied_object_refs": [item["entity_id"] for item in occupied], "non_overlapping": non_overlapping, **placement_space},
         },
         "effect_contract_committed": {
             "produces": ["object_at_destination", "object_supported_at_destination", "gripper_empty"],
@@ -3733,7 +4761,7 @@ def _build_object_relative_motion(
     perception_bindings = task_perception.get("concept_grounding", {}).get("candidate_bindings", [])
     support_binding = next((item for item in perception_bindings if item.get("role") == "support"), None)
     planning_entity = entity
-    if operator == "grasp_object" and (support_binding or entity.get("support_ref")):
+    if operator in {"grasp_object", "navigate_near"} and (support_binding or entity.get("support_ref")):
         support_ref = (support_binding or {}).get("entity_ref") or entity.get("support_ref")
         planning_entity = next(
             (item for item in session["runtime_objects"] if item.get("entity_id") == support_ref),
@@ -3748,13 +4776,20 @@ def _build_object_relative_motion(
     clearance = planning_radius + 0.05
     center_x, center_y = map(float, planning_entity["position"])
     half_x, half_y = float(planning_entity["size"][0]) / 2, float(planning_entity["size"][1]) / 2
-    projected_x = min(max(start[0], center_x - half_x), center_x + half_x)
-    projected_y = min(max(start[1], center_y - half_y), center_y + half_y)
+    projection_basis = entity["position"] if operator in {"grasp_object", "navigate_near"} else start
+    projected_x = min(max(projection_basis[0], center_x - half_x), center_x + half_x)
+    projected_y = min(max(projection_basis[1], center_y - half_y), center_y + half_y)
+    # For a grasp over a support surface, the base pose must clear the
+    # support's expanded AABB before the route planner can go around its
+    # perimeter. The extra margin prevents a direct diagonal from entering
+    # the furniture envelope at the first corner while keeping the end
+    # effector within reach of the target.
+    approach_clearance = clearance + (0.22 if operator == "grasp_object" else 0.0)
     side_candidates = [
-        {"side": "left", "position": [center_x - half_x - clearance, projected_y]},
-        {"side": "right", "position": [center_x + half_x + clearance, projected_y]},
-        {"side": "bottom", "position": [projected_x, center_y - half_y - clearance]},
-        {"side": "top", "position": [projected_x, center_y + half_y + clearance]},
+        {"side": "left", "position": [center_x - half_x - approach_clearance, projected_y]},
+        {"side": "right", "position": [center_x + half_x + approach_clearance, projected_y]},
+        {"side": "bottom", "position": [projected_x, center_y - half_y - approach_clearance]},
+        {"side": "top", "position": [projected_x, center_y + half_y + approach_clearance]},
     ]
     if operator == "avoid":
         # Without a downstream destination, "cleared" means leaving the obstacle's
@@ -3764,9 +4799,27 @@ def _build_object_relative_motion(
         else:
             side_candidates = [item for item in side_candidates if item["side"] in {"left", "right"}]
 
+    interaction_reach_m = (
+        float(session["executor_profile"]["body_envelope"]["radius_m"])
+        + float(session["executor_profile"].get("arm_reach_m", 0.0))
+    )
+    required_terminal_distance_m = (
+        interaction_reach_m
+        if operator in {"grasp_object", "navigate_near", "place_object"}
+        else clearance + 0.02
+    )
     feasible: list[dict[str, Any]] = []
     rejected: list[dict[str, Any]] = []
     for candidate in side_candidates:
+        terminal_distance = _distance_to_object_footprint(candidate["position"], entity)
+        if terminal_distance > required_terminal_distance_m:
+            rejected.append({
+                **candidate,
+                "reason": "terminal_pose_outside_required_interaction_reach",
+                "target_footprint_distance_m": round(terminal_distance, 3),
+                "required_terminal_distance_m": round(required_terminal_distance_m, 3),
+            })
+            continue
         terminal_collider = _collider_at(candidate["position"], planning_radius, session, _scene_for_session(session))
         if terminal_collider:
             rejected.append({**candidate, "reason": "terminal_body_envelope_not_clear", "collider": terminal_collider})
@@ -3838,7 +4891,7 @@ def _build_object_relative_motion(
             "kind": "object_footprint_clearance",
             "entity_ref": entity["entity_id"],
             "expected_relation": terminal_fact,
-            "maximum_near_distance_m": clearance + 0.02,
+            "maximum_near_distance_m": required_terminal_distance_m,
             "must_be_outside_longitudinal_projection": operator == "avoid",
         },
         "object_relative_motion": {
@@ -3847,6 +4900,7 @@ def _build_object_relative_motion(
             "route_kind": selected["plan"]["route_kind"],
             "route_length_m": selected["route_length_m"],
             "planning_radius_m": planning_radius,
+            "required_terminal_distance_m": required_terminal_distance_m,
             "candidate_count": len(side_candidates),
             "rejected_candidates": rejected,
             "motion_safety_contract": selected["plan"]["safety_contract"],
@@ -3992,7 +5046,11 @@ def _execute_water_service_stage(
 ) -> dict[str, Any]:
     bindings = intent["role_bindings"]
     action = stage["stage_id"]
-    if action == "fill_container":
+    if action == "acquire_container":
+        entity_ref = bindings["theme"]
+        post_completion = {"action": "grasp", "target_entity_ref": entity_ref, "mode": "direct_task"}
+        process = ["navigate_to_container", "align_end_effector", "grasp_container", "verify_container_in_effector"]
+    elif action == "fill_container":
         entity_ref = bindings["source"]
         post_completion = {"action": "fill", "container_ref": bindings["theme"], "source_ref": bindings["source"], "mode": "direct_task"}
         process = ["navigate_to_water_source", "align_container_under_outlet", "activate_flow", "verify_container_filled"]
@@ -4015,7 +5073,7 @@ def _execute_water_service_stage(
             "status": "contextual_affordance_available",
             "available": True,
             "entity_ref": entity_ref,
-            "operator_candidate": "navigate_near",
+            "operator_candidate": "grasp_object" if action == "acquire_container" else "navigate_near",
             "task_context": stage["utterance"],
             "scoped_authorization_present": bool(scoped_authorization),
             "grounding_basis": {"source": "long_intent_role_binding", "binding_strength": "current_world_snapshot"},
@@ -4023,6 +5081,22 @@ def _execute_water_service_stage(
         perf_counter_ns(),
     )
     if result.get("status") != "fact_established":
+        blocked = result.get("object_relative_motion") or {}
+        rejected = blocked.get("rejected_candidates") or []
+        reasons = ", ".join(
+            f"{item.get('side')}:{item.get('reason')}" for item in rejected if item.get("side")
+        )
+        result["diagnostic"] = {
+            "stage": action,
+            "target_entity_ref": entity_ref,
+            "blocking_reasons": reasons or result.get("reason"),
+            "next_safe_actions": ["先移动到承载面边缘再继续", "移除阻挡物", "暂停任务等待人工调整"],
+        }
+        result["prompt"] = (
+            f"当前阶段{action}无法执行：目标{entity.get('label', entity_ref)}没有通过本体净空验真。"
+            + (f"候选方向结果：{reasons}。" if reasons else "")
+            + "我会暂停当前阶段；可以先移动到承载面边缘、移除阻挡物，或等待你调整位置。"
+        )
         return result
     result["post_completion"] = post_completion
     result["candidate_execution_plan"] = {
@@ -4110,6 +5184,7 @@ def execute_command(
     utterance: str,
     scoped_authorization: dict[str, Any] | None = None,
     language_analysis: dict[str, Any] | None = None,
+    grounded_role_bindings: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     decision_started_ns = perf_counter_ns()
     session = SESSIONS.get(session_id)
@@ -4217,7 +5292,7 @@ def execute_command(
     if active_gap_dialogue.get("status") == "collecting_minimum_causal_contract":
         continued = continue_concept_gap_dialogue(
             active_gap_dialogue,
-            answer=text,
+            answer=original_text,
             runtime_objects=session["runtime_objects"],
             object_concepts=load_object_concepts()["concepts"],
             current_world_revision=session["world_revision"],
@@ -4249,11 +5324,47 @@ def execute_command(
     relocation_preview = _build_observed_relocation_preview(session, text)
     if relocation_preview:
         return relocation_preview
-    task_perception = build_task_perception_result(_scene_for_session(session), session, text)
+    role_grounding_context = grounded_role_bindings or (scoped_authorization or {}).get("role_bindings") or {}
+    task_perception = build_task_perception_result(
+        _scene_for_session(session), session, text, grounded_role_bindings=role_grounding_context
+    )
+    if task_perception and scoped_authorization:
+        bound_ref = (scoped_authorization.get("role_bindings") or {}).get("theme")
+        if bound_ref:
+            grounding = task_perception.setdefault("concept_grounding", {})
+            bound = next(
+                (item for item in grounding.get("candidate_bindings", []) if item.get("entity_ref") == bound_ref),
+                None,
+            )
+            if bound:
+                # Internal execution is already authorized against a resolved
+                # role. Collapse perception to that entity and preserve the
+                # physical observation as evidence, rather than reopening the
+                # user-facing ambiguity.
+                grounding["candidate_bindings"] = [deepcopy(bound)]
+                grounding["grounding_status"] = "spatially_grounded"
+                grounding["ambiguity_reason"] = None
+                grounding["target_entity_ref"] = bound_ref
     perception_bindings = (
         task_perception.get("concept_grounding", {}).get("candidate_bindings", [])
         if task_perception else []
     )
+    if not perception_bindings and role_grounding_context:
+        runtime_index = {item.get("entity_id"): item for item in session.get("runtime_objects", [])}
+        for role_name, binding_role in (("target", "theme"), ("support", "destination")):
+            entity = runtime_index.get(role_grounding_context.get(binding_role))
+            if not entity:
+                continue
+            perception_bindings.append({
+                "role": role_name,
+                "entity_ref": entity.get("entity_id"),
+                "label_hint": entity.get("label"),
+                "binding_strength": "current_task_role_revalidated_in_world_snapshot",
+                "evidence_ref": f"world_revision:{session['world_revision']}:{binding_role}_role",
+                "state": "runtime_revalidated",
+                "estimated_position": deepcopy(entity.get("position")),
+                "observed_attributes": observed_perceptual_attributes(entity),
+            })
     if task_perception:
         _invalidate_perception_history(session, "superseded_by_new_goal_directed_observation")
         session["perception_history"].append({
@@ -4267,6 +5378,24 @@ def execute_command(
             "current_use_status": "current_candidate",
         })
     if task_perception and task_perception.get("concept_grounding", {}).get("grounding_status") != "spatially_grounded":
+        normalized_gap = normalize_perception_gap(
+            language_analysis.get("process_template_resolution"),
+            task_perception,
+        )
+        if normalized_gap and not scoped_authorization:
+            immediate = _start_process_gap_dialogue(
+                session,
+                source_utterance=original_text,
+                language_analysis=language_analysis,
+                resolution=normalized_gap,
+            )
+            immediate.update({
+                "status": "process_grounding_clarification_required",
+                "reason": "required_process_slot_lacks_current_grounding_evidence",
+                "task_perception": deepcopy(task_perception),
+                "grounding_gap": deepcopy(normalized_gap.get("grounding_gap")),
+            })
+            return immediate
         ambiguity_reason = task_perception.get("concept_grounding", {}).get("ambiguity_reason")
         if ambiguity_reason == "target_not_observed" and task_perception.get("concept_grounding", {}).get("constraint_rejections"):
             _start_evidence_gap_clarification(
@@ -4274,7 +5403,7 @@ def execute_command(
                 source_utterance=original_text,
                 task_perception=task_perception,
             )
-        if ambiguity_reason in {"multiple_target_candidates", "multiple_support_candidates"}:
+        if ambiguity_reason in {"multiple_target_candidates", "multiple_support_candidates"} and not scoped_authorization:
             role = "destination" if ambiguity_reason == "multiple_support_candidates" else "theme"
             option_key = "support_candidate_options" if role == "destination" else "candidate_options"
             concept_key = "support_concept_id" if role == "destination" else "target_concept_id"
@@ -4299,6 +5428,7 @@ def execute_command(
         scoped_authorization=scoped_authorization,
         confirmed_bindings=session.get("confirmed_visual_bindings", []),
         perception_bindings=perception_bindings,
+        role_binding_evidence=(scoped_authorization or {}).get("role_binding_evidence") or role_grounding_context.get("_evidence"),
     )
     if contextual_affordance:
         if task_perception:
@@ -4602,16 +5732,192 @@ def _context_confirmation_value(utterance: str) -> bool | None:
     return None
 
 
+def _is_historical_return_navigation_request(analysis: dict[str, Any]) -> bool:
+    frame = analysis.get("situated_event_frame") or {}
+    return bool(
+        analysis.get("speech_act") == "task_request"
+        and frame.get("temporal_scope") in {"most_recent_verified_past", "verified_past"}
+        and "navigate_to" in frame.get("operators", [])
+    )
+
+
+def _build_historical_return_navigation(
+    session: dict[str, Any], text: str, analysis: dict[str, Any]
+) -> dict[str, Any] | None:
+    if not _is_historical_return_navigation_request(analysis):
+        return None
+    reference = _resolve_recent_verified_event_referent(session, analysis)
+    support_ref = (reference or {}).get("related_support_ref")
+    if not reference or not support_ref:
+        return {
+            "status": "historical_navigation_reference_not_resolved",
+            "reason": "matching_verified_event_has_no_source_support",
+            "prompt": "我理解你要返回某次已验真动作的来源位置，但事件记录中没有可解析的来源承载面。请指出是哪次动作或哪个地方。",
+            "frames": [],
+            "historical_reference": deepcopy(reference),
+            "language_understanding": _language_understanding_view(analysis),
+            "runtime_fact_committed": False,
+        }
+    support = next(
+        (
+            item for item in session.get("runtime_objects", [])
+            if item.get("entity_id") == support_ref and item.get("active") is not False
+        ),
+        None,
+    )
+    if not support:
+        return {
+            "status": "historical_navigation_target_not_currently_grounded",
+            "reason": "historical_referent_absent_from_current_world_snapshot",
+            "prompt": "我找到了历史事件中的来源位置，但该实体没有在当前任务期世界快照中重新落地，因此不能沿用旧位置或旧路径导航。",
+            "frames": [],
+            "historical_reference": deepcopy(reference),
+            "language_understanding": _language_understanding_view(analysis),
+            "runtime_fact_committed": False,
+        }
+    result = _build_object_relative_motion(
+        session,
+        {
+            "status": "contextual_affordance_available",
+            "available": True,
+            "entity_ref": support_ref,
+            "operator_candidate": "navigate_near",
+            "task_context": text,
+            "scoped_authorization_present": False,
+            "grounding_basis": {
+                "source": "recent_verified_event_referent_revalidated_in_current_snapshot",
+                "binding_strength": "current_world_snapshot",
+                "episode_id": reference.get("episode_id"),
+            },
+        },
+        perf_counter_ns(),
+    )
+    result["historical_reference"] = deepcopy(reference)
+    result["historical_reference"]["current_target_revalidated"] = True
+    result["historical_reference"]["old_trajectory_reused"] = False
+    result["language_understanding"] = _language_understanding_view(analysis)
+    if result.get("frames"):
+        result["prompt"] = (
+            f"我已从最近一次匹配的已验真事件中解析出来源位置是{support.get('label', support_ref)}；"
+            "目标已在当前世界快照中重新验真，路线按当前几何重新生成，没有复用旧轨迹。"
+        )
+    return result
+
+
+def _finalize_motion_result(
+    session_id: str,
+    text: str,
+    before: dict[str, Any],
+    result: dict[str, Any],
+    scoped_authorization: dict[str, Any] | None,
+) -> dict[str, Any]:
+    live = SESSIONS[session_id]
+    pending_confirmation = deepcopy(live.get("pending_confirmation"))
+    perception_history = deepcopy(live.get("perception_history", []))
+    concept_gap_dialogue = deepcopy(live.get("concept_gap_dialogue"))
+    role_clarification_dialogue = deepcopy(live.get("role_clarification_dialogue"))
+    evidence_gap_dialogue = deepcopy(live.get("evidence_gap_dialogue"))
+    process_gap_dialogue = deepcopy(live.get("process_gap_dialogue"))
+    SESSIONS[session_id] = before
+    frames = result.get("frames", [])
+    if not frames:
+        if pending_confirmation:
+            SESSIONS[session_id]["pending_confirmation"] = pending_confirmation
+        if result.get("task_perception_frame"):
+            SESSIONS[session_id]["perception_history"] = perception_history
+        if concept_gap_dialogue:
+            SESSIONS[session_id]["concept_gap_dialogue"] = concept_gap_dialogue
+        if role_clarification_dialogue:
+            SESSIONS[session_id]["role_clarification_dialogue"] = role_clarification_dialogue
+        if evidence_gap_dialogue:
+            SESSIONS[session_id]["evidence_gap_dialogue"] = evidence_gap_dialogue
+        if process_gap_dialogue:
+            SESSIONS[session_id]["process_gap_dialogue"] = process_gap_dialogue
+        result["session"] = get_session(session_id)
+        return {"status": result.get("status"), "immediate_result": result, "session": get_session(session_id)}
+    job_id = "motion_" + hashlib.sha1(f"{session_id}|{len(MOTION_JOBS) + 1}".encode()).hexdigest()[:12]
+    job = {
+        "job_id": job_id,
+        "session_id": session_id,
+        "utterance": text,
+        "status": "running",
+        "planned_world_revision": before["world_revision"],
+        "planned_policy_revision": before["policy_revision"],
+        "frames": frames,
+        "next_frame_index": 0,
+        "terminal_result": result,
+        "post_completion": deepcopy(result.get("post_completion")),
+        "execution_intent": _post_completion_signature(result.get("post_completion")),
+        "continuation_authorized": _authorization_is_current(before, text, scoped_authorization),
+        "replan_state_history": [],
+        "execution_collision_radius_m": (
+            result.get("effective_execution_envelope", {}).get("effective_constraints", {}).get("body_radius_m", 0.0)
+            + result.get("effective_execution_envelope", {}).get("effective_constraints", {}).get("minimum_avoidance_distance_m", 0.0)
+        ) or before["executor_profile"]["body_envelope"]["radius_m"],
+    }
+    MOTION_JOBS[job_id] = job
+    return {
+        "status": "motion_started",
+        "job_id": job_id,
+        "planned_world_revision": job["planned_world_revision"],
+        "planned_policy_revision": job["planned_policy_revision"],
+        "frame_count": len(frames),
+        "body_self_judgment": result.get("body_self_judgment"),
+        "route_evidence": result.get("route_evidence"),
+        "historical_reference": deepcopy(result.get("historical_reference")),
+        "session": get_session(session_id),
+    }
+
+
 def begin_motion_command(
     session_id: str,
     utterance: str,
     scoped_authorization: dict[str, Any] | None = None,
     internal_stage: bool = False,
+    grounded_role_bindings: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     session = SESSIONS.get(session_id)
     if not session:
         return {"error": "embodied_session_not_found", "session_id": session_id}
     text = utterance.strip()
+    _debug_runtime("input_received", session, utterance=text, internal_stage=internal_stage, scoped_authorization=bool(scoped_authorization))
+    count_match = re.search(r"(?:有|看到|当前有)?\s*(?:几个|多少个)\s*(杯子|杯|容器|人|客人|桌子|台子)", text)
+    if count_match:
+        noun = count_match.group(1)
+        kind_map = {
+            "杯子": "graspable_container", "杯": "graspable_container", "容器": "graspable_container",
+            "人": "human_recipient", "客人": "human_recipient",
+            "桌子": "operation_surface", "台子": "operation_surface",
+        }
+        kind = kind_map[noun]
+        candidates = [item for item in session.get("runtime_objects", []) if item.get("active") is not False and item.get("kind") == kind]
+        labels = [item.get("label") or item.get("entity_id") for item in candidates]
+        return {
+            "status": "state_query_answered",
+            "query_type": "count_entities",
+            "prompt": f"当前空间中有{len(candidates)}个{noun}：{'、'.join(labels)}。",
+            "answer": {"count": len(candidates), "entity_refs": [item.get("entity_id") for item in candidates], "labels": labels},
+            "runtime_fact_committed": False,
+            "session": get_session(session_id),
+        }
+    if text in {"你遇到了什么问题", "遇到什么问题", "为什么停了", "为什么停止", "怎么了", "发生了什么"}:
+        diagnostic = deepcopy(session.get("last_runtime_diagnostic"))
+        if diagnostic:
+            return {
+                "status": "runtime_diagnostic_report",
+                "prompt": (
+                    f"我在{diagnostic.get('stage') or '当前阶段'}遇到问题：{diagnostic.get('reason')}。"
+                    f"根因类别是{diagnostic.get('category')}。"
+                    f"下一步可以：{'；'.join(diagnostic.get('recovery_options') or [])}。"
+                ),
+                "runtime_diagnostic": diagnostic,
+                "session": get_session(session_id),
+            }
+        return {
+            "status": "runtime_diagnostic_unavailable",
+            "prompt": "当前没有可供总结的最近一次停止诊断。",
+            "session": get_session(session_id),
+        }
     if text in {"暂停当前任务", "暂停任务", "先别做了"}:
         suspended = _suspend_active_intent(session)
         if suspended:
@@ -4621,6 +5927,24 @@ def begin_motion_command(
         if resumed:
             resumed["immediate_result"]["session"] = get_session(session_id)
             return resumed
+    # P018 input arbitration precedes every pending task/dialogue state. Run
+    # semantic analysis on a copy so a read-only query cannot mutate focus,
+    # pending slots, intent lifecycle, or the task-period world snapshot.
+    early_analysis = None
+    if not internal_stage and not scoped_authorization:
+        early_analysis = _compose_session_language(deepcopy(session), text)
+        if _is_support_inventory_state_query(text, early_analysis):
+            return _answer_support_inventory_state_query(session, text, early_analysis)
+        if _is_historical_return_navigation_request(early_analysis):
+            if session.get("pending_confirmation"):
+                _revoke_pending_confirmation(session, "superseded_by_historical_navigation_task_control")
+            before_historical_navigation = deepcopy(session)
+            # Rebuild after the revocation snapshot so only planning-side
+            # mutations are rolled back while the task-control decision stays.
+            historical_navigation = _build_historical_return_navigation(session, text, early_analysis)
+            return _finalize_motion_result(
+                session_id, text, before_historical_navigation, historical_navigation, None
+            )
     pending = session.get("pending_confirmation")
     confirmation_value = _context_confirmation_value(utterance)
     if pending and confirmation_value is not None and not scoped_authorization:
@@ -4647,6 +5971,63 @@ def begin_motion_command(
         )
         if explained:
             return explained
+    # A repeated goal request is not an answer to a stale role dialogue. Once
+    # an active water intent owns the theme binding, only a candidate label may
+    # resolve that dialogue; otherwise discard it and resume the active goal.
+    stale_role_dialogue = session.get("role_clarification_dialogue")
+    active_for_dialogue = (session.get("long_horizon_intents") or {}).get(session.get("active_intent_id"))
+    if (
+        stale_role_dialogue
+        and active_for_dialogue
+        and active_for_dialogue.get("goal_fact") == "human_received_filled_container"
+        and (active_for_dialogue.get("current_stage") or {}).get("stage_id") == "fill_container"
+    ):
+        session["role_clarification_dialogue"] = None
+        stale_role_dialogue = None
+    if (
+        stale_role_dialogue
+        and active_for_dialogue
+        and active_for_dialogue.get("goal_fact") == "human_received_filled_container"
+        and (active_for_dialogue.get("role_bindings") or {}).get("theme")
+        and stale_role_dialogue.get("evidence_source") == "current_world_container_candidates"
+        and not any(
+            str(option.get("label") or option.get("label_hint") or "") in utterance
+            for option in stale_role_dialogue.get("candidate_options", [])
+        )
+    ):
+        session["role_clarification_dialogue"] = None
+    # Input arbitration happens before any pending role dialogue. Read-only
+    # state queries must never consume clarification slots or alter the task.
+    if (
+        _is_holding_state_query(text)
+        or _is_object_location_query(text)
+        or _is_object_presence_query(text)
+        or _is_open_world_observation_query(text)
+    ):
+        query_result = execute_command(session_id, text, None, None)
+        return {
+            "status": query_result.get("status"),
+            "immediate_result": query_result,
+            "session": get_session(session_id),
+        }
+    # Central recovery gate: every non-query retry/confirmation path must
+    # prune from the active intent's verified facts before role dialogue,
+    # experience replay, or fresh process search can run.
+    active_recovery = (session.get("long_horizon_intents") or {}).get(session.get("active_intent_id"))
+    if (
+        active_recovery
+        and active_recovery.get("intent_type") == "verified_water_delivery"
+        and active_recovery.get("lifecycle") in {"active", "awaiting_correction", "suspended"}
+        and "container_in_effector" in active_recovery.get("verified_facts", [])
+        and "container_filled" not in active_recovery.get("verified_facts", [])
+        and not internal_stage
+        and not scoped_authorization
+    ):
+        session["role_clarification_dialogue"] = None
+        resumed = _prepare_long_intent_stage(session, active_recovery)
+        resumed["recovery_pruned_from_verified_facts"] = True
+        resumed["session"] = get_session(session_id)
+        return resumed
     role_clarification = _continue_role_clarification(session, utterance)
     if role_clarification:
         return role_clarification
@@ -4654,18 +6035,104 @@ def begin_motion_command(
     if evidence_gap_resolution:
         return evidence_gap_resolution
     language_analysis = _compose_session_language(session, text)
+    hospitality_intent = None
+    if not internal_stage and not scoped_authorization and session.get("scene_id") == "hospitality_guest":
+        existing_hospitality = (session.get("long_horizon_intents") or {}).get(session.get("active_intent_id"))
+        if existing_hospitality and existing_hospitality.get("intent_type") == "hospitality_guest_service":
+            hospitality_intent = existing_hospitality
+        else:
+            hospitality_intent = _create_hospitality_intent(session, text)
+    if hospitality_intent:
+        graph = hospitality_intent.get("task_graph") or build_hospitality_task_graph(session["runtime_objects"])
+        return {
+            "status": "hospitality_intent_active",
+            "prompt": "已建立招待客人复合任务图；当前分支将按资源、可供性和未满足前提分别推进，在托盘装载节点汇合。",
+            "long_horizon_intent": _long_intent_view(hospitality_intent),
+            "task_graph": graph,
+            "task_graph_orchestration": build_hospitality_orchestration_view(graph),
+            "task_graph_unresolved_conditions": unresolved_hospitality_conditions(graph),
+            "session": get_session(session_id),
+        }
     composite_water_goal = _water_delivery_goal_semantics(session, text).get("goal_fact") in {
         "human_received_filled_container", "filled_container_supported_at_destination"
     }
+    active_water_intent = (session.get("long_horizon_intents") or {}).get(session.get("active_intent_id"))
+    active_water_binding = bool(
+        active_water_intent
+        and active_water_intent.get("lifecycle") in {"active", "awaiting_correction"}
+        and active_water_intent.get("goal_fact") == "human_received_filled_container"
+        and (active_water_intent.get("role_bindings") or {}).get("theme")
+    )
+    if active_water_binding and not internal_stage and not scoped_authorization:
+        # An active long-horizon goal owns its resolved roles. A repeated
+        # request must resume the current causal stage even if this utterance
+        # is lexically under-parsed; only an explicit goal change may replace it.
+        resumed = _prepare_long_intent_stage(session, active_water_intent)
+        resumed["reused_active_water_intent"] = True
+        resumed["session"] = get_session(session_id)
+        return resumed
+    if composite_water_goal and not internal_stage and not scoped_authorization:
+        water_containers = [
+            item for item in session["runtime_objects"]
+            if item.get("active") is not False
+            and item.get("kind") == "graspable_container"
+        ]
+        container_resolution = _resolve_current_role_binding(
+            session,
+            text,
+            water_containers,
+            role="theme",
+            language_analysis=language_analysis,
+            confirmed_entity_ref=session.get("pending_water_container_ref"),
+        )
+        if container_resolution.get("status") != "resolved" and len(water_containers) > 1 and not active_water_binding:
+            container_concept = next(
+                (
+                    concept for concept in load_object_concepts()["concepts"]
+                    if "graspable_container" in concept.get("compatible_kinds", [])
+                ),
+                None,
+            )
+            options = [
+                {
+                    "entity_ref": item["entity_id"],
+                    "value_ref": item["entity_id"],
+                    "label": item.get("label") or item["entity_id"],
+                    "label_hint": item.get("label") or item["entity_id"],
+                    "value_type": "graspable_container",
+                    "evidence": "current_world_snapshot",
+                }
+                for item in water_containers
+            ]
+            _start_role_clarification(
+                session,
+                source_utterance=text,
+                role="theme",
+                concept_id=(container_concept or {}).get("concept_id"),
+                options=options,
+                evidence_source="current_world_container_candidates",
+            )
+            return {
+                "status": "role_clarification_required",
+                "reason": "water_delivery_container_not_uniquely_bound",
+                "prompt": f"接水需要选择一个容器。当前候选是：{'、'.join(item['label'] for item in options)}。你要用哪一个？",
+                "known_goal": "human_received_filled_container",
+                "pending_role": "theme",
+                "candidate_options": deepcopy(options),
+                "candidate_only": True,
+                "runtime_fact_committed": False,
+                "session": get_session(session_id),
+            }
     process_resolution = language_analysis.get("process_template_resolution") or {}
+    historical_reference = None if internal_stage or scoped_authorization else _historical_support_reference_candidate(
+        session, text, language_analysis
+    )
     if (
         not internal_stage
         and not scoped_authorization
         and not composite_water_goal
-        and (
-            process_resolution.get("template_candidate", {}).get("requires_human_confirmation")
-            or process_resolution.get("status") == "unsafe_switch"
-        )
+        and not historical_reference
+        and language_analysis.get("speech_act") not in {"language_teaching", "prohibition", "state_query"}
         and process_resolution.get("status") in {"template_confirmation_required", "clarification_required", "unsafe_switch"}
     ):
         immediate = _start_process_gap_dialogue(
@@ -4675,9 +6142,6 @@ def begin_motion_command(
             resolution=process_resolution,
         )
         return {"status": immediate["status"], "immediate_result": immediate, "session": get_session(session_id)}
-    historical_reference = None if internal_stage or scoped_authorization else _historical_support_reference_candidate(
-        session, text, language_analysis
-    )
     if historical_reference:
         candidate = historical_reference["historical_reference_candidate"]
         if not candidate.get("destination_entity_ref"):
@@ -4740,10 +6204,59 @@ def begin_motion_command(
     ):
         immediate = execute_command(session_id, text, scoped_authorization, language_analysis)
         return {"status": immediate.get("status"), "immediate_result": immediate, "session": get_session(session_id)}
-    if not composite_water_goal and not gap_dialogue_collecting and language_analysis.get("decision") == "route_canonical_semantics" and language_analysis.get("canonical_utterance"):
+    if (
+        not internal_stage
+        and not scoped_authorization
+        and not composite_water_goal
+        and not gap_dialogue_collecting
+        and language_analysis.get("decision") == "route_canonical_semantics"
+        and language_analysis.get("canonical_utterance")
+    ):
         text = language_analysis["canonical_utterance"]
+    # A repeated request after a placement blockage is a continuation of the
+    # same causal gap, not a new acquire task. Reuse only when the terminal
+    # goal and both grounded roles match the active intent.
+    active_intent = (session.get("long_horizon_intents") or {}).get(session.get("active_intent_id"))
+    active_stage = (active_intent or {}).get("current_stage") or {}
+    process_bindings = process_resolution.get("bindings") or {}
+    same_blocked_place = bool(
+        active_intent
+        and not internal_stage
+        and not scoped_authorization
+        and active_intent.get("lifecycle") == "awaiting_correction"
+        and active_stage.get("stage_id") == "place_at_destination"
+        and active_intent.get("goal_fact") == process_resolution.get("goal_fact") == "object_supported_at_destination"
+        and (process_bindings.get("theme") or {}).get("value_ref") == active_intent.get("role_bindings", {}).get("theme")
+        and (process_bindings.get("destination") or {}).get("value_ref") == active_intent.get("role_bindings", {}).get("destination")
+    )
+    if same_blocked_place:
+        active_intent["lifecycle"] = "active"
+        active_intent["resume_envelope"] = None
+        prepared = _prepare_long_intent_stage(session, active_intent)
+        if prepared.get("immediate_result"):
+            prepared["immediate_result"]["repeat_request_reused_active_gap"] = True
+        prepared["session"] = get_session(session_id)
+        return prepared
+    same_failed_fill = bool(
+        active_intent
+        and not internal_stage
+        and not scoped_authorization
+        and active_intent.get("lifecycle") in {"awaiting_correction", "active"}
+        and active_stage.get("stage_id") == "fill_container"
+        and active_intent.get("goal_fact") == "human_received_filled_container"
+        and "target_object_in_gripper" in active_intent.get("verified_facts", [])
+        and "container_filled" not in active_intent.get("verified_facts", [])
+    )
+    if same_failed_fill:
+        active_intent["lifecycle"] = "active"
+        active_intent["resume_envelope"] = None
+        prepared = _prepare_long_intent_stage(session, active_intent)
+        if prepared.get("immediate_result"):
+            prepared["immediate_result"]["resumed_failed_fill"] = True
+        prepared["session"] = get_session(session_id)
+        return prepared
     long_intent = None if internal_stage or scoped_authorization else (
-        _create_water_delivery_intent(session, text)
+        _create_water_delivery_intent(session, text, language_analysis)
         or _create_water_placement_intent(session, text)
         or _create_object_handover_intent(session, text, language_analysis)
         or _create_transport_intent(session, text, language_analysis)
@@ -4758,6 +6271,8 @@ def begin_motion_command(
     factory_groundable_task = activate_task_perception(text) is not None
     if (
         not factory_groundable_task
+        and not session.get("process_gap_dialogue")
+        and process_resolution.get("status") not in {"clarification_required", "unsafe_switch", "template_confirmation_required"}
         and not (session.get("concept_gap_dialogue") or {}).get("status") == "collecting_minimum_causal_contract"
     ):
         recalled = _recall_trusted_experience(text)
@@ -4783,7 +6298,7 @@ def begin_motion_command(
         active_intent
         and active_intent.get("intent_type") in {"verified_water_delivery", "verified_water_placement", "verified_object_handover"}
         and (active_stage.get("utterance") == text or authorized_internal_stage)
-        and active_stage.get("stage_id") in {"fill_container", "handover_to_recipient"}
+        and active_stage.get("stage_id") in {"acquire_container", "fill_container", "handover_to_recipient"}
     )
     transport_region_stage_matches = bool(
         active_intent
@@ -4795,62 +6310,11 @@ def begin_motion_command(
         _execute_transport_region_stage(session, active_intent, active_stage, scoped_authorization)
         if transport_region_stage_matches
         else _execute_water_service_stage(session, active_intent, active_stage, scoped_authorization)
-        if service_stage_matches else execute_command(session_id, text, scoped_authorization, language_analysis)
+        if service_stage_matches else execute_command(
+            session_id, text, scoped_authorization, language_analysis, grounded_role_bindings
+        )
     )
-    pending_confirmation = deepcopy(SESSIONS[session_id].get("pending_confirmation"))
-    perception_history = deepcopy(SESSIONS[session_id].get("perception_history", []))
-    concept_gap_dialogue = deepcopy(SESSIONS[session_id].get("concept_gap_dialogue"))
-    role_clarification_dialogue = deepcopy(SESSIONS[session_id].get("role_clarification_dialogue"))
-    evidence_gap_dialogue = deepcopy(SESSIONS[session_id].get("evidence_gap_dialogue"))
-    process_gap_dialogue = deepcopy(SESSIONS[session_id].get("process_gap_dialogue"))
-    SESSIONS[session_id] = before
-    frames = result.get("frames", [])
-    if not frames:
-        if pending_confirmation:
-            SESSIONS[session_id]["pending_confirmation"] = pending_confirmation
-        if result.get("task_perception_frame"):
-            SESSIONS[session_id]["perception_history"] = perception_history
-        if concept_gap_dialogue:
-            SESSIONS[session_id]["concept_gap_dialogue"] = concept_gap_dialogue
-        if role_clarification_dialogue:
-            SESSIONS[session_id]["role_clarification_dialogue"] = role_clarification_dialogue
-        if evidence_gap_dialogue:
-            SESSIONS[session_id]["evidence_gap_dialogue"] = evidence_gap_dialogue
-        if process_gap_dialogue:
-            SESSIONS[session_id]["process_gap_dialogue"] = process_gap_dialogue
-        result["session"] = get_session(session_id)
-        return {"status": result.get("status"), "immediate_result": result, "session": get_session(session_id)}
-    job_id = "motion_" + hashlib.sha1(f"{session_id}|{len(MOTION_JOBS) + 1}".encode()).hexdigest()[:12]
-    job = {
-        "job_id": job_id,
-        "session_id": session_id,
-        "utterance": text,
-        "status": "running",
-        "planned_world_revision": before["world_revision"],
-        "planned_policy_revision": before["policy_revision"],
-        "frames": frames,
-        "next_frame_index": 0,
-        "terminal_result": result,
-        "post_completion": deepcopy(result.get("post_completion")),
-        "execution_intent": _post_completion_signature(result.get("post_completion")),
-        "continuation_authorized": _authorization_is_current(before, text, scoped_authorization),
-        "replan_state_history": [],
-        "execution_collision_radius_m": (
-            result.get("effective_execution_envelope", {}).get("effective_constraints", {}).get("body_radius_m", 0.0)
-            + result.get("effective_execution_envelope", {}).get("effective_constraints", {}).get("minimum_avoidance_distance_m", 0.0)
-        ) or before["executor_profile"]["body_envelope"]["radius_m"],
-    }
-    MOTION_JOBS[job_id] = job
-    return {
-        "status": "motion_started",
-        "job_id": job_id,
-        "planned_world_revision": job["planned_world_revision"],
-        "planned_policy_revision": job["planned_policy_revision"],
-        "frame_count": len(frames),
-        "body_self_judgment": result.get("body_self_judgment"),
-        "route_evidence": result.get("route_evidence"),
-        "session": get_session(session_id),
-    }
+    return _finalize_motion_result(session_id, text, before, result, scoped_authorization)
 
 
 def confirm_pending_motion(session_id: str, confirmation_id: str, approved: bool) -> dict[str, Any]:
@@ -5260,7 +6724,12 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
             })
     if job.get("teaching_action"):
         _record_completed_teaching_motion(session, job, result)
-    if (job.get("post_completion") or {}).get("action") == "grasp" and (job.get("post_completion") or {}).get("mode") == "direct_task":
+    post_completion = job.get("post_completion") or {}
+    terminal_relation_failed = result.get("status") == "terminal_fact_verification_failed"
+    if terminal_relation_failed and post_completion.get("action"):
+        result["effect_contract_committed"] = False
+        result["effect_commit_blocked_reason"] = "terminal_spatial_relation_not_verified"
+    elif post_completion.get("action") == "grasp" and post_completion.get("mode") == "direct_task":
         grasp = _apply_verified_grasp(session, job["post_completion"]["target_entity_ref"], "human_confirmed_candidate_task")
         if grasp.get("status") == "fact_established":
             result.update(grasp)
@@ -5268,7 +6737,7 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
             result["execution_chain"] = ["confirmed_target_binding", "route_replanned_from_current_state", "executor_within_grasp_reach", "grasp_physically_verified"]
         else:
             result = grasp
-    elif (job.get("post_completion") or {}).get("action") == "place" and (job.get("post_completion") or {}).get("mode") == "direct_task":
+    elif post_completion.get("action") == "place" and post_completion.get("mode") == "direct_task":
         placement = _apply_verified_place(
             session,
             job["post_completion"]["object_ref"],
@@ -5287,7 +6756,7 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
             ]
         else:
             result = placement
-    elif (job.get("post_completion") or {}).get("action") == "fill":
+    elif post_completion.get("action") == "fill":
         fill = _apply_verified_fill(
             session,
             job["post_completion"]["container_ref"],
@@ -5295,7 +6764,7 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
             "human_confirmed_water_service_stage",
         )
         result.update(fill)
-    elif (job.get("post_completion") or {}).get("action") == "handover":
+    elif post_completion.get("action") == "handover":
         handover = _apply_verified_handover(
             session,
             job["post_completion"]["container_ref"],
@@ -5304,7 +6773,7 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
             require_filled_container=job["post_completion"].get("require_filled_container", True),
         )
         result.update(handover)
-    elif (job.get("post_completion") or {}).get("action") == "grasp":
+    elif post_completion.get("action") == "grasp":
         result = _apply_verified_grasp(
             session,
             job["post_completion"]["target_entity_ref"],
@@ -5352,13 +6821,27 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
             if terminal_fact and terminal_fact not in intent["verified_facts"]:
                 intent["verified_facts"].append(terminal_fact)
             graph = intent.get("hierarchical_intent_graph")
+            stage_target_fact = (intent.get("current_stage") or {}).get("target_fact")
+            if stage_target_fact and stage_target_fact not in intent["verified_facts"]:
+                # The executor may report a lower-level physical fact (for
+                # example object_supported_at_destination) while the active
+                # stage names the composed goal fact. Promote both into the
+                # current task ledger before deriving the next stage.
+                intent["verified_facts"].append(stage_target_fact)
             if graph:
                 if terminal_fact:
                     record_intent_verified_fact(graph, terminal_fact)
-                stage_target_fact = (intent.get("current_stage") or {}).get("target_fact")
                 if stage_target_fact:
                     record_intent_verified_fact(graph, stage_target_fact)
-            stage_outcome = _prepare_long_intent_stage(session, intent)
+            stage_outcome = (
+                _prepare_long_intent_stage(session, intent)
+                if result.get("status") not in {"terminal_fact_verification_failed", "awaiting_correction", "failed"}
+                else {
+                    "status": "awaiting_correction",
+                    "long_horizon_intent": _long_intent_view(intent),
+                    "immediate_result": None,
+                }
+            )
             result["long_horizon_intent"] = stage_outcome.get("long_horizon_intent", _long_intent_view(intent))
             if stage_outcome.get("status") == "long_intent_completed":
                 result.pop("candidate_execution_plan", None)
@@ -5367,13 +6850,17 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
                 result["execution_plan_state"] = "released_on_task_completion"
                 result["prompt"] = "当前阶段已验真，长程目标的终止事实也已成立。"
             elif stage_outcome.get("job_id"):
+                next_stage_plan = deepcopy(stage_outcome.get("candidate_execution_plan"))
                 result["next_stage_started"] = {
                     "status": stage_outcome.get("status"),
                     "job_id": stage_outcome["job_id"],
                     "frame_count": stage_outcome.get("frame_count"),
                     "long_stage": deepcopy(stage_outcome.get("long_stage")),
                     "long_horizon_intent": deepcopy(stage_outcome.get("long_horizon_intent")),
+                    "candidate_execution_plan": next_stage_plan,
                 }
+                if next_stage_plan:
+                    result["candidate_execution_plan"] = next_stage_plan
                 result["prompt"] = (
                     "当前阶段已通过物理验真；原任务级授权仍然有效，我已按最新世界状态直接开始下一阶段。"
                 )

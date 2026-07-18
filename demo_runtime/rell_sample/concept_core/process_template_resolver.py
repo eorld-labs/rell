@@ -5,6 +5,13 @@ from copy import deepcopy
 from dataclasses import asdict, dataclass
 from typing import Any
 
+from .semantic_grounding import (
+    build_grounded_intent_frame,
+    build_observation_evidence_set,
+    build_semantic_constraint_frame,
+    ground_semantic_role,
+)
+
 
 @dataclass(frozen=True)
 class SlotSpec:
@@ -124,7 +131,23 @@ def resolve_process_request(
     executor_profile: dict[str, Any],
     world_revision: int,
     binding_overrides: dict[str, str] | None = None,
+    evidence_bindings: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
+    if not language_analysis.get("semantic_constraint_frame"):
+        language_analysis = deepcopy(language_analysis)
+        language_analysis["semantic_constraint_frame"] = build_semantic_constraint_frame(utterance, language_analysis)
+    if not language_analysis.get("observation_evidence"):
+        language_analysis["observation_evidence"] = build_observation_evidence_set(
+            runtime_objects,
+            _object_concepts_from_language_analysis(language_analysis),
+            world_revision=world_revision,
+            source="process_resolution_current_world_grounding",
+        )
+    if not language_analysis.get("grounded_intent_frame"):
+        language_analysis["grounded_intent_frame"] = build_grounded_intent_frame(
+            language_analysis["semantic_constraint_frame"],
+            language_analysis["observation_evidence"],
+        )
     candidates = _template_candidates(utterance, language_analysis)
     if not candidates:
         return None
@@ -133,6 +156,7 @@ def resolve_process_request(
     bindings: dict[str, dict[str, Any]] = {}
     slot_results = []
     binding_overrides = binding_overrides or {}
+    evidence_bindings = evidence_bindings or []
     for slot in sorted(template.slots, key=lambda item: item.priority):
         values = _slot_candidates(
             slot,
@@ -142,14 +166,38 @@ def resolve_process_request(
             runtime_state,
             semantic_regions,
             bindings,
+            evidence_bindings,
+            world_revision,
         )
         override = binding_overrides.get(slot.slot_id)
         if override:
             values = [item for item in values if item.get("value_ref") == override]
-        explicit = [item for item in values if item.get("explicit")]
-        usable = explicit or values
+            if not values:
+                entity = next((item for item in runtime_objects if item.get("entity_id") == override and item.get("active") is not False), None)
+                provider_compatible = bool(
+                    entity
+                    and (
+                        slot.candidate_provider == "graspable_objects" and entity.get("fixed") is not True
+                        or slot.candidate_provider == "human_recipients" and entity.get("kind") == "human_recipient"
+                        or slot.candidate_provider == "support_surfaces" and entity.get("kind") == "operation_surface"
+                    )
+                )
+                if provider_compatible:
+                    values = [_entity_value(
+                        entity,
+                        explicit=True,
+                        evidence_bindings=evidence_bindings,
+                        world_revision=world_revision,
+                        semantic_binding={
+                            "binding_basis": "human_confirmed_observed_constraint_substitution",
+                            "evidence_strength": 650,
+                            "world_revision": world_revision,
+                            "matched_constraints": [],
+                        },
+                    )]
+        usable = _non_dominated_evidence(values)
         conditionally_required = _conditionally_required(slot, bindings)
-        if not slot.required and not conditionally_required and not explicit and not override:
+        if not slot.required and not conditionally_required and not any(item.get("explicit") for item in usable) and not override:
             slot_results.append(_slot_result(slot, "optional_unbound", []))
         elif len(usable) == 1 and slot.auto_bind_unique:
             bindings[slot.slot_id] = deepcopy(usable[0])
@@ -171,6 +219,37 @@ def resolve_process_request(
     elif unresolved:
         status = "clarification_required"
         next_gap = sorted(unresolved, key=lambda item: item["priority"])[0]
+        slot = next((item for item in template.slots if item.slot_id == next_gap.get("slot_id")), None)
+        role_name = next(
+            (name for name in (slot.role_names if slot else ()) if name in (language_analysis.get("grounded_intent_frame") or {}).get("roles", {})),
+            next_gap.get("slot_id"),
+        )
+        role_grounding = ((language_analysis.get("grounded_intent_frame") or {}).get("roles") or {}).get(role_name) or {}
+        if role_grounding.get("constraint_rejections"):
+            substitute_candidates = [
+                {
+                    "value_ref": item.get("entity_ref"),
+                    "label": item.get("current_name_surface"),
+                    "value_type": item.get("kind"),
+                    "explicit": False,
+                    "evidence": "current_observation_constraint_rejection",
+                    "evidence_strength": 0,
+                    "observed_attributes": deepcopy(item.get("observed_attributes", {})),
+                    "constraint_mismatch": deepcopy(item.get("constraint_mismatches", [])),
+                    "requires_human_substitution_confirmation": True,
+                }
+                for item in role_grounding.get("constraint_rejections", [])
+                if item.get("entity_ref")
+            ]
+            next_gap = {
+                **deepcopy(next_gap),
+                "kind": "grounding_evidence_slot",
+                "required_condition": f"{next_gap.get('slot_id')}_grounded_in_current_world",
+                "requested_constraints": deepcopy((role_grounding.get("semantic_role") or {}).get("constraints", [])),
+                "constraint_rejections": deepcopy(role_grounding.get("constraint_rejections", [])),
+                "candidates": substitute_candidates,
+                "observation_evidence_set_id": role_grounding.get("observation_evidence_set_id"),
+            }
     elif template_confirmation_required:
         status = "template_confirmation_required"
         next_gap = {
@@ -202,9 +281,99 @@ def resolve_process_request(
     }
 
 
+def normalize_perception_gap(
+    process_resolution: dict[str, Any] | None,
+    task_perception: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Project perceptual evidence failures onto declared process slots."""
+    process_resolution = process_resolution or {}
+    task_perception = task_perception or {}
+    template = _TEMPLATE_BY_ID.get(process_resolution.get("template_id"))
+    grounding = task_perception.get("concept_grounding") or {}
+    if not template or grounding.get("grounding_status") == "spatially_grounded":
+        return None
+    observed_roles = {item.get("role") for item in grounding.get("candidate_bindings", [])}
+    provider_values = {
+        "graspable_objects": grounding.get("candidate_options", []) or grounding.get("constraint_rejections", []),
+        "support_surfaces": grounding.get("support_candidate_options", []),
+    }
+    perception_roles = {"graspable_objects": "target", "support_surfaces": "support"}
+    for slot in sorted(template.slots, key=lambda item: item.priority):
+        observed_role = perception_roles.get(slot.candidate_provider)
+        if not observed_role or observed_role in observed_roles:
+            continue
+        semantic_binding = (process_resolution.get("bindings") or {}).get(slot.slot_id)
+        if not semantic_binding and not slot.required:
+            continue
+        candidates = [
+            {
+                "value_ref": item.get("entity_ref"),
+                "label": item.get("label_hint"),
+                "value_type": slot.value_type,
+                "explicit": False,
+                "evidence": "bounded_task_perception_candidate",
+                "constraint_mismatch": deepcopy(item.get("mismatched_attributes", [])),
+                "observed_attributes": deepcopy(item.get("observed_attributes", {})),
+                "estimated_position": deepcopy(item.get("estimated_position")),
+            }
+            for item in provider_values.get(slot.candidate_provider, [])
+            if item.get("entity_ref")
+        ]
+        gap = {
+            "kind": "grounding_evidence_slot",
+            "slot_id": slot.slot_id,
+            "value_type": slot.value_type,
+            "status": "ambiguous" if len(candidates) > 1 else "missing_current_evidence",
+            "priority": slot.priority,
+            "candidate_provider": f"bounded_perception:{slot.candidate_provider}",
+            "candidates": candidates,
+            "bound_value": deepcopy(semantic_binding),
+            "required_condition": f"{slot.slot_id}_grounded_in_current_world",
+            "current_evidence": deepcopy(grounding.get("relation_evidence")),
+            "resolution_action": "observe_or_confirm_candidate_without_committing_physical_effect",
+        }
+        updated = deepcopy(process_resolution)
+        updated.update({
+            "status": "clarification_required",
+            "next_gap": gap,
+            "question": (
+                task_perception.get("prompt")
+                if grounding.get("constraint_rejections") and candidates
+                else _render_question("clarification_required", gap, template, updated.get("bindings", {}))
+            ),
+            "grounding_gap": {
+                "required_condition": gap["required_condition"],
+                "slot_id": slot.slot_id,
+                "candidate_provider": gap["candidate_provider"],
+                "candidate_values": deepcopy(candidates),
+                "perception_observation_id": task_perception.get("perception_observation", {}).get("observation_id"),
+                "language_confirmation_does_not_commit_physical_facts": True,
+                "requested_constraints": deepcopy(
+                    task_perception.get("task_perception_frame", {}).get("target_constraints", {})
+                ),
+            },
+        })
+        return updated
+    return None
+
+
 def _template_candidates(utterance: str, analysis: dict[str, Any]) -> list[dict[str, Any]]:
     operators = analysis.get("canonical_frame", {}).get("operators", [])
     candidates = []
+    goal_template = {
+        "object_in_gripper": "grasp_object",
+        "object_supported_at_destination": "place_object",
+        "object_received_by_recipient": "handover_object",
+        "object_at_target_region": "transport_object",
+    }.get(analysis.get("canonical_frame", {}).get("goal_relation"))
+    if goal_template:
+        candidates.append({
+            "template_id": goal_template,
+            "score": 1.1,
+            "basis": "terminal_goal_relation_projection",
+            "requires_human_confirmation": False,
+            "novel_surface": None,
+        })
     for operator in operators:
         template = _TEMPLATE_BY_OPERATOR.get(operator)
         if template:
@@ -256,23 +425,107 @@ def _slot_candidates(
     runtime_state: dict[str, Any],
     semantic_regions: list[dict[str, Any]],
     current_bindings: dict[str, dict[str, Any]],
+    evidence_bindings: list[dict[str, Any]],
+    world_revision: int,
 ) -> list[dict[str, Any]]:
     role = next((analysis.get("role_bindings", {}).get(name) for name in slot.role_names if analysis.get("role_bindings", {}).get(name)), {})
     if slot.candidate_provider == "graspable_objects":
-        values = [item for item in runtime_objects if item.get("active") is not False and item.get("kind") in {"graspable_object", "graspable_container"}]
+        values = [
+            item for item in runtime_objects
+            if item.get("active") is not False
+            and item.get("fixed") is not True
+            and (
+                item.get("kind") in {"graspable_object", "graspable_container"}
+                or {"graspable", "movable"}.intersection(item.get("affordances") or [])
+                or item.get("fixed") is False
+            )
+        ]
         concept_kinds = set(role.get("compatible_kinds", []))
         if concept_kinds:
-            values = [item for item in values if item.get("kind") in concept_kinds]
-        explicit_ref = role.get("entity_ref")
-        return [_entity_value(item, explicit=bool(explicit_ref == item.get("entity_id") or _mentioned(item, utterance))) for item in values]
+            concept_compatible_values = [item for item in values if item.get("kind") in concept_kinds]
+            if concept_compatible_values:
+                values = concept_compatible_values
+        role_name = next((name for name in slot.role_names if name in (analysis.get("semantic_constraint_frame") or {}).get("roles", {})), slot.slot_id)
+        semantic_grounding = ground_semantic_role(
+            analysis.get("semantic_constraint_frame") or {},
+            analysis.get("observation_evidence") or {},
+            role_name,
+            candidate_entity_refs={item.get("entity_id") for item in values},
+        )
+        grounded_candidates = semantic_grounding.get("candidate_bindings", [])
+        grounded_by_ref = {item.get("entity_ref"): item for item in grounded_candidates}
+        grounded_refs = set(grounded_by_ref)
+        if semantic_grounding.get("status") == "missing" and (semantic_grounding.get("semantic_role") or {}).get("constraints"):
+            values = []
+        elif grounded_refs:
+            values = [item for item in values if item.get("entity_id") in grounded_refs]
+        return [
+            _entity_value(
+                item,
+                explicit=int((grounded_by_ref.get(item.get("entity_id")) or {}).get("evidence_strength", 0)) >= 500,
+                evidence_bindings=evidence_bindings,
+                world_revision=world_revision,
+                semantic_binding=grounded_by_ref.get(item.get("entity_id")),
+                verified_relation=(
+                    "held_by_executor"
+                    if runtime_state.get("holding") == item.get("entity_id")
+                    else "held_by_human"
+                    if item.get("received_by")
+                    else None
+                ),
+            )
+            for item in values
+        ]
     if slot.candidate_provider == "human_recipients":
-        return [_entity_value(item, explicit=_mentioned(item, utterance)) for item in runtime_objects if item.get("active") is not False and item.get("kind") == "human_recipient"]
+        values = [
+            item for item in runtime_objects
+            if item.get("active") is not False and item.get("kind") == "human_recipient"
+        ]
+        role_name = next((name for name in slot.role_names if name in (analysis.get("semantic_constraint_frame") or {}).get("roles", {})), slot.slot_id)
+        semantic_grounding = ground_semantic_role(
+            analysis.get("semantic_constraint_frame") or {},
+            analysis.get("observation_evidence") or {},
+            role_name,
+            candidate_entity_refs={item.get("entity_id") for item in values},
+        )
+        grounded_by_ref = {item.get("entity_ref"): item for item in semantic_grounding.get("candidate_bindings", [])}
+        if grounded_by_ref:
+            values = [item for item in values if item.get("entity_id") in grounded_by_ref]
+        return [
+            _entity_value(
+                item,
+                explicit=int((grounded_by_ref.get(item.get("entity_id")) or {}).get("evidence_strength", 0)) >= 500,
+                evidence_bindings=evidence_bindings,
+                world_revision=world_revision,
+                semantic_binding=grounded_by_ref.get(item.get("entity_id")),
+            )
+            for item in values
+        ]
     if slot.candidate_provider == "support_surfaces":
         values = [item for item in runtime_objects if item.get("active") is not False and item.get("kind") == "operation_surface"]
         target_region = (current_bindings.get("target_region") or {}).get("value_ref")
         if target_region:
             values = [item for item in values if item.get("region_id") == target_region]
-        return [_entity_value(item, explicit=_mentioned(item, utterance)) for item in values]
+        role_name = next((name for name in slot.role_names if name in (analysis.get("semantic_constraint_frame") or {}).get("roles", {})), slot.slot_id)
+        semantic_grounding = ground_semantic_role(
+            analysis.get("semantic_constraint_frame") or {},
+            analysis.get("observation_evidence") or {},
+            role_name,
+            candidate_entity_refs={item.get("entity_id") for item in values},
+        )
+        grounded_by_ref = {item.get("entity_ref"): item for item in semantic_grounding.get("candidate_bindings", [])}
+        if grounded_by_ref:
+            values = [item for item in values if item.get("entity_id") in grounded_by_ref]
+        return [
+            _entity_value(
+                item,
+                explicit=int((grounded_by_ref.get(item.get("entity_id")) or {}).get("evidence_strength", 0)) >= 500,
+                evidence_bindings=evidence_bindings,
+                world_revision=world_revision,
+                semantic_binding=grounded_by_ref.get(item.get("entity_id")),
+            )
+            for item in values
+        ]
     if slot.candidate_provider == "semantic_regions":
         return [
             {
@@ -367,6 +620,21 @@ def _render_question(
         return f"我当前还拿着{gap.get('current_holding_label') or '另一个对象'}，没有可用执行器继续当前目标。要先安全放下当前持物吗？"
     if status != "clarification_required" or not gap:
         return None
+    if gap.get("kind") == "grounding_evidence_slot" and gap.get("constraint_rejections"):
+        requested = "、".join(
+            str(item.get("surface") or item.get("value"))
+            for item in gap.get("requested_constraints", [])
+            if item.get("surface") or item.get("value")
+        ) or "所述属性"
+        labels = [
+            item.get("current_name_surface") or item.get("label")
+            for item in gap.get("constraint_rejections", [])
+            if item.get("current_name_surface") or item.get("label")
+        ]
+        return (
+            f"我按当前空间完成了有界观察，没有发现符合“{requested}”约束的目标；"
+            f"但发现了这些同类候选：{'、'.join(labels)}。请指出其中哪一个可以替代，或补充新的可观察特征。"
+        )
     slot_id = gap["slot_id"]
     labels = [item.get("label") for item in gap.get("candidates", []) if item.get("label")]
     if slot_id == "theme":
@@ -416,19 +684,121 @@ def _canonical_utterance(template_id: str, bindings: dict[str, dict[str, Any]]) 
     return None
 
 
-def _entity_value(item: dict[str, Any], *, explicit: bool) -> dict[str, Any]:
+def _entity_value(
+    item: dict[str, Any],
+    *,
+    explicit: bool,
+    evidence_bindings: list[dict[str, Any]],
+    world_revision: int,
+    verified_relation: str | None = None,
+    semantic_binding: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    current_confirmations = [
+        binding for binding in evidence_bindings
+        if binding.get("entity_ref") == item.get("entity_id")
+        and binding.get("world_revision") == world_revision
+    ]
+    if explicit:
+        evidence_kind = (semantic_binding or {}).get("binding_basis") or "semantic_constraints_grounded_in_current_observation"
+        evidence_strength = int((semantic_binding or {}).get("evidence_strength") or 500)
+    elif verified_relation:
+        evidence_kind, evidence_strength = f"current_verified_relation:{verified_relation}", 450
+    elif current_confirmations:
+        strongest_confirmation = max(
+            current_confirmations,
+            key=lambda binding: int(binding.get("evidence_strength", 400)),
+        )
+        evidence_kind = strongest_confirmation.get("binding_source") or "current_human_confirmed_binding"
+        evidence_strength = int(strongest_confirmation.get("evidence_strength", 400))
+    else:
+        evidence_kind, evidence_strength = "current_world_snapshot_candidate", 100
     return {
         "value_ref": item.get("entity_id"),
         "label": item.get("label"),
         "value_type": item.get("kind"),
         "explicit": explicit,
-        "evidence": "explicit_language_and_current_snapshot" if explicit else "current_world_snapshot_candidate",
+        "evidence": evidence_kind,
+        "evidence_strength": evidence_strength,
+        "evidence_sources": deepcopy(current_confirmations),
+        "matched_semantic_constraints": deepcopy((semantic_binding or {}).get("matched_constraints", [])),
+        "observation_world_revision": (semantic_binding or {}).get("world_revision", world_revision),
     }
+
+
+def _object_concepts_from_language_analysis(language_analysis: dict[str, Any]) -> list[dict[str, Any]]:
+    """Recover the object concept adapters already present in the semantic frame."""
+    concepts: dict[str, dict[str, Any]] = {}
+    for role in (language_analysis.get("role_bindings") or {}).values():
+        concept_id = (role or {}).get("concept_id")
+        if not concept_id:
+            continue
+        concepts.setdefault(concept_id, {
+            "concept_id": concept_id,
+            "compatible_kinds": deepcopy((role or {}).get("compatible_kinds", [])),
+            "functional_affordances": deepcopy((role or {}).get("functional_affordances", [])),
+        })
+    return list(concepts.values())
+
+
+def _non_dominated_evidence(values: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Only equally strongest current evidence may remain ambiguous."""
+    if not values:
+        return []
+    def strength(item: dict[str, Any]) -> int:
+        if item.get("evidence_strength") is not None:
+            return int(item["evidence_strength"])
+        return 500 if item.get("explicit") else 100
+
+    strongest = max(strength(item) for item in values)
+    by_ref: dict[str, dict[str, Any]] = {}
+    for item in values:
+        if strength(item) != strongest:
+            continue
+        ref = str(item.get("value_ref"))
+        by_ref.setdefault(ref, item)
+    return list(by_ref.values())
 
 
 def _mentioned(item: dict[str, Any], utterance: str) -> bool:
     label = str(item.get("label") or "")
     return bool(label and label in utterance)
+
+
+def _distinctive_entity_text_match_score(
+    item: dict[str, Any], utterance: str, role: dict[str, Any]
+) -> int:
+    generic_surface = str(role.get("matched_alias") or "")
+    surfaces = [str(item.get("label") or ""), *[str(alias) for alias in item.get("language_aliases", [])]]
+    best = 0
+    for surface in surfaces:
+        if not surface:
+            continue
+        if surface in utterance:
+            best = max(best, len(surface))
+            continue
+        for length in range(len(surface) - 1, 1, -1):
+            matches = {
+                surface[start:start + length]
+                for start in range(len(surface) - length + 1)
+                if surface[start:start + length] in utterance
+            }
+            distinctive = [match for match in matches if match != generic_surface]
+            if distinctive:
+                best = max(best, length)
+                break
+    return best
+
+
+def _role_locally_mentions_entity(item: dict[str, Any], utterance: str, role: dict[str, Any]) -> bool:
+    label = str(item.get("label") or "")
+    role_start = role.get("start")
+    if label and isinstance(role_start, int):
+        positions = [match.start() for match in re.finditer(re.escape(label), utterance)]
+        if any(position <= role_start < position + len(label) for position in positions):
+            return True
+    if label and label in utterance and not isinstance(role_start, int):
+        return True
+    return False
 
 
 def _novel_surface_before_relation(text: str, relation: str, analysis: dict[str, Any]) -> str | None:

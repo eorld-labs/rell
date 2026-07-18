@@ -361,6 +361,7 @@ class P016Runtime:
         self.last_sequence = -1
         self.outcome = "running"
         self.stop_reason = ""
+        self.next_stage_index = 0
 
     def admit(self) -> dict[str, Any]:
         checks = []
@@ -394,16 +395,49 @@ class P016Runtime:
             return self._build_result(admission)
 
         self.state["runtime_state"] = "running"
-        for stage in self.process_instance["stages"]:
+        self.outcome = "running"
+        start_index = int(self.state.get("next_stage_index", self.next_stage_index))
+        for index, stage in enumerate(self.process_instance["stages"]):
+            if index < start_index:
+                continue
             if self.outcome != "running":
                 break
+            if not self._entry_conditions_met(stage):
+                self.next_stage_index = index
+                self.state["next_stage_index"] = index
+                self.state["runtime_state"] = "awaiting_next_stage"
+                self.outcome = "awaiting_next_stage"
+                self.stop_reason = f"entry_conditions_not_met:{stage['stage_id']}"
+                self.stage_summary.append({"stage_id": stage["stage_id"], "result": "awaiting_next_stage", "notes": self.stop_reason})
+                break
             self._run_stage(stage)
+            if self.outcome == "running":
+                self.next_stage_index = index + 1
+                self.state["next_stage_index"] = index + 1
 
         if self.outcome == "running":
             self.outcome = "completed"
             self.state["runtime_state"] = "completed"
 
         return self._build_result(admission)
+
+    def _entry_conditions_met(self, stage: dict[str, Any]) -> bool:
+        """Check facts/variables required by the next stage without side effects."""
+        conditions = stage.get("entry_conditions") or []
+        for condition in conditions:
+            if isinstance(condition, str):
+                if self.final_facts.get(condition) != "established":
+                    return False
+                continue
+            if not isinstance(condition, dict):
+                continue
+            fact_id = condition.get("fact_id") or condition.get("predicate")
+            if fact_id and self.final_facts.get(fact_id) != condition.get("state", "established"):
+                return False
+            variable = condition.get("variable")
+            if variable and variable not in self.state.get("variables", {}):
+                return False
+        return True
 
     def _run_stage(self, stage: dict[str, Any]) -> None:
         stage_id = stage["stage_id"]
@@ -462,6 +496,15 @@ class P016Runtime:
                     "notes": f"{stage.get('transition_condition_ref')} satisfied",
                 }
             )
+            stage_index = self.process_instance["stages"].index(stage)
+            next_stage = self.process_instance["stages"][stage_index + 1] if stage_index + 1 < len(self.process_instance["stages"]) else None
+            if next_stage is not None and not self._entry_conditions_met(next_stage):
+                self.next_stage_index = stage_index + 1
+                self.state["next_stage_index"] = self.next_stage_index
+                self.state["runtime_state"] = "awaiting_next_stage"
+                self.outcome = "awaiting_next_stage"
+                self.stop_reason = f"entry_conditions_not_met:{next_stage['stage_id']}"
+                self.stage_summary.append({"stage_id": next_stage["stage_id"], "result": "awaiting_next_stage", "notes": self.stop_reason})
             return
 
         self.outcome = "failed"
