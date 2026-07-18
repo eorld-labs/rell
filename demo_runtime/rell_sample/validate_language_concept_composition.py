@@ -57,6 +57,13 @@ def main() -> None:
     require(transfer["canonical_frame"]["goal_relation"] == "object_supported_at_destination", f"goal projection failed: {transfer}")
     require("桌子" in str(transfer["canonical_utterance"]), f"destination role was lost: {transfer}")
 
+    restore_first = compose("我喝完了，把杯子放回桌子上")
+    restore_second = compose("我喝完了，把杯子放回桌子上")
+    require(restore_first["canonical_utterance"] == "把杯子放回桌子", f"restore relation degraded into an unbound release: {restore_first}")
+    require(restore_first["role_bindings"].get("theme", {}).get("matched_alias") == "杯子" and restore_first["role_bindings"].get("destination", {}).get("matched_alias") == "桌子", f"restore theme and destination were not separated: {restore_first}")
+    require(restore_first["modifiers"].get("restore_prior_relation") is True and restore_first["canonical_frame"].get("destination_binding_policy") == "most_recent_verified_support_relation", f"restore did not retain its temporal relation constraint: {restore_first}")
+    require(restore_first["confidence"] == restore_second["confidence"] and restore_first["role_bindings"] == restore_second["role_bindings"], f"identical language and context produced non-deterministic semantics: {restore_first}: {restore_second}")
+
     handover = compose("现在把苹果再递给人类")
     require(handover["speech_act"] == "task_request", f"object handover was not understood as a task: {handover}")
     require(handover["canonical_frame"]["operators"] == ["handover_object"], f"handover language did not reach the generic event primitive: {handover}")

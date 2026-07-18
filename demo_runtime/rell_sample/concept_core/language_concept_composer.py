@@ -11,7 +11,7 @@ EVENT_LEXICAL_PRIMITIVES: tuple[dict[str, Any], ...] = (
     {"operator": "orient_executor", "concept_id": "factory_event_orient", "heads": ("转向", "面向", "朝向", "转"), "canonical": "转向"},
     {"operator": "grasp_object", "concept_id": "factory_event_grasp", "heads": ("捡", "拾", "抓", "取", "拿"), "canonical": "拿起"},
     {"operator": "release_object", "concept_id": "factory_event_release", "heads": ("释放", "撒手", "松开", "放开"), "canonical": "放开"},
-    {"operator": "place_object", "concept_id": "factory_event_place", "heads": ("搁", "摆", "放"), "canonical": "放到"},
+    {"operator": "place_object", "concept_id": "factory_event_place", "heads": ("放回", "搁", "摆", "放"), "canonical": "放到"},
     {"operator": "handover_object", "concept_id": "factory_event_handover", "heads": ("递给", "交给", "拿给", "送给", "递过去", "交过去"), "canonical": "递给"},
     {"operator": "transport_object", "concept_id": "factory_event_transport", "heads": ("带到", "拿到", "送到", "端到", "带走", "拿来"), "canonical": "带到"},
     {"operator": "apply_directional_force", "concept_id": "factory_event_push_pull", "heads": ("拖", "挪", "推", "拉"), "canonical": "推动"},
@@ -214,9 +214,10 @@ def _roles(
     if placing:
         surface = str(place_event.get("matched_surface") or "")
         has_destination_connector = any(marker in surface for marker in ("到", "在"))
+        restores_prior_relation = "回" in surface
         before = [item for item in objects if item.get("end", 0) <= place_event["start"]]
         after = [item for item in objects if item.get("start", 0) >= place_event["end"]]
-        if has_destination_connector and after:
+        if (has_destination_connector or restores_prior_relation) and after:
             roles["destination"] = deepcopy(after[-1])
             if before:
                 roles["theme"] = deepcopy(before[-1])
@@ -279,7 +280,8 @@ def _canonical_utterance(speech_act: str, query_type: str | None, events: list[d
         if operator == "grasp_object" and target_name:
             part = f"拿起{target_name}"
         elif operator == "place_object":
-            part = f"把{target_name}放到{destination_name}" if target_name and destination_name else (f"放下{target_name}" if target_name else None)
+            placement_surface = "放回" if "回" in str(event.get("matched_surface") or "") else "放到"
+            part = f"把{target_name}{placement_surface}{destination_name}" if target_name and destination_name else (f"放下{target_name}" if target_name else None)
         elif operator == "handover_object":
             part = f"把{target_name}递给{recipient_name}" if target_name and recipient_name else None
         elif operator == "navigate_to" and destination_name:
@@ -407,6 +409,10 @@ def compose_language_concepts(
             "completed_or_resultative": any(marker in normalized for marker in ("到了", "看见", "看到", "完成", "已经")),
             "current_scope": not any(marker in normalized for marker in ("昨天", "以前", "曾经")),
             "body_relative_direction": relative_direction,
+            "restore_prior_relation": any(
+                item.get("operator") == "place_object" and "回" in str(item.get("matched_surface") or "")
+                for item in events
+            ),
         },
         "canonical_utterance": canonical,
         "canonical_frame": {
@@ -422,6 +428,14 @@ def compose_language_concepts(
                 )
             ),
             "world_scope": "current_world_revision",
+            "destination_binding_policy": (
+                "most_recent_verified_support_relation"
+                if any(
+                    item.get("operator") == "place_object" and "回" in str(item.get("matched_surface") or "")
+                    for item in events
+                )
+                else "current_spatial_relation"
+            ),
         },
         "definition_candidate": deepcopy(definition),
         "unknown_surface": unknown_surface,

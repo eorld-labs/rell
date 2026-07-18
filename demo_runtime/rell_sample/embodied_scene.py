@@ -185,6 +185,7 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator", scene_id
         "dialogue_focus_entities": [],
         "last_language_understanding": None,
         "long_horizon_intents": {},
+        "completed_intent_archive": [],
         "active_intent_id": None,
         "intent_activation_stack": [],
         "relational_reference_dialogue": None,
@@ -206,8 +207,11 @@ def _long_intent_view(intent: dict[str, Any]) -> dict[str, Any]:
         "intent_type": intent.get("intent_type"),
         "goal_fact": intent["goal_fact"],
         "role_bindings": deepcopy(intent["role_bindings"]),
+        "source_language_frame": deepcopy(intent.get("source_language_frame")),
         "lifecycle": intent["lifecycle"],
         "verified_facts": list(intent["verified_facts"]),
+        "verified_facts_scope": "historical_intent_execution_evidence",
+        "current_world_facts_rederived_before_arbitration": True,
         "current_stage": deepcopy(intent.get("current_stage")),
         "resume_envelope": deepcopy(intent.get("resume_envelope")),
         "trajectory_persisted": False,
@@ -347,6 +351,16 @@ def _create_transfer_intent(
             "destination": destination["entity_id"],
             **({"source_holder": source_holder_ref} if source_holder_ref else {}),
             **({"companions": companion_refs} if companion_refs else {}),
+        },
+        "source_language_frame": {
+            "utterance": utterance,
+            "canonical_utterance": (language_analysis or {}).get("canonical_utterance"),
+            "semantic_roles": deepcopy((language_analysis or {}).get("role_bindings", {})),
+            "modifiers": deepcopy((language_analysis or {}).get("modifiers", {})),
+            "destination_binding_policy": deepcopy(
+                (language_analysis or {}).get("canonical_frame", {}).get("destination_binding_policy")
+            ),
+            "fact_effect": "language_binds_goal_and_roles_but_does_not_commit_physical_facts",
         },
         "goal_contract": {
             "requires": ["theme_object_grounded", "destination_grounded"],
@@ -839,7 +853,18 @@ def _prepare_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) 
         if session.get("active_intent_id") == intent["intent_id"]:
             session["active_intent_id"] = None
             session["intent_activation_stack"] = []
-        return {"status": "long_intent_completed", "long_horizon_intent": _long_intent_view(intent)}
+        completed_view = _long_intent_view(intent)
+        completed_view.update({
+            "closed_world_revision": session["world_revision"],
+            "arbitration_eligible": False,
+            "snapshot_state": "released_from_active_arbitration",
+        })
+        archive = session.setdefault("completed_intent_archive", [])
+        archive.append(deepcopy(completed_view))
+        if len(archive) > 128:
+            del archive[:-128]
+        session.get("long_horizon_intents", {}).pop(intent["intent_id"], None)
+        return {"status": "long_intent_completed", "long_horizon_intent": completed_view}
     if stage["status"] != "stage_ready":
         intent["lifecycle"] = "awaiting_rebinding"
         return {
@@ -5336,6 +5361,10 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
             stage_outcome = _prepare_long_intent_stage(session, intent)
             result["long_horizon_intent"] = stage_outcome.get("long_horizon_intent", _long_intent_view(intent))
             if stage_outcome.get("status") == "long_intent_completed":
+                result.pop("candidate_execution_plan", None)
+                result.pop("next_stage_candidate", None)
+                result.pop("pending_confirmation", None)
+                result["execution_plan_state"] = "released_on_task_completion"
                 result["prompt"] = "当前阶段已验真，长程目标的终止事实也已成立。"
             elif stage_outcome.get("job_id"):
                 result["next_stage_started"] = {

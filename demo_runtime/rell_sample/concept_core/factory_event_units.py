@@ -120,7 +120,7 @@ FACTORY_EVENT_CONCEPT_UNITS: list[dict[str, Any]] = [
         "factory_event_place",
         "放置对象事件概念",
         "place_object",
-        ["放到", "放在", "放下", "摆到", "摆在", "搁在"],
+        ["放回", "放到", "放在", "放下", "摆到", "摆在", "搁在"],
         "place_object",
         {
             "object": {"role": "theme", "entity_type": "held_object"},

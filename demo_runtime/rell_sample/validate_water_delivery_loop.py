@@ -55,8 +55,11 @@ def complete_authorized_service(scene_id: str) -> dict:
     require(container.get("received_by") == recipient["entity_id"], f"handover fact missing in {scene_id}: {container}")
     require(container["entity_id"] in recipient.get("received_object_refs", []), f"recipient possession missing: {recipient}")
     require(live.get("active_intent_id") is None, f"long intent not completed: {live.get('long_horizon_intents')}")
-    completed_intent = next(iter(live.get("long_horizon_intents", {}).values()))
+    require(not live.get("long_horizon_intents"), f"completed intent remained eligible for arbitration: {live.get('long_horizon_intents')}")
+    completed_intent = live.get("completed_intent_archive", [])[-1]
     require(completed_intent.get("hierarchical_intent_graph", {}).get("lifecycle") == "completed", f"runtime stages did not close the unified hierarchical intent graph: {completed_intent}")
+    require(completed_intent.get("arbitration_eligible") is False and completed_intent.get("verified_facts_scope") == "historical_intent_execution_evidence", f"completed facts were not archived with an explicit historical scope: {completed_intent}")
+    require("candidate_execution_plan" not in outcomes[-1] and outcomes[-1].get("execution_plan_state") == "released_on_task_completion", f"completed result retained a stale candidate plan: {outcomes[-1]}")
     require("container_filled" in stage_facts and "human_received_filled_container" in stage_facts, f"stage facts missing: {stage_facts}")
     return {"scene_id": scene_id, "stage_facts": stage_facts, "route_kinds": route_kinds, "intent_graph": "completed"}
 
@@ -156,6 +159,19 @@ def verify_post_handover_reacquisition_and_support_disambiguation() -> dict:
     require(reported_intent.get("role_bindings", {}).get("source_holder") == "human_b" and reported_intent.get("role_bindings", {}).get("destination") == "counter_b", f"verified holder and confirmed support were not used by the long-horizon solver: {reported_transfer}")
     report_candidates = get_session(confirmed_id).get("human_reported_fact_candidates", [])
     require(report_candidates and report_candidates[-1].get("possible_derived_fact") == "container_empty" and report_candidates[-1].get("runtime_fact_committed") is False, f"drink completion was not retained as a bounded human-reported state candidate: {report_candidates}")
+
+    restore_session = start_session("home_humanoid", "home_semantic_3d_b")
+    restore_id = restore_session["session_id"]
+    drain_service(begin_motion_command(restore_id, "给我接一杯水"))
+    restored = begin_motion_command(restore_id, "我喝完了，把杯子放回桌子上")
+    restored_result = restored.get("immediate_result") or restored
+    restored_intent = restored.get("long_horizon_intent", {})
+    restored_language = restored_intent.get("source_language_frame", {})
+    require(restored_result.get("status") == "requires_human_confirmation", f"restore request did not derive reacquisition as the next stage: {restored}")
+    require(restored_intent.get("role_bindings", {}).get("source_holder") == "human_b", f"restore request lost the current verified human holder: {restored}")
+    require(restored_intent.get("role_bindings", {}).get("destination") == "counter_b", f"restore request did not bind the most recent verified support: {restored}")
+    require(restored_language.get("canonical_utterance") == "把杯子放回桌子", f"restore semantics degraded into release or lost its destination: {restored_language}")
+    require(restored_language.get("modifiers", {}).get("restore_prior_relation") is True and restored_language.get("destination_binding_policy") == "most_recent_verified_support_relation", f"restore relation was not retained as a historical binding constraint: {restored_language}")
 
     correction_session = start_session("home_humanoid", "home_semantic_3d_b")
     correction_id = correction_session["session_id"]
