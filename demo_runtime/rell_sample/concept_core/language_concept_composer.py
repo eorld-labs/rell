@@ -34,6 +34,9 @@ FUNCTION_WORDS = (
 # or causal role of their own.
 FUNCTION_WORDS += ("再", "然后", "接着")
 FUNCTION_WORDS += ("人类", "家人", "主人", "用户", "接收人")
+# Discourse acknowledgements can frame a task request, but they do not fill
+# any event, entity, temporal, spatial, or causal slot in that request.
+FUNCTION_WORDS += ("嗯嗯", "嗯", "好的", "好")
 
 
 def normalize_language_text(text: str) -> str:
@@ -209,6 +212,7 @@ def _roles(
     held = [item for item in context_entities if item.get("focus_source") == "verified_holding_fact"]
     place_event = next((item for item in events if item["operator"] == "place_object"), None)
     handover_event = next((item for item in events if item["operator"] == "handover_object"), None)
+    transport_event = next((item for item in events if item["operator"] == "transport_object"), None)
     placing = place_event is not None
     roles: dict[str, Any] = {}
     if placing:
@@ -254,15 +258,38 @@ def _roles(
                 "reference": "human_speaker" if recipient_surface == "我" else "current_human_recipient_role",
                 "source": "human_recipient_relational_language",
             }
+    if transport_event:
+        destination = roles.get("destination")
+        if destination:
+            alias = str(destination.get("matched_alias") or "")
+            suffix = text[int(destination.get("end", 0)):] if isinstance(destination.get("end"), int) else ""
+            if alias and suffix.startswith(("上", "上面", "上边")):
+                destination["spatial_relation"] = "on_support_surface"
+            elif alias and suffix.startswith(("旁", "旁边", "附近")):
+                destination["spatial_relation"] = "near_landmark"
+            elif alias and suffix.startswith(("里", "里面", "内部")):
+                destination["spatial_relation"] = "inside_container"
+        else:
+            complement = text[transport_event["end"]:]
+            complement = re.sub(r"(?:里面|内部|附近|旁边|上面|上边|上|里|去)$", "", complement)
+            if complement:
+                roles["target_region"] = {
+                    "matched_alias": complement,
+                    "entity_type": "semantic_region",
+                    "spatial_relation": "inside_semantic_region",
+                    "source": "transport_result_complement",
+                }
     return roles
 
 
 def _canonical_utterance(speech_act: str, query_type: str | None, events: list[dict[str, Any]], roles: dict[str, Any]) -> str | None:
     target = roles.get("theme") or roles.get("target") or roles.get("destination") or {}
     destination = roles.get("destination") or {}
+    target_region = roles.get("target_region") or {}
     recipient = roles.get("recipient") or {}
     target_name = target.get("matched_alias") or target.get("label") or target.get("display_name")
     destination_name = destination.get("matched_alias") or destination.get("display_name")
+    target_region_name = target_region.get("matched_alias") or target_region.get("display_name")
     recipient_name = recipient.get("matched_alias") or recipient.get("label") or recipient.get("display_name")
     if speech_act == "state_query":
         if query_type == "object_visibility" and target_name:
@@ -284,6 +311,14 @@ def _canonical_utterance(speech_act: str, query_type: str | None, events: list[d
             part = f"把{target_name}{placement_surface}{destination_name}" if target_name and destination_name else (f"放下{target_name}" if target_name else None)
         elif operator == "handover_object":
             part = f"把{target_name}递给{recipient_name}" if target_name and recipient_name else None
+        elif operator == "transport_object":
+            transport_destination = destination_name or target_region_name
+            if target_name and transport_destination and destination.get("spatial_relation") == "on_support_surface":
+                part = f"把{target_name}放到{transport_destination}"
+            elif target_name and transport_destination:
+                part = f"把{target_name}带到{transport_destination}"
+            else:
+                part = None
         elif operator == "navigate_to" and destination_name:
             part = f"走到{destination_name}"
         elif operator == "observe_entity" and target_name:
@@ -420,7 +455,13 @@ def compose_language_concepts(
             "operators": [item["operator"] for item in events],
             "query_type": query_type,
             "roles": deepcopy(roles),
-            "goal_relation": "object_supported_at_destination" if any(item["operator"] == "place_object" for item in events) else (
+            "goal_relation": "object_supported_at_destination" if (
+                any(item["operator"] == "place_object" for item in events)
+                or (
+                    any(item["operator"] == "transport_object" for item in events)
+                    and roles.get("destination", {}).get("spatial_relation") == "on_support_surface"
+                )
+            ) else (
                 "object_received_by_recipient" if any(item["operator"] == "handover_object" for item in events) else (
                     "object_at_target_region" if any(item["operator"] == "transport_object" for item in events) else (
                         "object_in_gripper" if any(item["operator"] == "grasp_object" for item in events) else None

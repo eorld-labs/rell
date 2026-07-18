@@ -57,6 +57,16 @@ def main() -> None:
     require(transfer["canonical_frame"]["goal_relation"] == "object_supported_at_destination", f"goal projection failed: {transfer}")
     require("桌子" in str(transfer["canonical_utterance"]), f"destination role was lost: {transfer}")
 
+    transport_to_support = compose("嗯，把杯子拿到桌子上去")
+    require(transport_to_support["canonical_frame"]["operators"] == ["transport_object"], f"transport surface was not recognized: {transport_to_support}")
+    require(transport_to_support["role_bindings"].get("destination", {}).get("spatial_relation") == "on_support_surface", f"support topology was not extracted from the result complement: {transport_to_support}")
+    require(transport_to_support["canonical_frame"].get("goal_relation") == "object_supported_at_destination" and transport_to_support["canonical_utterance"] == "把杯子放到桌子", f"support transport did not compile to a supported-object terminal fact: {transport_to_support}")
+    require(transport_to_support["unknown_surface"] is None and transport_to_support["decision"] == "route_canonical_semantics", f"discourse acknowledgement incorrectly blocked a complete task frame: {transport_to_support}")
+
+    transport_to_region = compose("把苹果带到厨房")
+    require(transport_to_region["role_bindings"].get("target_region", {}).get("matched_alias") == "厨房", f"region result complement was not extracted: {transport_to_region}")
+    require(transport_to_region["canonical_frame"].get("goal_relation") == "object_at_target_region" and transport_to_region["canonical_utterance"] == "把苹果带到厨房", f"region transport was confused with support placement: {transport_to_region}")
+
     restore_first = compose("我喝完了，把杯子放回桌子上")
     restore_second = compose("我喝完了，把杯子放回桌子上")
     require(restore_first["canonical_utterance"] == "把杯子放回桌子", f"restore relation degraded into an unbound release: {restore_first}")

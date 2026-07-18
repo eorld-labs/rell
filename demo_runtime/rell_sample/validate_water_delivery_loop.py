@@ -187,6 +187,17 @@ def verify_post_handover_reacquisition_and_support_disambiguation() -> dict:
     sofa_route_cup = next(item for item in sofa_route_live["runtime_objects"] if item["entity_id"] == "cup_a")
     require(sofa_route_cup.get("support_ref") == "counter_a" and sofa_route_live.get("active_intent_id") is None, f"return task did not close on the verified support fact: {sofa_route_live}")
 
+    colloquial_session = start_session("home_humanoid", "home_semantic_3d_a")
+    colloquial_id = colloquial_session["session_id"]
+    drain_service(begin_motion_command(colloquial_id, "给我接一杯水"))
+    colloquial = begin_motion_command(colloquial_id, "嗯，把杯子拿到桌子上去")
+    colloquial_result = colloquial.get("immediate_result") or colloquial
+    colloquial_intent = colloquial.get("long_horizon_intent", {})
+    require(colloquial_result.get("status") == "requires_human_confirmation", f"support transport fell through to perception or experience replay: {colloquial}")
+    require(colloquial_intent.get("goal_fact") == "object_supported_at_destination", f"support transport compiled to the wrong terminal fact: {colloquial}")
+    require(colloquial_intent.get("role_bindings", {}).get("theme") == "cup_a" and colloquial_intent.get("role_bindings", {}).get("destination") == "counter_a", f"support transport lost its theme or destination role: {colloquial}")
+    require(colloquial_intent.get("role_bindings", {}).get("source_holder") == "human_a", f"support transport did not derive reacquisition from the current holder: {colloquial}")
+
     correction_session = start_session("home_humanoid", "home_semantic_3d_b")
     correction_id = correction_session["session_id"]
     drain_service(begin_motion_command(correction_id, "给我接一杯水"))
