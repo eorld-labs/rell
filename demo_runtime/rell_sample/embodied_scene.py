@@ -5399,6 +5399,49 @@ def _first_collision(
 ) -> dict[str, Any] | None:
     scene = scene or _scene_for_session(session)
     distance = math.dist(start, target)
+    analytic_contacts: list[tuple[float, dict[str, Any]]] = []
+    for item in scene["objects"]:
+        if not item.get("fixed"):
+            continue
+        ox, oy = map(float, item["position"])
+        sx, sy = map(float, item["size"][:2])
+        entry = _segment_aabb_entry_fraction(
+            start,
+            target,
+            ox - sx / 2 - radius,
+            ox + sx / 2 + radius,
+            oy - sy / 2 - radius,
+            oy + sy / 2 + radius,
+        )
+        if entry is not None:
+            analytic_contacts.append((entry, {**deepcopy(item), "obstacle_class": "fixed_furniture", "fixed": True}))
+    for obstacle in session["active_obstacles"]:
+        entry = _segment_circle_entry_fraction(
+            start,
+            target,
+            list(map(float, obstacle["position"])),
+            radius + 0.38,
+        )
+        if entry is not None:
+            analytic_contacts.append((entry, {**deepcopy(obstacle), "label": "凳子", "obstacle_class": "movable_obstacle", "fixed": False}))
+    if analytic_contacts:
+        entry, obstacle = min(analytic_contacts, key=lambda value: value[0])
+        clearance_fraction = min(entry, 0.003 / max(distance, 0.003))
+        safe_ratio = max(0.0, entry - clearance_fraction)
+        contact_position = [
+            start[0] + (target[0] - start[0]) * entry,
+            start[1] + (target[1] - start[1]) * entry,
+        ]
+        safe_position = [
+            start[0] + (target[0] - start[0]) * safe_ratio,
+            start[1] + (target[1] - start[1]) * safe_ratio,
+        ]
+        return {
+            "obstacle": obstacle,
+            "contact_position": contact_position,
+            "safe_position": safe_position,
+            "detector": "analytic_segment_expanded_aabb_intersection",
+        }
     sample_count = max(2, int(distance / 0.04) + 1)
     previous = list(start)
     for index in range(1, sample_count):
@@ -5409,6 +5452,62 @@ def _first_collision(
             return {"obstacle": collider, "contact_position": point, "safe_position": previous}
         previous = point
     return None
+
+
+def _segment_aabb_entry_fraction(
+    start: list[float],
+    target: list[float],
+    min_x: float,
+    max_x: float,
+    min_y: float,
+    max_y: float,
+) -> float | None:
+    """Return the first segment fraction entering an axis-aligned box."""
+    entry, exit_fraction = 0.0, 1.0
+    for origin, delta, lower, upper in (
+        (float(start[0]), float(target[0]) - float(start[0]), min_x, max_x),
+        (float(start[1]), float(target[1]) - float(start[1]), min_y, max_y),
+    ):
+        if abs(delta) < 1e-12:
+            if origin < lower or origin > upper:
+                return None
+            continue
+        first = (lower - origin) / delta
+        second = (upper - origin) / delta
+        if first > second:
+            first, second = second, first
+        entry = max(entry, first)
+        exit_fraction = min(exit_fraction, second)
+        if entry > exit_fraction:
+            return None
+    if exit_fraction < 0.0 or entry > 1.0:
+        return None
+    return max(0.0, entry)
+
+
+def _segment_circle_entry_fraction(
+    start: list[float], target: list[float], center: list[float], radius: float
+) -> float | None:
+    dx = float(target[0]) - float(start[0])
+    dy = float(target[1]) - float(start[1])
+    fx = float(start[0]) - float(center[0])
+    fy = float(start[1]) - float(center[1])
+    a = dx * dx + dy * dy
+    c = fx * fx + fy * fy - radius * radius
+    if c <= 0.0:
+        return 0.0
+    if a <= 1e-18:
+        return None
+    b = 2.0 * (fx * dx + fy * dy)
+    discriminant = b * b - 4.0 * a * c
+    if discriminant < 0.0:
+        return None
+    root = math.sqrt(discriminant)
+    entry = (-b - root) / (2.0 * a)
+    exit_fraction = (-b + root) / (2.0 * a)
+    if exit_fraction < 0.0 or entry > 1.0:
+        return None
+    return max(0.0, entry)
 
 
 def _plan_verified_motion(
@@ -5446,6 +5545,9 @@ def _plan_verified_motion(
     for side_name, side_sign in (("left", 1.0), ("right", -1.0)):
         template_waypoints = _detour_candidate(start, target, obstacle, radius, side_sign, preserve_terminal_goal)
         waypoints = _simplify_collision_free_waypoints(session, start, template_waypoints, radius)
+        if not waypoints:
+            rejected.append({"side": side_name, "reason": "no_collision_free_bridge_to_detour_waypoints"})
+            continue
         segment_start = start
         rejection = None
         for segment_index, waypoint in enumerate(waypoints):
@@ -5560,8 +5662,19 @@ def _global_collision_free_route(
     while nodes[-1] != start_node:
         nodes.append(came_from[nodes[-1]])
     nodes.reverse()
-    raw = [point(node) for node in nodes[1:]] + [list(target)]
-    return _simplify_collision_free_waypoints(session, start, raw, radius)
+    # Keep the verified bridge from the continuous start pose onto the grid.
+    # Omitting start_node can make the first returned grid neighbor unreachable
+    # even though A* itself found a valid route from start_node onward.
+    raw = [point(start_node)] + [point(node) for node in nodes[1:]] + [list(target)]
+    simplified = _simplify_collision_free_waypoints(session, start, raw, radius)
+    if not simplified:
+        return None
+    segment_start = start
+    for waypoint in simplified:
+        if _first_collision(session, segment_start, waypoint, radius, scene):
+            return None
+        segment_start = waypoint
+    return simplified
 
 
 def _collider_at(point: list[float], radius: float, session: dict[str, Any], scene: dict[str, Any]) -> dict[str, Any] | None:
@@ -5624,12 +5737,14 @@ def _simplify_collision_free_waypoints(
     anchor = list(start)
     index = 0
     while index < len(template_waypoints):
-        furthest = index
+        furthest = None
         for candidate_index in range(len(template_waypoints) - 1, index - 1, -1):
             candidate = template_waypoints[candidate_index]
             if _first_collision(session, anchor, candidate, radius) is None:
                 furthest = candidate_index
                 break
+        if furthest is None:
+            return []
         waypoint = list(template_waypoints[furthest])
         simplified.append(waypoint)
         anchor = waypoint

@@ -173,6 +173,20 @@ def verify_post_handover_reacquisition_and_support_disambiguation() -> dict:
     require(restored_language.get("canonical_utterance") == "把杯子放回桌子", f"restore semantics degraded into release or lost its destination: {restored_language}")
     require(restored_language.get("modifiers", {}).get("restore_prior_relation") is True and restored_language.get("destination_binding_policy") == "most_recent_verified_support_relation", f"restore relation was not retained as a historical binding constraint: {restored_language}")
 
+    sofa_route_session = start_session("home_humanoid", "home_semantic_3d_a")
+    sofa_route_id = sofa_route_session["session_id"]
+    drain_service(begin_motion_command(sofa_route_id, "给我接一杯水"))
+    returned = begin_motion_command(sofa_route_id, "我喝完了，把杯子放到桌子上去")
+    require((returned.get("immediate_result") or returned).get("status") == "requires_human_confirmation", f"return task did not expose its reacquisition candidate: {returned}")
+    grasp_result = drain(begin_motion_command(sofa_route_id, "确认"))
+    require(grasp_result.get("terminal_fact") == "target_object_in_gripper", f"return task did not reacquire the cup from the human: {grasp_result}")
+    placed_result = drain(begin_motion_command(sofa_route_id, "确认"))
+    require(placed_result.get("terminal_fact") == "object_supported_at_destination", f"static sofa route did not reach and place the cup: {placed_result}")
+    require(placed_result.get("status") != "replanning_stalled_by_persistent_constraint", f"planner emitted a route that its execution checker rejected: {placed_result}")
+    sofa_route_live = get_session(sofa_route_id)
+    sofa_route_cup = next(item for item in sofa_route_live["runtime_objects"] if item["entity_id"] == "cup_a")
+    require(sofa_route_cup.get("support_ref") == "counter_a" and sofa_route_live.get("active_intent_id") is None, f"return task did not close on the verified support fact: {sofa_route_live}")
+
     correction_session = start_session("home_humanoid", "home_semantic_3d_b")
     correction_id = correction_session["session_id"]
     drain_service(begin_motion_command(correction_id, "给我接一杯水"))
