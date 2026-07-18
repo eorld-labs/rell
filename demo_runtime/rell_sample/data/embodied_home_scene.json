@@ -44,7 +44,7 @@
       "manipulator_channels": [{"channel_id": "primary_gripper", "side": "center", "max_holding_count": 1}],
       "arm_reach_m": 0.72,
       "gripper_span_m": 0.11,
-      "supported_actions": ["relative_move", "navigate_to_region", "local_obstacle_avoidance", "grasp_object", "place_object", "fill_container", "handover_container", "request_human_confirmation"]
+      "supported_actions": ["relative_move", "navigate_to_region", "local_obstacle_avoidance", "grasp_object", "place_object", "fill_container", "handover_container", "handover_object", "request_human_confirmation"]
     },
     "home_humanoid": {
       "executor_type": "humanoid_robot",
@@ -62,7 +62,7 @@
       "manipulator_channels": [{"channel_id": "left_hand", "side": "left", "max_holding_count": 1}, {"channel_id": "right_hand", "side": "right", "max_holding_count": 1}],
       "arm_reach_m": 0.78,
       "gripper_span_m": 0.12,
-      "supported_actions": ["relative_move", "navigate_to_region", "local_obstacle_avoidance", "grasp_object", "place_object", "fill_container", "handover_container", "request_human_confirmation"]
+      "supported_actions": ["relative_move", "navigate_to_region", "local_obstacle_avoidance", "grasp_object", "place_object", "fill_container", "handover_container", "handover_object", "request_human_confirmation"]
     }
   },
   "initial_state": {"executor_position": [-3.0, -1.2], "executor_yaw_deg": 0.0, "active_region": "living_room", "holding": null}

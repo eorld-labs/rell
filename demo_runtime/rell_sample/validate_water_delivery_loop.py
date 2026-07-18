@@ -202,6 +202,25 @@ def verify_contrastive_evidence_gap_dialogue() -> dict:
     }
 
 
+def verify_generic_object_handover() -> dict:
+    session = start_session("home_humanoid", "home_semantic_3d_a")
+    session_id = session["session_id"]
+    started = begin_motion_command(session_id, "现在把苹果再递给人类")
+    intent = started.get("long_horizon_intent", {})
+    require(started.get("status") == "motion_started", f"explicit object handover did not authorize its necessary causal stages: {started}")
+    require(intent.get("intent_type") == "verified_object_handover" and intent.get("goal_fact") == "object_received_by_recipient", f"apple handover fell back to a water-specific or unknown task: {started}")
+    outcomes = drain_service(started)
+    live = get_session(session_id)
+    apple = next(item for item in live["runtime_objects"] if item["entity_id"] == "apple_a")
+    recipient = next(item for item in live["runtime_objects"] if item["entity_id"] == "human_a")
+    require([item.get("terminal_fact") for item in outcomes] == ["target_object_in_gripper", "object_received_by_recipient"], f"generic handover did not derive acquire then transfer stages: {outcomes}")
+    require(apple.get("received_by") == "human_a" and "apple_a" in recipient.get("received_object_refs", []), f"recipient possession was not physically verified: {apple}: {recipient}")
+    require(live.get("active_intent_id") is None, f"generic handover goal did not terminate after verification: {live.get('long_horizon_intents')}")
+    episode = next(item for item in reversed(live.get("episodic_fact_memory", [])) if item.get("operator") == "handover_object")
+    require(episode.get("participants", {}).get("theme") == "apple_a" and episode.get("verification_basis") == "effector_release_plus_recipient_possession_tracking", f"object-independent handover transition was not retained: {episode}")
+    return {"goal_fact": "object_received_by_recipient", "theme": "apple_a", "recipient": "human_a"}
+
+
 def verify_teaching_actions() -> dict:
     session = start_session("home_humanoid", "home_semantic_3d_a")
     session_id = session["session_id"]
@@ -269,6 +288,7 @@ def main() -> None:
         "water_then_place_composition": verify_water_then_place_composition(),
         "post_handover_reacquisition": verify_post_handover_reacquisition_and_support_disambiguation(),
         "contrastive_evidence_gap_dialogue": verify_contrastive_evidence_gap_dialogue(),
+        "generic_object_handover": verify_generic_object_handover(),
     }
     print(report)
 

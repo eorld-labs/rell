@@ -18,6 +18,7 @@ from concept_core.factory_state_facts import build_factory_state_catalog, derive
 from concept_core.lightweight_orchestrator import build_lightweight_causal_candidate, build_lightweight_orchestrator_catalog
 from concept_core.language_concept_composer import compose_language_concepts, normalize_language_text
 from concept_core.perceptual_grounding import COLOR_ALIASES, COLOR_NAMES, activate_task_perception, build_open_world_observation, build_task_perception_result, load_object_concepts
+from concept_core.process_template_resolver import resolve_process_request
 from concept_core.situated_event_reasoning import (
     compile_situated_event_frame,
     create_hierarchical_intent_graph,
@@ -190,6 +191,7 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator", scene_id
         "situated_event_frame_history": [],
         "role_clarification_dialogue": None,
         "evidence_gap_dialogue": None,
+        "process_gap_dialogue": None,
         "human_reported_fact_candidates": [],
     }
     _holding_by_effector(session)
@@ -201,6 +203,7 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator", scene_id
 def _long_intent_view(intent: dict[str, Any]) -> dict[str, Any]:
     return {
         "intent_id": intent["intent_id"],
+        "intent_type": intent.get("intent_type"),
         "goal_fact": intent["goal_fact"],
         "role_bindings": deepcopy(intent["role_bindings"]),
         "lifecycle": intent["lifecycle"],
@@ -232,13 +235,17 @@ def _conceptual_reference_for_entity(entity: dict[str, Any]) -> str:
     return str(entity.get("label") or "目标对象")
 
 
-def _create_transfer_intent(session: dict[str, Any], utterance: str) -> dict[str, Any] | None:
+def _create_transfer_intent(
+    session: dict[str, Any], utterance: str, language_analysis: dict[str, Any] | None = None
+) -> dict[str, Any] | None:
     normalized = re.sub(r"[，。！？、,.!?\s]+", "", utterance)
     transfer_tokens = ("放到", "放在", "摆到", "摆在", "搁到", "搁在", "移到", "搬到", "挪到")
     restore_requested = any(token in normalized for token in ("放回", "放回去", "放回原处", "还回去"))
     if not restore_requested and not any(token in normalized for token in transfer_tokens):
         return None
     concepts = load_object_concepts()["concepts"]
+    process_resolution = (language_analysis or {}).get("process_template_resolution") or {}
+    process_bindings = process_resolution.get("bindings", {}) if process_resolution.get("template_id") == "place_object" else {}
     mentioned = [concept for concept in concepts if any(alias and alias in normalized for alias in concept.get("aliases", []))]
     theme_concepts = [concept for concept in mentioned if "graspable" in concept.get("functional_affordances", [])]
     destination_concepts = [concept for concept in mentioned if "support_object" in concept.get("functional_affordances", [])]
@@ -301,6 +308,12 @@ def _create_transfer_intent(session: dict[str, Any], utterance: str) -> dict[str
         ]
         if len(confirmed_destinations) == 1:
             destinations = confirmed_destinations
+    resolved_theme_ref = (process_bindings.get("theme") or {}).get("value_ref")
+    resolved_destination_ref = (process_bindings.get("destination") or {}).get("value_ref")
+    if resolved_theme_ref:
+        theme_candidates = [item for item in theme_candidates if item.get("entity_id") == resolved_theme_ref]
+    if resolved_destination_ref:
+        destinations = [item for item in destinations if item.get("entity_id") == resolved_destination_ref]
     if len(theme_candidates) != 1 or len(destinations) != 1:
         return None
     theme, destination = theme_candidates[0], destinations[0]
@@ -356,6 +369,139 @@ def _create_transfer_intent(session: dict[str, Any], utterance: str) -> dict[str
         "current_stage": None,
         "resume_envelope": None,
         "created_world_revision": session["world_revision"],
+    }
+    _attach_hierarchical_intent_graph(intent)
+    session["long_horizon_intents"][intent_id] = intent
+    session["active_intent_id"] = intent_id
+    session["intent_activation_stack"] = [intent_id]
+    return intent
+
+
+def _create_object_handover_intent(
+    session: dict[str, Any], utterance: str, language_analysis: dict[str, Any]
+) -> dict[str, Any] | None:
+    resolution = language_analysis.get("process_template_resolution") or {}
+    if resolution.get("template_id") != "handover_object" or resolution.get("status") not in {"ready", "subgoals_required"}:
+        return None
+    bindings = resolution.get("bindings", {})
+    theme_ref = (bindings.get("theme") or {}).get("value_ref")
+    recipient_ref = (bindings.get("recipient") or {}).get("value_ref")
+    theme = next((item for item in session["runtime_objects"] if item.get("entity_id") == theme_ref), None)
+    recipient = next((item for item in session["runtime_objects"] if item.get("entity_id") == recipient_ref), None)
+    if not theme or not recipient:
+        return None
+    source_holder_ref = theme.get("received_by")
+    intent_id = "intent_" + hashlib.sha1(
+        f"{session['session_id']}|object_handover|{theme['entity_id']}|{recipient['entity_id']}|{session['world_revision']}".encode("utf-8")
+    ).hexdigest()[:12]
+    intent = {
+        "intent_id": intent_id,
+        "intent_type": "verified_object_handover",
+        "source_utterance": utterance,
+        "goal_fact": "object_received_by_recipient",
+        "role_bindings": {
+            "theme": theme["entity_id"],
+            "recipient": recipient["entity_id"],
+            **({"source_holder": source_holder_ref} if source_holder_ref else {}),
+        },
+        "goal_contract": {
+            "requires": ["theme_object_grounded", "recipient_grounded", "recipient_ready"],
+            "produces": ["object_received_by_recipient"],
+            "verification": ["effector_release_observed", "recipient_possession_observed"],
+        },
+        "dependency_graph": {
+            "root": "object_received_by_recipient",
+            "nodes": [
+                {
+                    "stage_id": "acquire_theme",
+                    **({"requires": "object_received_by_current_holder"} if source_holder_ref else {}),
+                    "produces": "object_in_gripper",
+                },
+                {
+                    "stage_id": "handover_to_recipient",
+                    "requires": "object_in_gripper",
+                    "produces": "object_received_by_recipient",
+                },
+            ],
+        },
+        "lifecycle": "active",
+        "verified_facts": [],
+        "current_stage": None,
+        "resume_envelope": None,
+        "created_world_revision": session["world_revision"],
+        "task_level_authorization": {
+            "source": "explicit_human_imperative",
+            "scope": "ordinary_object_handover_goal_and_necessary_causal_stages",
+            "goal_fact": "object_received_by_recipient",
+            "role_bindings": {"theme": theme["entity_id"], "recipient": recipient["entity_id"]},
+            "stage_by_stage_reconfirmation_required": False,
+            "revocation_conditions": ["role_binding_ambiguity", "goal_change", "known_safety_conflict", "policy_requires_confirmation"],
+        },
+    }
+    _attach_hierarchical_intent_graph(intent)
+    session["long_horizon_intents"][intent_id] = intent
+    session["active_intent_id"] = intent_id
+    session["intent_activation_stack"] = [intent_id]
+    return intent
+
+
+def _create_transport_intent(
+    session: dict[str, Any], utterance: str, language_analysis: dict[str, Any]
+) -> dict[str, Any] | None:
+    resolution = language_analysis.get("process_template_resolution") or {}
+    if resolution.get("template_id") != "transport_object" or resolution.get("status") not in {"ready", "subgoals_required"}:
+        return None
+    bindings = resolution.get("bindings", {})
+    theme_ref = (bindings.get("theme") or {}).get("value_ref")
+    region_ref = (bindings.get("target_region") or {}).get("value_ref")
+    mode = (bindings.get("transport_mode") or {}).get("value_ref")
+    destination_ref = (bindings.get("destination") or {}).get("value_ref")
+    if not theme_ref or not region_ref or mode not in {"retain_holding", "place_at_region"}:
+        return None
+    if mode == "place_at_region" and not destination_ref:
+        return None
+    theme = next((item for item in session["runtime_objects"] if item.get("entity_id") == theme_ref), None)
+    if not theme:
+        return None
+    intent_id = "intent_" + hashlib.sha1(
+        f"{session['session_id']}|transport|{theme_ref}|{region_ref}|{mode}|{destination_ref}|{session['world_revision']}".encode("utf-8")
+    ).hexdigest()[:12]
+    nodes = [
+        {"stage_id": "acquire_theme", "produces": "object_in_gripper"},
+        {"stage_id": "transport_to_region", "requires": "object_in_gripper", "produces": "object_at_target_region"},
+    ]
+    if mode == "place_at_region":
+        nodes.append({"stage_id": "place_at_region", "requires": "object_at_target_region", "produces": "object_supported_at_destination"})
+    intent = {
+        "intent_id": intent_id,
+        "intent_type": "verified_object_transport",
+        "source_utterance": utterance,
+        "goal_fact": "object_supported_at_destination" if mode == "place_at_region" else "object_at_target_region",
+        "role_bindings": {
+            "theme": theme_ref,
+            "target_region": region_ref,
+            "transport_mode": mode,
+            **({"destination": destination_ref} if destination_ref else {}),
+        },
+        "goal_contract": {
+            "requires": ["theme_object_grounded", "target_region_grounded", "route_feasible"],
+            "produces": ["object_at_target_region"] + (["object_supported_at_destination"] if destination_ref else []),
+            "verification": ["executor_inside_target_region", "object_remains_bound_to_selected_transport_mode"],
+        },
+        "dependency_graph": {"root": "object_at_target_region", "nodes": nodes},
+        "lifecycle": "active",
+        "verified_facts": [],
+        "current_stage": None,
+        "resume_envelope": None,
+        "created_world_revision": session["world_revision"],
+        "task_level_authorization": {
+            "source": "explicit_human_imperative",
+            "scope": "ordinary_object_transport_goal_and_necessary_causal_stages",
+            "goal_fact": "object_at_target_region",
+            "role_bindings": {"theme": theme_ref, "target_region": region_ref, "transport_mode": mode},
+            "stage_by_stage_reconfirmation_required": False,
+            "revocation_conditions": ["role_binding_ambiguity", "goal_change", "known_safety_conflict", "policy_requires_confirmation"],
+        },
     }
     _attach_hierarchical_intent_graph(intent)
     session["long_horizon_intents"][intent_id] = intent
@@ -549,6 +695,66 @@ def _create_water_placement_intent(session: dict[str, Any], utterance: str) -> d
 
 
 def _derive_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) -> dict[str, Any]:
+    if intent.get("intent_type") == "verified_object_transport":
+        bindings = intent["role_bindings"]
+        theme = next((item for item in session["runtime_objects"] if item.get("entity_id") == bindings["theme"]), None)
+        region = next((item for item in _scene_for_session(session)["semantic_regions"] if item.get("region_id") == bindings["target_region"]), None)
+        destination = next((item for item in session["runtime_objects"] if item.get("entity_id") == bindings.get("destination")), None)
+        if not theme or not region:
+            return {"status": "rebind_required", "reason": "object_transport_role_binding_no_longer_present"}
+        mode = bindings["transport_mode"]
+        if mode == "place_at_region" and destination and theme.get("support_ref") == destination["entity_id"] and not _is_held(session, theme["entity_id"]):
+            return {"status": "completed", "verified_fact": "object_supported_at_destination"}
+        if mode == "retain_holding" and _is_held(session, theme["entity_id"]) and session["state"].get("active_region") == region["region_id"]:
+            return {"status": "completed", "verified_fact": "object_at_target_region"}
+        if not _is_held(session, theme["entity_id"]):
+            return {
+                "status": "stage_ready", "stage_id": "acquire_theme",
+                "utterance": f"拿起{_conceptual_reference_for_entity(theme)}",
+                "required_fact": "theme_object_grounded", "target_fact": "object_in_gripper",
+            }
+        if session["state"].get("active_region") != region["region_id"]:
+            return {
+                "status": "stage_ready", "stage_id": "transport_to_region",
+                "utterance": f"带着{_conceptual_reference_for_entity(theme)}走到{region['label']}",
+                "required_fact": "object_in_gripper", "target_fact": "object_at_target_region",
+            }
+        if mode == "place_at_region" and destination:
+            return {
+                "status": "stage_ready", "stage_id": "place_at_region",
+                "utterance": f"把{_conceptual_reference_for_entity(theme)}放到{destination['label']}",
+                "required_fact": "object_at_target_region", "target_fact": "object_supported_at_destination",
+            }
+        return {"status": "completed", "verified_fact": "object_at_target_region"}
+    if intent.get("intent_type") == "verified_object_handover":
+        bindings = intent["role_bindings"]
+        objects = {item["entity_id"]: item for item in session["runtime_objects"]}
+        theme = objects.get(bindings["theme"])
+        recipient = objects.get(bindings["recipient"])
+        if not theme or not recipient:
+            return {"status": "rebind_required", "reason": "object_handover_role_binding_no_longer_present"}
+        if theme.get("received_by") == recipient["entity_id"] and not _is_held(session, theme["entity_id"]):
+            return {"status": "completed", "verified_fact": "object_received_by_recipient"}
+        if not _is_held(session, theme["entity_id"]):
+            source_holder_ref = theme.get("received_by")
+            source_holder = objects.get(source_holder_ref)
+            return {
+                "status": "stage_ready",
+                "stage_id": "acquire_theme",
+                "utterance": (
+                    f"从{source_holder['label']}手上拿起{_conceptual_reference_for_entity(theme)}"
+                    if source_holder else f"拿起{_conceptual_reference_for_entity(theme)}"
+                ),
+                "required_fact": "object_received_by_current_holder" if source_holder else "theme_object_grounded",
+                "target_fact": "object_in_gripper",
+            }
+        return {
+            "status": "stage_ready",
+            "stage_id": "handover_to_recipient",
+            "utterance": f"把{_conceptual_reference_for_entity(theme)}递给{recipient['label']}",
+            "required_fact": "object_in_gripper",
+            "target_fact": "object_received_by_recipient",
+        }
     if intent.get("intent_type") in {"verified_water_delivery", "verified_water_placement"}:
         bindings = intent["role_bindings"]
         objects = {item["entity_id"]: item for item in session["runtime_objects"]}
@@ -691,6 +897,8 @@ def _prepare_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) 
     goal_summary = (
         "把接好的水交给人" if intent.get("intent_type") == "verified_water_delivery"
         else "把接好的水稳定放到目标承载面" if intent.get("intent_type") == "verified_water_placement"
+        else "把指定对象交给接收者" if intent.get("intent_type") == "verified_object_handover"
+        else "把指定对象运输到目标区域" if intent.get("intent_type") == "verified_object_transport"
         else "将对象放到目标承载面"
     )
     immediate["prompt"] = (
@@ -862,6 +1070,15 @@ def _compose_session_language(session: dict[str, Any], utterance: str) -> dict[s
         recent_episodes=session.get("episodic_fact_memory", []),
     )
     analysis["situated_event_frame"] = situated_frame
+    analysis["process_template_resolution"] = resolve_process_request(
+        utterance,
+        analysis,
+        runtime_objects=session.get("runtime_objects", []),
+        runtime_state=session.get("state", {}),
+        semantic_regions=_scene_for_session(session).get("semantic_regions", []),
+        executor_profile=session.get("executor_profile", {}),
+        world_revision=session.get("world_revision", 0),
+    )
     frame_history = session.setdefault("situated_event_frame_history", [])
     frame_history.append(deepcopy(situated_frame))
     if len(frame_history) > 128:
@@ -909,6 +1126,7 @@ def _language_understanding_view(analysis: dict[str, Any]) -> dict[str, Any]:
         "candidate_only": True,
         "runtime_fact_committed": False,
         "situated_event_frame": deepcopy(analysis.get("situated_event_frame")),
+        "process_template_resolution": deepcopy(analysis.get("process_template_resolution")),
     }
 
 
@@ -1234,6 +1452,196 @@ def _continue_evidence_gap_clarification(session: dict[str, Any], utterance: str
             + resumed["immediate_result"].get("prompt", "")
         )
     return resumed
+
+
+def _start_process_gap_dialogue(
+    session: dict[str, Any],
+    *,
+    source_utterance: str,
+    language_analysis: dict[str, Any],
+    resolution: dict[str, Any],
+) -> dict[str, Any]:
+    phase = "awaiting_template_confirmation" if resolution.get("status") == "template_confirmation_required" else "awaiting_slot_value"
+    dialogue = {
+        "status": "collecting_process_template_contract",
+        "phase": phase,
+        "source_utterance": source_utterance,
+        "source_language_analysis": deepcopy(language_analysis),
+        "template_id": resolution.get("template_id"),
+        "binding_overrides": {},
+        "resolution": deepcopy(resolution),
+        "world_revision": session["world_revision"],
+        "policy_revision": session["policy_revision"],
+    }
+    session["process_gap_dialogue"] = dialogue
+    return {
+        "status": "process_template_confirmation_required" if phase == "awaiting_template_confirmation" else "process_slot_clarification_required",
+        "reason": "process_template_candidate_requires_human_confirmation" if phase == "awaiting_template_confirmation" else "required_process_slot_not_uniquely_bound",
+        "prompt": resolution.get("question"),
+        "process_template_resolution": deepcopy(resolution),
+        "known_goal": resolution.get("goal_fact"),
+        "pending_slot": (resolution.get("next_gap") or {}).get("slot_id"),
+        "candidate_only": True,
+        "runtime_fact_committed": False,
+        "direct_execution_allowed": False,
+        "session": get_session(session["session_id"]),
+    }
+
+
+def _continue_process_gap_dialogue(session: dict[str, Any], utterance: str) -> dict[str, Any] | None:
+    dialogue = session.get("process_gap_dialogue")
+    if not dialogue or dialogue.get("status") != "collecting_process_template_contract":
+        return None
+    if dialogue.get("world_revision") != session["world_revision"] or dialogue.get("policy_revision") != session["policy_revision"]:
+        session["process_gap_dialogue"] = None
+        return None
+    resolution = dialogue.get("resolution") or {}
+    if dialogue.get("phase") == "awaiting_template_confirmation":
+        polarity = _context_confirmation_value(utterance)
+        if polarity is None:
+            return {
+                "status": "process_template_confirmation_required",
+                "immediate_result": {
+                    "status": "process_template_confirmation_required",
+                    "reason": "template_mapping_confirmation_not_resolved",
+                    "prompt": resolution.get("question"),
+                    "process_template_resolution": deepcopy(resolution),
+                    "candidate_only": True,
+                    "runtime_fact_committed": False,
+                    "session": get_session(session["session_id"]),
+                },
+                "session": get_session(session["session_id"]),
+            }
+        if polarity is False:
+            session["process_gap_dialogue"] = None
+            return {
+                "status": "process_template_candidate_rejected",
+                "immediate_result": {
+                    "status": "process_template_candidate_rejected",
+                    "prompt": "好的，我不会采用这个过程解释。请告诉我你期望对象最终处于什么状态或关系。",
+                    "candidate_only": True,
+                    "runtime_fact_committed": False,
+                    "session": get_session(session["session_id"]),
+                },
+                "session": get_session(session["session_id"]),
+            }
+        candidate = resolution.get("template_candidate") or {}
+        novel_surface = candidate.get("novel_surface")
+        concept_by_template = {
+            "grasp_object": ("factory_event_grasp", "grasp_object", "拿起"),
+            "place_object": ("factory_event_place", "place_object", "放到"),
+            "handover_object": ("factory_event_handover", "handover_object", "递给"),
+            "transport_object": ("factory_event_transport", "transport_object", "带到"),
+        }
+        learned_adapter = None
+        if novel_surface and dialogue.get("template_id") in concept_by_template:
+            concept_id, operator, canonical_surface = concept_by_template[dialogue["template_id"]]
+            adapter_seed = f"{novel_surface}|{concept_id}|{operator}"
+            learned_adapter = {
+                "adapter_id": "language_adapter_" + hashlib.sha1(adapter_seed.encode("utf-8")).hexdigest()[:12],
+                "surface_form": novel_surface,
+                "concept_id": concept_id,
+                "operator": operator,
+                "canonical_surface": canonical_surface,
+                "status": "session_confirmed",
+                "scope": "current_executor_session",
+                "confirmation_count": 1,
+                "negative_confirmation_count": 0,
+                "source": "process_template_structural_candidate_confirmed_by_human",
+                "modifies_concept_kernel": False,
+                "runtime_fact_committed": False,
+            }
+            existing = next((item for item in session["language_adapters"] if item.get("adapter_id") == learned_adapter["adapter_id"]), None)
+            if existing:
+                existing["confirmation_count"] = int(existing.get("confirmation_count", 0)) + 1
+                learned_adapter = deepcopy(existing)
+            else:
+                session["language_adapters"].append(deepcopy(learned_adapter))
+        canonical = resolution.get("canonical_utterance")
+        session["process_gap_dialogue"] = None
+        if not canonical:
+            return None
+        resumed = begin_motion_command(session["session_id"], canonical)
+        resumed["process_template_mapping_learned"] = deepcopy(learned_adapter)
+        if resumed.get("immediate_result"):
+            resumed["immediate_result"]["process_template_mapping_learned"] = deepcopy(learned_adapter)
+            resumed["immediate_result"]["prompt"] = (
+                f"已确认“{novel_surface}”在当前会话中激活{dialogue['template_id']}过程模板；"
+                "我只保存语言入口，现在按最新世界状态继续原目标。"
+                + resumed["immediate_result"].get("prompt", "")
+            )
+        return resumed
+
+    gap = resolution.get("next_gap") or {}
+    candidates = gap.get("candidates", [])
+    normalized = re.sub(r"[\s，。！？、,.!?]+", "", utterance)
+    matches = [item for item in candidates if item.get("label") and item["label"] in normalized]
+    if len(matches) != 1:
+        return {
+            "status": "process_slot_clarification_required",
+            "immediate_result": {
+                "status": "process_slot_clarification_required",
+                "reason": "slot_answer_not_unique",
+                "prompt": resolution.get("question"),
+                "pending_slot": gap.get("slot_id"),
+                "candidate_options": deepcopy(candidates),
+                "candidate_only": True,
+                "runtime_fact_committed": False,
+                "session": get_session(session["session_id"]),
+            },
+            "session": get_session(session["session_id"]),
+        }
+    dialogue.setdefault("binding_overrides", {})[gap["slot_id"]] = matches[0]["value_ref"]
+    source_analysis = deepcopy(dialogue["source_language_analysis"])
+    updated = resolve_process_request(
+        dialogue["source_utterance"],
+        source_analysis,
+        runtime_objects=session.get("runtime_objects", []),
+        runtime_state=session.get("state", {}),
+        semantic_regions=_scene_for_session(session).get("semantic_regions", []),
+        executor_profile=session.get("executor_profile", {}),
+        world_revision=session["world_revision"],
+        binding_overrides=dialogue["binding_overrides"],
+    )
+    if not updated:
+        session["process_gap_dialogue"] = None
+        return None
+    dialogue["resolution"] = deepcopy(updated)
+    if updated.get("status") in {"clarification_required", "unsafe_switch"}:
+        dialogue["phase"] = "awaiting_slot_value"
+        session["process_gap_dialogue"] = dialogue
+        return {
+            "status": "process_slot_clarification_required",
+            "immediate_result": {
+                "status": "process_slot_clarification_required",
+                "reason": "next_required_process_slot_not_uniquely_bound",
+                "prompt": updated.get("question"),
+                "process_template_resolution": deepcopy(updated),
+                "pending_slot": (updated.get("next_gap") or {}).get("slot_id"),
+                "candidate_only": True,
+                "runtime_fact_committed": False,
+                "session": get_session(session["session_id"]),
+            },
+            "session": get_session(session["session_id"]),
+        }
+    if updated.get("status") == "template_confirmation_required":
+        dialogue["phase"] = "awaiting_template_confirmation"
+        session["process_gap_dialogue"] = dialogue
+        return {
+            "status": "process_template_confirmation_required",
+            "immediate_result": {
+                "status": "process_template_confirmation_required",
+                "prompt": updated.get("question"),
+                "process_template_resolution": deepcopy(updated),
+                "candidate_only": True,
+                "runtime_fact_committed": False,
+                "session": get_session(session["session_id"]),
+            },
+            "session": get_session(session["session_id"]),
+        }
+    session["process_gap_dialogue"] = None
+    canonical = updated.get("canonical_utterance")
+    return begin_motion_command(session["session_id"], canonical) if canonical else None
 
 
 def _replace_last_alias(text: str, aliases: list[str], replacement: str) -> str:
@@ -3176,15 +3584,22 @@ def _apply_verified_fill(session: dict[str, Any], container_ref: str, source_ref
     }
 
 
-def _apply_verified_handover(session: dict[str, Any], container_ref: str, recipient_ref: str, control_source: str) -> dict[str, Any]:
+def _apply_verified_handover(
+    session: dict[str, Any],
+    object_ref: str,
+    recipient_ref: str,
+    control_source: str,
+    *,
+    require_filled_container: bool = True,
+) -> dict[str, Any]:
     objects = {item["entity_id"]: item for item in session["runtime_objects"]}
-    container, recipient = objects.get(container_ref), objects.get(recipient_ref)
-    if not container or not recipient or recipient.get("kind") != "human_recipient":
-        return {"status": "handover_blocked", "reason": "container_or_recipient_not_available", "frames": []}
-    effector = _held_effector(session, container_ref)
+    theme, recipient = objects.get(object_ref), objects.get(recipient_ref)
+    if not theme or not recipient or recipient.get("kind") != "human_recipient":
+        return {"status": "handover_blocked", "reason": "object_or_recipient_not_available", "frames": []}
+    effector = _held_effector(session, object_ref)
     if not effector:
-        return {"status": "handover_blocked", "reason": "container_is_not_currently_held", "frames": []}
-    if container.get("liquid_state") != "filled":
+        return {"status": "handover_blocked", "reason": "object_is_not_currently_held", "frames": []}
+    if require_filled_container and theme.get("liquid_state") != "filled":
         return {"status": "handover_blocked", "reason": "container_fill_fact_not_established", "frames": []}
     distance = _distance_to_object_footprint(session["state"]["executor_position"], recipient)
     if distance > float(session["executor_profile"]["arm_reach_m"]):
@@ -3192,37 +3607,42 @@ def _apply_verified_handover(session: dict[str, Any], container_ref: str, recipi
     if recipient.get("handover_ready") is not True:
         return {"status": "handover_blocked", "reason": "recipient_readiness_not_established", "frames": []}
     received = recipient.setdefault("received_object_refs", [])
-    if container_ref not in received:
-        received.append(container_ref)
+    if object_ref not in received:
+        received.append(object_ref)
     _holding_by_effector(session)[effector] = None
     _sync_primary_holding(session)
-    container["attached_to_executor"] = False
-    container.pop("held_by_effector", None)
-    container["received_by"] = recipient_ref
-    container["position"] = [float(recipient["position"][0]) + 0.28, float(recipient["position"][1])]
-    container["elevation_m"] = 0.92
+    theme["attached_to_executor"] = False
+    theme.pop("held_by_effector", None)
+    theme["received_by"] = recipient_ref
+    theme["position"] = [float(recipient["position"][0]) + 0.28, float(recipient["position"][1])]
+    theme["elevation_m"] = 0.92
     _append_verified_episode(
         session,
         operator="handover_object",
-        participants={"theme": container_ref, "recipient": recipient_ref, "effector": effector},
-        before_facts=[{"predicate": "held_by", "subject": container_ref, "object": effector}],
-        produces=[{"predicate": "received_by", "subject": container_ref, "object": recipient_ref}],
-        destroys=[{"predicate": "held_by", "subject": container_ref, "object": effector}],
+        participants={"theme": object_ref, "recipient": recipient_ref, "effector": effector},
+        before_facts=[{"predicate": "held_by", "subject": object_ref, "object": effector}],
+        produces=[{"predicate": "received_by", "subject": object_ref, "object": recipient_ref}],
+        destroys=[{"predicate": "held_by", "subject": object_ref, "object": effector}],
         verification_basis="effector_release_plus_recipient_possession_tracking",
     )
+    terminal_fact = "human_received_filled_container" if require_filled_container else "object_received_by_recipient"
     return {
         "status": "fact_established",
         "reason": "verified_human_handover_completed",
-        "prompt": f"已把装水的{container['label']}交给{recipient['label']}，并验真末端释放与接收方持有状态一致。",
-        "terminal_fact": "human_received_filled_container",
-        "terminal_fact_binding": {"container_ref": container_ref, "recipient_ref": recipient_ref},
+        "prompt": (
+            f"已把装水的{theme['label']}交给{recipient['label']}，并验真末端释放与接收方持有状态一致。"
+            if require_filled_container
+            else f"已把{theme['label']}递给{recipient['label']}，并验真末端释放与接收方持有状态一致。"
+        ),
+        "terminal_fact": terminal_fact,
+        "terminal_fact_binding": {"object_ref": object_ref, "recipient_ref": recipient_ref},
         "verification_evidence": {
-            "first_channel": {"source": "simulated_effector_release_and_transfer_contact", "effector": effector, "established": not _is_held(session, container_ref)},
-            "second_channel": {"source": "simulated_recipient_possession_tracking", "established": container_ref in received},
-            "final_fact": "human_received_filled_container", "final_fact_established": True,
+            "first_channel": {"source": "simulated_effector_release_and_transfer_contact", "effector": effector, "established": not _is_held(session, object_ref)},
+            "second_channel": {"source": "simulated_recipient_possession_tracking", "established": object_ref in received},
+            "final_fact": terminal_fact, "final_fact_established": True,
             "verification_boundary": "P016_multi_channel_fact_verification",
         },
-        "effect_contract_committed": {"produces": ["human_received_filled_container", "effector_empty"], "destroys": ["container_in_effector"]},
+        "effect_contract_committed": {"produces": [terminal_fact, "effector_empty"], "destroys": ["object_in_gripper"]},
         "control_source": control_source,
         "runtime_objects": deepcopy(session["runtime_objects"]),
         "frames": [],
@@ -3553,8 +3973,14 @@ def _execute_water_service_stage(
         process = ["navigate_to_water_source", "align_container_under_outlet", "activate_flow", "verify_container_filled"]
     elif action == "handover_to_recipient":
         entity_ref = bindings["recipient"]
-        post_completion = {"action": "handover", "container_ref": bindings["theme"], "recipient_ref": bindings["recipient"], "mode": "direct_task"}
-        process = ["navigate_to_safe_handover_zone", "verify_recipient_readiness", "transfer_container", "verify_recipient_possession"]
+        post_completion = {
+            "action": "handover",
+            "container_ref": bindings["theme"],
+            "recipient_ref": bindings["recipient"],
+            "require_filled_container": intent.get("intent_type") == "verified_water_delivery",
+            "mode": "direct_task",
+        }
+        process = ["navigate_to_safe_handover_zone", "verify_recipient_readiness", "transfer_object", "verify_recipient_possession"]
     else:
         return {"status": "service_stage_not_supported", "reason": action, "frames": []}
     entity = next(item for item in session["runtime_objects"] if item["entity_id"] == entity_ref)
@@ -3595,6 +4021,63 @@ def _execute_water_service_stage(
             "frames": [],
         })
     return result
+
+
+def _execute_transport_region_stage(
+    session: dict[str, Any],
+    intent: dict[str, Any],
+    stage: dict[str, Any],
+    scoped_authorization: dict[str, Any] | None,
+) -> dict[str, Any]:
+    region_ref = intent.get("role_bindings", {}).get("target_region")
+    region = next((item for item in _scene_for_session(session)["semantic_regions"] if item.get("region_id") == region_ref), None)
+    theme_ref = intent.get("role_bindings", {}).get("theme")
+    if not region or not theme_ref or not _is_held(session, theme_ref):
+        return {"status": "transport_stage_blocked", "reason": "target_region_or_holding_fact_not_established", "frames": []}
+    start = list(session["state"]["executor_position"])
+    target = list(region["center"])
+    envelope = build_effective_execution_envelope(session["executor_profile"], session.get("protection_policy_overlay"))
+    planning_radius = envelope["effective_constraints"]["body_radius_m"] + envelope["effective_constraints"]["minimum_avoidance_distance_m"]
+    plan = _plan_verified_motion(session, start, target, planning_radius)
+    if plan.get("outcome") != "verified":
+        return {
+            "status": "transport_stage_blocked",
+            "reason": "no_verified_route_to_target_region",
+            "target_region": region_ref,
+            "route_evidence": deepcopy(plan),
+            "frames": [],
+        }
+    frames: list[dict[str, Any]] = []
+    segment_start = start
+    current_yaw = float(session["state"]["executor_yaw_deg"])
+    for waypoint in plan["waypoints"]:
+        segment_yaw = math.degrees(math.atan2(waypoint[1] - segment_start[1], waypoint[0] - segment_start[0]))
+        if abs(segment_yaw - current_yaw) > 0.1:
+            frames.extend(_rotation_frames(segment_start, current_yaw, segment_yaw))
+        count = max(3, int(math.dist(segment_start, waypoint) / 0.06) + 1)
+        frames.extend(_with_yaw(_interpolate(segment_start, waypoint, count)[1:], segment_yaw))
+        segment_start = waypoint
+        current_yaw = segment_yaw
+    _apply_speed_timing(frames, envelope["effective_constraints"]["max_linear_speed_mps"])
+    return {
+        "status": "fact_established",
+        "reason": "verified_object_transport_region_candidate",
+        "prompt": f"已生成保持当前持物并进入{region['label']}的当前地图路径；执行末帧将重新验真本体与对象均位于目标区域。",
+        "frames": frames,
+        "terminal_fact": "object_at_target_region",
+        "terminal_fact_binding": {"object_ref": theme_ref, "target_region_ref": region_ref},
+        "candidate_execution_plan": {
+            "goal_fact": "object_at_target_region",
+            "role_bindings": deepcopy(intent.get("role_bindings", {})),
+            "candidate_process": ["retain_verified_holding", "navigate_current_map_to_region", "verify_executor_and_object_inside_region"],
+            "route_kind": plan.get("route_kind"),
+            "world_revision": session["world_revision"],
+            "candidate_only": not bool(scoped_authorization),
+            "direct_execution_allowed": bool(scoped_authorization),
+        },
+        "route_evidence": deepcopy(plan.get("safety_contract")),
+        "effective_execution_envelope": envelope,
+    }
 
 
 def execute_command(
@@ -4124,6 +4607,9 @@ def begin_motion_command(
         explained = _continue_historical_reference_explanation(session, pending, utterance)
         if explained:
             return explained
+    process_gap_resolution = _continue_process_gap_dialogue(session, utterance)
+    if process_gap_resolution:
+        return process_gap_resolution
     relational_dialogue = session.get("relational_reference_dialogue")
     if relational_dialogue and not scoped_authorization:
         explained = _continue_historical_reference_explanation(
@@ -4143,6 +4629,27 @@ def begin_motion_command(
     if evidence_gap_resolution:
         return evidence_gap_resolution
     language_analysis = _compose_session_language(session, text)
+    composite_water_goal = _water_delivery_goal_semantics(session, text).get("goal_fact") in {
+        "human_received_filled_container", "filled_container_supported_at_destination"
+    }
+    process_resolution = language_analysis.get("process_template_resolution") or {}
+    if (
+        not internal_stage
+        and not scoped_authorization
+        and not composite_water_goal
+        and (
+            process_resolution.get("template_candidate", {}).get("requires_human_confirmation")
+            or process_resolution.get("status") == "unsafe_switch"
+        )
+        and process_resolution.get("status") in {"template_confirmation_required", "clarification_required", "unsafe_switch"}
+    ):
+        immediate = _start_process_gap_dialogue(
+            session,
+            source_utterance=text,
+            language_analysis=language_analysis,
+            resolution=process_resolution,
+        )
+        return {"status": immediate["status"], "immediate_result": immediate, "session": get_session(session_id)}
     historical_reference = None if internal_stage or scoped_authorization else _historical_support_reference_candidate(
         session, text, language_analysis
     )
@@ -4199,9 +4706,6 @@ def begin_motion_command(
             "session": get_session(session_id),
         }
         return {"status": immediate["status"], "immediate_result": immediate, "session": get_session(session_id)}
-    composite_water_goal = _water_delivery_goal_semantics(session, text).get("goal_fact") in {
-        "human_received_filled_container", "filled_container_supported_at_destination"
-    }
     gap_dialogue_collecting = (session.get("concept_gap_dialogue") or {}).get("status") == "collecting_minimum_causal_contract"
     if language_analysis.get("speech_act") in {"language_teaching", "prohibition"} or (
         language_analysis.get("decision") == "request_minimum_semantic_clarification"
@@ -4216,7 +4720,9 @@ def begin_motion_command(
     long_intent = None if internal_stage or scoped_authorization else (
         _create_water_delivery_intent(session, text)
         or _create_water_placement_intent(session, text)
-        or _create_transfer_intent(session, text)
+        or _create_object_handover_intent(session, text, language_analysis)
+        or _create_transport_intent(session, text, language_analysis)
+        or _create_transfer_intent(session, text, language_analysis)
     )
     if long_intent:
         prepared = _prepare_long_intent_stage(session, long_intent)
@@ -4242,22 +4748,36 @@ def begin_motion_command(
     before = deepcopy(session)
     active_intent = (session.get("long_horizon_intents") or {}).get(session.get("active_intent_id"))
     active_stage = (active_intent or {}).get("current_stage") or {}
+    authorized_internal_stage = bool(
+        internal_stage
+        and scoped_authorization
+        and scoped_authorization.get("long_intent_id") == (active_intent or {}).get("intent_id")
+        and scoped_authorization.get("long_stage_id") == active_stage.get("stage_id")
+    )
     service_stage_matches = bool(
         active_intent
-        and active_intent.get("intent_type") in {"verified_water_delivery", "verified_water_placement"}
-        and active_stage.get("utterance") == text
+        and active_intent.get("intent_type") in {"verified_water_delivery", "verified_water_placement", "verified_object_handover"}
+        and (active_stage.get("utterance") == text or authorized_internal_stage)
         and active_stage.get("stage_id") in {"fill_container", "handover_to_recipient"}
     )
+    transport_region_stage_matches = bool(
+        active_intent
+        and active_intent.get("intent_type") == "verified_object_transport"
+        and authorized_internal_stage
+        and active_stage.get("stage_id") == "transport_to_region"
+    )
     result = (
-        _execute_water_service_stage(session, active_intent, active_stage, scoped_authorization)
-        if service_stage_matches
-        else execute_command(session_id, text, scoped_authorization, language_analysis)
+        _execute_transport_region_stage(session, active_intent, active_stage, scoped_authorization)
+        if transport_region_stage_matches
+        else _execute_water_service_stage(session, active_intent, active_stage, scoped_authorization)
+        if service_stage_matches else execute_command(session_id, text, scoped_authorization, language_analysis)
     )
     pending_confirmation = deepcopy(SESSIONS[session_id].get("pending_confirmation"))
     perception_history = deepcopy(SESSIONS[session_id].get("perception_history", []))
     concept_gap_dialogue = deepcopy(SESSIONS[session_id].get("concept_gap_dialogue"))
     role_clarification_dialogue = deepcopy(SESSIONS[session_id].get("role_clarification_dialogue"))
     evidence_gap_dialogue = deepcopy(SESSIONS[session_id].get("evidence_gap_dialogue"))
+    process_gap_dialogue = deepcopy(SESSIONS[session_id].get("process_gap_dialogue"))
     SESSIONS[session_id] = before
     frames = result.get("frames", [])
     if not frames:
@@ -4271,6 +4791,8 @@ def begin_motion_command(
             SESSIONS[session_id]["role_clarification_dialogue"] = role_clarification_dialogue
         if evidence_gap_dialogue:
             SESSIONS[session_id]["evidence_gap_dialogue"] = evidence_gap_dialogue
+        if process_gap_dialogue:
+            SESSIONS[session_id]["process_gap_dialogue"] = process_gap_dialogue
         result["session"] = get_session(session_id)
         return {"status": result.get("status"), "immediate_result": result, "session": get_session(session_id)}
     job_id = "motion_" + hashlib.sha1(f"{session_id}|{len(MOTION_JOBS) + 1}".encode()).hexdigest()[:12]
@@ -4487,7 +5009,12 @@ def _post_completion_signature(post_completion: dict[str, Any] | None) -> dict[s
     if action == "fill":
         return {"action": action, "container_ref": post_completion.get("container_ref"), "source_ref": post_completion.get("source_ref")}
     if action == "handover":
-        return {"action": action, "container_ref": post_completion.get("container_ref"), "recipient_ref": post_completion.get("recipient_ref")}
+        return {
+            "action": action,
+            "container_ref": post_completion.get("container_ref"),
+            "recipient_ref": post_completion.get("recipient_ref"),
+            "require_filled_container": post_completion.get("require_filled_container", True),
+        }
     return {"action": action}
 
 
@@ -4749,6 +5276,7 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
             job["post_completion"]["container_ref"],
             job["post_completion"]["recipient_ref"],
             "human_confirmed_water_service_stage",
+            require_filled_container=job["post_completion"].get("require_filled_container", True),
         )
         result.update(handover)
     elif (job.get("post_completion") or {}).get("action") == "grasp":

@@ -584,6 +584,7 @@ def main() -> None:
     run_python("validate_small_vocabulary_generalization.py")
     run_python("validate_language_concept_composition.py")
     run_python("validate_situated_event_reasoning.py")
+    run_python("validate_process_template_resolution.py")
     run_python("validate_visual_concept_pipeline.py")
     run_python("validate_qwen_visual_adapter.py")
     run_physics_python("validate_minimal_physics.py")

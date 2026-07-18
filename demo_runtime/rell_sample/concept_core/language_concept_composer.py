@@ -12,6 +12,8 @@ EVENT_LEXICAL_PRIMITIVES: tuple[dict[str, Any], ...] = (
     {"operator": "grasp_object", "concept_id": "factory_event_grasp", "heads": ("捡", "拾", "抓", "取", "拿"), "canonical": "拿起"},
     {"operator": "release_object", "concept_id": "factory_event_release", "heads": ("释放", "撒手", "松开", "放开"), "canonical": "放开"},
     {"operator": "place_object", "concept_id": "factory_event_place", "heads": ("搁", "摆", "放"), "canonical": "放到"},
+    {"operator": "handover_object", "concept_id": "factory_event_handover", "heads": ("递给", "交给", "拿给", "送给", "递过去", "交过去"), "canonical": "递给"},
+    {"operator": "transport_object", "concept_id": "factory_event_transport", "heads": ("带到", "拿到", "送到", "端到", "带走", "拿来"), "canonical": "带到"},
     {"operator": "apply_directional_force", "concept_id": "factory_event_push_pull", "heads": ("拖", "挪", "推", "拉"), "canonical": "推动"},
     {"operator": "change_open_state", "concept_id": "factory_event_open_close", "heads": ("打开", "关上", "关闭", "合上"), "canonical": "打开"},
     {"operator": "change_device_activation", "concept_id": "factory_event_activate_deactivate", "heads": ("启动", "开启", "关掉", "开机", "关机"), "canonical": "启动"},
@@ -31,6 +33,7 @@ FUNCTION_WORDS = (
 # These markers order discourse stages but do not contribute an event, object,
 # or causal role of their own.
 FUNCTION_WORDS += ("再", "然后", "接着")
+FUNCTION_WORDS += ("人类", "家人", "主人", "用户", "接收人")
 
 
 def normalize_language_text(text: str) -> str:
@@ -199,11 +202,13 @@ def _roles(
     events: list[dict[str, Any]],
     objects: list[dict[str, Any]],
     context_entities: list[dict[str, Any]],
+    text: str,
 ) -> dict[str, Any]:
     movable = [item for item in objects if any(token in set(item.get("functional_affordances", [])) for token in ("graspable", "movable", "graspable_candidate"))]
     supports = [item for item in objects if any(token in set(item.get("functional_affordances", [])) for token in ("support_object", "receive_object", "receive_liquid"))]
     held = [item for item in context_entities if item.get("focus_source") == "verified_holding_fact"]
     place_event = next((item for item in events if item["operator"] == "place_object"), None)
+    handover_event = next((item for item in events if item["operator"] == "handover_object"), None)
     placing = place_event is not None
     roles: dict[str, Any] = {}
     if placing:
@@ -232,14 +237,32 @@ def _roles(
         roles["target"] = deepcopy(objects[0])
     if any(item["operator"] == "navigate_to" for item in events) and objects:
         roles["destination"] = deepcopy(objects[-1])
+    if handover_event:
+        if movable:
+            roles["theme"] = deepcopy(movable[0])
+        recipient_surface = next(
+            (marker for marker in ("接收人", "人类", "家人", "主人", "用户") if marker in text),
+            None,
+        )
+        if not recipient_surface and any(marker in text for marker in ("给我", "递给我", "交给我", "送给我", "拿给我")):
+            recipient_surface = "我"
+        if recipient_surface:
+            roles["recipient"] = {
+                "matched_alias": recipient_surface,
+                "entity_type": "human_recipient",
+                "reference": "human_speaker" if recipient_surface == "我" else "current_human_recipient_role",
+                "source": "human_recipient_relational_language",
+            }
     return roles
 
 
 def _canonical_utterance(speech_act: str, query_type: str | None, events: list[dict[str, Any]], roles: dict[str, Any]) -> str | None:
     target = roles.get("theme") or roles.get("target") or roles.get("destination") or {}
     destination = roles.get("destination") or {}
+    recipient = roles.get("recipient") or {}
     target_name = target.get("matched_alias") or target.get("label") or target.get("display_name")
     destination_name = destination.get("matched_alias") or destination.get("display_name")
+    recipient_name = recipient.get("matched_alias") or recipient.get("label") or recipient.get("display_name")
     if speech_act == "state_query":
         if query_type == "object_visibility" and target_name:
             return f"看得到{target_name}吗"
@@ -257,6 +280,8 @@ def _canonical_utterance(speech_act: str, query_type: str | None, events: list[d
             part = f"拿起{target_name}"
         elif operator == "place_object":
             part = f"把{target_name}放到{destination_name}" if target_name and destination_name else (f"放下{target_name}" if target_name else None)
+        elif operator == "handover_object":
+            part = f"把{target_name}递给{recipient_name}" if target_name and recipient_name else None
         elif operator == "navigate_to" and destination_name:
             part = f"走到{destination_name}"
         elif operator == "observe_entity" and target_name:
@@ -297,7 +322,7 @@ def compose_language_concepts(
     speech_act = _speech_act(normalized, events, definition)
     query_type = _query_type(normalized, events, objects) if speech_act == "state_query" else None
     context_entities = context_entities or []
-    roles = _roles(events, objects, context_entities)
+    roles = _roles(events, objects, context_entities, normalized)
     relative_direction = next(
         (direction for direction, markers in {
             "forward": ("往前", "向前", "前进"),
@@ -322,6 +347,8 @@ def compose_language_concepts(
         unresolved.append("event_operator_not_resolved")
     requires_object = any(item["operator"] in {
         "observe_entity", "grasp_object", "release_object", "place_object",
+        "handover_object",
+        "transport_object",
         "apply_directional_force", "change_open_state", "change_device_activation", "remove_surface_contaminant",
     } for item in events) or (any(item["operator"] == "navigate_to" for item in events) and not relative_direction)
     if requires_object and not objects:
@@ -332,6 +359,11 @@ def compose_language_concepts(
         place_surface = str(next(item for item in events if item["operator"] == "place_object").get("matched_surface") or "")
         if not roles.get("destination") and place_surface != "放下":
             unresolved.append("placement_destination_not_grounded")
+    if any(item["operator"] == "handover_object" for item in events):
+        if not roles.get("theme"):
+            unresolved.append("handover_theme_not_grounded")
+        if not roles.get("recipient"):
+            unresolved.append("handover_recipient_not_grounded")
 
     unknown_surface = _unknown_surface(normalized, events, objects)
     confidence = 0.15
@@ -383,7 +415,11 @@ def compose_language_concepts(
             "query_type": query_type,
             "roles": deepcopy(roles),
             "goal_relation": "object_supported_at_destination" if any(item["operator"] == "place_object" for item in events) else (
-                "object_in_gripper" if any(item["operator"] == "grasp_object" for item in events) else None
+                "object_received_by_recipient" if any(item["operator"] == "handover_object" for item in events) else (
+                    "object_at_target_region" if any(item["operator"] == "transport_object" for item in events) else (
+                        "object_in_gripper" if any(item["operator"] == "grasp_object" for item in events) else None
+                    )
+                )
             ),
             "world_scope": "current_world_revision",
         },

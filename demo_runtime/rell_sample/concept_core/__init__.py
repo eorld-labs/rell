@@ -39,6 +39,13 @@ from .lightweight_orchestrator import (
     compile_causal_operator_registry,
 )
 from .language_concept_composer import compose_language_concepts, normalize_language_text
+from .process_template_resolver import (
+    PROCESS_TEMPLATES,
+    ProcessTemplate,
+    SlotSpec,
+    build_process_template_catalog,
+    resolve_process_request,
+)
 from .concept_units import (
     STATE_CONCEPT_UNITS,
     build_supported_runtime_questions,
@@ -87,6 +94,11 @@ __all__ = [
     "compile_causal_operator_registry",
     "compose_language_concepts",
     "normalize_language_text",
+    "PROCESS_TEMPLATES",
+    "ProcessTemplate",
+    "SlotSpec",
+    "build_process_template_catalog",
+    "resolve_process_request",
     "infer_local_concept_gap",
     "request_cloud_concept_support",
     "resolve_action_concepts",

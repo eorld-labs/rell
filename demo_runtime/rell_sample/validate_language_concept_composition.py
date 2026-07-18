@@ -57,6 +57,12 @@ def main() -> None:
     require(transfer["canonical_frame"]["goal_relation"] == "object_supported_at_destination", f"goal projection failed: {transfer}")
     require("桌子" in str(transfer["canonical_utterance"]), f"destination role was lost: {transfer}")
 
+    handover = compose("现在把苹果再递给人类")
+    require(handover["speech_act"] == "task_request", f"object handover was not understood as a task: {handover}")
+    require(handover["canonical_frame"]["operators"] == ["handover_object"], f"handover language did not reach the generic event primitive: {handover}")
+    require(handover["canonical_frame"]["goal_relation"] == "object_received_by_recipient", f"handover goal relation was not projected: {handover}")
+    require(handover["role_bindings"].get("theme", {}).get("concept_id") == "concept_edible_apple" and handover["role_bindings"].get("recipient"), f"handover theme and recipient roles were not separated: {handover}")
+
     prohibited = compose("不要拿杯子")
     require(prohibited["speech_act"] == "prohibition" and prohibited["modifiers"]["negated"], f"negation scope failed: {prohibited}")
     require(prohibited["direct_execution_allowed"] is False, "language composition must never authorize execution")

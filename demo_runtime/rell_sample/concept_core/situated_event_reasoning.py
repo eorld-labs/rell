@@ -272,13 +272,19 @@ def _fact(predicate: str, subject: Any, obj: Any, evidence: str, world_revision:
 
 def _project_goal_facts(goal_relation: str | None, roles: dict[str, Any]) -> list[dict[str, Any]]:
     theme = roles.get("theme") or roles.get("target") or {}
-    destination = roles.get("destination") or {}
+    destination = roles.get("destination") or roles.get("target_region") or {}
+    recipient = roles.get("recipient") or {}
     theme_ref = theme.get("entity_ref") or theme.get("concept_id") or theme.get("matched_alias")
     destination_ref = destination.get("entity_ref") or destination.get("concept_id") or destination.get("matched_alias")
+    recipient_ref = recipient.get("entity_ref") or recipient.get("reference") or recipient.get("matched_alias")
     if goal_relation == "object_supported_at_destination":
         return [{"predicate": "supported_by", "subject": theme_ref, "object": destination_ref, "status": "expected"}]
     if goal_relation == "object_in_gripper":
         return [{"predicate": "held_by_executor", "subject": theme_ref, "object": "executor", "status": "expected"}]
+    if goal_relation == "object_received_by_recipient":
+        return [{"predicate": "received_by", "subject": theme_ref, "object": recipient_ref, "status": "expected"}]
+    if goal_relation == "object_at_target_region":
+        return [{"predicate": "inside_region", "subject": theme_ref, "object": destination_ref, "status": "expected"}]
     return []
 
 
