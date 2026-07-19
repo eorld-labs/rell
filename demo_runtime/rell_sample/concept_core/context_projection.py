@@ -199,6 +199,8 @@ def build_context_projection(
         for role_name, role in roles.items():
             if not isinstance(role, dict):
                 continue
+            if role_name not in {"theme", "target"} or role.get("relation_predicate"):
+                continue
             role_kinds = set(role.get("compatible_kinds") or [])
             candidates = []
             for fact in current_facts:

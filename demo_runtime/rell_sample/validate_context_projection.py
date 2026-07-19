@@ -23,7 +23,12 @@ def main() -> None:
         "speech_act": "task_request",
         "event_candidates": [{"operator": "grasp_object"}],
         "role_bindings": {
-            "theme": {"entity_ref": "vessel_x", "compatible_kinds": ["unfamiliar_vessel"]}
+            "theme": {"entity_ref": "vessel_x", "compatible_kinds": ["unfamiliar_vessel"]},
+            "destination_relation_object": {
+                "compatible_kinds": ["unfamiliar_vessel"],
+                "relation_predicate": "supported_by",
+                "relation_target_role": "destination",
+            },
         },
         "discourse_roles": {
             "source_holder": {"reference": "human_speaker"}
@@ -85,6 +90,10 @@ def main() -> None:
     require(projection["active_task_summary"]["candidate_plan_included"] is False and "hierarchical_intent_graph" not in projection["active_task_summary"], f"active task summary retained mechanics: {projection}")
     require(projection["dialogue_focus_refs"] == [], f"expired discourse focus remained active: {projection}")
     require(projection.get("relational_role_candidates", {}).get("theme", [])[0].get("entity_ref") == "vessel_x", f"current holder relation did not produce a generic role candidate: {projection}")
+    require(
+        "destination_relation_object" not in projection.get("relational_role_candidates", {}),
+        f"source-holder context leaked into a relational modifier role: {projection}",
+    )
 
     repeat_projection = build_context_projection(
         {

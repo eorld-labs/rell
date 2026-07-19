@@ -58,6 +58,31 @@ def main() -> None:
     require(transfer["canonical_frame"]["goal_relation"] == "object_supported_at_destination", f"goal projection failed: {transfer}")
     require("桌子" in str(transfer["canonical_utterance"]), f"destination role was lost: {transfer}")
 
+    relational_destination = compose("把杯子放在有高脚玻璃杯的桌子上")
+    modifier = relational_destination.get("role_bindings", {}).get(
+        "destination_relation_object", {}
+    )
+    require(
+        modifier.get("relation_predicate") == "supported_by"
+        and modifier.get("relation_target_role") == "destination",
+        f"relational destination modifier was flattened into an entity list: {relational_destination}",
+    )
+    relational_constraints = build_semantic_constraint_frame(
+        "把杯子放在有高脚玻璃杯的桌子上", relational_destination
+    )
+    predicates = relational_constraints.get("attribute_predicates", [])
+    require(
+        predicates
+        and all(item.get("role") == "destination_relation_object" for item in predicates)
+        and not relational_constraints.get("roles", {}).get("theme", {}).get("constraints"),
+        f"the relation object's attributes leaked into the placement theme: {relational_constraints}",
+    )
+    non_support_relation = compose("把苹果放在有水的杯子里")
+    require(
+        not non_support_relation.get("role_bindings", {}).get("destination_relation_object"),
+        f"container contents were misread as a support relation: {non_support_relation}",
+    )
+
     co_location = compose("去把苹果拿过来，和杯子一起放在桌子上")
     require(
         co_location["role_bindings"].get("theme", {}).get("concept_id") == "concept_edible_apple"

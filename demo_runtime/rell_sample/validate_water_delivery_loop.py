@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from copy import deepcopy
 
 from embodied_scene import (
     MOTION_JOBS,
@@ -733,6 +734,101 @@ def verify_historical_event_return_replans_current_route() -> dict:
     return {"source_support_ref": reference["source_support_ref"], "old_trajectory_reused": False}
 
 
+def verify_relational_destination_grounding_and_slot_resume() -> dict:
+    direct_session = start_session("home_humanoid", "hospitality_guest")
+    direct_id = direct_session["session_id"]
+    drain_service(begin_motion_command(direct_id, "用白色马克杯给我接一杯水"))
+    direct = begin_motion_command(
+        direct_id,
+        "我喝完了，把杯子放到桌子上面有高脚玻璃杯的桌子上",
+    )
+    direct_intent = direct.get("long_horizon_intent") or (
+        direct.get("immediate_result") or {}
+    ).get("long_horizon_intent") or {}
+    require(
+        direct.get("status") == "requires_human_confirmation"
+        and direct_intent.get("role_bindings", {}).get("theme") == "mug_white"
+        and direct_intent.get("role_bindings", {}).get("destination") == "hospitality_counter_a",
+        f"current support relation did not ground the described destination: {direct}",
+    )
+    destination_evidence = (
+        direct_intent.get("source_language_frame", {})
+        .get("semantic_roles", {})
+        .get("destination", {})
+        .get("binding_evidence", {})
+    )
+    require(
+        destination_evidence.get("evidence")
+        == "relation_constraint_grounded_in_current_observation"
+        and get_session(direct_id).get("process_gap_dialogue") is None,
+        f"relational destination binding lacked current-world evidence: {direct_intent}",
+    )
+
+    resumed_session = start_session("home_humanoid", "hospitality_guest")
+    resumed_id = resumed_session["session_id"]
+    drain_service(begin_motion_command(resumed_id, "用白色马克杯给我接一杯水"))
+    gap = begin_motion_command(resumed_id, "我喝完了，把杯子放到桌子上")
+    require(
+        gap.get("status") == "process_slot_clarification_required",
+        f"ambiguous destination did not open a process slot: {gap}",
+    )
+    resumed = begin_motion_command(resumed_id, "放在有高脚玻璃杯的桌子")
+    resumed_intent = resumed.get("long_horizon_intent") or (
+        resumed.get("immediate_result") or {}
+    ).get("long_horizon_intent") or {}
+    require(
+        resumed.get("status") == "requires_human_confirmation"
+        and resumed_intent.get("role_bindings", {}).get("theme") == "mug_white"
+        and resumed_intent.get("role_bindings", {}).get("destination") == "hospitality_counter_a",
+        f"structured slot answer was treated as a replacement task: {resumed}",
+    )
+    require(
+        get_session(resumed_id).get("process_gap_dialogue") is None,
+        f"resolved relation left the old destination slot active: {get_session(resumed_id).get('process_gap_dialogue')}",
+    )
+
+    ambiguous_session = start_session("home_humanoid", "hospitality_guest")
+    ambiguous_id = ambiguous_session["session_id"]
+    drain_service(begin_motion_command(ambiguous_id, "用白色马克杯给我接一杯水"))
+    ambiguous_live = SESSIONS[ambiguous_id]
+    first_glass = next(
+        item for item in ambiguous_live["runtime_objects"]
+        if item["entity_id"] == "glass_tall"
+    )
+    second_glass = deepcopy(first_glass)
+    second_glass.update({
+        "entity_id": "glass_tall_second",
+        "label": "未登记高脚饮具乙",
+        "support_ref": "hospitality_counter_b",
+        "position": [1.85, 0.35],
+    })
+    ambiguous_live["runtime_objects"].append(second_glass)
+    ambiguous = begin_motion_command(
+        ambiguous_id,
+        "我喝完了，把杯子放在有高脚玻璃杯的桌子上",
+    )
+    ambiguous_result = ambiguous.get("immediate_result") or ambiguous
+    ambiguous_candidates = (
+        ambiguous_result.get("process_template_resolution", {})
+        .get("next_gap", {})
+        .get("candidates", [])
+    )
+    require(
+        ambiguous_result.get("status") == "process_slot_clarification_required"
+        and {
+            item.get("value_ref")
+            for item in ambiguous_candidates
+        } == {"hospitality_counter_a", "hospitality_counter_b"},
+        f"multiple relation-equivalent destinations were selected arbitrarily: {ambiguous}",
+    )
+    return {
+        "relation_object": "glass_tall",
+        "resolved_destination": "hospitality_counter_a",
+        "structured_slot_answer_resumed": True,
+        "equal_relation_evidence_remains_ambiguous": True,
+    }
+
+
 def verify_generic_movable_asset_transfer_binding() -> dict:
     session = start_session("home_humanoid", "hospitality_guest")
     session_id = session["session_id"]
@@ -776,6 +872,7 @@ def main() -> None:
         "terminal_relation_effect_gate": verify_terminal_relation_gates_effect_commit(),
         "role_scoped_transfer_after_handover": verify_role_scoped_transfer_after_handover(),
         "historical_event_return": verify_historical_event_return_replans_current_route(),
+        "relational_destination_grounding": verify_relational_destination_grounding_and_slot_resume(),
         "generic_movable_asset_transfer": verify_generic_movable_asset_transfer_binding(),
     }
     print(report)

@@ -250,6 +250,53 @@ def _resolve_pronouns(text: str, objects: list[dict[str, Any]], context_entities
     return objects, ["pronoun_reference_not_unique"]
 
 
+def _destination_relation_modifier(
+    text: str,
+    objects: list[dict[str, Any]],
+    destination: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Extract the object in a relational noun phrase such as 'the table holding X'."""
+    if not destination:
+        return None
+    destination_affordances = set(destination.get("functional_affordances", []))
+    if not {"support_object", "receive_object"}.intersection(destination_affordances):
+        return None
+    destination_start = destination.get("start")
+    if not isinstance(destination_start, int):
+        return None
+    possessive = text.rfind("的", 0, destination_start)
+    if possessive < 0 or destination_start - possessive > 2:
+        return None
+    relation_markers = ("上面有", "上有", "放着", "摆着", "有")
+    marker_matches = [
+        (text.rfind(marker, 0, possessive), marker)
+        for marker in relation_markers
+        if text.rfind(marker, 0, possessive) >= 0
+    ]
+    if not marker_matches:
+        return None
+    marker_start, marker = max(marker_matches, key=lambda item: item[0])
+    modifier_start = marker_start + len(marker)
+    candidates = [
+        item for item in objects
+        if item is not destination
+        and isinstance(item.get("start"), int)
+        and isinstance(item.get("end"), int)
+        and modifier_start <= item["start"]
+        and item["end"] <= possessive
+    ]
+    if not candidates:
+        return None
+    modifier = deepcopy(candidates[-1])
+    modifier.update({
+        "relation_predicate": "supported_by",
+        "relation_target_role": "destination",
+        "relation_surface": text[marker_start:destination_start + len(str(destination.get("matched_alias") or ""))],
+        "source": "relational_noun_phrase",
+    })
+    return modifier
+
+
 def _roles(
     events: list[dict[str, Any]],
     objects: list[dict[str, Any]],
@@ -270,6 +317,16 @@ def _roles(
         restores_prior_relation = "回" in surface
         before = [item for item in objects if item.get("end", 0) <= place_event["start"]]
         after = [item for item in objects if item.get("start", 0) >= place_event["end"]]
+        destination_candidate = after[-1] if after else None
+        destination_relation_object = _destination_relation_modifier(
+            text, after, destination_candidate
+        )
+        movable_themes = [
+            item for item in movable
+            if not destination_relation_object
+            or item.get("start") != destination_relation_object.get("start")
+            or item.get("end") != destination_relation_object.get("end")
+        ]
         prior_acquisition = next(
             (
                 item for item in reversed(events)
@@ -311,7 +368,9 @@ def _roles(
             if relation_prefix.endswith(("和", "与", "同")) and "一起" in relation_suffix:
                 companion_mentions.append(item)
         if (has_destination_connector or restores_prior_relation) and after:
-            roles["destination"] = deepcopy(after[-1])
+            roles["destination"] = deepcopy(destination_candidate)
+            if destination_relation_object:
+                roles["destination_relation_object"] = destination_relation_object
             if acquired_theme:
                 roles["theme"] = deepcopy(acquired_theme)
             elif before:
@@ -319,8 +378,8 @@ def _roles(
                 roles["theme"] = deepcopy((primary_before or before)[-1])
         elif surface == "放下" and after:
             roles["theme"] = deepcopy(after[0])
-        elif movable:
-            roles["theme"] = deepcopy(acquired_theme or movable[0])
+        elif movable_themes:
+            roles["theme"] = deepcopy(acquired_theme or movable_themes[0])
         if companion_mentions:
             roles["companion"] = deepcopy(companion_mentions[0])
             roles["companion"]["semantic_relation"] = "co_located_with_theme_at_destination"

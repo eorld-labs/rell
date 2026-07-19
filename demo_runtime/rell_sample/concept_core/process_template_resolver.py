@@ -506,16 +506,62 @@ def _slot_candidates(
         target_region = (current_bindings.get("target_region") or {}).get("value_ref")
         if target_region:
             values = [item for item in values if item.get("region_id") == target_region]
+        semantic_frame = analysis.get("semantic_constraint_frame") or {}
+        observation_evidence = analysis.get("observation_evidence") or {}
+        relation_roles = [
+            (name, relation_role)
+            for name, relation_role in (semantic_frame.get("roles") or {}).items()
+            if relation_role.get("relation_target_role") in slot.role_names
+            and relation_role.get("relation_predicate") == "supported_by"
+        ]
+        relational_bindings: dict[str, dict[str, Any]] = {}
+        if relation_roles:
+            allowed_support_refs = {item.get("entity_id") for item in values}
+            for relation_role_name, relation_role in relation_roles:
+                modifier_grounding = ground_semantic_role(
+                    semantic_frame,
+                    observation_evidence,
+                    relation_role_name,
+                )
+                modifier_bindings = modifier_grounding.get("candidate_bindings", [])
+                support_refs = {
+                    relation.get("object")
+                    for modifier in modifier_bindings
+                    for relation in modifier.get("observed_relations", [])
+                    if relation.get("predicate") == relation_role["relation_predicate"]
+                    and relation.get("object")
+                }
+                allowed_support_refs &= support_refs
+                for support_ref in support_refs:
+                    relational_bindings[support_ref] = {
+                        "binding_basis": "relation_constraint_grounded_in_current_observation",
+                        "evidence_strength": 550,
+                        "world_revision": observation_evidence.get("world_revision", world_revision),
+                        "matched_constraints": [{
+                            "predicate_type": "relation_constraint",
+                            "predicate": relation_role["relation_predicate"],
+                            "target_role": relation_role["relation_target_role"],
+                            "modifier_role": relation_role_name,
+                            "modifier_entity_refs": [
+                                item.get("entity_ref") for item in modifier_bindings
+                            ],
+                        }],
+                    }
+            values = [
+                item for item in values
+                if item.get("entity_id") in allowed_support_refs
+            ]
         role_name = next((name for name in slot.role_names if name in (analysis.get("semantic_constraint_frame") or {}).get("roles", {})), slot.slot_id)
         semantic_grounding = ground_semantic_role(
-            analysis.get("semantic_constraint_frame") or {},
-            analysis.get("observation_evidence") or {},
+            semantic_frame,
+            observation_evidence,
             role_name,
             candidate_entity_refs={item.get("entity_id") for item in values},
         )
         grounded_by_ref = {item.get("entity_ref"): item for item in semantic_grounding.get("candidate_bindings", [])}
         if grounded_by_ref:
             values = [item for item in values if item.get("entity_id") in grounded_by_ref]
+        grounded_by_ref.update(relational_bindings)
         return [
             _entity_value(
                 item,

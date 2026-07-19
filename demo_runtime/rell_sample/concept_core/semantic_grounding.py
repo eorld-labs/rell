@@ -45,6 +45,9 @@ def build_semantic_constraint_frame(
             "end": role.get("end"),
             "compatible_kinds": deepcopy(role.get("compatible_kinds", [])),
             "functional_affordances": deepcopy(role.get("functional_affordances", [])),
+            "relation_predicate": role.get("relation_predicate"),
+            "relation_target_role": role.get("relation_target_role"),
+            "relation_surface": role.get("relation_surface"),
             "constraints": [],
         }
 

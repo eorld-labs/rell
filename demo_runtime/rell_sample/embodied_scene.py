@@ -3129,6 +3129,38 @@ def _start_process_gap_dialogue(
     }
 
 
+def _pending_process_slot_candidate(
+    dialogue: dict[str, Any] | None,
+    analysis: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Return a current candidate when a structured reply fills the pending slot."""
+    if not dialogue or not analysis:
+        return None
+    pending_resolution = dialogue.get("resolution") or {}
+    gap = pending_resolution.get("next_gap") or {}
+    slot_id = gap.get("slot_id")
+    answer_resolution = analysis.get("process_template_resolution") or {}
+    if (
+        not slot_id
+        or answer_resolution.get("template_id") != pending_resolution.get("template_id")
+    ):
+        return None
+    pending_theme = (pending_resolution.get("bindings") or {}).get("theme", {}).get("value_ref")
+    answer_theme = (answer_resolution.get("bindings") or {}).get("theme", {}).get("value_ref")
+    if pending_theme and answer_theme and pending_theme != answer_theme:
+        return None
+    answer_ref = (answer_resolution.get("bindings") or {}).get(slot_id, {}).get("value_ref")
+    if not answer_ref:
+        return None
+    return next(
+        (
+            item for item in gap.get("candidates", [])
+            if item.get("value_ref") == answer_ref
+        ),
+        None,
+    )
+
+
 def _continue_process_gap_dialogue(session: dict[str, Any], utterance: str) -> dict[str, Any] | None:
     dialogue = session.get("process_gap_dialogue")
     if not dialogue or dialogue.get("status") != "collecting_process_template_contract":
@@ -3217,6 +3249,11 @@ def _continue_process_gap_dialogue(session: dict[str, Any], utterance: str) -> d
     candidates = gap.get("candidates", [])
     normalized = re.sub(r"[\s，。！？、,.!?]+", "", utterance)
     matches = [item for item in candidates if item.get("label") and item["label"] in normalized]
+    if len(matches) != 1:
+        answer_analysis = _compose_session_language(deepcopy(session), utterance)
+        semantic_match = _pending_process_slot_candidate(dialogue, answer_analysis)
+        if semantic_match:
+            matches = [semantic_match]
     if len(matches) != 1 and len(candidates) == 1 and _context_confirmation_value(utterance) is True:
         matches = [candidates[0]]
     historical_evidence = None
@@ -7334,8 +7371,13 @@ def begin_motion_command(
         explained = _continue_historical_reference_explanation(session, pending, utterance)
         if explained:
             return explained
+    active_process_gap = session.get("process_gap_dialogue")
+    pending_slot_candidate = _pending_process_slot_candidate(
+        active_process_gap, early_analysis
+    )
     process_gap_superseded = bool(
-        session.get("process_gap_dialogue")
+        active_process_gap
+        and not pending_slot_candidate
         and (early_analysis or {}).get("speech_act") == "task_request"
         and any(
             item.get("operator")
