@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from causal_task_graph_runtime import (
     apply_condition_answer,
+    causal_graph_activation_matches,
     evaluate_causal_graph,
     initialize_causal_graph_runtime,
     record_graph_facts,
@@ -17,6 +18,11 @@ def require(condition: bool, message: str) -> None:
 def main() -> None:
     graph = {
         "goal_fact": "bundle_delivered",
+        "activation_contract": {
+            "speech_acts": ["task_request"],
+            "operators_any": ["transport_object"],
+            "goal_relations_any": ["object_at_target_region"],
+        },
         "roles": {"resource": "resource_a"},
         "world_fact_rules": {
             "resource_present": {"operator": "role_exists", "role": "resource"},
@@ -40,6 +46,18 @@ def main() -> None:
         ],
     }
     objects = [{"entity_id": "resource_a", "kind": "unfamiliar_resource", "active": True}]
+    matching_language = {
+        "speech_act": "task_request",
+        "event_candidates": [{"operator": "transport_object"}],
+        "canonical_frame": {"goal_relation": "object_at_target_region"},
+    }
+    unrelated_language = {
+        "speech_act": "task_request",
+        "event_candidates": [{"operator": "place_object"}],
+        "canonical_frame": {"goal_relation": "object_supported_at_destination"},
+    }
+    require(causal_graph_activation_matches(graph, matching_language), "matching composed goal did not activate a generic graph")
+    require(not causal_graph_activation_matches(graph, unrelated_language), "scene availability overrode an unrelated composed goal")
     runtime = initialize_causal_graph_runtime(graph, world_revision=0)
     first = evaluate_causal_graph(graph, runtime, objects, world_revision=0)
     require([node["node_id"] for node in first["ready_nodes"]] == ["observe"], f"root epistemic node was not ready: {first}")

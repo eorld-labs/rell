@@ -35,6 +35,7 @@ from concept_core.situated_event_reasoning import (
 from concept_core.visual_concept_packs import build_visual_pack_catalog
 from causal_task_graph_runtime import (
     apply_condition_answer,
+    causal_graph_activation_matches,
     established_graph_facts,
     evaluate_causal_graph,
     initialize_causal_graph_runtime,
@@ -893,13 +894,17 @@ def _create_water_delivery_intent(
     return intent
 
 
-def _create_hospitality_intent(session: dict[str, Any], utterance: str) -> dict[str, Any] | None:
+def _create_hospitality_intent(
+    session: dict[str, Any],
+    utterance: str,
+    language_analysis: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
     """Create the composite guest-service intent from the live task graph."""
     if session.get("scene_id") != "hospitality_guest":
         return None
-    if not any(token in utterance for token in ("客人", "红茶", "托盘", "报纸", "招待")):
-        return None
     graph = build_hospitality_task_graph(session["runtime_objects"])
+    if not causal_graph_activation_matches(graph, language_analysis):
+        return None
     intent_id = "intent_hospitality_" + hashlib.sha1(
         f"{session['session_id']}|{session['world_revision']}|{graph['goal_fact']}".encode("utf-8")
     ).hexdigest()[:12]
@@ -6320,7 +6325,9 @@ def _finalize_motion_result(
 
 
 def _continue_causal_graph_clarification(
-    session: dict[str, Any], answer: str
+    session: dict[str, Any],
+    answer: str,
+    language_analysis: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     dialogue = session.get("causal_graph_clarification")
     if not dialogue:
@@ -6336,6 +6343,32 @@ def _continue_causal_graph_clarification(
         world_revision=session["world_revision"],
     )
     if resolved.get("status") == "condition_answer_not_resolved":
+        # A complete new task is not an answer to an older graph slot. Release
+        # the old task-period snapshot and let normal arbitration create a new
+        # task from the current physical world.
+        if (
+            (language_analysis or {}).get("speech_act") == "task_request"
+            and any(
+                item.get("operator")
+                for item in (language_analysis or {}).get("event_candidates", [])
+            )
+        ):
+            intent["lifecycle"] = "superseded"
+            intent["current_stage"] = None
+            released = _long_intent_view(intent)
+            released.update({
+                "closed_world_revision": session["world_revision"],
+                "arbitration_eligible": False,
+                "snapshot_state": "released_on_new_task",
+                "release_reason": "new_goal_directed_task_superseded_pending_condition",
+            })
+            session.setdefault("released_intent_archive", []).append(released)
+            session.get("long_horizon_intents", {}).pop(intent["intent_id"], None)
+            if session.get("active_intent_id") == intent["intent_id"]:
+                session["active_intent_id"] = None
+                session["intent_activation_stack"] = []
+            session["causal_graph_clarification"] = None
+            return None
         return {
             "status": "causal_graph_clarification_required",
             "reason": "answer_did_not_resolve_pending_causal_condition",
@@ -6435,7 +6468,9 @@ def begin_motion_command(
             return _finalize_motion_result(
                 session_id, text, before_historical_navigation, historical_navigation, None
             )
-        graph_clarification = _continue_causal_graph_clarification(session, text)
+        graph_clarification = _continue_causal_graph_clarification(
+            session, text, early_analysis
+        )
         if graph_clarification:
             return graph_clarification
     pending = session.get("pending_confirmation")
@@ -6534,7 +6569,9 @@ def begin_motion_command(
         if existing_hospitality and existing_hospitality.get("intent_type") == "hospitality_guest_service":
             hospitality_intent = existing_hospitality
         else:
-            hospitality_intent = _create_hospitality_intent(session, text)
+            hospitality_intent = _create_hospitality_intent(
+                session, text, language_analysis
+            )
     if hospitality_intent:
         prepared = _prepare_long_intent_stage(session, hospitality_intent)
         prepared["task_graph"] = deepcopy(hospitality_intent.get("task_graph"))

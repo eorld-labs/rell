@@ -44,6 +44,11 @@ def build_hospitality_task_graph(
         "schema_version": "1.0.0",
         "intent_type": "hospitality_guest_service",
         "goal_fact": HOSPITALITY_GOAL,
+        "activation_contract": {
+            "speech_acts": ["task_request"],
+            "operators_any": ["transport_object"],
+            "goal_relations_any": ["object_at_target_region"],
+        },
         "roles": {
             "tea_vessel": mug.get("entity_id") if mug else None,
             "water_vessel": glass.get("entity_id") if glass else None,

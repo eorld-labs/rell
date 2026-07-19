@@ -91,6 +91,26 @@ def main() -> None:
     require(runtime_objects["newspaper_a"].get("contained_by") == runtime_objects["newspaper_b"].get("contained_by") == "trash_bin_hospitality", f"discard effects were not committed: {runtime_objects}")
     require(runtime_objects["mug_white"].get("support_ref") == runtime_objects["glass_tall"].get("support_ref") == "wooden_tray", f"join node did not load both vessels: {runtime_objects}")
     require(runtime_objects["wooden_tray"].get("received_by") == "guest", f"terminal handover relation missing: {runtime_objects}")
+    post_task = begin_motion_command(
+        graph_session["session_id"],
+        "客人喝完了，把杯子还是放回桌子上",
+    )
+    require(post_task.get("status") == "process_slot_clarification_required", f"post-task placement was hijacked by the hospitality graph: {post_task}")
+    require(post_task.get("status") != "causal_graph_clarification_required", f"completed graph restarted from a guest mention: {post_task}")
+    require(get_session(graph_session["session_id"]).get("active_intent_id") is None, f"ambiguous post-task placement committed a new task snapshot: {post_task}")
+
+    supersede_session = start_session("home_humanoid", "hospitality_guest")
+    pending_graph = begin_motion_command(supersede_session["session_id"], task)
+    old_intent_id = get_session(supersede_session["session_id"])["active_intent_id"]
+    require(pending_graph.get("status") == "causal_graph_clarification_required", f"precondition for supersession test missing: {pending_graph}")
+    superseding_task = begin_motion_command(
+        supersede_session["session_id"],
+        "客人喝完了，把杯子放回桌子上",
+    )
+    superseded_live = get_session(supersede_session["session_id"])
+    require(superseding_task.get("status") == "process_slot_clarification_required", f"new task was consumed as an old graph answer: {superseding_task}")
+    require(superseded_live.get("causal_graph_clarification") is None, f"new task left the old condition dialogue active: {superseded_live}")
+    require(any(item.get("intent_id") == old_intent_id and item.get("lifecycle") == "superseded" for item in superseded_live.get("released_intent_archive", [])), f"superseded task snapshot was not released: {superseded_live}")
     print({"scene": scene["scene_id"], "goal": graph["goal_fact"], "parallel_branches": graph["parallel_ready_branches"], "execution_order": node_order, "route_segment_counts": route_segment_counts, "missing_conditions": missing, "status": "passed"})
 
 

@@ -4,6 +4,35 @@ from copy import deepcopy
 from typing import Any
 
 
+def causal_graph_activation_matches(
+    graph: dict[str, Any], language_analysis: dict[str, Any] | None
+) -> bool:
+    """Require composed goal semantics before a scene graph may own input."""
+    contract = graph.get("activation_contract") or {}
+    if not contract or not language_analysis:
+        return False
+    speech_act = language_analysis.get("speech_act")
+    operators = {
+        item.get("operator")
+        for item in language_analysis.get("event_candidates", [])
+        if item.get("operator")
+    }
+    goal_relation = (language_analysis.get("canonical_frame") or {}).get("goal_relation")
+    allowed_speech_acts = set(contract.get("speech_acts") or [])
+    required_operators = set(contract.get("operators_all") or [])
+    alternative_operators = set(contract.get("operators_any") or [])
+    alternative_goal_relations = set(contract.get("goal_relations_any") or [])
+    return bool(
+        (not allowed_speech_acts or speech_act in allowed_speech_acts)
+        and required_operators.issubset(operators)
+        and (not alternative_operators or bool(operators & alternative_operators))
+        and (
+            not alternative_goal_relations
+            or goal_relation in alternative_goal_relations
+        )
+    )
+
+
 def initialize_causal_graph_runtime(graph: dict[str, Any], *, world_revision: int) -> dict[str, Any]:
     return {
         "schema_version": "1.0.0",
@@ -333,6 +362,7 @@ def apply_condition_answer(
 
 __all__ = [
     "apply_condition_answer",
+    "causal_graph_activation_matches",
     "established_graph_facts",
     "evaluate_causal_graph",
     "evaluate_world_fact_rules",
