@@ -117,6 +117,22 @@ FACTORY_EVENT_CONCEPT_UNITS: list[dict[str, Any]] = [
         postcondition="对象不再受夹持约束；不保证对象稳定放置",
     ),
     _event(
+        "factory_event_fill_container",
+        "向容器加入液体事件概念",
+        "fill_container",
+        ["接水", "取水", "装水", "接一杯水", "接杯水"],
+        "fill_container",
+        {
+            "container": {"role": "theme", "entity_type": "fillable_container"},
+            "source": {"role": "source", "entity_type": "liquid_source"},
+        },
+        ["container_grounded", "liquid_source_grounded", "container_at_source"],
+        ["container_filled"],
+        ["container_empty"],
+        ["liquid_level_verified", "source_liquid_identity_verified"],
+        postcondition="容器中的目标液体达到任务要求液位，并通过液位与液体来源联合验真",
+    ),
+    _event(
         "factory_event_place",
         "放置对象事件概念",
         "place_object",

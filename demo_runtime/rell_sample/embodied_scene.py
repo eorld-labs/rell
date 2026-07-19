@@ -258,6 +258,13 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator", scene_id
     )
     session_id = "embodied_" + hashlib.sha1(f"{scene['scene_id']}|{len(SESSIONS) + 1}".encode()).hexdigest()[:12]
     state = deepcopy(scene["initial_state"])
+    human_participant_refs = [
+        item.get("entity_id")
+        for item in scene["objects"]
+        if item.get("active") is not False
+        and item.get("kind") == "human_recipient"
+        and item.get("entity_id")
+    ]
     session = {
         "session_id": session_id,
         "scene_id": scene["scene_id"],
@@ -271,6 +278,10 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator", scene_id
         "perception_history": [],
         "perception_scenario": "normal",
         "runtime_objects": deepcopy(scene["objects"]),
+        "interaction_role_bindings": {
+            "human_speaker": human_participant_refs[0]
+            if len(human_participant_refs) == 1 else None,
+        },
         "teaching_session": None,
         "learned_experience": None,
         "available_local_experiences": _experience_catalog(),
@@ -427,6 +438,8 @@ def _archive_and_release_task_context(
         ),
         active_intent=None,
         recent_episodes=session.get("episodic_fact_memory", []),
+        recent_intent_capsules=session.get("completed_intent_archive", []),
+        interaction_role_bindings=session.get("interaction_role_bindings", {}),
         dialogue_focus_entities=terminal_focus,
         world_revision=int(session.get("world_revision", 0)),
         current_turn=int(session.get("interaction_turn", 0)),
@@ -789,21 +802,66 @@ def _create_transport_intent(
     return intent
 
 
-def _water_delivery_goal_semantics(session: dict[str, Any], utterance: str) -> dict[str, Any]:
+def _water_delivery_goal_semantics(
+    session: dict[str, Any],
+    utterance: str,
+    language_analysis: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Compose a service goal from effects and roles, independent of word order."""
     normalized = re.sub(r"[，。！？、,.!?\s]+", "", utterance)
+    analysis = language_analysis or {}
+    discourse_roles = analysis.get("discourse_roles") or {}
+    beneficiary_requested = (
+        (discourse_roles.get("beneficiary") or {}).get("reference")
+        == "human_speaker"
+    )
+    deictic_recipient_requested = (
+        (discourse_roles.get("recipient") or {}).get("reference")
+        == "human_speaker"
+    )
+    recent_goal_capsules = (
+        (analysis.get("context_projection") or {}).get("recent_goal_capsules") or []
+    )
+    recent_water_goal = next(
+        (
+            capsule for capsule in reversed(recent_goal_capsules)
+            if capsule.get("goal_fact") == "human_received_filled_container"
+        ),
+        None,
+    )
+    omitted_content = any(
+        item.get("slot") == "theme_content"
+        and item.get("status") == "omitted_head_requires_contextual_goal_schema"
+        for item in analysis.get("ellipsis_candidates", [])
+    )
     water_effect_requested = any(token in normalized for token in ("接水", "取水", "倒水", "装水", "一杯水")) or bool(
         re.search(r"(?:接|取|倒|装)(?:一)?杯水", normalized)
     )
-    transfer_relation_requested = any(token in normalized for token in ("给", "交给", "递给", "送给", "拿给"))
+    if omitted_content and recent_water_goal:
+        water_effect_requested = True
+    transfer_relation_requested = (
+        any(token in normalized for token in ("给", "交给", "递给", "送给", "拿给"))
+        or beneficiary_requested
+        or bool(recent_water_goal and omitted_content)
+    )
     recipients = [
         item for item in session["runtime_objects"]
         if item.get("active") is not False and item.get("kind") == "human_recipient"
     ]
     explicit_recipient_refs = [item["entity_id"] for item in recipients if str(item.get("label") or "") in normalized]
     deictic_human_reference = any(token in normalized for token in ("给我", "交给我", "递给我", "送给我", "拿给我"))
+    speaker_ref = (session.get("interaction_role_bindings") or {}).get("human_speaker")
+    if (beneficiary_requested or deictic_recipient_requested or deictic_human_reference) and speaker_ref:
+        explicit_recipient_refs = list(dict.fromkeys([*explicit_recipient_refs, speaker_ref]))
     generic_human_reference = any(token in normalized for token in ("人类", "人", "家人", "主人", "用户", "客人", "接收人"))
-    recipient_role_requested = bool(explicit_recipient_refs or deictic_human_reference or generic_human_reference)
+    recipient_role_requested = bool(
+        explicit_recipient_refs
+        or deictic_human_reference
+        or deictic_recipient_requested
+        or beneficiary_requested
+        or generic_human_reference
+        or (recent_water_goal and omitted_content)
+    )
     placement_relation_requested = any(token in normalized for token in ("放到", "放在", "摆到", "摆在", "搁到", "搁在"))
     support_concepts = [
         concept for concept in load_object_concepts()["concepts"]
@@ -842,6 +900,8 @@ def _water_delivery_goal_semantics(session: dict[str, Any], utterance: str) -> d
         "water_effect_requested": water_effect_requested,
         "transfer_relation_requested": transfer_relation_requested,
         "recipient_role_requested": recipient_role_requested,
+        "beneficiary_role_requested": beneficiary_requested,
+        "goal_schema_continued_from_recent_capsule": bool(recent_water_goal and omitted_content),
         "explicit_recipient_refs": explicit_recipient_refs,
         "placement_relation_requested": placement_relation_requested,
         "support_role_requested": support_role_requested,
@@ -901,6 +961,41 @@ def _resolve_current_role_binding(
                 "source": "unified_process_binding_revalidated_in_current_snapshot",
             },
         }
+    relational_candidates = (
+        ((analysis.get("context_projection") or {}).get("relational_role_candidates") or {}).get(role)
+        or []
+    )
+    valid_relational = [
+        item
+        for item in relational_candidates
+        if item.get("entity_ref") in current_by_ref
+        and item.get("world_revision") == session.get("world_revision")
+    ]
+    if not confirmed_entity_ref and len(valid_relational) == 1:
+        relational = valid_relational[0]
+        entity_ref = relational["entity_ref"]
+        return {
+            "status": "resolved",
+            "entity": current_by_ref[entity_ref],
+            "entity_ref": entity_ref,
+            "evidence": {
+                "basis": f"current_verified_relation:{relational.get('relation')}",
+                "strength": 475,
+                "world_revision": relational.get("world_revision"),
+                "observation_evidence_set_id": (analysis.get("observation_evidence") or {}).get("evidence_set_id"),
+                "matched_constraints": [{
+                    "predicate": relational.get("relation"),
+                    "object": relational.get("relation_object_ref"),
+                }],
+                "current_snapshot_revalidated": True,
+            },
+            "compatible_candidates": deepcopy(current_candidates),
+            "grounded_role": {
+                "status": "resolved",
+                "binding": deepcopy(relational),
+                "source": "context_projection_current_relation",
+            },
+        }
     semantic_frame = analysis.get("semantic_constraint_frame") or build_semantic_constraint_frame(utterance, analysis)
     observation_evidence = analysis.get("observation_evidence") or _current_observation_evidence(
         session,
@@ -953,7 +1048,9 @@ def _create_water_delivery_intent(
         # empty after a terminal-frame failure.
         return existing
     pending_container_ref = session.get("pending_water_container_ref")
-    goal_semantics = _water_delivery_goal_semantics(session, utterance)
+    goal_semantics = _water_delivery_goal_semantics(
+        session, utterance, language_analysis
+    )
     # During clarification recovery the original goal is already known. The
     # answer may be classified as a generic grasp utterance, but that lexical
     # downgrade must not erase the pending service-goal contract.
@@ -1091,9 +1188,15 @@ def _create_hospitality_intent(
     return intent
 
 
-def _create_water_placement_intent(session: dict[str, Any], utterance: str) -> dict[str, Any] | None:
+def _create_water_placement_intent(
+    session: dict[str, Any],
+    utterance: str,
+    language_analysis: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
     """Compose filling and placement effects into one state-driven intent."""
-    goal_semantics = _water_delivery_goal_semantics(session, utterance)
+    goal_semantics = _water_delivery_goal_semantics(
+        session, utterance, language_analysis
+    )
     if goal_semantics["goal_fact"] != "filled_container_supported_at_destination":
         return None
     containers = [item for item in session["runtime_objects"] if item.get("active") is not False and item.get("kind") == "graspable_container"]
@@ -1907,12 +2010,38 @@ def _compose_session_language(session: dict[str, Any], utterance: str) -> dict[s
         current_facts=current_facts,
         active_intent=active_intent,
         recent_episodes=session.get("episodic_fact_memory", []),
+        recent_intent_capsules=session.get("completed_intent_archive", []),
+        interaction_role_bindings=session.get("interaction_role_bindings", {}),
         dialogue_focus_entities=session.get("dialogue_focus_entities", []),
         world_revision=int(session.get("world_revision", 0)),
         current_turn=int(session.get("interaction_turn", 0)),
     )
     analysis["context_projection"] = context_projection
     session["last_context_projection"] = deepcopy(context_projection)
+    contextual_goals = {
+        item.get("goal_fact")
+        for item in context_projection.get("recent_goal_capsules", [])
+        if item.get("goal_fact")
+    }
+    if analysis.get("ellipsis_candidates") and len(contextual_goals) == 1:
+        contextual_goal = next(iter(contextual_goals))
+        analysis["contextual_goal_resolution"] = {
+            "status": "resolved_from_unique_recent_goal_schema",
+            "goal_fact": contextual_goal,
+            "role_bindings_reused": False,
+            "verified_facts_reused": False,
+            "current_world_rebinding_required": True,
+        }
+        analysis["speech_act"] = "task_request"
+        analysis.setdefault("canonical_frame", {})["speech_act"] = "task_request"
+        analysis["canonical_frame"]["goal_relation"] = contextual_goal
+        analysis["unresolved_slots"] = [
+            slot for slot in analysis.get("unresolved_slots", [])
+            if slot not in {"event_or_query_concept_not_resolved", "event_operator_not_resolved"}
+        ]
+        analysis["decision"] = "route_contextually_resolved_goal_schema"
+        analysis["confidence"] = max(float(analysis.get("confidence") or 0.0), 0.86)
+        analysis["confidence_band"] = "high"
     situated_frame = compile_situated_event_frame(
         utterance,
         analysis,
@@ -2006,6 +2135,9 @@ def _language_understanding_view(analysis: dict[str, Any]) -> dict[str, Any]:
         "semantic_constraint_frame": deepcopy(analysis.get("semantic_constraint_frame")),
         "grounded_intent_frame": deepcopy(analysis.get("grounded_intent_frame")),
         "context_projection": deepcopy(analysis.get("context_projection")),
+        "discourse_roles": deepcopy(analysis.get("discourse_roles", {})),
+        "ellipsis_candidates": deepcopy(analysis.get("ellipsis_candidates", [])),
+        "contextual_goal_resolution": deepcopy(analysis.get("contextual_goal_resolution")),
     }
 
 
@@ -6771,7 +6903,9 @@ def begin_motion_command(
         prepared["task_graph_evaluation"] = deepcopy(hospitality_intent.get("task_graph_evaluation"))
         prepared["session"] = get_session(session_id)
         return prepared
-    composite_water_goal = _water_delivery_goal_semantics(session, text).get("goal_fact") in {
+    composite_water_goal = _water_delivery_goal_semantics(
+        session, text, language_analysis
+    ).get("goal_fact") in {
         "human_received_filled_container", "filled_container_supported_at_destination"
     }
     active_water_intent = (session.get("long_horizon_intents") or {}).get(session.get("active_intent_id"))
@@ -6982,7 +7116,7 @@ def begin_motion_command(
         return prepared
     long_intent = None if internal_stage or scoped_authorization else (
         _create_water_delivery_intent(session, text, language_analysis)
-        or _create_water_placement_intent(session, text)
+        or _create_water_placement_intent(session, text, language_analysis)
         or _create_object_handover_intent(session, text, language_analysis)
         or _create_transport_intent(session, text, language_analysis)
         or _create_transfer_intent(session, text, language_analysis)

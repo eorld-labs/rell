@@ -211,6 +211,14 @@ def main() -> None:
     require(query_during_confirmation.get("status") == "support_inventory_state_answered", f"pending execution confirmation intercepted the state query: {query_during_confirmation}")
     require(pending_before_query and pending_after_query == pending_before_query, f"read-only query consumed or replaced the pending task slot: {query_during_confirmation}")
 
+    elliptical_service = compose("我喝完了，再帮我接一杯")
+    require((elliptical_service.get("discourse_roles", {}).get("beneficiary") or {}).get("reference") == "human_speaker", f"beneficiary discourse role was not composed: {elliptical_service}")
+    require((elliptical_service.get("discourse_roles", {}).get("source_holder") or {}).get("physical_state_change_committed") is False, f"reported consumption incorrectly committed a physical state: {elliptical_service}")
+    require(any(item.get("slot") == "theme_content" and item.get("does_not_commit_concept") is True for item in elliptical_service.get("ellipsis_candidates", [])), f"omitted cup content was not exposed as a context-dependent slot: {elliptical_service}")
+    explicit_beneficiary_service = compose("我喝完了，再帮我用白色杯子接一杯水")
+    require(explicit_beneficiary_service.get("speech_act") == "task_request" and [item.get("operator") for item in explicit_beneficiary_service.get("event_candidates", [])] == ["fill_container"], f"explicit fill event was not composed at the concept layer: {explicit_beneficiary_service}")
+    require(explicit_beneficiary_service.get("canonical_frame", {}).get("goal_relation") == "container_filled", f"fill event did not project its physical postcondition: {explicit_beneficiary_service}")
+
     samples = []
     for _ in range(300):
         started = perf_counter_ns()

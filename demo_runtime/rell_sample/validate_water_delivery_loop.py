@@ -454,8 +454,27 @@ def verify_current_relation_precedes_category_ambiguity() -> dict:
     outcomes = drain_service(repeated)
     facts = [item.get("terminal_fact") for item in outcomes]
     require(facts == ["target_object_in_gripper", "container_filled", "human_received_filled_container"], f"relation-bound repeat service did not complete: {outcomes}")
+    repeat_forms = [
+        ("我喝完了，再帮我用白色杯子接一杯水", False),
+        ("我喝完了，再帮我接一杯", True),
+    ]
+    for utterance, expects_goal_schema_continuation in repeat_forms:
+        continued = begin_motion_command(session_id, utterance)
+        continued_intent = continued.get("long_horizon_intent") or {}
+        require(continued.get("status") == "motion_started", f"context-composed repeat request did not start: {utterance}: {continued}")
+        require(continued_intent.get("role_bindings", {}).get("theme") == "mug_white" and continued_intent.get("verified_facts") == [], f"repeat request reused old facts or lost current theme: {utterance}: {continued}")
+        runtime_continued = SESSIONS[session_id]["long_horizon_intents"][SESSIONS[session_id]["active_intent_id"]]
+        semantics = runtime_continued.get("composed_goal_semantics") or {}
+        source_projection = (runtime_continued.get("source_language_frame") or {}).get("context_projection") or {}
+        require(semantics.get("beneficiary_role_requested") is True, f"beneficiary role was not composed: {utterance}: {semantics}")
+        require(semantics.get("goal_schema_continued_from_recent_capsule") is expects_goal_schema_continuation, f"ellipsis used the wrong goal-schema boundary: {utterance}: {semantics}")
+        if expects_goal_schema_continuation:
+            require(any(item.get("goal_fact") == "human_received_filled_container" and item.get("prior_verified_facts_reused") is False for item in source_projection.get("recent_goal_capsules", [])), f"ellipsis did not expose safe goal-only continuation evidence: {source_projection}")
+        continued_outcomes = drain_service(continued)
+        require([item.get("terminal_fact") for item in continued_outcomes] == ["target_object_in_gripper", "container_filled", "human_received_filled_container"], f"context-composed repeat service failed: {utterance}: {continued_outcomes}")
+
     compacted = get_session(session_id)
-    require(len(compacted.get("completed_intent_archive", [])) == 2, f"goal-level capsules did not remain bounded to completed tasks: {compacted.get('completed_intent_archive')}")
+    require(len(compacted.get("completed_intent_archive", [])) == 4, f"goal-level capsules did not match completed tasks: {compacted.get('completed_intent_archive')}")
     require(len(compacted.get("dialogue_focus_entities", [])) <= 4 and len(compacted.get("episodic_fact_memory", [])) <= 32, f"bounded recent context exceeded its retention contract: {compacted}")
     require(not compacted.get("event_history") and compacted.get("last_language_understanding") is None, f"second completed task retained short-term execution or parse detail: {compacted}")
     return {"theme": "mug_white", "binding_basis": evidence["basis"], "stage_facts": facts}

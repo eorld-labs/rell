@@ -11,6 +11,7 @@ EVENT_LEXICAL_PRIMITIVES: tuple[dict[str, Any], ...] = (
     {"operator": "orient_executor", "concept_id": "factory_event_orient", "heads": ("转向", "面向", "朝向", "转"), "canonical": "转向"},
     {"operator": "grasp_object", "concept_id": "factory_event_grasp", "heads": ("捡", "拾", "抓", "取", "拿"), "canonical": "拿起"},
     {"operator": "release_object", "concept_id": "factory_event_release", "heads": ("释放", "撒手", "松开", "放开"), "canonical": "放开"},
+    {"operator": "fill_container", "concept_id": "factory_event_fill_container", "heads": ("接一杯水", "接杯水", "接水", "取水", "装水"), "canonical": "接水"},
     {"operator": "place_object", "concept_id": "factory_event_place", "heads": ("放回", "搁", "摆", "放"), "canonical": "放到"},
     {"operator": "handover_object", "concept_id": "factory_event_handover", "heads": ("递给", "交给", "拿给", "送给", "递过去", "交过去"), "canonical": "递给"},
     {"operator": "transport_object", "concept_id": "factory_event_transport", "heads": ("带到", "拿到", "送到", "端到", "带走", "拿来"), "canonical": "带到"},
@@ -182,6 +183,44 @@ def _query_type(text: str, events: list[dict[str, Any]], objects: list[dict[str,
     if any(marker in text for marker in ("现在做什么", "正在做什么", "当前动作")):
         return "current_action"
     return None
+
+
+def _discourse_roles(text: str) -> dict[str, dict[str, Any]]:
+    roles: dict[str, dict[str, Any]] = {}
+    if any(marker in text for marker in ("帮我", "替我", "为我")):
+        roles["beneficiary"] = {
+            "reference": "human_speaker",
+            "relation": "benefits_from_requested_outcome",
+            "source": "deictic_service_role",
+        }
+    if any(marker in text for marker in ("给我", "交给我", "递给我", "送给我", "拿给我")):
+        roles["recipient"] = {
+            "reference": "human_speaker",
+            "relation": "receives_requested_theme",
+            "source": "deictic_service_role",
+        }
+    if re.search(r"我(?:已经)?(?:喝|饮用)(?:完|光)", text):
+        roles["source_holder"] = {
+            "reference": "human_speaker",
+            "relation": "holds_reported_consumed_container_candidate",
+            "source": "deictic_reported_event_role",
+            "physical_state_change_committed": False,
+        }
+    return roles
+
+
+def _ellipsis_candidates(text: str) -> list[dict[str, Any]]:
+    candidates = []
+    match = re.search(r"(?P<event>接|取|倒|装|来)(?:一)?杯(?!子|水|茶|咖啡|饮料)", text)
+    if match:
+        candidates.append({
+            "slot": "theme_content",
+            "classifier": "杯",
+            "governing_event_surface": match.group("event"),
+            "status": "omitted_head_requires_contextual_goal_schema",
+            "does_not_commit_concept": True,
+        })
+    return candidates
 
 
 def _resolve_pronouns(text: str, objects: list[dict[str, Any]], context_entities: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[str]]:
@@ -369,6 +408,8 @@ def _canonical_utterance(speech_act: str, query_type: str | None, events: list[d
             part = f"走到{destination_name}"
         elif operator == "observe_entity" and target_name:
             part = f"观察{target_name}"
+        elif operator == "fill_container":
+            part = f"给{target_name}接水" if target_name else "接水"
         else:
             part = event.get("canonical_surface")
             if part and target_name and len(events) == 1:
@@ -402,7 +443,15 @@ def compose_language_concepts(
     objects = _object_mentions(normalized, object_concepts)
     events = _event_mentions(normalized, event_concepts, learned_adapters or [])
     objects, unresolved = _resolve_pronouns(normalized, objects, context_entities or [])
+    discourse_roles = _discourse_roles(normalized)
+    ellipsis_candidates = _ellipsis_candidates(normalized)
     speech_act = _speech_act(normalized, events, definition)
+    if (
+        speech_act == "unknown"
+        and discourse_roles.get("beneficiary")
+        and ellipsis_candidates
+    ):
+        speech_act = "task_request"
     query_type = _query_type(normalized, events, objects) if speech_act == "state_query" else None
     context_entities = context_entities or []
     roles = _roles(events, objects, context_entities, normalized)
@@ -430,6 +479,7 @@ def compose_language_concepts(
         unresolved.append("event_operator_not_resolved")
     requires_object = any(item["operator"] in {
         "observe_entity", "grasp_object", "release_object", "place_object",
+        "fill_container",
         "handover_object",
         "transport_object",
         "apply_directional_force", "change_open_state", "change_device_activation", "remove_surface_contaminant",
@@ -484,6 +534,8 @@ def compose_language_concepts(
         "event_candidates": deepcopy(events),
         "entity_mentions": deepcopy(objects),
         "role_bindings": deepcopy(roles),
+        "discourse_roles": discourse_roles,
+        "ellipsis_candidates": ellipsis_candidates,
         "modifiers": {
             "negated": speech_act == "prohibition",
             "ability_or_possibility": any(marker in normalized for marker in ("能", "可以", "得见", "得到", "能不能", "可不可以")),
@@ -510,7 +562,9 @@ def compose_language_concepts(
             ) else (
                 "object_received_by_recipient" if any(item["operator"] == "handover_object" for item in events) else (
                     "object_at_target_region" if any(item["operator"] == "transport_object" for item in events) else (
-                        "object_in_gripper" if any(item["operator"] == "grasp_object" for item in events) else None
+                        "container_filled" if any(item["operator"] == "fill_container" for item in events) else (
+                            "object_in_gripper" if any(item["operator"] == "grasp_object" for item in events) else None
+                        )
                     )
                 )
             ),

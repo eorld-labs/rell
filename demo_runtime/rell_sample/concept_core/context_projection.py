@@ -73,6 +73,8 @@ def build_context_projection(
     current_facts: list[dict[str, Any]],
     active_intent: dict[str, Any] | None,
     recent_episodes: list[dict[str, Any]],
+    recent_intent_capsules: list[dict[str, Any]],
+    interaction_role_bindings: dict[str, Any],
     dialogue_focus_entities: list[dict[str, Any]],
     world_revision: int,
     current_turn: int,
@@ -162,6 +164,66 @@ def build_context_projection(
             break
     relevant_episodes.reverse()
 
+    normalized = str(language_analysis.get("normalized_utterance") or "")
+    continuation_requested = any(
+        marker in normalized
+        for marker in ("再", "继续", "接着", "还是", "同样", "照刚才", "再来")
+    )
+    recent_goal_capsules = []
+    if continuation_requested:
+        for capsule in reversed(recent_intent_capsules):
+            if capsule.get("lifecycle") != "completed" or not capsule.get("goal_fact"):
+                continue
+            recent_goal_capsules.append({
+                "intent_id": capsule.get("intent_id"),
+                "intent_type": capsule.get("intent_type"),
+                "goal_fact": capsule.get("goal_fact"),
+                "closed_world_revision": capsule.get("closed_world_revision"),
+                "usable_as_current_world_state": False,
+                "prior_role_bindings_reused": False,
+                "prior_verified_facts_reused": False,
+                "reuse_scope": "goal_schema_only",
+            })
+            if len(recent_goal_capsules) >= 2:
+                break
+        recent_goal_capsules.reverse()
+
+    relational_role_candidates: dict[str, list[dict[str, Any]]] = {}
+    source_holder_role = (language_analysis.get("discourse_roles") or {}).get(
+        "source_holder"
+    ) or {}
+    source_holder_ref = interaction_role_bindings.get(
+        source_holder_role.get("reference")
+    )
+    if source_holder_ref:
+        for role_name, role in roles.items():
+            if not isinstance(role, dict):
+                continue
+            role_kinds = set(role.get("compatible_kinds") or [])
+            candidates = []
+            for fact in current_facts:
+                subject = fact.get("subject")
+                if (
+                    fact.get("predicate") != "received_by"
+                    or fact.get("object") != source_holder_ref
+                    or subject not in runtime_index
+                    or (
+                        role_kinds
+                        and runtime_index[subject].get("kind") not in role_kinds
+                    )
+                ):
+                    continue
+                candidates.append({
+                    "entity_ref": subject,
+                    "relation": "received_by",
+                    "relation_object_ref": source_holder_ref,
+                    "evidence": "current_physically_verified_relation",
+                    "world_revision": world_revision,
+                    "current_snapshot_revalidated": True,
+                })
+            if candidates:
+                relational_role_candidates[role_name] = candidates
+
     active_task_summary = None
     if active_intent and active_intent.get("lifecycle") in {
         "active", "awaiting_correction", "suspended", "awaiting_rebinding"
@@ -190,11 +252,15 @@ def build_context_projection(
         "current_world_facts": projected_facts,
         "active_task_summary": active_task_summary,
         "recent_episode_capsules": relevant_episodes,
+        "recent_goal_capsules": recent_goal_capsules,
+        "relational_role_candidates": relational_role_candidates,
         "dialogue_focus_refs": sorted(ref for ref in focus_refs if ref),
         "retention_contract": {
             "current_world_relations_are_authoritative": True,
             "episode_capsules_are_not_current_facts": True,
             "completed_task_snapshots_are_not_projected": True,
+            "completed_goal_schemas_may_be_projected_for_ellipsis": True,
+            "completed_goal_roles_and_facts_are_not_reused": True,
             "raw_transcript_included": False,
             "candidate_plans_included": False,
             "trajectories_included": False,
