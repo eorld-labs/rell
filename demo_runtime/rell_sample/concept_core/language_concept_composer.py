@@ -14,7 +14,7 @@ EVENT_LEXICAL_PRIMITIVES: tuple[dict[str, Any], ...] = (
     {"operator": "fill_container", "concept_id": "factory_event_fill_container", "heads": ("接一杯水", "接杯水", "接水", "取水", "装水", "倒一杯水", "倒杯水"), "canonical": "接水"},
     {"operator": "place_object", "concept_id": "factory_event_place", "heads": ("放回", "搁", "摆", "放"), "canonical": "放到"},
     {"operator": "handover_object", "concept_id": "factory_event_handover", "heads": ("递给", "交给", "拿给", "送给", "递过去", "交过去"), "canonical": "递给"},
-    {"operator": "transport_object", "concept_id": "factory_event_transport", "heads": ("带到", "拿到", "送到", "端到", "带走", "拿来"), "canonical": "带到"},
+    {"operator": "transport_object", "concept_id": "factory_event_transport", "heads": ("拿过来", "带过来", "端过来", "带到", "拿到", "送到", "端到", "带走", "拿来"), "canonical": "带到"},
     {"operator": "apply_directional_force", "concept_id": "factory_event_push_pull", "heads": ("拖", "挪", "推", "拉"), "canonical": "推动"},
     {"operator": "change_open_state", "concept_id": "factory_event_open_close", "heads": ("打开", "关上", "关闭", "合上"), "canonical": "打开"},
     {"operator": "change_device_activation", "concept_id": "factory_event_activate_deactivate", "heads": ("启动", "开启", "关掉", "开机", "关机"), "canonical": "启动"},

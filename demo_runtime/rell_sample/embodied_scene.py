@@ -1257,7 +1257,166 @@ def _create_water_placement_intent(
     return intent
 
 
+def _create_payload_carrier_delivery_intent(
+    session: dict[str, Any], subtask: dict[str, Any]
+) -> dict[str, Any] | None:
+    """Create a carrier-mediated delivery goal from typed, current role bindings."""
+    objects = {item.get("entity_id"): item for item in session.get("runtime_objects", [])}
+    payload = objects.get(subtask.get("payload_ref"))
+    carrier = objects.get(subtask.get("carrier_ref"))
+    source = objects.get(subtask.get("source_ref"))
+    recipient = objects.get(subtask.get("recipient_ref"))
+    if not all((payload, carrier, source, recipient)):
+        return None
+    carrier_profile = build_functional_profile(carrier, load_object_concepts()["concepts"])
+    carrier_support = evaluate_role_compatibility(carrier_profile, "support_or_container")
+    if (
+        payload.get("kind") != "graspable_container"
+        or source.get("kind") != "water_source"
+        or recipient.get("kind") != "human_recipient"
+        or carrier_support.get("compatible") is not True
+        or "transport_supported_payload" not in carrier_profile.get("functional_affordances", [])
+    ):
+        return None
+    required_area = float(payload.get("size", [0.0, 0.0])[0]) * float(
+        payload.get("size", [0.0, 0.0])[1]
+    )
+    usable_area = float(carrier.get("usable_footprint_m2", 0.0))
+    if usable_area < required_area:
+        return None
+    intent_id = "intent_" + hashlib.sha1(
+        (
+            f"{session['session_id']}|payload_carrier_delivery|{payload['entity_id']}|"
+            f"{carrier['entity_id']}|{source['entity_id']}|{recipient['entity_id']}|"
+            f"{session['world_revision']}"
+        ).encode("utf-8")
+    ).hexdigest()[:12]
+    intent = {
+        "intent_id": intent_id,
+        "intent_type": "verified_payload_carrier_delivery",
+        "source_utterance": subtask.get("utterance"),
+        "goal_fact": "recipient_received_carrier_with_payload",
+        "role_bindings": {
+            "payload": payload["entity_id"],
+            "source": source["entity_id"],
+            "carrier": carrier["entity_id"],
+            "recipient": recipient["entity_id"],
+        },
+        "goal_contract": {
+            "requires": [
+                "payload_grounded",
+                "liquid_source_grounded",
+                "portable_support_carrier_grounded",
+                "recipient_grounded",
+            ],
+            "produces": [
+                "payload_filled",
+                "payload_supported_on_carrier",
+                "carrier_in_effector",
+                "recipient_received_carrier_with_payload",
+            ],
+            "verification": [
+                "payload_fill_independently_verified",
+                "payload_projection_inside_carrier_boundary",
+                "carrier_grasp_verified",
+                "payload_support_preserved_during_transport",
+                "recipient_possession_verified",
+            ],
+        },
+        "dependency_graph": {
+            "root": "recipient_received_carrier_with_payload",
+            "nodes": [
+                {"stage_id": "acquire_payload", "produces": "payload_in_effector"},
+                {"stage_id": "fill_payload", "requires": "payload_in_effector", "produces": "payload_filled"},
+                {"stage_id": "place_payload_on_carrier", "requires": "payload_filled", "produces": "payload_supported_on_carrier"},
+                {"stage_id": "acquire_carrier", "requires": "payload_supported_on_carrier", "produces": "carrier_in_effector"},
+                {"stage_id": "handover_carrier", "requires": "carrier_in_effector", "produces": "recipient_received_carrier_with_payload"},
+            ],
+        },
+        "lifecycle": "active",
+        "verified_facts": [],
+        "current_stage": None,
+        "resume_envelope": None,
+        "created_world_revision": session["world_revision"],
+        "task_level_authorization": {
+            "source": "explicit_human_imperative",
+            "scope": "carrier_mediated_payload_delivery_and_necessary_causal_stages",
+            "stage_by_stage_reconfirmation_required": False,
+            "revocation_conditions": [
+                "role_binding_ambiguity",
+                "payload_support_lost",
+                "known_safety_conflict",
+                "policy_requires_confirmation",
+            ],
+        },
+    }
+    _attach_hierarchical_intent_graph(intent)
+    session["long_horizon_intents"][intent_id] = intent
+    session["active_intent_id"] = intent_id
+    session["intent_activation_stack"] = [intent_id]
+    return intent
+
+
 def _derive_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) -> dict[str, Any]:
+    if intent.get("intent_type") == "verified_payload_carrier_delivery":
+        bindings = intent["role_bindings"]
+        objects = {item["entity_id"]: item for item in session["runtime_objects"]}
+        payload = objects.get(bindings["payload"])
+        source = objects.get(bindings["source"])
+        carrier = objects.get(bindings["carrier"])
+        recipient = objects.get(bindings["recipient"])
+        if not all((payload, source, carrier, recipient)):
+            return {"status": "rebind_required", "reason": "payload_carrier_delivery_role_no_longer_present"}
+        verified = set(intent.get("verified_facts", []))
+        if intent["goal_fact"] in verified:
+            return {"status": "completed", "verified_fact": intent["goal_fact"]}
+        if "payload_filled" not in verified:
+            if not _is_held(session, payload["entity_id"]):
+                return {
+                    "status": "stage_ready",
+                    "stage_id": "acquire_payload",
+                    "utterance": f"拿起{_conceptual_reference_for_entity(payload)}",
+                    "required_fact": "payload_grounded",
+                    "target_fact": "payload_in_effector",
+                }
+            return {
+                "status": "stage_ready",
+                "stage_id": "fill_payload",
+                "utterance": f"到{source['label']}给{payload['label']}接水",
+                "required_fact": "payload_in_effector",
+                "target_fact": "payload_filled",
+            }
+        if payload.get("support_ref") != carrier["entity_id"]:
+            if not _is_held(session, payload["entity_id"]):
+                return {
+                    "status": "stage_ready",
+                    "stage_id": "acquire_payload",
+                    "utterance": f"拿起{_conceptual_reference_for_entity(payload)}",
+                    "required_fact": "payload_filled",
+                    "target_fact": "payload_in_effector",
+                }
+            return {
+                "status": "stage_ready",
+                "stage_id": "place_payload_on_carrier",
+                "utterance": f"把{_conceptual_reference_for_entity(payload)}放到{carrier['label']}上",
+                "required_fact": "payload_filled",
+                "target_fact": "payload_supported_on_carrier",
+            }
+        if not _is_held(session, carrier["entity_id"]):
+            return {
+                "status": "stage_ready",
+                "stage_id": "acquire_carrier",
+                "utterance": f"拿起{_conceptual_reference_for_entity(carrier)}",
+                "required_fact": "payload_supported_on_carrier",
+                "target_fact": "carrier_in_effector",
+            }
+        return {
+            "status": "stage_ready",
+            "stage_id": "handover_carrier",
+            "utterance": f"把{_conceptual_reference_for_entity(carrier)}递给{recipient['label']}",
+            "required_fact": "carrier_in_effector",
+            "target_fact": "recipient_received_carrier_with_payload",
+        }
     if intent.get("intent_type") == "verified_object_transport":
         bindings = intent["role_bindings"]
         theme = next((item for item in session["runtime_objects"] if item.get("entity_id") == bindings["theme"]), None)
@@ -2226,9 +2385,12 @@ def _compound_sequence_view(sequence: dict[str, Any] | None) -> dict[str, Any] |
             {
                 "subtask_id": item.get("subtask_id"),
                 "status": item.get("status"),
+                "subtask_kind": item.get("subtask_kind", "ordinary_event"),
                 "operators": deepcopy(item.get("operators", [])),
                 "goal_relation": item.get("goal_relation"),
                 "explicit_theme_ref": item.get("explicit_theme_ref"),
+                "payload_ref": item.get("payload_ref"),
+                "carrier_ref": item.get("carrier_ref"),
             }
             for item in sequence.get("subtasks", [])
         ],
@@ -2240,6 +2402,42 @@ def _compound_sequence_view(sequence: dict[str, Any] | None) -> dict[str, Any] |
     }
 
 
+def _scope_compound_clarification(
+    session: dict[str, Any], sequence: dict[str, Any], started: dict[str, Any]
+) -> None:
+    result = started.get("immediate_result") or started
+    if result.get("status") not in {
+        "process_slot_clarification_required",
+        "process_grounding_clarification_required",
+        "role_clarification_required",
+    }:
+        return
+    index = int(sequence.get("current_subtask_index", 0))
+    subtasks = sequence.get("subtasks", [])
+    current = subtasks[index] if index < len(subtasks) else {}
+    objects = {item.get("entity_id"): item for item in session.get("runtime_objects", [])}
+    theme = objects.get(current.get("explicit_theme_ref")) or {}
+    later = subtasks[index + 1:]
+    retained = []
+    for item in later:
+        payload = objects.get(item.get("payload_ref") or item.get("explicit_theme_ref")) or {}
+        carrier = objects.get(item.get("carrier_ref")) or {}
+        if item.get("subtask_kind") == "payload_carrier_delivery":
+            retained.append(
+                f"为{payload.get('label', '后续载荷')}完成填充、放到{carrier.get('label', '承载体')}并连同承载体交付"
+            )
+        else:
+            retained.append("继续后续子目标")
+    prefix = (
+        f"复合任务第{index + 1}个子目标正在处理{theme.get('label', '当前对象')}。"
+    )
+    if retained:
+        prefix += f"后续目标已保留：{'；'.join(retained)}。"
+    result["prompt"] = prefix + (result.get("prompt") or "请补充当前子目标缺失的角色。")
+    if result is not started:
+        started["prompt"] = result["prompt"]
+
+
 def _dispatch_compound_subtask(session: dict[str, Any]) -> dict[str, Any] | None:
     sequence = session.get("compound_command_sequence") or {}
     index = int(sequence.get("current_subtask_index", 0))
@@ -2249,11 +2447,24 @@ def _dispatch_compound_subtask(session: dict[str, Any]) -> dict[str, Any] | None
     subtask = subtasks[index]
     sequence["dispatching"] = True
     try:
-        started = begin_motion_command(
-            session["session_id"],
-            subtask["utterance"],
-            compound_dispatch=True,
-        )
+        if subtask.get("subtask_kind") == "payload_carrier_delivery":
+            intent = _create_payload_carrier_delivery_intent(session, subtask)
+            if intent:
+                started = _prepare_long_intent_stage(session, intent)
+                started["session"] = get_session(session["session_id"])
+            else:
+                started = {
+                    "status": "compound_role_rebinding_required",
+                    "reason": "payload_carrier_delivery_roles_not_currently_executable",
+                    "runtime_fact_committed": False,
+                    "session": get_session(session["session_id"]),
+                }
+        else:
+            started = begin_motion_command(
+                session["session_id"],
+                subtask["utterance"],
+                compound_dispatch=True,
+            )
     finally:
         session = SESSIONS.get(session["session_id"], session)
         live_sequence = session.get("compound_command_sequence") or sequence
@@ -2263,6 +2474,7 @@ def _dispatch_compound_subtask(session: dict[str, Any]) -> dict[str, Any] | None
     subtask["status"] = "active"
     subtask["intent_id"] = session.get("active_intent_id")
     started["compound_command_sequence"] = _compound_sequence_view(sequence)
+    _scope_compound_clarification(session, sequence, started)
     _debug_runtime(
         "compound_subtask_dispatched",
         session,
@@ -2272,6 +2484,75 @@ def _dispatch_compound_subtask(session: dict[str, Any]) -> dict[str, Any] | None
         explicit_theme_ref=subtask.get("explicit_theme_ref"),
     )
     return started
+
+
+def _compile_compound_subtasks(
+    session: dict[str, Any], frames: list[dict[str, Any]], sequence_id: str
+) -> list[dict[str, Any]]:
+    subtasks: list[dict[str, Any]] = []
+    objects = {item.get("entity_id"): item for item in session.get("runtime_objects", [])}
+    index = 0
+    while index < len(frames):
+        frame = frames[index]
+        operators = set((frame.get("canonical_frame") or {}).get("operators", []))
+        next_frame = frames[index + 1] if index + 1 < len(frames) else None
+        next_operators = set(
+            ((next_frame or {}).get("canonical_frame") or {}).get("operators", [])
+        )
+        payload_ref = _event_frame_bound_ref(frame)
+        carrier_ref = _event_frame_bound_ref(next_frame or {}, "destination")
+        carrier = objects.get(carrier_ref)
+        carrier_profile = (
+            build_functional_profile(carrier, load_object_concepts()["concepts"])
+            if carrier else {}
+        )
+        recipient_ref = (session.get("interaction_role_bindings") or {}).get("human_speaker")
+        sources = [
+            item for item in session.get("runtime_objects", [])
+            if item.get("active") is not False and item.get("kind") == "water_source"
+        ]
+        carrier_flow = bool(
+            "fill_container" in operators
+            and {"place_object", "transport_object"}.issubset(next_operators)
+            and payload_ref
+            and carrier_ref
+            and recipient_ref
+            and len(sources) == 1
+            and "transport_supported_payload" in carrier_profile.get("functional_affordances", [])
+        )
+        if carrier_flow:
+            subtask_index = len(subtasks)
+            subtasks.append({
+                "subtask_id": f"{sequence_id}:{subtask_index}",
+                "subtask_kind": "payload_carrier_delivery",
+                "utterance": f"{frame['utterance']}，{next_frame['utterance']}",
+                "operators": ["fill_container", "place_object", "transport_object", "handover_object"],
+                "goal_relation": "recipient_received_carrier_with_payload",
+                "explicit_theme_ref": payload_ref,
+                "payload_ref": payload_ref,
+                "carrier_ref": carrier_ref,
+                "source_ref": sources[0]["entity_id"],
+                "recipient_ref": recipient_ref,
+                "depends_on": [subtasks[-1]["subtask_id"]] if subtasks else [],
+                "status": "pending",
+                "intent_id": None,
+            })
+            index += 2
+            continue
+        subtask_index = len(subtasks)
+        subtasks.append({
+            "subtask_id": f"{sequence_id}:{subtask_index}",
+            "subtask_kind": "ordinary_event",
+            "utterance": frame["utterance"],
+            "operators": deepcopy((frame.get("canonical_frame") or {}).get("operators", [])),
+            "goal_relation": (frame.get("canonical_frame") or {}).get("goal_relation"),
+            "explicit_theme_ref": _event_frame_bound_ref(frame),
+            "depends_on": [subtasks[-1]["subtask_id"]] if subtasks else [],
+            "status": "pending",
+            "intent_id": None,
+        })
+        index += 1
+    return subtasks
 
 
 def _start_compound_command_sequence(
@@ -2289,18 +2570,7 @@ def _start_compound_command_sequence(
         "source_utterance_hash": hashlib.sha1(utterance.encode("utf-8")).hexdigest(),
         "current_subtask_index": 0,
         "dispatching": False,
-        "subtasks": [
-            {
-                "subtask_id": f"{sequence_id}:{index}",
-                "utterance": frame["utterance"],
-                "operators": deepcopy((frame.get("canonical_frame") or {}).get("operators", [])),
-                "goal_relation": (frame.get("canonical_frame") or {}).get("goal_relation"),
-                "explicit_theme_ref": _event_frame_bound_ref(frame),
-                "status": "pending",
-                "intent_id": None,
-            }
-            for index, frame in enumerate(frames)
-        ],
+        "subtasks": _compile_compound_subtasks(session, frames, sequence_id),
     }
     session["compound_command_sequence"] = sequence
     _debug_runtime(
@@ -5285,6 +5555,7 @@ def _apply_verified_handover(
     control_source: str,
     *,
     require_filled_container: bool = True,
+    expected_supported_payload_refs: list[str] | None = None,
 ) -> dict[str, Any]:
     objects = {item["entity_id"]: item for item in session["runtime_objects"]}
     theme, recipient = objects.get(object_ref), objects.get(recipient_ref)
@@ -5295,6 +5566,17 @@ def _apply_verified_handover(
         return {"status": "handover_blocked", "reason": "object_is_not_currently_held", "frames": []}
     if require_filled_container and theme.get("liquid_state") != "filled":
         return {"status": "handover_blocked", "reason": "container_fill_fact_not_established", "frames": []}
+    expected_payloads = list(expected_supported_payload_refs or [])
+    if any(
+        not objects.get(ref) or objects[ref].get("support_ref") != object_ref
+        for ref in expected_payloads
+    ):
+        return {
+            "status": "handover_blocked",
+            "reason": "carrier_payload_support_not_preserved",
+            "expected_supported_payload_refs": expected_payloads,
+            "frames": [],
+        }
     distance = _distance_to_object_footprint(session["state"]["executor_position"], recipient)
     if distance > float(session["executor_profile"]["arm_reach_m"]):
         return {"status": "handover_blocked", "reason": "recipient_outside_safe_handover_workspace", "frames": []}
@@ -5310,6 +5592,21 @@ def _apply_verified_handover(
     theme["received_by"] = recipient_ref
     theme["position"] = [float(recipient["position"][0]) + 0.28, float(recipient["position"][1])]
     theme["elevation_m"] = 0.92
+    supported_payloads = [objects[ref] for ref in expected_payloads] if expected_payloads else [
+        item for item in session["runtime_objects"] if item.get("support_ref") == object_ref
+    ]
+    for index, payload in enumerate(supported_payloads):
+        payload["position"] = [
+            float(theme["position"][0]) + 0.04 * index,
+            float(theme["position"][1]),
+        ]
+        payload["elevation_m"] = float(theme["elevation_m"]) + float(theme.get("size", [0.0, 0.0, 0.0])[2])
+    payload_support_preserved = all(
+        objects.get(ref) and objects[ref].get("support_ref") == object_ref
+        for ref in expected_payloads
+    ) if expected_payloads else all(
+        payload.get("support_ref") == object_ref for payload in supported_payloads
+    )
     _append_verified_episode(
         session,
         operator="handover_object",
@@ -5333,6 +5630,11 @@ def _apply_verified_handover(
         "verification_evidence": {
             "first_channel": {"source": "simulated_effector_release_and_transfer_contact", "effector": effector, "established": not _is_held(session, object_ref)},
             "second_channel": {"source": "simulated_recipient_possession_tracking", "established": object_ref in received},
+            "supported_payload_channel": {
+                "source": "simulated_carrier_payload_support_tracking",
+                "payload_refs": [item["entity_id"] for item in supported_payloads],
+                "established": payload_support_preserved,
+            },
             "final_fact": terminal_fact, "final_fact_established": True,
             "verification_boundary": "P016_multi_channel_fact_verification",
         },
@@ -5687,21 +5989,39 @@ def _execute_water_service_stage(
 ) -> dict[str, Any]:
     bindings = intent["role_bindings"]
     action = stage["stage_id"]
-    if action == "acquire_container":
-        entity_ref = bindings["theme"]
+    if action in {"acquire_container", "acquire_payload"}:
+        entity_ref = bindings.get("theme") or bindings["payload"]
         post_completion = {"action": "grasp", "target_entity_ref": entity_ref, "mode": "direct_task"}
         process = ["navigate_to_container", "align_end_effector", "grasp_container", "verify_container_in_effector"]
-    elif action == "fill_container":
+    elif action in {"fill_container", "fill_payload"}:
         entity_ref = bindings["source"]
-        post_completion = {"action": "fill", "container_ref": bindings["theme"], "source_ref": bindings["source"], "mode": "direct_task"}
+        post_completion = {"action": "fill", "container_ref": bindings.get("theme") or bindings["payload"], "source_ref": bindings["source"], "mode": "direct_task"}
         process = ["navigate_to_water_source", "align_container_under_outlet", "activate_flow", "verify_container_filled"]
-    elif action == "handover_to_recipient":
+    elif action == "place_payload_on_carrier":
+        entity_ref = bindings["carrier"]
+        post_completion = {
+            "action": "place",
+            "object_ref": bindings["payload"],
+            "destination_ref": bindings["carrier"],
+            "mode": "direct_task",
+        }
+        process = ["retain_payload_grasp", "align_over_carrier", "place_payload", "verify_payload_support"]
+    elif action == "acquire_carrier":
+        entity_ref = bindings["carrier"]
+        post_completion = {"action": "grasp", "target_entity_ref": entity_ref, "mode": "direct_task"}
+        process = ["navigate_to_carrier", "align_end_effector", "grasp_carrier", "verify_carrier_in_effector"]
+    elif action in {"handover_to_recipient", "handover_carrier"}:
         entity_ref = bindings["recipient"]
         post_completion = {
             "action": "handover",
-            "container_ref": bindings["theme"],
+            "container_ref": bindings.get("theme") or bindings["carrier"],
             "recipient_ref": bindings["recipient"],
             "require_filled_container": intent.get("intent_type") == "verified_water_delivery",
+            "expected_supported_payload_refs": (
+                [bindings["payload"]]
+                if intent.get("intent_type") == "verified_payload_carrier_delivery"
+                else []
+            ),
             "mode": "direct_task",
         }
         process = ["navigate_to_safe_handover_zone", "verify_recipient_readiness", "transfer_object", "verify_recipient_possession"]
@@ -5714,7 +6034,7 @@ def _execute_water_service_stage(
             "status": "contextual_affordance_available",
             "available": True,
             "entity_ref": entity_ref,
-            "operator_candidate": "grasp_object" if action == "acquire_container" else "navigate_near",
+            "operator_candidate": "grasp_object" if action in {"acquire_container", "acquire_payload", "acquire_carrier"} else "navigate_near",
             "task_context": stage["utterance"],
             "scoped_authorization_present": bool(scoped_authorization),
             "grounding_basis": {"source": "long_intent_role_binding", "binding_strength": "current_world_snapshot"},
@@ -7014,7 +7334,31 @@ def begin_motion_command(
         explained = _continue_historical_reference_explanation(session, pending, utterance)
         if explained:
             return explained
-    process_gap_resolution = _continue_process_gap_dialogue(session, utterance)
+    process_gap_superseded = bool(
+        session.get("process_gap_dialogue")
+        and (early_analysis or {}).get("speech_act") == "task_request"
+        and any(
+            item.get("operator")
+            for item in (early_analysis or {}).get("event_candidates", [])
+        )
+    )
+    if process_gap_superseded:
+        old_sequence = session.get("compound_command_sequence")
+        session["process_gap_dialogue"] = None
+        session["compound_command_sequence"] = None
+        _debug_runtime(
+            "pending_process_slot_superseded_by_new_task",
+            session,
+            released_compound_sequence_id=(old_sequence or {}).get("sequence_id"),
+            new_operators=[
+                item.get("operator")
+                for item in (early_analysis or {}).get("event_candidates", [])
+            ],
+        )
+    process_gap_resolution = (
+        None if process_gap_superseded
+        else _continue_process_gap_dialogue(session, utterance)
+    )
     if process_gap_resolution:
         return process_gap_resolution
     relational_dialogue = session.get("relational_reference_dialogue")
@@ -7366,9 +7710,23 @@ def begin_motion_command(
     )
     service_stage_matches = bool(
         active_intent
-        and active_intent.get("intent_type") in {"verified_water_delivery", "verified_water_placement", "verified_object_handover"}
+        and active_intent.get("intent_type") in {
+            "verified_water_delivery",
+            "verified_water_placement",
+            "verified_object_handover",
+            "verified_payload_carrier_delivery",
+        }
         and (active_stage.get("utterance") == text or authorized_internal_stage)
-        and active_stage.get("stage_id") in {"acquire_container", "fill_container", "handover_to_recipient"}
+        and active_stage.get("stage_id") in {
+            "acquire_container",
+            "fill_container",
+            "handover_to_recipient",
+            "acquire_payload",
+            "fill_payload",
+            "place_payload_on_carrier",
+            "acquire_carrier",
+            "handover_carrier",
+        }
     )
     transport_region_stage_matches = bool(
         active_intent
@@ -7593,6 +7951,9 @@ def _post_completion_signature(post_completion: dict[str, Any] | None) -> dict[s
             "container_ref": post_completion.get("container_ref"),
             "recipient_ref": post_completion.get("recipient_ref"),
             "require_filled_container": post_completion.get("require_filled_container", True),
+            "expected_supported_payload_refs": list(
+                post_completion.get("expected_supported_payload_refs", [])
+            ),
         }
     if action == "causal_graph_node":
         return {
@@ -7867,6 +8228,9 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
             job["post_completion"]["recipient_ref"],
             "human_confirmed_water_service_stage",
             require_filled_container=job["post_completion"].get("require_filled_container", True),
+            expected_supported_payload_refs=job["post_completion"].get(
+                "expected_supported_payload_refs", []
+            ),
         )
         result.update(handover)
     elif post_completion.get("action") == "causal_graph_node":

@@ -36,6 +36,19 @@
       },
       "load_policy": "domain_resident",
       "direct_execution_allowed": false
+    },
+    {
+      "concept_id": "concept_portable_support_carrier",
+      "display_name": "可移动承载体",
+      "aliases": ["托盘", "托板", "餐盘", "承载盘"],
+      "compatible_kinds": ["graspable_tray"],
+      "perceptual_invariants": ["bounded_support_footprint", "graspable_carrier_body", "payload_support_plane"],
+      "variable_features": ["color", "material", "size", "handle_presence"],
+      "functional_affordances": ["graspable", "movable", "support_object", "receive_object", "transport_supported_payload"],
+      "physical_properties": ["portable_support", "rigid", "capacity_requires_runtime_verification"],
+      "expected_relations": ["supports_payload", "held_by_executor", "moves_with_supported_payload"],
+      "load_policy": "domain_resident",
+      "direct_execution_allowed": false
     }
   ]
 }

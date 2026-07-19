@@ -231,6 +231,12 @@ def main() -> None:
     stemmed_predicates = scoped_second_semantics.get("attribute_predicates", [])
     require(stemmed_predicates and all(item.get("role") == "theme" for item in stemmed_predicates), f"the second clause's container-form constraint leaked into another event role: {scoped_second_semantics}")
 
+    carrier_compound = compose("把杯子放到桌子上，然后用高脚杯接一杯水，放在托盘上拿过来")
+    carrier_frames = carrier_compound.get("event_frames", [])
+    require(len(carrier_frames) == 3, f"carrier-mediated request did not retain all event scopes: {carrier_compound}")
+    require(carrier_frames[2].get("canonical_frame", {}).get("operators") == ["place_object", "transport_object"], f"directional complement '拿过来' was reduced to grasp instead of transport: {carrier_frames[2]}")
+    require((carrier_frames[2].get("role_bindings", {}).get("destination") or {}).get("concept_id") == "concept_portable_support_carrier", f"portable support carrier was not represented as a typed destination role: {carrier_frames[2]}")
+
     samples = []
     for _ in range(300):
         started = perf_counter_ns()
@@ -246,6 +252,7 @@ def main() -> None:
         "unknown_predicate_learning": "passed",
         "negation_no_motion": "passed",
         "event_scoped_compound_language": "passed",
+        "carrier_dataflow_language": "passed",
         "latency_ms": {"median": round(median(samples), 4), "p95": round(p95, 4), "maximum": round(max(samples), 4)},
     })
 

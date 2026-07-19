@@ -117,6 +117,130 @@ def verify_event_scoped_compound_sequence() -> dict:
     return {"stage_facts": facts, "theme_sequence": role_sequence, "working_memory_released": True}
 
 
+def verify_carrier_mediated_compound_sequence() -> dict:
+    session = start_session("home_humanoid", "hospitality_guest")
+    session_id = session["session_id"]
+    drain_service(begin_motion_command(session_id, "用白色杯子给我接杯水"))
+    started = begin_motion_command(
+        session_id,
+        "我喝完了，帮我把杯子放到桌子上去，然后用玻璃高脚杯再帮我接一杯水，放在托盘上拿过来",
+    )
+    sequence = started.get("compound_command_sequence") or {}
+    subtasks = sequence.get("subtasks", [])
+    require(started.get("status") == "process_slot_clarification_required", f"first placement gap did not remain the active scoped question: {started}")
+    prompt = started.get("prompt") or (started.get("immediate_result") or {}).get("prompt") or ""
+    require("第1个子目标" in prompt and "后续目标已保留" in prompt and "木质托盘" in prompt, f"clarification did not explain its subtask scope or retained downstream goal: {started}")
+    require(len(subtasks) == 2 and subtasks[1].get("subtask_kind") == "payload_carrier_delivery", f"payload production and carrier delivery were left as unrelated sequential tasks: {sequence}")
+    require(subtasks[1].get("payload_ref") == "glass_tall" and subtasks[1].get("carrier_ref") == "wooden_tray", f"payload/carrier roles were not independently grounded: {subtasks[1]}")
+
+    outcomes = drain_service_with_confirmations(
+        session_id, begin_motion_command(session_id, "操作台A")
+    )
+    facts = [item.get("terminal_fact") for item in outcomes]
+    require(
+        facts == [
+            "target_object_in_gripper",
+            "object_supported_at_destination",
+            "target_object_in_gripper",
+            "container_filled",
+            "object_supported_at_destination",
+            "target_object_in_gripper",
+            "object_received_by_recipient",
+        ],
+        f"carrier-mediated dataflow did not preserve causal order: {outcomes}",
+    )
+    require("human_received_filled_container" not in facts, f"payload was handed over before its downstream carrier consumer ran: {facts}")
+    live = get_session(session_id)
+    tray = next(item for item in live["runtime_objects"] if item["entity_id"] == "wooden_tray")
+    glass = next(item for item in live["runtime_objects"] if item["entity_id"] == "glass_tall")
+    require(tray.get("received_by") == "guest", f"carrier was not delivered to the recipient: {tray}")
+    require(glass.get("support_ref") == "wooden_tray" and glass.get("liquid_state") == "filled" and not glass.get("received_by"), f"payload support was not preserved through carrier transport: {glass}")
+    require(live.get("compound_command_sequence") is None, f"completed carrier graph remained in working memory: {live.get('compound_command_sequence')}")
+
+    disturbed_session = start_session("home_humanoid", "hospitality_guest")
+    disturbed_id = disturbed_session["session_id"]
+    drain_service(begin_motion_command(disturbed_id, "用白色杯子给我接杯水"))
+    begin_motion_command(
+        disturbed_id,
+        "我喝完了，把杯子放到桌子上，然后用高脚杯接一杯水，放在托盘上拿过来",
+    )
+    current = begin_motion_command(disturbed_id, "操作台A")
+    blocked_handover = None
+    for _ in range(12):
+        if current.get("status") == "requires_human_confirmation" and not current.get("job_id"):
+            current = begin_motion_command(disturbed_id, "确认")
+            continue
+        immediate = current.get("immediate_result") or {}
+        if immediate.get("status") == "requires_human_confirmation":
+            current = begin_motion_command(disturbed_id, "确认")
+            continue
+        job = MOTION_JOBS.get(current.get("job_id")) or {}
+        if (job.get("post_completion") or {}).get("action") == "handover":
+            require(
+                job["post_completion"].get("expected_supported_payload_refs") == ["glass_tall"],
+                f"expected payload constraint did not reach the handover commit job: {job}",
+            )
+            disturbed_live = SESSIONS[disturbed_id]
+            disturbed_glass = next(
+                item for item in disturbed_live["runtime_objects"]
+                if item["entity_id"] == "glass_tall"
+            )
+            disturbed_glass["support_ref"] = None
+            blocked_handover = drain(current)
+            break
+        outcome = drain(current)
+        current = outcome.get("next_stage_started")
+        if (
+            not current
+            and outcome.get("pending_confirmation")
+            and (outcome.get("long_horizon_intent") or {}).get("lifecycle") == "active"
+        ):
+            current = begin_motion_command(disturbed_id, "确认")
+        require(bool(current), f"carrier workflow ended before its handover gate: {outcome}")
+    require(blocked_handover is not None, "carrier workflow never reached the expected handover gate")
+    require(
+        blocked_handover.get("status") == "handover_blocked"
+        and blocked_handover.get("reason") == "carrier_payload_support_not_preserved",
+        f"lost payload support did not block carrier handover: {blocked_handover}",
+    )
+    disturbed_live = get_session(disturbed_id)
+    disturbed_tray = next(
+        item for item in disturbed_live["runtime_objects"]
+        if item["entity_id"] == "wooden_tray"
+    )
+    disturbed_intent = (disturbed_live.get("long_horizon_intents") or {}).get(
+        disturbed_live.get("active_intent_id")
+    ) or {}
+    require(
+        disturbed_tray.get("received_by") is None
+        and "wooden_tray" in _holding_by_effector(SESSIONS[disturbed_id]).values(),
+        f"blocked handover released or transferred the carrier: {disturbed_tray}",
+    )
+    require(
+        "recipient_received_carrier_with_payload" not in disturbed_intent.get("verified_facts", []),
+        f"blocked handover committed the composite terminal fact: {disturbed_intent}",
+    )
+
+    supersede_session = start_session("home_humanoid", "hospitality_guest")
+    supersede_id = supersede_session["session_id"]
+    drain_service(begin_motion_command(supersede_id, "用白色杯子给我接杯水"))
+    begin_motion_command(
+        supersede_id,
+        "我喝完了，把杯子放到桌子上，然后用高脚杯接一杯水，放在托盘上拿过来",
+    )
+    replacement = begin_motion_command(supersede_id, "我喝完了，再帮我接一杯水")
+    require(replacement.get("status") == "motion_started", f"complete new task was consumed by an older destination slot: {replacement}")
+    replacement_live = get_session(supersede_id)
+    require(replacement_live.get("process_gap_dialogue") is None and replacement_live.get("compound_command_sequence") is None, f"superseded clarification state still owned the new request: {replacement_live}")
+    return {
+        "stage_facts": facts,
+        "payload": "glass_tall",
+        "carrier": "wooden_tray",
+        "disturbed_support_gate": "passed",
+        "pending_slot_supersession": "passed",
+    }
+
+
 def complete_authorized_service(scene_id: str) -> dict:
     session = start_session("home_humanoid", scene_id)
     session_id = session["session_id"]
@@ -648,6 +772,7 @@ def main() -> None:
         "current_relation_precedes_category_ambiguity": verify_current_relation_precedes_category_ambiguity(),
         "explicit_container_precedes_ambiguity": verify_explicit_container_binding_precedes_ambiguity(),
         "event_scoped_compound_sequence": verify_event_scoped_compound_sequence(),
+        "carrier_mediated_compound_sequence": verify_carrier_mediated_compound_sequence(),
         "terminal_relation_effect_gate": verify_terminal_relation_gates_effect_commit(),
         "role_scoped_transfer_after_handover": verify_role_scoped_transfer_after_handover(),
         "historical_event_return": verify_historical_event_return_replans_current_route(),
