@@ -3030,7 +3030,8 @@ def _compile_compound_subtasks(
         ]
         carrier_flow = bool(
             "fill_container" in operators
-            and {"place_object", "transport_object"}.issubset(next_operators)
+            and "place_object" in next_operators
+            and bool({"transport_object", "handover_object"}.intersection(next_operators))
             and payload_ref
             and carrier_ref
             and recipient_ref
@@ -7935,9 +7936,26 @@ def begin_motion_command(
     pending_slot_candidate = _pending_process_slot_candidate(
         active_process_gap, early_analysis
     )
+    pending_historical_relation_answer = False
+    pending_gap = ((active_process_gap or {}).get("resolution") or {}).get("next_gap") or {}
+    if active_process_gap and pending_gap.get("slot_id") == "destination":
+        historical_choice = _historical_destination_role_choice(
+            session,
+            {
+                "role": "destination",
+                "source_utterance": active_process_gap.get("source_utterance"),
+                "candidate_options": [
+                    {"entity_ref": item.get("value_ref"), "label": item.get("label")}
+                    for item in pending_gap.get("candidates", [])
+                ],
+            },
+            utterance,
+        )
+        pending_historical_relation_answer = historical_choice is not None
     process_gap_superseded = bool(
         active_process_gap
         and not pending_slot_candidate
+        and not pending_historical_relation_answer
         and (early_analysis or {}).get("speech_act") == "task_request"
         and any(
             item.get("operator")

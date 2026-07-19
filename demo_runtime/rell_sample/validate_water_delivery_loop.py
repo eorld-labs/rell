@@ -241,12 +241,52 @@ def verify_carrier_mediated_compound_sequence() -> dict:
     require(replacement.get("status") == "motion_started", f"complete new task was consumed by an older destination slot: {replacement}")
     replacement_live = get_session(supersede_id)
     require(replacement_live.get("process_gap_dialogue") is None and replacement_live.get("compound_command_sequence") is None, f"superseded clarification state still owned the new request: {replacement_live}")
+
+    direct_session = start_session("home_humanoid", "hospitality_guest")
+    direct_id = direct_session["session_id"]
+    direct = begin_motion_command(
+        direct_id,
+        "用玻璃高脚杯给我倒杯水，放在托盘上拿给我",
+    )
+    direct_sequence = direct.get("compound_command_sequence") or {}
+    direct_subtasks = direct_sequence.get("subtasks", [])
+    require(
+        len(direct_subtasks) == 1
+        and direct_subtasks[0].get("subtask_kind") == "payload_carrier_delivery"
+        and direct_subtasks[0].get("payload_ref") == "glass_tall"
+        and direct_subtasks[0].get("carrier_ref") == "wooden_tray",
+        f"place-plus-handover carrier request was split into direct payload delivery: {direct}",
+    )
+    direct_outcomes = drain_service(direct)
+    direct_facts = [item.get("terminal_fact") for item in direct_outcomes]
+    require(
+        direct_facts == [
+            "target_object_in_gripper",
+            "container_filled",
+            "object_supported_at_destination",
+            "target_object_in_gripper",
+            "object_received_by_recipient",
+        ]
+        and "human_received_filled_container" not in direct_facts,
+        f"carrier handover delivered the payload before the carrier graph completed: {direct_outcomes}",
+    )
+    direct_live = get_session(direct_id)
+    direct_objects = {
+        item["entity_id"]: item for item in direct_live["runtime_objects"]
+    }
+    require(
+        direct_objects["wooden_tray"].get("received_by") == "guest"
+        and direct_objects["glass_tall"].get("support_ref") == "wooden_tray"
+        and direct_objects["glass_tall"].get("received_by") is None,
+        f"carrier-mediated terminal relations were not preserved: {direct_objects}",
+    )
     return {
         "stage_facts": facts,
         "payload": "glass_tall",
         "carrier": "wooden_tray",
         "disturbed_support_gate": "passed",
         "pending_slot_supersession": "passed",
+        "place_handover_compilation": "passed",
     }
 
 
@@ -832,6 +872,58 @@ def verify_historical_event_return_replans_current_route() -> dict:
     return {"source_support_ref": reference["source_support_ref"], "old_trajectory_reused": False}
 
 
+def verify_historical_destination_answer_precedes_task_supersession() -> dict:
+    session = start_session("home_humanoid", "hospitality_guest")
+    session_id = session["session_id"]
+    drain_service(
+        begin_motion_command(session_id, "用白色马克杯给我接一杯水")
+    )
+    gap = begin_motion_command(
+        session_id, "我喝完了，帮我把杯子放到桌子上去"
+    )
+    require(
+        gap.get("status") == "process_slot_clarification_required"
+        and (gap.get("immediate_result") or gap).get("pending_slot") == "destination",
+        f"historical destination setup did not open the expected slot: {gap}",
+    )
+    resumed = begin_motion_command(session_id, "放到刚才拿杯子的地方")
+    intent = resumed.get("long_horizon_intent") or (
+        resumed.get("immediate_result") or {}
+    ).get("long_horizon_intent") or {}
+    resolution = resumed.get("process_gap_resolution") or (
+        resumed.get("immediate_result") or {}
+    ).get("process_gap_resolution") or {}
+    require(
+        resumed.get("status") == "requires_human_confirmation"
+        and (intent.get("role_bindings") or {}).get("theme") == "mug_white"
+        and (intent.get("role_bindings") or {}).get("destination") == "hospitality_counter_a"
+        and resolution.get("value_ref") == "hospitality_counter_a"
+        and (resolution.get("evidence") or {}).get("kind") == "most_recent_verified_source_support",
+        f"historical relation answer was treated as a replacement task: {resumed}",
+    )
+    require(
+        get_session(session_id).get("process_gap_dialogue") is None,
+        f"resolved historical destination left the old slot active: {get_session(session_id).get('process_gap_dialogue')}",
+    )
+    outcomes = drain_service_with_confirmations(session_id, resumed)
+    final = get_session(session_id)
+    mug = next(
+        item for item in final["runtime_objects"]
+        if item["entity_id"] == "mug_white"
+    )
+    require(
+        mug.get("support_ref") == "hospitality_counter_a"
+        and outcomes[-1].get("terminal_fact") == "object_supported_at_destination",
+        f"historical destination did not survive execution-time revalidation: {outcomes}",
+    )
+    return {
+        "theme": "mug_white",
+        "destination": "hospitality_counter_a",
+        "evidence": "most_recent_verified_source_support",
+        "terminal_fact": outcomes[-1].get("terminal_fact"),
+    }
+
+
 def verify_relational_destination_grounding_and_slot_resume() -> dict:
     direct_session = start_session("home_humanoid", "hospitality_guest")
     direct_id = direct_session["session_id"]
@@ -1059,6 +1151,7 @@ def main() -> None:
         "terminal_relation_effect_gate": verify_terminal_relation_gates_effect_commit(),
         "role_scoped_transfer_after_handover": verify_role_scoped_transfer_after_handover(),
         "historical_event_return": verify_historical_event_return_replans_current_route(),
+        "historical_destination_answer": verify_historical_destination_answer_precedes_task_supersession(),
         "relational_destination_grounding": verify_relational_destination_grounding_and_slot_resume(),
         "generic_movable_asset_transfer": verify_generic_movable_asset_transfer_binding(),
         "support_occupancy_repair": verify_support_occupancy_repair_and_parent_resume(),

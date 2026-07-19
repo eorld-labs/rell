@@ -460,8 +460,6 @@ def _roles(
             roles["theme"] = deepcopy(movable[0])
         if supports:
             roles["destination"] = deepcopy(supports[-1])
-        elif len(objects) > 1:
-            roles["destination"] = deepcopy(objects[-1])
     if objects and "theme" not in roles and not placing:
         roles["target"] = deepcopy(objects[0])
     navigation = next((item for item in events if item["operator"] == "navigate_to"), None)
