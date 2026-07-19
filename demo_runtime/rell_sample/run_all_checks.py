@@ -586,6 +586,7 @@ def main() -> None:
     run_python("validate_semantic_grounding_architecture.py")
     run_python("validate_situated_event_reasoning.py")
     run_python("validate_process_template_resolution.py")
+    run_python("validate_causal_task_graph_runtime.py")
     run_python("validate_hospitality_task_graph.py")
     run_python("validate_visual_concept_pipeline.py")
     run_python("validate_qwen_visual_adapter.py")

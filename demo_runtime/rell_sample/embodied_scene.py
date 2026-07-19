@@ -33,6 +33,14 @@ from concept_core.situated_event_reasoning import (
     record_verified_fact as record_intent_verified_fact,
 )
 from concept_core.visual_concept_packs import build_visual_pack_catalog
+from causal_task_graph_runtime import (
+    apply_condition_answer,
+    established_graph_facts,
+    evaluate_causal_graph,
+    initialize_causal_graph_runtime,
+    record_graph_facts,
+    select_condition_clarification,
+)
 from hospitality_task_graph import (
     build_hospitality_orchestration_view,
     build_hospitality_task_graph,
@@ -289,6 +297,7 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator", scene_id
         "evidence_gap_dialogue": None,
         "process_gap_dialogue": None,
         "human_reported_fact_candidates": [],
+        "causal_graph_clarification": None,
     }
     if scene_id == "hospitality_guest":
         hospitality_graph = build_hospitality_task_graph(session["runtime_objects"])
@@ -317,6 +326,7 @@ def _long_intent_view(intent: dict[str, Any]) -> dict[str, Any]:
         "resume_envelope": deepcopy(intent.get("resume_envelope")),
         "trajectory_persisted": False,
         "hierarchical_intent_graph": deepcopy(intent.get("hierarchical_intent_graph")),
+        "causal_graph_runtime": deepcopy(intent.get("causal_graph_runtime")),
     }
 
 
@@ -905,7 +915,14 @@ def _create_hospitality_intent(session: dict[str, Any], utterance: str) -> dict[
         "verified_facts": [],
         "current_stage": None,
         "created_world_revision": session["world_revision"],
-        "task_level_authorization": {"source": "explicit_human_imperative", "scope": "hospitality_guest_service"},
+        "causal_graph_runtime": initialize_causal_graph_runtime(
+            graph, world_revision=session["world_revision"]
+        ),
+        "task_level_authorization": {
+            "source": "explicit_human_imperative",
+            "scope": "causal_task_graph_and_necessary_verified_nodes",
+            "stage_by_stage_reconfirmation_required": False,
+        },
     }
     session.setdefault("long_horizon_intents", {})[intent_id] = intent
     session["active_intent_id"] = intent_id
@@ -1140,31 +1157,131 @@ def _derive_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) -
     }
 
 
+def _derive_causal_graph_stage(session: dict[str, Any], intent: dict[str, Any]) -> dict[str, Any]:
+    graph = intent.get("task_graph") or {}
+    runtime = intent.get("causal_graph_runtime")
+    if not runtime:
+        runtime = initialize_causal_graph_runtime(graph, world_revision=session["world_revision"])
+        intent["causal_graph_runtime"] = runtime
+    while True:
+        evaluation = evaluate_causal_graph(
+            graph,
+            runtime,
+            session.get("runtime_objects", []),
+            world_revision=session["world_revision"],
+        )
+        intent["task_graph_evaluation"] = deepcopy(evaluation)
+        if evaluation.get("goal_established"):
+            return {"status": "completed", "verified_fact": graph.get("goal_fact")}
+
+        automatic = next(
+            (
+                node for node in evaluation.get("ready_nodes", [])
+                if (node.get("execution_contract") or {}).get("mode") == "epistemic"
+            ),
+            None,
+        )
+        if automatic:
+            node_id = automatic["node_id"]
+            record_graph_facts(
+                runtime,
+                list(automatic.get("produces", [])),
+                source="current_world_snapshot_epistemic_verification",
+                node_id=node_id,
+                world_revision=session["world_revision"],
+                physical_verification=True,
+            )
+            runtime["node_states"][node_id]["status"] = "completed"
+            if node_id not in runtime["completed_node_order"]:
+                runtime["completed_node_order"].append(node_id)
+            for fact in automatic.get("produces", []):
+                if fact not in intent["verified_facts"]:
+                    intent["verified_facts"].append(fact)
+            continue
+
+        clarification = select_condition_clarification(graph, evaluation)
+        if (
+            clarification
+            and (graph.get("scheduler_policy") or {}).get(
+                "resolve_goal_affecting_conditions_before_execution", False
+            )
+        ):
+            runtime["pending_condition"] = deepcopy(clarification)
+            session["causal_graph_clarification"] = {
+                "intent_id": intent["intent_id"],
+                "condition": clarification["condition"],
+                "node_id": clarification["node_id"],
+                "question": clarification.get("question"),
+                "world_revision": session["world_revision"],
+            }
+            intent["lifecycle"] = "awaiting_correction"
+            intent["current_stage"] = None
+            return {
+                "status": "causal_graph_clarification_required",
+                "reason": "goal_affecting_causal_precondition_unresolved",
+                "prompt": clarification.get("question"),
+                "pending_condition": deepcopy(clarification),
+                "task_graph_evaluation": deepcopy(evaluation),
+                "long_horizon_intent": _long_intent_view(intent),
+            }
+
+        ready = evaluation.get("ready_nodes", [])
+        if ready:
+            node = ready[0]
+            node_id = node["node_id"]
+            runtime["active_node_id"] = node_id
+            runtime["node_states"][node_id]["status"] = "active"
+            runtime["node_states"][node_id]["attempt_count"] = int(
+                runtime["node_states"][node_id].get("attempt_count", 0)
+            ) + 1
+            contract = deepcopy(node.get("execution_contract") or {})
+            produces = list(node.get("produces", []))
+            return {
+                "status": "stage_ready",
+                "stage_id": node_id,
+                "graph_node_id": node_id,
+                "utterance": f"执行任务图节点：{node.get('label', node_id)}",
+                "required_fact": list(node.get("requires", [])),
+                "target_fact": produces[-1] if produces else None,
+                "produces_facts": produces,
+                "verification": deepcopy(node.get("verification", [])),
+                "execution_contract": contract,
+                "scheduler_basis": "current_verified_graph_facts",
+            }
+
+        reason = "causal_graph_waiting_for_predecessors"
+        if evaluation.get("blocked_nodes"):
+            reason = "causal_graph_has_unresolved_noninteractive_preconditions"
+        return {
+            "status": "awaiting_correction",
+            "reason": reason,
+            "task_graph_evaluation": deepcopy(evaluation),
+            "prompt": "当前因果图没有可安全执行的节点；我已保留任务事实，请补充缺失条件或等待世界状态变化。",
+        }
+
+
 def _prepare_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) -> dict[str, Any]:
     intent_id = intent["intent_id"]
-    if intent.get("intent_type") == "hospitality_guest_service":
-        graph = build_hospitality_task_graph(session["runtime_objects"])
-        intent["task_graph"] = graph
-        orchestration = build_hospitality_orchestration_view(graph)
-        unresolved = unresolved_hospitality_conditions(graph)
-        intent["lifecycle"] = "awaiting_next_stage" if unresolved else "active"
-        return {
-            "status": "hospitality_orchestration_pending" if unresolved else "hospitality_orchestration_ready",
-            "prompt": (
-                "招待客人复合任务已按当前世界事实重新编排。"
-                + ("当前红茶分支等待温度条件，其余可行分支可继续。" if unresolved else "所有起始分支均满足入口条件。")
-            ),
-            "long_horizon_intent": _long_intent_view(intent),
-            "task_graph": graph,
-            "task_graph_orchestration": orchestration,
-            "task_graph_unresolved_conditions": unresolved,
-            "session": get_session(session["session_id"]),
-        }
+    if intent.get("causal_graph_runtime") is not None:
+        stage = _derive_causal_graph_stage(session, intent)
+        if stage.get("status") == "causal_graph_clarification_required":
+            stage["session"] = get_session(session["session_id"])
+            return stage
+        if stage.get("status") == "awaiting_correction":
+            intent["lifecycle"] = "awaiting_correction"
+            intent["current_stage"] = None
+            return {
+                **stage,
+                "long_horizon_intent": _long_intent_view(intent),
+                "session": get_session(session["session_id"]),
+            }
+    else:
+        stage = None
     verified = set(intent.get("verified_facts", []))
     # P018 step-6 pruning is mandatory on every resume/replan path, including
     # experience replay. A completed acquisition fact removes both navigation
     # and grasp from the candidate chain; recovery resumes at fill_container.
-    if (
+    if stage is None and (
         intent.get("intent_type") == "verified_water_delivery"
         and "container_in_effector" in verified
         and "container_filled" not in verified
@@ -1182,7 +1299,7 @@ def _prepare_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) 
             "pruned_steps": ["navigate_to_container", "grasp_container"],
             "resume_basis": "current_verified_task_facts",
         }
-    else:
+    elif stage is None:
         stage = _derive_long_intent_stage(session, intent)
     _debug_runtime("stage_pruned", session, intent_id=intent_id, stage=stage.get("stage_id"), pruned_steps=stage.get("pruned_steps", []), resume_basis=stage.get("resume_basis"))
     if stage["status"] == "completed":
@@ -5122,6 +5239,339 @@ def _execute_water_service_stage(
     return result
 
 
+def _graph_role_refs(graph: dict[str, Any], role_name: str) -> list[str]:
+    refs = (graph.get("roles") or {}).get(role_name)
+    if isinstance(refs, list):
+        return [str(ref) for ref in refs if ref]
+    return [str(refs)] if refs else []
+
+
+def _nested_graph_field(entity: dict[str, Any], path: str) -> Any:
+    value: Any = entity
+    for part in str(path or "").split("."):
+        if not isinstance(value, dict) or part not in value:
+            return None
+        value = value[part]
+    return value
+
+
+def _set_nested_graph_field(entity: dict[str, Any], path: str, value: Any) -> None:
+    parts = str(path or "").split(".")
+    target = entity
+    for part in parts[:-1]:
+        target = target.setdefault(part, {})
+    target[parts[-1]] = deepcopy(value)
+
+
+def _release_graph_entity_from_effector(session: dict[str, Any], entity_ref: str) -> None:
+    for effector, held_ref in list(_holding_by_effector(session).items()):
+        if held_ref == entity_ref:
+            _holding_by_effector(session)[effector] = None
+    _sync_primary_holding(session)
+
+
+def _apply_causal_graph_node_effects(
+    session: dict[str, Any], intent: dict[str, Any], node: dict[str, Any]
+) -> dict[str, Any]:
+    graph = intent.get("task_graph") or {}
+    runtime = intent.get("causal_graph_runtime") or {}
+    contract = node.get("execution_contract") or {}
+    objects_before = deepcopy(session.get("runtime_objects", []))
+    state_before = deepcopy(session.get("state", {}))
+    objects = {item.get("entity_id"): item for item in session.get("runtime_objects", [])}
+    effect_checks: list[dict[str, Any]] = []
+
+    def role_entities(role: str) -> list[dict[str, Any]]:
+        return [objects[ref] for ref in _graph_role_refs(graph, role) if ref in objects]
+
+    try:
+        for effect in contract.get("effects", []):
+            operator = effect.get("operator")
+            if operator == "move_role_members_to_container":
+                themes = role_entities(effect["themes_role"])
+                containers = role_entities(effect["container_role"])
+                if not themes or len(containers) != 1:
+                    raise ValueError("discard_roles_not_currently_grounded")
+                container = containers[0]
+                for index, theme in enumerate(themes):
+                    _release_graph_entity_from_effector(session, theme["entity_id"])
+                    theme.pop("support_ref", None)
+                    theme.pop("received_by", None)
+                    theme.pop("attached_to_executor", None)
+                    theme.pop("held_by_effector", None)
+                    theme["contained_by"] = container["entity_id"]
+                    theme["position"] = [
+                        float(container["position"][0]) + 0.02 * index,
+                        float(container["position"][1]),
+                    ]
+                effect_checks.append({
+                    "operator": operator,
+                    "established": all(theme.get("contained_by") == container["entity_id"] and not theme.get("support_ref") for theme in themes),
+                })
+            elif operator == "decrement_role_inventory":
+                entities = role_entities(effect["role"])
+                if len(entities) != 1:
+                    raise ValueError("inventory_role_not_currently_grounded")
+                current = _nested_graph_field(entities[0], effect["field"])
+                amount = int(effect.get("amount", 1))
+                if current is None or int(current) < amount:
+                    raise ValueError("inventory_amount_not_available")
+                _set_nested_graph_field(entities[0], effect["field"], int(current) - amount)
+                effect_checks.append({
+                    "operator": operator,
+                    "established": _nested_graph_field(entities[0], effect["field"]) == int(current) - amount,
+                })
+            elif operator == "set_role_fields":
+                entities = role_entities(effect["role"])
+                if not entities:
+                    raise ValueError("field_target_role_not_currently_grounded")
+                for entity in entities:
+                    for field, value in (effect.get("fields") or {}).items():
+                        _set_nested_graph_field(entity, field, value)
+                effect_checks.append({
+                    "operator": operator,
+                    "established": all(
+                        _nested_graph_field(entity, field) == value
+                        for entity in entities
+                        for field, value in (effect.get("fields") or {}).items()
+                    ),
+                })
+            elif operator == "copy_role_field":
+                sources = role_entities(effect["source_role"])
+                targets = role_entities(effect["target_role"])
+                if len(sources) != 1 or not targets:
+                    raise ValueError("copy_field_roles_not_currently_grounded")
+                value = _nested_graph_field(sources[0], effect["source_field"])
+                for target in targets:
+                    _set_nested_graph_field(target, effect["target_field"], value)
+                effect_checks.append({
+                    "operator": operator,
+                    "established": all(_nested_graph_field(target, effect["target_field"]) == value for target in targets),
+                })
+            elif operator == "attach_role_to_available_effector":
+                entities = role_entities(effect["role"])
+                if len(entities) != 1:
+                    raise ValueError("grasp_role_not_currently_grounded")
+                grasp = _apply_verified_grasp(
+                    session, entities[0]["entity_id"], "causal_graph_verified_node"
+                )
+                if grasp.get("status") != "fact_established":
+                    raise ValueError(grasp.get("reason") or "graph_node_grasp_not_verified")
+                effect_checks.append({"operator": operator, "established": _is_held(session, entities[0]["entity_id"])})
+            elif operator == "support_roles_on_role":
+                supports = role_entities(effect["support_role"])
+                themes = [
+                    entity
+                    for role in effect.get("themes_roles", [])
+                    for entity in role_entities(role)
+                ]
+                if len(supports) != 1 or not themes:
+                    raise ValueError("support_loading_roles_not_currently_grounded")
+                support = supports[0]
+                offsets = [(-0.07, 0.0), (0.07, 0.0)]
+                for index, theme in enumerate(themes):
+                    _release_graph_entity_from_effector(session, theme["entity_id"])
+                    theme.pop("received_by", None)
+                    theme.pop("attached_to_executor", None)
+                    theme.pop("held_by_effector", None)
+                    theme["support_ref"] = support["entity_id"]
+                    dx, dy = offsets[index] if index < len(offsets) else (0.0, 0.04 * index)
+                    theme["position"] = [
+                        float(support["position"][0]) + dx,
+                        float(support["position"][1]) + dy,
+                    ]
+                effect_checks.append({
+                    "operator": operator,
+                    "established": all(theme.get("support_ref") == support["entity_id"] for theme in themes),
+                })
+            elif operator == "move_role_with_supported_payloads_to_executor":
+                carriers = role_entities(effect["role"])
+                if len(carriers) != 1 or not _is_held(session, carriers[0]["entity_id"]):
+                    raise ValueError("carrier_not_verified_in_effector")
+                carrier = carriers[0]
+                carrier["position"] = deepcopy(session["state"]["executor_position"])
+                payloads = [
+                    item for item in session["runtime_objects"]
+                    if item.get("support_ref") == carrier["entity_id"]
+                ]
+                for index, payload in enumerate(payloads):
+                    payload["position"] = [
+                        float(carrier["position"][0]) + (-0.07 if index == 0 else 0.07),
+                        float(carrier["position"][1]),
+                    ]
+                effect_checks.append({
+                    "operator": operator,
+                    "established": _is_held(session, carrier["entity_id"]) and carrier.get("position") == session["state"]["executor_position"] and all(payload.get("support_ref") == carrier["entity_id"] for payload in payloads),
+                })
+            elif operator == "handover_role_to_role":
+                themes = role_entities(effect["theme_role"])
+                recipients = role_entities(effect["recipient_role"])
+                if len(themes) != 1 or len(recipients) != 1:
+                    raise ValueError("handover_roles_not_currently_grounded")
+                theme, recipient = themes[0], recipients[0]
+                if not _is_held(session, theme["entity_id"]) or not recipient.get("handover_ready"):
+                    raise ValueError("handover_physical_precondition_not_verified")
+                _release_graph_entity_from_effector(session, theme["entity_id"])
+                theme.pop("attached_to_executor", None)
+                theme.pop("held_by_effector", None)
+                theme["received_by"] = recipient["entity_id"]
+                theme["position"] = deepcopy(recipient["position"])
+                recipient.setdefault("received_object_refs", [])
+                if theme["entity_id"] not in recipient["received_object_refs"]:
+                    recipient["received_object_refs"].append(theme["entity_id"])
+                effect_checks.append({
+                    "operator": operator,
+                    "established": theme.get("received_by") == recipient["entity_id"] and not _is_held(session, theme["entity_id"]),
+                })
+            else:
+                raise ValueError(f"unsupported_graph_effect_operator:{operator}")
+        if not effect_checks or not all(check.get("established") for check in effect_checks):
+            raise ValueError("declared_graph_effect_failed_postcondition_verification")
+    except (KeyError, TypeError, ValueError) as exc:
+        session["runtime_objects"] = objects_before
+        session["state"] = state_before
+        return {
+            "status": "causal_graph_node_effect_failed",
+            "reason": str(exc),
+            "frames": [],
+            "effect_contract_committed": False,
+        }
+
+    produces = list(node.get("produces", []))
+    record_graph_facts(
+        runtime,
+        produces,
+        source="causal_graph_node_terminal_verification",
+        node_id=node["node_id"],
+        world_revision=session["world_revision"],
+        physical_verification=True,
+    )
+    runtime["active_node_id"] = None
+    runtime["node_states"][node["node_id"]]["status"] = "completed"
+    runtime["node_states"][node["node_id"]]["last_reason"] = None
+    if node["node_id"] not in runtime["completed_node_order"]:
+        runtime["completed_node_order"].append(node["node_id"])
+    return {
+        "status": "fact_established",
+        "reason": "causal_graph_node_effects_physically_verified",
+        "prompt": f"任务图节点“{node.get('label', node['node_id'])}”已通过末态验真。",
+        "terminal_fact": produces[-1] if produces else None,
+        "established_facts": produces,
+        "graph_node_id": node["node_id"],
+        "effect_contract_committed": True,
+        "verification_evidence": {
+            "node_id": node["node_id"],
+            "verification_contract": deepcopy(node.get("verification", [])),
+            "world_revision": session["world_revision"],
+            "all_declared_effects_applied": True,
+            "effect_checks": deepcopy(effect_checks),
+        },
+        "runtime_objects": deepcopy(session["runtime_objects"]),
+        "frames": [],
+    }
+
+
+def _execute_causal_graph_stage(
+    session: dict[str, Any],
+    intent: dict[str, Any],
+    stage: dict[str, Any],
+    scoped_authorization: dict[str, Any] | None,
+) -> dict[str, Any]:
+    graph = intent.get("task_graph") or {}
+    contract = stage.get("execution_contract") or {}
+    target_refs = _graph_role_refs(graph, str(contract.get("target_role") or ""))
+    target_ref = target_refs[0] if target_refs else None
+    target = next(
+        (item for item in session.get("runtime_objects", []) if item.get("entity_id") == target_ref),
+        None,
+    )
+    if contract.get("mode") != "motion_effect" or not target:
+        return {
+            "status": "causal_graph_node_not_executable",
+            "reason": "execution_contract_or_target_role_not_grounded",
+            "graph_node_id": stage.get("graph_node_id"),
+            "frames": [],
+        }
+    route_refs = [
+        ref
+        for role_name in contract.get("route_roles", [contract.get("target_role")])
+        for ref in _graph_role_refs(graph, str(role_name or ""))
+    ]
+    planning_session = deepcopy(session)
+    all_frames: list[dict[str, Any]] = []
+    route_segments = []
+    result: dict[str, Any] = {}
+    for route_ref in route_refs:
+        route_entity = next(
+            (item for item in planning_session.get("runtime_objects", []) if item.get("entity_id") == route_ref),
+            None,
+        )
+        if not route_entity:
+            return {
+                "status": "causal_graph_node_not_executable",
+                "reason": "route_role_not_grounded_in_current_world",
+                "missing_entity_ref": route_ref,
+                "frames": [],
+            }
+        result = _build_object_relative_motion(
+            planning_session,
+            {
+                "status": "contextual_affordance_available",
+                "available": True,
+                "entity_ref": route_ref,
+                "operator_candidate": "navigate_near",
+                "task_context": stage["utterance"],
+                "scoped_authorization_present": bool(scoped_authorization),
+                "grounding_basis": {
+                    "source": "causal_graph_role_binding_revalidated_in_current_world",
+                    "binding_strength": "current_world_snapshot",
+                },
+            },
+            perf_counter_ns(),
+        )
+        if result.get("status") != "fact_established":
+            result["failed_route_entity_ref"] = route_ref
+            result["completed_route_segments"] = deepcopy(route_segments)
+            return result
+        segment_frames = deepcopy(result.get("frames", []))
+        all_frames.extend(segment_frames)
+        if segment_frames:
+            planning_session["state"]["executor_position"] = deepcopy(segment_frames[-1]["position"])
+            if segment_frames[-1].get("yaw_deg") is not None:
+                planning_session["state"]["executor_yaw_deg"] = segment_frames[-1]["yaw_deg"]
+        route_segments.append({
+            "entity_ref": route_ref,
+            "route_kind": (result.get("object_relative_motion") or {}).get("route_kind"),
+            "frame_count": len(segment_frames),
+            "terminal_pose_preverified": True,
+        })
+    result["frames"] = all_frames
+    result["causal_graph_route_segments"] = route_segments
+    if not result.get("frames"):
+        result["frames"] = [{
+            "position": deepcopy(session["state"]["executor_position"]),
+            "yaw_deg": session["state"].get("executor_yaw_deg", 0.0),
+            "duration_s": 0.05,
+        }]
+    result["post_completion"] = {
+        "action": "causal_graph_node",
+        "intent_id": intent["intent_id"],
+        "node_id": stage["graph_node_id"],
+    }
+    result["candidate_execution_plan"] = {
+        "goal_fact": stage.get("target_fact"),
+        "produces_facts": deepcopy(stage.get("produces_facts", [])),
+        "role_bindings": deepcopy(graph.get("roles", {})),
+        "candidate_process": deepcopy(contract.get("process_chain", [])),
+        "route_segments": deepcopy(route_segments),
+        "process_template": contract.get("process_template"),
+        "world_revision": session["world_revision"],
+        "candidate_only": not bool(scoped_authorization),
+        "direct_execution_allowed": bool(scoped_authorization),
+    }
+    return result
+
+
 def _execute_transport_region_stage(
     session: dict[str, Any],
     intent: dict[str, Any],
@@ -5869,6 +6319,46 @@ def _finalize_motion_result(
     }
 
 
+def _continue_causal_graph_clarification(
+    session: dict[str, Any], answer: str
+) -> dict[str, Any] | None:
+    dialogue = session.get("causal_graph_clarification")
+    if not dialogue:
+        return None
+    intent = (session.get("long_horizon_intents") or {}).get(dialogue.get("intent_id"))
+    if not intent or intent.get("causal_graph_runtime") is None:
+        session["causal_graph_clarification"] = None
+        return None
+    resolved = apply_condition_answer(
+        intent.get("task_graph") or {},
+        intent["causal_graph_runtime"],
+        answer,
+        world_revision=session["world_revision"],
+    )
+    if resolved.get("status") == "condition_answer_not_resolved":
+        return {
+            "status": "causal_graph_clarification_required",
+            "reason": "answer_did_not_resolve_pending_causal_condition",
+            "prompt": resolved.get("prompt") or dialogue.get("question"),
+            "pending_condition": deepcopy(intent["causal_graph_runtime"].get("pending_condition")),
+            "long_horizon_intent": _long_intent_view(intent),
+            "session": get_session(session["session_id"]),
+        }
+    if resolved.get("status") == "condition_world_change_required":
+        intent["lifecycle"] = "awaiting_correction"
+        return {
+            **resolved,
+            "long_horizon_intent": _long_intent_view(intent),
+            "session": get_session(session["session_id"]),
+        }
+    session["causal_graph_clarification"] = None
+    intent["lifecycle"] = "active"
+    prepared = _prepare_long_intent_stage(session, intent)
+    prepared["condition_resolution"] = deepcopy(resolved)
+    prepared["session"] = get_session(session["session_id"])
+    return prepared
+
+
 def begin_motion_command(
     session_id: str,
     utterance: str,
@@ -5945,6 +6435,9 @@ def begin_motion_command(
             return _finalize_motion_result(
                 session_id, text, before_historical_navigation, historical_navigation, None
             )
+        graph_clarification = _continue_causal_graph_clarification(session, text)
+        if graph_clarification:
+            return graph_clarification
     pending = session.get("pending_confirmation")
     confirmation_value = _context_confirmation_value(utterance)
     if pending and confirmation_value is not None and not scoped_authorization:
@@ -6043,16 +6536,11 @@ def begin_motion_command(
         else:
             hospitality_intent = _create_hospitality_intent(session, text)
     if hospitality_intent:
-        graph = hospitality_intent.get("task_graph") or build_hospitality_task_graph(session["runtime_objects"])
-        return {
-            "status": "hospitality_intent_active",
-            "prompt": "已建立招待客人复合任务图；当前分支将按资源、可供性和未满足前提分别推进，在托盘装载节点汇合。",
-            "long_horizon_intent": _long_intent_view(hospitality_intent),
-            "task_graph": graph,
-            "task_graph_orchestration": build_hospitality_orchestration_view(graph),
-            "task_graph_unresolved_conditions": unresolved_hospitality_conditions(graph),
-            "session": get_session(session_id),
-        }
+        prepared = _prepare_long_intent_stage(session, hospitality_intent)
+        prepared["task_graph"] = deepcopy(hospitality_intent.get("task_graph"))
+        prepared["task_graph_evaluation"] = deepcopy(hospitality_intent.get("task_graph_evaluation"))
+        prepared["session"] = get_session(session_id)
+        return prepared
     composite_water_goal = _water_delivery_goal_semantics(session, text).get("goal_fact") in {
         "human_received_filled_container", "filled_container_supported_at_destination"
     }
@@ -6196,11 +6684,18 @@ def begin_motion_command(
         }
         return {"status": immediate["status"], "immediate_result": immediate, "session": get_session(session_id)}
     gap_dialogue_collecting = (session.get("concept_gap_dialogue") or {}).get("status") == "collecting_minimum_causal_contract"
-    if language_analysis.get("speech_act") in {"language_teaching", "prohibition"} or (
-        language_analysis.get("decision") == "request_minimum_semantic_clarification"
-        and language_analysis.get("canonical_utterance")
-        and not gap_dialogue_collecting
-        and not composite_water_goal
+    if (
+        not internal_stage
+        and not scoped_authorization
+        and (
+            language_analysis.get("speech_act") in {"language_teaching", "prohibition"}
+            or (
+                language_analysis.get("decision") == "request_minimum_semantic_clarification"
+                and language_analysis.get("canonical_utterance")
+                and not gap_dialogue_collecting
+                and not composite_water_goal
+            )
+        )
     ):
         immediate = execute_command(session_id, text, scoped_authorization, language_analysis)
         return {"status": immediate.get("status"), "immediate_result": immediate, "session": get_session(session_id)}
@@ -6306,8 +6801,28 @@ def begin_motion_command(
         and authorized_internal_stage
         and active_stage.get("stage_id") == "transport_to_region"
     )
+    causal_graph_stage_matches = bool(
+        active_intent
+        and active_intent.get("causal_graph_runtime") is not None
+        and authorized_internal_stage
+        and active_stage.get("graph_node_id")
+        and (active_stage.get("execution_contract") or {}).get("mode") == "motion_effect"
+    )
+    if internal_stage and active_intent and active_intent.get("causal_graph_runtime") is not None:
+        _debug_runtime(
+            "causal_graph_stage_dispatch",
+            session,
+            authorized_internal_stage=authorized_internal_stage,
+            causal_graph_stage_matches=causal_graph_stage_matches,
+            authorization_intent=(scoped_authorization or {}).get("long_intent_id"),
+            authorization_stage=(scoped_authorization or {}).get("long_stage_id"),
+            active_stage=active_stage.get("stage_id"),
+            execution_mode=(active_stage.get("execution_contract") or {}).get("mode"),
+        )
     result = (
-        _execute_transport_region_stage(session, active_intent, active_stage, scoped_authorization)
+        _execute_causal_graph_stage(session, active_intent, active_stage, scoped_authorization)
+        if causal_graph_stage_matches
+        else _execute_transport_region_stage(session, active_intent, active_stage, scoped_authorization)
         if transport_region_stage_matches
         else _execute_water_service_stage(session, active_intent, active_stage, scoped_authorization)
         if service_stage_matches else execute_command(
@@ -6503,6 +7018,12 @@ def _post_completion_signature(post_completion: dict[str, Any] | None) -> dict[s
             "container_ref": post_completion.get("container_ref"),
             "recipient_ref": post_completion.get("recipient_ref"),
             "require_filled_container": post_completion.get("require_filled_container", True),
+        }
+    if action == "causal_graph_node":
+        return {
+            "action": action,
+            "intent_id": post_completion.get("intent_id"),
+            "node_id": post_completion.get("node_id"),
         }
     return {"action": action}
 
@@ -6773,6 +7294,25 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
             require_filled_container=job["post_completion"].get("require_filled_container", True),
         )
         result.update(handover)
+    elif post_completion.get("action") == "causal_graph_node":
+        graph_intent = (session.get("long_horizon_intents") or {}).get(
+            post_completion.get("intent_id")
+        )
+        graph_node = next(
+            (
+                node for node in (graph_intent or {}).get("task_graph", {}).get("nodes", [])
+                if node.get("node_id") == post_completion.get("node_id")
+            ),
+            None,
+        )
+        if not graph_intent or not graph_node:
+            result.update({
+                "status": "causal_graph_node_effect_failed",
+                "reason": "active_graph_intent_or_node_not_found_at_commit_time",
+                "effect_contract_committed": False,
+            })
+        else:
+            result.update(_apply_causal_graph_node_effects(session, graph_intent, graph_node))
     elif post_completion.get("action") == "grasp":
         result = _apply_verified_grasp(
             session,
@@ -6818,8 +7358,12 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
     if intent:
         if result.get("status") == "fact_established":
             terminal_fact = result.get("terminal_fact")
-            if terminal_fact and terminal_fact not in intent["verified_facts"]:
-                intent["verified_facts"].append(terminal_fact)
+            established_facts = list(result.get("established_facts", []))
+            if terminal_fact:
+                established_facts.append(terminal_fact)
+            for established_fact in dict.fromkeys(established_facts):
+                if established_fact and established_fact not in intent["verified_facts"]:
+                    intent["verified_facts"].append(established_fact)
             graph = intent.get("hierarchical_intent_graph")
             stage_target_fact = (intent.get("current_stage") or {}).get("target_fact")
             if stage_target_fact and stage_target_fact not in intent["verified_facts"]:

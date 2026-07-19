@@ -48,69 +48,157 @@ def build_hospitality_task_graph(
             "tea_vessel": mug.get("entity_id") if mug else None,
             "water_vessel": glass.get("entity_id") if glass else None,
             "water_source": thermos.get("entity_id") if thermos else None,
+            "tea_inventory": tea_box.get("entity_id") if tea_box else None,
             "tray": tray.get("entity_id") if tray else None,
             "recipient": guest.get("entity_id") if guest else None,
             "handover_zone": service.get("entity_id") if service else None,
             "trash_bin": trash.get("entity_id") if trash else None,
+            "discardables": [item["entity_id"] for item in newspapers],
+            "clearance_surface": next((item.get("support_ref") for item in newspapers if item.get("support_ref")), None),
         },
         "nodes": [
             {
                 "node_id": "inspect_resources",
                 "label": "观察资源与可供性",
+                "priority": 10,
                 "requires": [],
                 "produces": ["resources_grounded", "affordances_grounded"],
                 "verification": ["current_world_snapshot_bound"],
+                "execution_contract": {
+                    "mode": "epistemic",
+                    "process_template": "observe_current_world",
+                },
             },
             {
                 "node_id": "clear_old_newspapers",
                 "label": "清理操作台B旧报纸",
+                "priority": 20,
                 "requires": ["resources_grounded", "newspapers_present", "trash_bin_accepts_discardable"],
                 "produces": ["counter_b_footprint_released", "newspapers_discarded"],
                 "verification": ["newspapers_not_on_counter_b", "discard_bin_possession_verified"],
+                "execution_contract": {
+                    "mode": "motion_effect",
+                    "process_template": "discard_objects",
+                    "target_role": "discardables",
+                    "route_roles": ["discardables"],
+                    "process_chain": ["collect_discardables", "navigate_to_discard_container", "release_into_container", "verify_discard_relation"],
+                    "effects": [
+                        {"operator": "move_role_members_to_container", "themes_role": "discardables", "container_role": "trash_bin"}
+                    ],
+                },
             },
             {
                 "node_id": "prepare_black_tea",
                 "label": "准备一杯红茶",
-                "requires": ["black_tea_available", "tea_vessel_suitable", "brewing_temperature_sufficient"],
+                "priority": 30,
+                "requires": ["resources_grounded", "black_tea_available", "tea_vessel_suitable"],
+                "requires_any": [["brewing_temperature_sufficient", "room_temperature_brewing_authorized"]],
                 "produces": ["black_tea_ready"],
                 "verification": ["tea_bag_consumed", "liquid_level_verified", "steeping_time_verified"],
                 "recovery": ["ask_for_hot_water", "substitute_tea_vessel", "ask_for_tea_substitution"],
+                "execution_contract": {
+                    "mode": "motion_effect",
+                    "process_template": "prepare_infusion",
+                    "target_role": "tea_vessel",
+                    "route_roles": ["tea_inventory", "tea_vessel", "water_source", "tea_vessel"],
+                    "process_chain": ["acquire_tea_bag", "place_tea_bag_in_vessel", "add_bound_water", "verify_liquid_and_steeping_state"],
+                    "effects": [
+                        {"operator": "decrement_role_inventory", "role": "tea_inventory", "field": "inventory.black_tea", "amount": 1},
+                        {"operator": "set_role_fields", "role": "tea_vessel", "fields": {"liquid_state": "filled", "fill_level": 0.7, "contents": "black_tea", "tea_bag_present": True}}
+                    ],
+                },
             },
             {
                 "node_id": "prepare_room_temperature_water",
                 "label": "准备一杯常温水",
-                "requires": ["room_temperature_water_source", "water_vessel_suitable"],
+                "priority": 40,
+                "requires": ["resources_grounded", "room_temperature_water_source", "water_vessel_suitable"],
                 "produces": ["room_temperature_water_ready"],
                 "verification": ["water_level_verified", "temperature_verified"],
+                "execution_contract": {
+                    "mode": "motion_effect",
+                    "process_template": "fill_container",
+                    "target_role": "water_source",
+                    "route_roles": ["water_vessel", "water_source"],
+                    "process_chain": ["position_vessel_at_source", "activate_or_pour_source", "verify_liquid_level", "verify_temperature"],
+                    "effects": [
+                        {"operator": "copy_role_field", "source_role": "water_source", "source_field": "temperature_c", "target_role": "water_vessel", "target_field": "temperature_c"},
+                        {"operator": "set_role_fields", "role": "water_vessel", "fields": {"liquid_state": "filled", "fill_level": 0.75, "contents": "water"}}
+                    ],
+                },
             },
             {
                 "node_id": "acquire_tray",
                 "label": "取得托盘",
-                "requires": ["tray_grounded", "tray_graspable"],
+                "priority": 50,
+                "requires": ["resources_grounded", "tray_grounded", "tray_graspable"],
                 "produces": ["tray_in_effector"],
                 "verification": ["tray_in_effector_verified"],
+                "execution_contract": {
+                    "mode": "motion_effect",
+                    "process_template": "grasp_object",
+                    "target_role": "tray",
+                    "route_roles": ["tray"],
+                    "process_chain": ["navigate_to_tray", "align_free_effector", "grasp_tray", "verify_tray_in_effector"],
+                    "effects": [
+                        {"operator": "attach_role_to_available_effector", "role": "tray"}
+                    ],
+                },
             },
             {
                 "node_id": "load_tray",
                 "label": "将两杯装载到托盘",
+                "priority": 60,
                 "requires": ["tray_in_effector", "black_tea_ready", "room_temperature_water_ready", "tray_capacity_sufficient"],
                 "produces": ["tray_loaded_with_two_cups"],
                 "verification": ["load_stable", "all_items_supported_by_tray"],
                 "recovery": ["ask_direct_carry_or_alternate_tray"],
+                "execution_contract": {
+                    "mode": "motion_effect",
+                    "process_template": "load_support_carrier",
+                    "target_role": "tray",
+                    "route_roles": ["tea_vessel", "tray", "water_vessel", "tray"],
+                    "process_chain": ["grasp_first_payload", "place_on_carrier", "grasp_second_payload", "place_on_carrier", "verify_non_overlapping_support"],
+                    "effects": [
+                        {"operator": "support_roles_on_role", "themes_roles": ["tea_vessel", "water_vessel"], "support_role": "tray"}
+                    ],
+                },
             },
             {
                 "node_id": "deliver_tray",
                 "label": "端托盘到客人交接区域",
+                "priority": 70,
                 "requires": ["tray_loaded_with_two_cups", "handover_zone_reachable", "handover_zone_not_used_as_support"],
                 "produces": ["tray_at_handover_zone"],
                 "verification": ["tray_stable_during_transport"],
+                "execution_contract": {
+                    "mode": "motion_effect",
+                    "process_template": "transport_object",
+                    "target_role": "handover_zone",
+                    "route_roles": ["handover_zone"],
+                    "process_chain": ["retain_carrier_grasp", "navigate_to_handover_zone", "verify_carrier_load_stability"],
+                    "effects": [
+                        {"operator": "move_role_with_supported_payloads_to_executor", "role": "tray"}
+                    ],
+                },
             },
             {
                 "node_id": "handover_to_guest",
                 "label": "将托盘交给客人",
+                "priority": 80,
                 "requires": ["tray_at_handover_zone", "recipient_ready"],
                 "produces": [HOSPITALITY_GOAL],
                 "verification": ["recipient_possession_verified"],
+                "execution_contract": {
+                    "mode": "motion_effect",
+                    "process_template": "handover_object",
+                    "target_role": "recipient",
+                    "route_roles": ["recipient"],
+                    "process_chain": ["verify_recipient_readiness", "transfer_carrier", "release_effector", "verify_recipient_possession"],
+                    "effects": [
+                        {"operator": "handover_role_to_role", "theme_role": "tray", "recipient_role": "recipient"}
+                    ],
+                },
             },
         ],
         "edges": [
@@ -127,6 +215,11 @@ def build_hospitality_task_graph(
         ],
         "join_nodes": ["load_tray", "deliver_tray", "handover_to_guest"],
         "parallel_ready_branches": ["clear_old_newspapers", "prepare_black_tea", "prepare_room_temperature_water", "acquire_tray"],
+        "scheduler_policy": {
+            "mode": "verified_fact_driven_interleaving",
+            "resolve_goal_affecting_conditions_before_execution": True,
+            "maximum_active_motion_nodes": 1,
+        },
         "current_evidence": {
             "black_tea_count": int(tea_inventory.get("black_tea", 0)),
             "green_tea_count": int(tea_inventory.get("green_tea", 0)),
@@ -146,6 +239,41 @@ def build_hospitality_task_graph(
             "tray_capacity_sufficient": tray_area >= cup_area if tray else False,
             "handover_zone_not_used_as_support": bool(service) and not bool((service or {}).get("stable", False)),
             "newspapers_need_clearance": bool(newspapers),
+        },
+        "world_fact_rules": {
+            "newspapers_present": {"operator": "all_members_field_equals_role_ref", "role": "discardables", "field": "support_ref", "value_role": "clearance_surface"},
+            "trash_bin_accepts_discardable": {"operator": "field_truthy", "role": "trash_bin", "field": "accepts_discardable"},
+            "black_tea_available": {"operator": "field_gte", "role": "tea_inventory", "field": "inventory.black_tea", "value": 1},
+            "tea_vessel_suitable": {"operator": "field_equals", "role": "tea_vessel", "field": "tea_suitable", "value": True},
+            "brewing_temperature_sufficient": {"operator": "field_gte", "role": "water_source", "field": "temperature_c", "value": brewing_temperature_c},
+            "room_temperature_water_source": {"operator": "field_equals", "role": "water_source", "field": "temperature_c", "value": 20},
+            "water_vessel_suitable": {"operator": "role_exists", "role": "water_vessel"},
+            "tray_grounded": {"operator": "role_exists", "role": "tray"},
+            "tray_graspable": {"operator": "role_exists", "role": "tray"},
+            "tray_capacity_sufficient": {"operator": "sum_role_footprints_lte_role_field", "member_roles": ["tea_vessel", "water_vessel"], "capacity_role": "tray", "capacity_field": "usable_footprint_m2"},
+            "handover_zone_reachable": {"operator": "role_exists", "role": "handover_zone"},
+            "handover_zone_not_used_as_support": {"operator": "field_equals", "role": "handover_zone", "field": "stable", "value": False},
+            "recipient_ready": {"operator": "field_truthy", "role": "recipient", "field": "handover_ready"}
+        },
+        "condition_resolutions": {
+            "brewing_temperature_sufficient": {
+                "priority": 10,
+                "question": "当前水源是常温水，不满足红茶浸泡温度。要换热水源，还是允许按常温方式准备？",
+                "options": [
+                    {
+                        "option_id": "provide_hot_water_source",
+                        "aliases": ["换热水", "热水源", "换热水壶", "我来换热水"],
+                        "requires_world_change": True,
+                        "prompt": "请把可用热水源放入当前空间；世界状态更新后我会重新观察温度，不会把口头回答当成物理温度事实。"
+                    },
+                    {
+                        "option_id": "authorize_room_temperature_preparation",
+                        "aliases": ["用常温水", "常温水试试", "按常温", "常温方式"],
+                        "establishes": ["room_temperature_brewing_authorized"],
+                        "acknowledgement": "已把目标约束调整为按常温方式准备；当前水温事实仍保持20°C。"
+                    }
+                ]
+            }
         },
     }
     return graph
