@@ -423,6 +423,28 @@ def verify_hospitality_container_selection_service_chain() -> dict:
     return {"stage_facts": facts, "selected_container": "mug_white"}
 
 
+def verify_current_relation_precedes_category_ambiguity() -> dict:
+    session = start_session("home_humanoid", "hospitality_guest")
+    session_id = session["session_id"]
+    begin_motion_command(session_id, "给我接一杯水")
+    drain_service(begin_motion_command(session_id, "白色马克杯"))
+
+    repeated = begin_motion_command(
+        session_id,
+        "水喝完了，再从我手上拿过杯子去接杯水给我",
+    )
+    intent = repeated.get("long_horizon_intent") or {}
+    runtime_intent = SESSIONS[session_id]["long_horizon_intents"][SESSIONS[session_id]["active_intent_id"]]
+    evidence = (runtime_intent.get("role_binding_evidence") or {}).get("theme") or {}
+    require(repeated.get("status") == "motion_started", f"verified holder relation fell back to category ambiguity: {repeated}")
+    require(intent.get("role_bindings", {}).get("theme") == "mug_white", f"current human-held object was not bound as the new theme: {repeated}")
+    require(evidence.get("basis") == "current_verified_relation:held_by_human" and evidence.get("current_snapshot_revalidated") is True, f"relational binding did not expose current-world provenance: {evidence}")
+    outcomes = drain_service(repeated)
+    facts = [item.get("terminal_fact") for item in outcomes]
+    require(facts == ["target_object_in_gripper", "container_filled", "human_received_filled_container"], f"relation-bound repeat service did not complete: {outcomes}")
+    return {"theme": "mug_white", "binding_basis": evidence["basis"], "stage_facts": facts}
+
+
 def verify_explicit_container_binding_precedes_ambiguity() -> dict:
     explicit_session = start_session("home_humanoid", "hospitality_guest")
     explicit = begin_motion_command(explicit_session["session_id"], "\u7528\u767d\u8272\u9a6c\u514b\u676f\u7ed9\u6211\u63a5\u4e00\u676f\u6c34")
@@ -536,6 +558,7 @@ def main() -> None:
         "generic_object_handover": verify_generic_object_handover(),
         "internal_stage_recovery_guard": verify_internal_stage_start_does_not_reenter_recovery(),
         "hospitality_selected_container_service": verify_hospitality_container_selection_service_chain(),
+        "current_relation_precedes_category_ambiguity": verify_current_relation_precedes_category_ambiguity(),
         "explicit_container_precedes_ambiguity": verify_explicit_container_binding_precedes_ambiguity(),
         "terminal_relation_effect_gate": verify_terminal_relation_gates_effect_commit(),
         "role_scoped_transfer_after_handover": verify_role_scoped_transfer_after_handover(),

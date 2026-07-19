@@ -745,6 +745,45 @@ def _resolve_current_role_binding(
     """Compatibility facade over the single concept-to-instance grounder."""
     current_candidates = [item for item in candidates if item.get("active") is not False]
     analysis = language_analysis or {}
+    current_by_ref = {item.get("entity_id"): item for item in current_candidates}
+    # The unified process resolver may already have reduced a concept role by
+    # a current verified relation (for example, the only object possessed by
+    # the addressed human). Do not discard that stronger binding and restart
+    # from category cardinality. Revalidate it against this world revision and
+    # the caller's candidate domain before accepting it.
+    process_binding = (
+        ((analysis.get("process_template_resolution") or {}).get("bindings") or {}).get(role)
+        or {}
+    )
+    composed_binding = (analysis.get("role_bindings") or {}).get(role) or {}
+    resolved_ref = process_binding.get("value_ref") or composed_binding.get("entity_ref")
+    binding_revision = process_binding.get("observation_world_revision")
+    if binding_revision is None:
+        binding_revision = (analysis.get("observation_evidence") or {}).get("world_revision")
+    if (
+        not confirmed_entity_ref
+        and resolved_ref in current_by_ref
+        and binding_revision == session.get("world_revision")
+    ):
+        return {
+            "status": "resolved",
+            "entity": current_by_ref[resolved_ref],
+            "entity_ref": resolved_ref,
+            "evidence": {
+                "basis": process_binding.get("evidence") or "composed_current_world_role_binding",
+                "strength": int(process_binding.get("evidence_strength") or 0),
+                "world_revision": binding_revision,
+                "observation_evidence_set_id": (analysis.get("observation_evidence") or {}).get("evidence_set_id"),
+                "matched_constraints": deepcopy(process_binding.get("matched_semantic_constraints", [])),
+                "current_snapshot_revalidated": True,
+            },
+            "compatible_candidates": deepcopy(current_candidates),
+            "grounded_role": {
+                "status": "resolved",
+                "binding": deepcopy(process_binding),
+                "source": "unified_process_binding_revalidated_in_current_snapshot",
+            },
+        }
     semantic_frame = analysis.get("semantic_constraint_frame") or build_semantic_constraint_frame(utterance, analysis)
     observation_evidence = analysis.get("observation_evidence") or _current_observation_evidence(
         session,
@@ -759,7 +798,6 @@ def _resolve_current_role_binding(
         confirmed_entity_ref=confirmed_entity_ref,
     )
     binding = grounded.get("binding") or {}
-    current_by_ref = {item.get("entity_id"): item for item in current_candidates}
     entity = current_by_ref.get(binding.get("entity_ref"))
     return {
         "status": "resolved" if grounded.get("status") == "resolved" else (
