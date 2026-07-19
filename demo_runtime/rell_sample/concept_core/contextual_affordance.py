@@ -202,13 +202,14 @@ def resolve_contextual_affordance_request(
         # A task-conditioned semantic role outranks incidental entity mentions.
         # For example, in "take the cup from the person", the person is the
         # source holder while the perceived target remains the grasp theme.
-        if operator == "grasp_object" and perceived_target_ref:
+        if operator in {"grasp_object", "navigate_near"} and perceived_target_ref:
             grounded_target = next(
                 (item for item in entities if item.get("entity_id") == perceived_target_ref),
                 None,
             )
             if grounded_target:
                 entity = grounded_target
+                ambiguous_entities = []
     if not entity and operator != "place_object" and any(token in utterance for token in ("拿起", "抓取", "拾起", "拿住", "拿")):
         # Task-conditioned perception owns the target role. Concept file order
         # must never let an earlier support mention displace that grounded theme.

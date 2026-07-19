@@ -917,15 +917,35 @@ def _water_delivery_goal_semantics(
         and item.get("status") == "omitted_head_requires_contextual_goal_schema"
         for item in analysis.get("ellipsis_candidates", [])
     )
+    reported_consumption = next(
+        (
+            item for item in analysis.get("reported_event_candidates", [])
+            if item.get("event_type") == "consumption_completed"
+            and item.get("physical_state_change_committed") is False
+        ),
+        None,
+    )
     water_effect_requested = any(token in normalized for token in ("接水", "取水", "倒水", "装水", "一杯水")) or bool(
         re.search(r"(?:接|取|倒|装)(?:一)?杯水", normalized)
     )
     if omitted_content and recent_water_goal:
         water_effect_requested = True
+    repeated_service_after_consumption = bool(
+        recent_water_goal
+        and reported_consumption
+        and water_effect_requested
+        and not beneficiary_requested
+        and not deictic_recipient_requested
+        and not any(
+            token in normalized
+            for token in ("给我", "交给我", "递给我", "送给我", "拿给我")
+        )
+    )
     transfer_relation_requested = (
         any(token in normalized for token in ("给", "交给", "递给", "送给", "拿给"))
         or beneficiary_requested
         or bool(recent_water_goal and omitted_content)
+        or repeated_service_after_consumption
     )
     recipients = [
         item for item in session["runtime_objects"]
@@ -944,6 +964,7 @@ def _water_delivery_goal_semantics(
         or beneficiary_requested
         or generic_human_reference
         or (recent_water_goal and omitted_content)
+        or repeated_service_after_consumption
     )
     placement_relation_requested = any(token in normalized for token in ("放到", "放在", "摆到", "摆在", "搁到", "搁在"))
     support_concepts = [
@@ -984,7 +1005,11 @@ def _water_delivery_goal_semantics(
         "transfer_relation_requested": transfer_relation_requested,
         "recipient_role_requested": recipient_role_requested,
         "beneficiary_role_requested": beneficiary_requested,
-        "goal_schema_continued_from_recent_capsule": bool(recent_water_goal and omitted_content),
+        "goal_schema_continued_from_recent_capsule": bool(
+            recent_water_goal and (omitted_content or repeated_service_after_consumption)
+        ),
+        "reported_consumption_candidate": deepcopy(reported_consumption),
+        "reported_consumption_committed_as_physical_fact": False,
         "explicit_recipient_refs": explicit_recipient_refs,
         "placement_relation_requested": placement_relation_requested,
         "support_role_requested": support_role_requested,
@@ -2225,7 +2250,59 @@ def _project_resolved_process_roles(
         analysis["decision"] = "route_canonical_semantics"
 
 
-def _compose_session_language(session: dict[str, Any], utterance: str) -> dict[str, Any]:
+def _structured_role_binding(
+    session: dict[str, Any], role: str, entity_ref: str
+) -> dict[str, Any] | None:
+    entity = next(
+        (
+            item for item in session.get("runtime_objects", [])
+            if item.get("entity_id") == entity_ref and item.get("active") is not False
+        ),
+        None,
+    )
+    if not entity:
+        return None
+    concepts = [
+        item for item in load_object_concepts()["concepts"]
+        if entity.get("kind") in item.get("compatible_kinds", [])
+    ]
+    if role in {"destination", "support", "carrier"}:
+        preferred = [
+            item for item in concepts
+            if {"support_object", "receive_object"}.intersection(
+                item.get("functional_affordances", [])
+            )
+        ]
+        concepts = preferred or concepts
+    elif role in {"theme", "target", "payload"}:
+        preferred = [
+            item for item in concepts
+            if {"graspable", "movable", "receive_liquid"}.intersection(
+                item.get("functional_affordances", [])
+            )
+        ]
+        concepts = preferred or concepts
+    concept = concepts[0] if concepts else {}
+    return {
+        "entity_ref": entity_ref,
+        "value_ref": entity_ref,
+        "label": entity.get("label") or entity_ref,
+        "label_hint": entity.get("label") or entity_ref,
+        "concept_id": concept.get("concept_id"),
+        "display_name": concept.get("display_name"),
+        "compatible_kinds": [entity.get("kind")],
+        "functional_affordances": deepcopy(concept.get("functional_affordances", [])),
+        "source": "structured_dialogue_role_binding",
+        "binding_strength": "explicit_human_slot_answer",
+        "observation_world_revision": session.get("world_revision"),
+    }
+
+
+def _compose_session_language(
+    session: dict[str, Any],
+    utterance: str,
+    grounded_role_bindings: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     analysis = compose_language_concepts(
         utterance,
         event_concepts=FACTORY_EVENT_CONCEPT_UNITS,
@@ -2233,6 +2310,30 @@ def _compose_session_language(session: dict[str, Any], utterance: str) -> dict[s
         context_entities=_language_context_entities(session),
         learned_adapters=session.get("language_adapters", []),
     )
+    structured_bindings: dict[str, dict[str, Any]] = {}
+    for role, value in (grounded_role_bindings or {}).items():
+        if isinstance(value, str):
+            entity_ref = value
+        elif isinstance(value, dict):
+            entity_ref = value.get("entity_ref") or value.get("value_ref")
+        else:
+            # Collection-valued graph roles are owned by the causal runtime,
+            # not by the single-entity dialogue slot binder.
+            continue
+        binding = _structured_role_binding(session, role, str(entity_ref or ""))
+        if not binding:
+            continue
+        structured_bindings[role] = binding
+        analysis.setdefault("role_bindings", {})[role] = deepcopy(binding)
+        analysis.setdefault("canonical_frame", {}).setdefault("roles", {})[role] = deepcopy(binding)
+        if not any(
+            item.get("entity_ref") == entity_ref
+            for item in analysis.get("entity_mentions", [])
+        ):
+            analysis.setdefault("entity_mentions", []).append(deepcopy(binding))
+    if structured_bindings:
+        analysis["structured_role_bindings"] = deepcopy(structured_bindings)
+        analysis["structured_binding_reparsed_as_surface_text"] = False
     semantic_frame = build_semantic_constraint_frame(utterance, analysis)
     observation_evidence = _current_observation_evidence(
         session,
@@ -3774,14 +3875,6 @@ def _continue_process_gap_dialogue(session: dict[str, Any], utterance: str) -> d
     return resumed
 
 
-def _replace_last_alias(text: str, aliases: list[str], replacement: str) -> str:
-    matches = [(text.rfind(alias), alias) for alias in aliases if alias and text.rfind(alias) >= 0]
-    if not matches:
-        return text
-    position, alias = max(matches, key=lambda item: item[0])
-    return text[:position] + replacement + text[position + len(alias):]
-
-
 def _historical_destination_role_choice(
     session: dict[str, Any], dialogue: dict[str, Any], utterance: str
 ) -> tuple[dict[str, Any], dict[str, Any]] | None:
@@ -3853,18 +3946,9 @@ def _resume_role_clarification_choice(
     evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     label = choice.get("label") or choice.get("label_hint")
-    concept = next(
-        (item for item in load_object_concepts()["concepts"] if item.get("concept_id") == dialogue.get("concept_id")),
-        None,
-    )
-    aliases = list((concept or {}).get("aliases", []))
-    resolved_utterance = _replace_last_alias(dialogue["source_utterance"], aliases, label)
+    resolved_utterance = dialogue["source_utterance"]
     if dialogue.get("role") == "theme" and dialogue.get("evidence_source") == "current_world_container_candidates":
         session["pending_water_container_ref"] = choice.get("entity_ref")
-        # Preserve the original service-goal expression and append the selected
-        # slot value. Replacing the generic classifier in "一杯水" would destroy
-        # the already recognized water-delivery relation.
-        resolved_utterance = f"{dialogue['source_utterance']}，用{label}"
     session["role_clarification_dialogue"] = None
     if dialogue.get("role") == "theme" and dialogue.get("evidence_source") == "current_world_container_candidates":
         # The human-selected entity is a structured binding. Resume the
@@ -3891,9 +3975,17 @@ def _resume_role_clarification_choice(
                 resumed = _prepare_long_intent_stage(session, active)
                 resumed["session"] = get_session(session["session_id"])
             else:
-                resumed = begin_motion_command(session["session_id"], resolved_utterance)
+                resumed = begin_motion_command(
+                    session["session_id"],
+                    resolved_utterance,
+                    grounded_role_bindings={dialogue["role"]: choice.get("entity_ref")},
+                )
     else:
-        resumed = begin_motion_command(session["session_id"], resolved_utterance)
+        resumed = begin_motion_command(
+            session["session_id"],
+            resolved_utterance,
+            grounded_role_bindings={dialogue["role"]: choice.get("entity_ref")},
+        )
     resolution = {
         "status": "role_clarification_resolved",
         "role": dialogue["role"],
@@ -3901,6 +3993,8 @@ def _resume_role_clarification_choice(
         "label": label,
         "source_utterance": dialogue["source_utterance"],
         "resolved_utterance": resolved_utterance,
+        "binding_mode": "structured_role_binding",
+        "surface_text_rewritten": False,
         "evidence": deepcopy(evidence),
         "physical_fact_committed": False,
     }
@@ -7139,7 +7233,16 @@ def execute_command(
     )
     if not perception_bindings and role_grounding_context:
         runtime_index = {item.get("entity_id"): item for item in session.get("runtime_objects", [])}
-        for role_name, binding_role in (("target", "theme"), ("support", "destination")):
+        navigation_uses_destination_as_target = any(
+            item.get("operator") == "navigate_to"
+            for item in language_analysis.get("event_candidates", [])
+        )
+        perception_role_pairs = (
+            (("target", "theme"), ("target", "destination"))
+            if navigation_uses_destination_as_target
+            else (("target", "theme"), ("support", "destination"))
+        )
+        for role_name, binding_role in perception_role_pairs:
             entity = runtime_index.get(role_grounding_context.get(binding_role))
             if not entity:
                 continue
@@ -7958,7 +8061,9 @@ def begin_motion_command(
     evidence_gap_resolution = _continue_evidence_gap_clarification(session, utterance)
     if evidence_gap_resolution:
         return evidence_gap_resolution
-    language_analysis = _compose_session_language(session, text)
+    language_analysis = _compose_session_language(
+        session, text, grounded_role_bindings=grounded_role_bindings
+    )
     if not internal_stage and not scoped_authorization and not compound_dispatch:
         compound_started = _start_compound_command_sequence(
             session, text, language_analysis

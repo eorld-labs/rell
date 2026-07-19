@@ -262,6 +262,40 @@ def main() -> None:
     require(explicit_beneficiary_service.get("speech_act") == "task_request" and [item.get("operator") for item in explicit_beneficiary_service.get("event_candidates", [])] == ["fill_container"], f"explicit fill event was not composed at the concept layer: {explicit_beneficiary_service}")
     require(explicit_beneficiary_service.get("canonical_frame", {}).get("goal_relation") == "container_filled", f"fill event did not project its physical postcondition: {explicit_beneficiary_service}")
 
+    serial_refill = compose("我喝完了，再去倒一杯水")
+    require(
+        [item.get("operator") for item in serial_refill.get("event_candidates", [])]
+        == ["fill_container"]
+        and not serial_refill.get("role_bindings", {}).get("destination"),
+        f"a bare motion auxiliary created an independent destination slot: {serial_refill}",
+    )
+    require(
+        serial_refill.get("event_dependencies") == [{
+            "operator": "navigate_to",
+            "surface": "去",
+            "relation": "execution_prerequisite_internal_to_following_event",
+            "governing_operator": "fill_container",
+            "requires_independent_destination_role": False,
+        }],
+        f"serial motion dependency was not retained as an auditable prerequisite: {serial_refill}",
+    )
+    reported_consumption = serial_refill.get("reported_event_candidates", [])
+    require(
+        len(reported_consumption) == 1
+        and reported_consumption[0].get("event_type") == "consumption_completed"
+        and reported_consumption[0].get("physical_state_change_committed") is False
+        and serial_refill.get("unknown_surface") is None,
+        f"reported consumption was either discarded or committed as physical truth: {serial_refill}",
+    )
+    explicit_serial_destination = compose("去桌子拿杯子")
+    require(
+        [item.get("operator") for item in explicit_serial_destination.get("event_candidates", [])]
+        == ["navigate_to", "grasp_object"]
+        and (explicit_serial_destination.get("role_bindings", {}).get("destination") or {}).get("matched_alias") == "桌子"
+        and (explicit_serial_destination.get("role_bindings", {}).get("theme") or {}).get("matched_alias") == "杯子",
+        f"an explicit locative complement was collapsed with the serial auxiliary: {explicit_serial_destination}",
+    )
+
     scoped_compound = compose("好，现在帮我把杯子放到桌子上去，用高脚杯给我倒一杯水")
     scoped_frames = scoped_compound.get("event_frames", [])
     require(len(scoped_frames) == 2, f"independent event clauses were flattened into one role frame: {scoped_compound}")

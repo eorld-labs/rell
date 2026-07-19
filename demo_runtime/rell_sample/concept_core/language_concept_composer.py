@@ -220,6 +220,73 @@ def _discourse_roles(text: str) -> dict[str, dict[str, Any]]:
     return roles
 
 
+def _reported_events(text: str) -> list[dict[str, Any]]:
+    """Represent human-reported state changes without committing physical facts."""
+    candidates: list[dict[str, Any]] = []
+    for surface in ("喝完了", "喝完", "饮用完了", "饮用完"):
+        for match in re.finditer(re.escape(surface), text):
+            candidates.append({
+                "event_type": "consumption_completed",
+                "operator": "report_consumption_completed",
+                "matched_surface": surface,
+                "start": match.start(),
+                "end": match.end(),
+                "candidate_postcondition": "previously_received_container_empty",
+                "evidence_source": "human_report",
+                "physical_state_change_committed": False,
+            })
+    return _longest_non_overlapping_mentions(text, candidates)
+
+
+def _resolve_serial_event_dependencies(
+    text: str,
+    events: list[dict[str, Any]],
+    objects: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Collapse bare motion auxiliaries into the following executable event."""
+    retained: list[dict[str, Any]] = []
+    dependencies: list[dict[str, Any]] = []
+    for index, event in enumerate(events):
+        if event.get("operator") != "navigate_to" or event.get("matched_surface") not in {"去", "走"}:
+            retained.append(event)
+            continue
+        following = next(
+            (candidate for candidate in events[index + 1:] if candidate.get("operator") != "navigate_to"),
+            None,
+        )
+        if not following:
+            retained.append(event)
+            continue
+        intervening_objects = [
+            item for item in objects
+            if int(item.get("start", -1)) >= int(event.get("end", 0))
+            and int(item.get("end", -1)) <= int(following.get("start", 0))
+        ]
+        explicit_destination_mentions = [
+            item for item in intervening_objects
+            if not text[
+                int(event.get("end", 0)):int(item.get("start", 0))
+            ].endswith(("把", "将", "用"))
+        ]
+        intervening = text[int(event.get("end", 0)):int(following.get("start", 0))]
+        residual = intervening
+        for item in intervening_objects:
+            residual = residual.replace(str(item.get("matched_alias") or ""), "")
+        for marker in ("再", "然后", "接着", "随后", "帮我", "去帮我", "把", "将", "用"):
+            residual = residual.replace(marker, "")
+        if not explicit_destination_mentions and not residual:
+            dependencies.append({
+                "operator": "navigate_to",
+                "surface": event.get("matched_surface"),
+                "relation": "execution_prerequisite_internal_to_following_event",
+                "governing_operator": following.get("operator"),
+                "requires_independent_destination_role": False,
+            })
+            continue
+        retained.append(event)
+    return retained, dependencies
+
+
 def _ellipsis_candidates(text: str) -> list[dict[str, Any]]:
     candidates = []
     match = re.search(r"(?P<event>接|取|倒|装|来)(?:一)?杯(?!子|水|茶|咖啡|饮料)", text)
@@ -307,7 +374,7 @@ def _roles(
     text: str,
 ) -> dict[str, Any]:
     movable = [item for item in objects if any(token in set(item.get("functional_affordances", [])) for token in ("graspable", "movable", "graspable_candidate"))]
-    supports = [item for item in objects if any(token in set(item.get("functional_affordances", [])) for token in ("support_object", "receive_object", "receive_liquid"))]
+    supports = [item for item in objects if any(token in set(item.get("functional_affordances", [])) for token in ("support_object", "receive_object"))]
     held = [item for item in context_entities if item.get("focus_source") == "verified_holding_fact"]
     place_event = next((item for item in events if item["operator"] == "place_object"), None)
     handover_event = next((item for item in events if item["operator"] == "handover_object"), None)
@@ -397,8 +464,21 @@ def _roles(
             roles["destination"] = deepcopy(objects[-1])
     if objects and "theme" not in roles and not placing:
         roles["target"] = deepcopy(objects[0])
-    if any(item["operator"] == "navigate_to" for item in events) and objects:
-        roles["destination"] = deepcopy(objects[-1])
+    navigation = next((item for item in events if item["operator"] == "navigate_to"), None)
+    if navigation and objects:
+        following = next(
+            (item for item in events if item.get("start", 0) >= navigation.get("end", 0) and item is not navigation),
+            None,
+        )
+        explicit_navigation_objects = [
+            item for item in objects
+            if item.get("start", -1) >= navigation.get("end", 0)
+            and (not following or item.get("end", -1) <= following.get("start", 0))
+        ]
+        if explicit_navigation_objects:
+            roles["destination"] = deepcopy(explicit_navigation_objects[-1])
+        elif len(events) == 1:
+            roles["destination"] = deepcopy(objects[-1])
     if handover_event:
         if movable:
             roles["theme"] = deepcopy(movable[0])
@@ -493,9 +573,18 @@ def _canonical_utterance(speech_act: str, query_type: str | None, events: list[d
     return "然后".join(parts) or None
 
 
-def _unknown_surface(text: str, events: list[dict[str, Any]], objects: list[dict[str, Any]]) -> str | None:
+def _unknown_surface(
+    text: str,
+    events: list[dict[str, Any]],
+    objects: list[dict[str, Any]],
+    reported_events: list[dict[str, Any]],
+) -> str | None:
     residual = text
-    spans = [(item["start"], item["end"]) for item in [*events, *objects] if isinstance(item.get("start"), int)]
+    spans = [
+        (item["start"], item["end"])
+        for item in [*events, *objects, *reported_events]
+        if isinstance(item.get("start"), int)
+    ]
     for start, end in sorted(spans, reverse=True):
         residual = residual[:start] + (" " * (end - start)) + residual[end:]
     for word in sorted(FUNCTION_WORDS, key=len, reverse=True):
@@ -518,7 +607,9 @@ def compose_language_concepts(
     objects = _object_mentions(normalized, object_concepts)
     events = _event_mentions(normalized, event_concepts, learned_adapters or [])
     objects, unresolved = _resolve_pronouns(normalized, objects, context_entities or [])
+    events, event_dependencies = _resolve_serial_event_dependencies(normalized, events, objects)
     discourse_roles = _discourse_roles(normalized)
+    reported_events = _reported_events(normalized)
     ellipsis_candidates = _ellipsis_candidates(normalized)
     speech_act = _speech_act(normalized, events, definition)
     if (
@@ -574,7 +665,7 @@ def compose_language_concepts(
         if not roles.get("recipient"):
             unresolved.append("handover_recipient_not_grounded")
 
-    unknown_surface = _unknown_surface(normalized, events, objects)
+    unknown_surface = _unknown_surface(normalized, events, objects, reported_events)
     confidence = 0.15
     if speech_act != "unknown":
         confidence += 0.18
@@ -611,6 +702,8 @@ def compose_language_concepts(
         "entity_mentions": deepcopy(objects),
         "role_bindings": deepcopy(roles),
         "discourse_roles": discourse_roles,
+        "reported_event_candidates": deepcopy(reported_events),
+        "event_dependencies": deepcopy(event_dependencies),
         "ellipsis_candidates": ellipsis_candidates,
         "modifiers": {
             "negated": speech_act == "prohibition",

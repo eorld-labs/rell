@@ -665,6 +665,96 @@ def verify_current_relation_precedes_category_ambiguity() -> dict:
     return {"theme": "mug_white", "binding_basis": evidence["basis"], "stage_facts": facts}
 
 
+def verify_reported_consumption_repeat_refill() -> dict:
+    session = start_session("home_humanoid", "hospitality_guest")
+    session_id = session["session_id"]
+    first = begin_motion_command(
+        session_id, "用白色马克杯给我接一杯水"
+    )
+    require(
+        [item.get("terminal_fact") for item in drain_service(first)]
+        == ["target_object_in_gripper", "container_filled", "human_received_filled_container"],
+        "repeat-refill setup did not establish the current recipient relation",
+    )
+
+    repeated = begin_motion_command(
+        session_id, "我喝完了，再去倒一杯水"
+    )
+    intent = repeated.get("long_horizon_intent") or {}
+    live_intent = SESSIONS[session_id]["long_horizon_intents"][
+        SESSIONS[session_id]["active_intent_id"]
+    ]
+    semantics = live_intent.get("composed_goal_semantics") or {}
+    evidence = (live_intent.get("role_binding_evidence") or {}).get("theme") or {}
+    require(
+        repeated.get("status") == "motion_started"
+        and (intent.get("current_stage") or {}).get("stage_id") == "acquire_container"
+        and (intent.get("role_bindings") or {}).get("theme") == "mug_white",
+        f"reported consumption repeat was routed into navigation ambiguity: {repeated}",
+    )
+    require(
+        semantics.get("goal_schema_continued_from_recent_capsule") is True
+        and semantics.get("reported_consumption_committed_as_physical_fact") is False
+        and (semantics.get("reported_consumption_candidate") or {}).get("event_type") == "consumption_completed",
+        f"repeat service did not preserve the human-report verification boundary: {semantics}",
+    )
+    require(
+        evidence.get("basis") in {
+            "current_verified_relation:received_by",
+            "current_verified_relation:held_by_human",
+        }
+        and evidence.get("current_snapshot_revalidated") is True,
+        f"repeat service did not select the container from the current recipient relation: {evidence}",
+    )
+    outcomes = drain_service(repeated)
+    facts = [item.get("terminal_fact") for item in outcomes]
+    require(
+        facts == ["target_object_in_gripper", "container_filled", "human_received_filled_container"],
+        f"reported consumption repeat service did not complete: {outcomes}",
+    )
+    return {
+        "theme": "mug_white",
+        "reported_event_committed": False,
+        "goal_schema_reused": True,
+        "stage_facts": facts,
+    }
+
+
+def verify_structured_role_answer_does_not_rewrite_source_text() -> dict:
+    session = start_session("home_humanoid", "hospitality_guest")
+    session_id = session["session_id"]
+    source = "走到杯子旁边"
+    ambiguous = begin_motion_command(session_id, source)
+    require(
+        ambiguous.get("status") == "contextual_affordance_disambiguation_required",
+        f"navigation target setup did not open a typed role dialogue: {ambiguous}",
+    )
+    resolved = begin_motion_command(session_id, "白色马克杯")
+    resolution = resolved.get("role_clarification_resolution") or (
+        resolved.get("immediate_result") or {}
+    ).get("role_clarification_resolution") or {}
+    require(
+        resolved.get("status") == "motion_started"
+        and resolution.get("role") == "destination"
+        and resolution.get("entity_ref") == "mug_white"
+        and resolution.get("resolved_utterance") == source
+        and resolution.get("binding_mode") == "structured_role_binding"
+        and resolution.get("surface_text_rewritten") is False,
+        f"role answer was reparsed through textual substitution: {resolved}",
+    )
+    outcome = drain(resolved)
+    require(
+        outcome.get("terminal_fact") == "executor_near_object",
+        f"structured navigation role did not reach physical verification: {outcome}",
+    )
+    return {
+        "role": "destination",
+        "entity_ref": "mug_white",
+        "source_text_rewritten": False,
+        "terminal_fact": outcome.get("terminal_fact"),
+    }
+
+
 def verify_explicit_container_binding_precedes_ambiguity() -> dict:
     explicit_session = start_session("home_humanoid", "hospitality_guest")
     explicit = begin_motion_command(explicit_session["session_id"], "\u7528\u767d\u8272\u9a6c\u514b\u676f\u7ed9\u6211\u63a5\u4e00\u676f\u6c34")
@@ -961,6 +1051,8 @@ def main() -> None:
         "internal_stage_recovery_guard": verify_internal_stage_start_does_not_reenter_recovery(),
         "hospitality_selected_container_service": verify_hospitality_container_selection_service_chain(),
         "current_relation_precedes_category_ambiguity": verify_current_relation_precedes_category_ambiguity(),
+        "reported_consumption_repeat_refill": verify_reported_consumption_repeat_refill(),
+        "structured_role_answer": verify_structured_role_answer_does_not_rewrite_source_text(),
         "explicit_container_precedes_ambiguity": verify_explicit_container_binding_precedes_ambiguity(),
         "event_scoped_compound_sequence": verify_event_scoped_compound_sequence(),
         "carrier_mediated_compound_sequence": verify_carrier_mediated_compound_sequence(),
