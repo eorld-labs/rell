@@ -149,7 +149,9 @@ def _attach_runtime_diagnostic(result: dict[str, Any], session: dict[str, Any], 
         return result
     reason = result.get("reason") or result.get("error") or status or "unknown_failure"
     category = "unknown_runtime_failure"
-    if "reach" in reason or "terminal_pose" in reason:
+    if result.get("occupied_object_refs"):
+        category = "support_occupancy_constraint"
+    elif "reach" in reason or "terminal_pose" in reason:
         category = "capability_or_terminal_pose_boundary"
     elif "collision" in reason or "blocked" in reason or "obstacle" in reason:
         category = "route_or_collision_blocked"
@@ -164,15 +166,22 @@ def _attach_runtime_diagnostic(result: dict[str, Any], session: dict[str, Any], 
         "evidence": {
             "entity_ref": result.get("entity_ref") or result.get("target_entity_ref"),
             "blocking_entity": result.get("blocking_entity") or result.get("collider", {}).get("entity_id"),
+            "blocking_entity_refs": deepcopy(result.get("occupied_object_refs", [])),
+            "destination_ref": result.get("destination_ref"),
             "world_revision": session.get("world_revision"),
             "rejected_candidates": (result.get("object_relative_motion") or {}).get("rejected_candidates", []),
         },
-        "recovery_options": result.get("next_safe_actions") or [
+        "recovery_options": result.get("next_safe_actions") or result.get("recovery_options") or [
             "继续观察当前世界状态",
             "改变目标或移除阻碍",
             "向人类询问缺失的最小条件",
         ],
-        "requires_human_input": category in {"capability_or_terminal_pose_boundary", "missing_causal_precondition", "unknown_runtime_failure"},
+        "requires_human_input": category in {
+            "capability_or_terminal_pose_boundary",
+            "missing_causal_precondition",
+            "support_occupancy_constraint",
+            "unknown_runtime_failure",
+        },
     }
     result["runtime_diagnostic"] = diagnostic
     session["last_runtime_diagnostic"] = deepcopy(diagnostic)
@@ -183,6 +192,39 @@ def _attach_runtime_diagnostic(result: dict[str, Any], session: dict[str, Any], 
             f"下一步：{'；'.join(diagnostic['recovery_options'])}。"
         )
     return result
+
+
+def _record_stage_recovery_contract(
+    session: dict[str, Any], intent: dict[str, Any], result: dict[str, Any]
+) -> None:
+    """Retain only the causal gap required to repair and resume a failed stage."""
+    blocker_refs = [str(ref) for ref in result.get("occupied_object_refs", []) if ref]
+    destination_ref = (intent.get("role_bindings") or {}).get("destination")
+    if not blocker_refs or not destination_ref:
+        return
+    objects = {item.get("entity_id"): item for item in session.get("runtime_objects", [])}
+    live_blockers = [
+        ref for ref in blocker_refs
+        if ref in objects and objects[ref].get("support_ref") == destination_ref
+    ]
+    if not live_blockers:
+        return
+    intent["resume_envelope"] = {
+        "reason": result.get("reason") or "stage_precondition_not_satisfied",
+        "repair_contract": {
+            "contract_type": "release_support_occupancy",
+            "blocked_stage_id": (intent.get("current_stage") or {}).get("stage_id"),
+            "blocked_goal_fact": intent.get("goal_fact"),
+            "destination_ref": destination_ref,
+            "theme_ref": (intent.get("role_bindings") or {}).get("theme"),
+            "blocking_entity_refs": live_blockers,
+            "current_relation": "supported_by",
+            "required_postcondition": "blocking_entities_absent_from_destination_support",
+            "resume_policy": "rederive_failed_stage_from_current_world_after_repair_verification",
+        },
+        "world_revision": session.get("world_revision"),
+        "old_path_discarded": True,
+    }
 _LANGUAGE_OBJECT_CONCEPT_CACHE: list[dict[str, Any]] | None = None
 
 
@@ -316,6 +358,7 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator", scene_id
         "process_gap_dialogue": None,
         "human_reported_fact_candidates": [],
         "causal_graph_clarification": None,
+        "support_clearance_dialogue": None,
         "completed_motion_receipts": [],
     }
     if scene_id == "hospitality_guest":
@@ -493,6 +536,7 @@ def _archive_and_release_task_context(
         "evidence_gap_dialogue",
         "process_gap_dialogue",
         "causal_graph_clarification",
+        "support_clearance_dialogue",
     ):
         session[key] = None
     return capsule
@@ -1765,6 +1809,7 @@ def _prepare_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) 
         stage = _derive_long_intent_stage(session, intent)
     _debug_runtime("stage_pruned", session, intent_id=intent_id, stage=stage.get("stage_id"), pruned_steps=stage.get("pruned_steps", []), resume_basis=stage.get("resume_basis"))
     if stage["status"] == "completed":
+        repair_parent_intent_id = intent.get("resume_parent_intent_id")
         intent["lifecycle"] = "completed"
         if intent["goal_fact"] not in intent["verified_facts"]:
             intent["verified_facts"].append(intent["goal_fact"])
@@ -1786,13 +1831,26 @@ def _prepare_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) 
             archive_key="completed_intent_archive",
         )
         session.get("long_horizon_intents", {}).pop(intent["intent_id"], None)
-        compound_next = _advance_compound_command_sequence(
-            session, intent["intent_id"]
+        repair_next = None
+        if repair_parent_intent_id:
+            parent = (session.get("long_horizon_intents") or {}).get(
+                repair_parent_intent_id
+            )
+            if parent:
+                parent["lifecycle"] = "active"
+                parent["resume_envelope"] = None
+                session["active_intent_id"] = repair_parent_intent_id
+                session["intent_activation_stack"] = [repair_parent_intent_id]
+                repair_next = _prepare_long_intent_stage(session, parent)
+        compound_next = (
+            None if repair_parent_intent_id
+            else _advance_compound_command_sequence(session, intent["intent_id"])
         )
         return {
             "status": "long_intent_completed",
             "long_horizon_intent": completed_view,
             "compound_next_started": compound_next,
+            "repair_next_started": repair_next,
         }
     if stage["status"] != "stage_ready":
         intent["lifecycle"] = "awaiting_rebinding"
@@ -2393,6 +2451,283 @@ def _event_frame_bound_ref(frame: dict[str, Any], role: str = "theme") -> str | 
         or {}
     ).get("binding") or {}
     return process_binding.get("value_ref") or grounded_binding.get("entity_ref")
+
+
+def _support_clearance_repair_contract(intent: dict[str, Any] | None) -> dict[str, Any]:
+    return deepcopy((((intent or {}).get("resume_envelope") or {}).get("repair_contract") or {}))
+
+
+def _current_repair_blockers(
+    session: dict[str, Any], contract: dict[str, Any]
+) -> list[dict[str, Any]]:
+    destination_ref = contract.get("destination_ref")
+    expected_refs = set(contract.get("blocking_entity_refs", []))
+    return [
+        item for item in session.get("runtime_objects", [])
+        if item.get("entity_id") in expected_refs
+        and item.get("support_ref") == destination_ref
+        and item.get("active") is not False
+    ]
+
+
+def _compatible_clearance_sinks(
+    session: dict[str, Any], blockers: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    blocker_kinds = {str(item.get("kind")) for item in blockers if item.get("kind")}
+    candidates = []
+    for entity in session.get("runtime_objects", []):
+        if entity.get("active") is False:
+            continue
+        accepted_kinds = set(entity.get("accepts_entity_kinds", []))
+        accepts_discardable = bool(entity.get("accepts_discardable")) and all(
+            item.get("discardable") is True for item in blockers
+        )
+        accepts_declared_kinds = bool(blocker_kinds) and blocker_kinds.issubset(accepted_kinds)
+        if accepts_discardable or accepts_declared_kinds:
+            reachability = _build_object_relative_motion(
+                deepcopy(session),
+                {
+                    "status": "contextual_affordance_available",
+                    "available": True,
+                    "entity_ref": entity.get("entity_id"),
+                    "operator_candidate": "navigate_near",
+                    "task_context": "verify_repair_destination_reachability",
+                    "scoped_authorization_present": True,
+                    "grounding_basis": {
+                        "source": "current_world_repair_destination_candidate",
+                        "binding_strength": "current_world_snapshot",
+                    },
+                },
+                perf_counter_ns(),
+            )
+            if reachability.get("status") != "fact_established":
+                continue
+            candidates.append({
+                "entity_ref": entity.get("entity_id"),
+                "label": entity.get("label") or entity.get("entity_id"),
+                "relation": "contained_by",
+                "compatibility_basis": (
+                    "destination_accepts_discardable_members"
+                    if accepts_discardable else "destination_accepts_declared_entity_kinds"
+                ),
+                "reachability_basis": "current_body_verified_object_relative_terminal_pose",
+            })
+    return candidates
+
+
+def _create_support_clearance_repair_intent(
+    session: dict[str, Any],
+    parent_intent: dict[str, Any],
+    blockers: list[dict[str, Any]],
+    sink: dict[str, Any],
+    utterance: str,
+) -> dict[str, Any]:
+    parent_id = parent_intent["intent_id"]
+    blocker_refs = [item["entity_id"] for item in blockers]
+    destination_ref = _support_clearance_repair_contract(parent_intent).get("destination_ref")
+    repair_id = "intent_repair_" + hashlib.sha1(
+        f"{session['session_id']}|{parent_id}|{'|'.join(blocker_refs)}|{sink['entity_ref']}|{session['world_revision']}".encode("utf-8")
+    ).hexdigest()[:12]
+    goal_fact = "blocked_support_occupancy_released"
+    graph = {
+        "schema_version": "1.0.0",
+        "intent_type": "support_occupancy_repair",
+        "goal_fact": goal_fact,
+        "roles": {
+            "blocking_objects": blocker_refs,
+            "repair_destination": sink["entity_ref"],
+            "blocked_destination": destination_ref,
+        },
+        "nodes": [{
+            "node_id": "release_blocked_support_occupancy",
+            "label": "释放被占用的承载空间",
+            "priority": 10,
+            "requires": [],
+            "produces": [goal_fact],
+            "verification": [
+                "blocking_objects_absent_from_blocked_support",
+                "blocking_objects_bound_to_compatible_recovery_destination",
+            ],
+            "execution_contract": {
+                "mode": "motion_effect",
+                "process_template": "relocate_blocking_objects",
+                "target_role": "blocking_objects",
+                "route_roles": ["blocking_objects", "repair_destination"],
+                "process_chain": [
+                    "ground_current_blocking_relations",
+                    "relocate_each_blocking_object",
+                    "verify_source_footprint_released",
+                    "verify_recovery_destination_relation",
+                ],
+                "effects": [{
+                    "operator": "move_role_members_to_destination",
+                    "themes_role": "blocking_objects",
+                    "destination_role": "repair_destination",
+                    "relation": sink.get("relation"),
+                    "source_role": "blocked_destination",
+                }],
+            },
+        }],
+        "edges": [],
+        "join_nodes": [],
+    }
+    intent = {
+        "intent_id": repair_id,
+        "intent_type": "support_occupancy_repair",
+        "source_utterance": utterance,
+        "goal_fact": goal_fact,
+        "role_bindings": deepcopy(graph["roles"]),
+        "goal_contract": {
+            "requires": ["blocking_relations_currently_grounded", "recovery_destination_compatible"],
+            "produces": [goal_fact],
+            "verification": deepcopy(graph["nodes"][0]["verification"]),
+        },
+        "task_graph": graph,
+        "dependency_graph": {
+            "nodes": [{
+                "stage_id": "release_blocked_support_occupancy",
+                "requires": [],
+                "produces": goal_fact,
+            }],
+            "edges": [],
+            "join_nodes": [],
+        },
+        "causal_graph_runtime": initialize_causal_graph_runtime(
+            graph, world_revision=session["world_revision"]
+        ),
+        "lifecycle": "active",
+        "verified_facts": [],
+        "current_stage": None,
+        "resume_envelope": None,
+        "resume_parent_intent_id": parent_id,
+        "created_world_revision": session["world_revision"],
+        "task_level_authorization": {
+            "source": "explicit_human_recovery_instruction",
+            "scope": "repair_verified_blocking_relation_then_resume_parent_goal",
+            "goal_fact": goal_fact,
+            "stage_by_stage_reconfirmation_required": False,
+            "revocation_conditions": [
+                "blocking_relation_changed",
+                "repair_destination_compatibility_changed",
+                "known_safety_conflict",
+                "policy_requires_confirmation",
+            ],
+        },
+    }
+    _attach_hierarchical_intent_graph(intent)
+    parent_intent["lifecycle"] = "suspended"
+    parent_intent["task_level_authorization"] = {
+        "source": "explicit_human_recovery_and_resume_instruction",
+        "scope": "repair_blocked_precondition_and_resume_existing_goal",
+        "goal_fact": parent_intent.get("goal_fact"),
+        "role_bindings": deepcopy(parent_intent.get("role_bindings", {})),
+        "stage_by_stage_reconfirmation_required": False,
+        "revocation_conditions": [
+            "parent_role_binding_changed",
+            "repair_postcondition_not_verified",
+            "known_safety_conflict",
+            "policy_requires_confirmation",
+        ],
+    }
+    session["long_horizon_intents"][repair_id] = intent
+    session["active_intent_id"] = repair_id
+    session["intent_activation_stack"] = [parent_id, repair_id]
+    return intent
+
+
+def _start_support_clearance_recovery(
+    session: dict[str, Any], utterance: str, analysis: dict[str, Any]
+) -> dict[str, Any] | None:
+    parent = (session.get("long_horizon_intents") or {}).get(session.get("active_intent_id"))
+    contract = _support_clearance_repair_contract(parent)
+    operators = {item.get("operator") for item in analysis.get("event_candidates", [])}
+    if (
+        not parent
+        or parent.get("lifecycle") != "awaiting_correction"
+        or contract.get("contract_type") != "release_support_occupancy"
+        or "relocate_object" not in operators
+    ):
+        return None
+    blockers = _current_repair_blockers(session, contract)
+    if not blockers:
+        parent["lifecycle"] = "active"
+        parent["resume_envelope"] = None
+        return _prepare_long_intent_stage(session, parent)
+    sinks = _compatible_clearance_sinks(session, blockers)
+    if len(sinks) != 1:
+        session["support_clearance_dialogue"] = {
+            "source_utterance": utterance,
+            "parent_intent_id": parent["intent_id"],
+            "blocking_entity_refs": [item["entity_id"] for item in blockers],
+            "destination_ref": contract.get("destination_ref"),
+            "candidate_sinks": deepcopy(sinks),
+            "world_revision": session["world_revision"],
+        }
+        labels = [item["label"] for item in sinks]
+        prompt = (
+            f"我已确认需要先移开当前占用物，但有多个兼容去向：{'、'.join(labels)}。请指定一个。"
+            if labels else
+            "我已确认需要先移开当前占用物，但当前没有可验真的兼容去向。请指定放置位置或提供可接收这些物体的容器。"
+        )
+        return {
+            "status": "support_clearance_destination_required",
+            "reason": "repair_destination_not_uniquely_grounded",
+            "prompt": prompt,
+            "candidate_options": deepcopy(sinks),
+            "runtime_fact_committed": False,
+            "long_horizon_intent": _long_intent_view(parent),
+            "session": get_session(session["session_id"]),
+        }
+    repair = _create_support_clearance_repair_intent(
+        session, parent, blockers, sinks[0], utterance
+    )
+    started = _prepare_long_intent_stage(session, repair)
+    started["support_clearance_recovery"] = {
+        "parent_intent_id": parent["intent_id"],
+        "blocking_entity_refs": [item["entity_id"] for item in blockers],
+        "destination_ref": contract.get("destination_ref"),
+        "repair_destination_ref": sinks[0]["entity_ref"],
+        "resume_after_verification": True,
+    }
+    started["session"] = get_session(session["session_id"])
+    return started
+
+
+def _continue_support_clearance_dialogue(
+    session: dict[str, Any], utterance: str, analysis: dict[str, Any]
+) -> dict[str, Any] | None:
+    dialogue = session.get("support_clearance_dialogue")
+    if not dialogue:
+        return None
+    if dialogue.get("world_revision") != session.get("world_revision"):
+        session["support_clearance_dialogue"] = None
+        return None
+    matches = [
+        item for item in dialogue.get("candidate_sinks", [])
+        if str(item.get("label") or "") in utterance
+    ]
+    if len(matches) != 1:
+        if analysis.get("speech_act") == "task_request" and analysis.get("event_candidates"):
+            session["support_clearance_dialogue"] = None
+            return None
+        return {
+            "status": "support_clearance_destination_required",
+            "reason": "repair_destination_answer_not_unique",
+            "prompt": "请从当前兼容去向中指定一个明确位置。",
+            "candidate_options": deepcopy(dialogue.get("candidate_sinks", [])),
+            "runtime_fact_committed": False,
+            "session": get_session(session["session_id"]),
+        }
+    parent = (session.get("long_horizon_intents") or {}).get(dialogue.get("parent_intent_id"))
+    contract = _support_clearance_repair_contract(parent)
+    blockers = _current_repair_blockers(session, contract)
+    session["support_clearance_dialogue"] = None
+    if not parent or not blockers:
+        return None
+    repair = _create_support_clearance_repair_intent(
+        session, parent, blockers, matches[0], dialogue.get("source_utterance") or utterance
+    )
+    return _prepare_long_intent_stage(session, repair)
 
 
 def _independent_event_frames(
@@ -6270,6 +6605,47 @@ def _apply_causal_graph_node_effects(
                     "operator": operator,
                     "established": all(theme.get("contained_by") == container["entity_id"] and not theme.get("support_ref") for theme in themes),
                 })
+            elif operator == "move_role_members_to_destination":
+                themes = role_entities(effect["themes_role"])
+                destinations = role_entities(effect["destination_role"])
+                sources = role_entities(effect.get("source_role", ""))
+                if not themes or len(destinations) != 1:
+                    raise ValueError("repair_roles_not_currently_grounded")
+                destination = destinations[0]
+                relation = effect.get("relation")
+                accepted_kinds = set(destination.get("accepts_entity_kinds", []))
+                accepts_discardable = bool(destination.get("accepts_discardable")) and all(
+                    theme.get("discardable") is True for theme in themes
+                )
+                accepts_declared_kinds = all(
+                    theme.get("kind") in accepted_kinds for theme in themes
+                )
+                if relation != "contained_by" or not (
+                    accepts_discardable or accepts_declared_kinds
+                ):
+                    raise ValueError("repair_destination_relation_not_compatible")
+                source_refs = {source.get("entity_id") for source in sources}
+                for index, theme in enumerate(themes):
+                    _release_graph_entity_from_effector(session, theme["entity_id"])
+                    theme.pop("support_ref", None)
+                    theme.pop("received_by", None)
+                    theme.pop("attached_to_executor", None)
+                    theme.pop("held_by_effector", None)
+                    theme["contained_by"] = destination["entity_id"]
+                    theme["position"] = [
+                        float(destination["position"][0]) + 0.02 * index,
+                        float(destination["position"][1]),
+                    ]
+                effect_checks.append({
+                    "operator": operator,
+                    "established": all(
+                        theme.get("contained_by") == destination["entity_id"]
+                        and theme.get("support_ref") not in source_refs
+                        for theme in themes
+                    ),
+                    "source_relation_released": True,
+                    "destination_relation": relation,
+                })
             elif operator == "decrement_role_inventory":
                 entities = role_entities(effect["role"])
                 if len(entities) != 1:
@@ -7535,6 +7911,29 @@ def begin_motion_command(
             "immediate_result": query_result,
             "session": get_session(session_id),
         }
+    if not internal_stage and not scoped_authorization:
+        clearance_dialogue_result = _continue_support_clearance_dialogue(
+            session, text, early_analysis or {}
+        )
+        if clearance_dialogue_result:
+            if clearance_dialogue_result.get("job_id") or clearance_dialogue_result.get("immediate_result"):
+                return clearance_dialogue_result
+            return {
+                "status": clearance_dialogue_result.get("status"),
+                "immediate_result": clearance_dialogue_result,
+                "session": get_session(session_id),
+            }
+        clearance_recovery = _start_support_clearance_recovery(
+            session, text, early_analysis or {}
+        )
+        if clearance_recovery:
+            if clearance_recovery.get("job_id") or clearance_recovery.get("immediate_result"):
+                return clearance_recovery
+            return {
+                "status": clearance_recovery.get("status"),
+                "immediate_result": clearance_recovery,
+                "session": get_session(session_id),
+            }
     # Central recovery gate: every non-query retry/confirmation path must
     # prune from the active intent's verified facts before role dialogue,
     # experience replay, or fresh process search can run.
@@ -8493,37 +8892,47 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
                 result.pop("candidate_execution_plan", None)
                 result.pop("next_stage_candidate", None)
                 result.pop("pending_confirmation", None)
-                result["execution_plan_state"] = "released_on_task_completion"
+                repair_next = stage_outcome.get("repair_next_started") or {}
+                result["execution_plan_state"] = (
+                    "repair_details_released_parent_resumed"
+                    if repair_next else "released_on_task_completion"
+                )
                 result["prompt"] = "当前阶段已验真，长程目标的终止事实也已成立。"
                 compound_next = stage_outcome.get("compound_next_started") or {}
-                if compound_next.get("job_id"):
+                continuation_next = repair_next or compound_next
+                if continuation_next.get("job_id"):
                     result["next_stage_started"] = {
-                        "status": compound_next.get("status"),
-                        "job_id": compound_next["job_id"],
-                        "frame_count": compound_next.get("frame_count"),
-                        "long_stage": deepcopy(compound_next.get("long_stage")),
-                        "long_horizon_intent": deepcopy(compound_next.get("long_horizon_intent")),
-                        "candidate_execution_plan": deepcopy(compound_next.get("candidate_execution_plan")),
-                        "compound_command_sequence": deepcopy(compound_next.get("compound_command_sequence")),
+                        "status": continuation_next.get("status"),
+                        "job_id": continuation_next["job_id"],
+                        "frame_count": continuation_next.get("frame_count"),
+                        "long_stage": deepcopy(continuation_next.get("long_stage")),
+                        "long_horizon_intent": deepcopy(continuation_next.get("long_horizon_intent")),
+                        "candidate_execution_plan": deepcopy(continuation_next.get("candidate_execution_plan")),
+                        "compound_command_sequence": deepcopy(continuation_next.get("compound_command_sequence")),
                     }
                     result["long_horizon_intent"] = deepcopy(
-                        compound_next.get("long_horizon_intent")
+                        continuation_next.get("long_horizon_intent")
                     ) or result["long_horizon_intent"]
                     result["candidate_execution_plan"] = deepcopy(
-                        compound_next.get("candidate_execution_plan")
+                        continuation_next.get("candidate_execution_plan")
                     )
                     result["compound_command_sequence"] = deepcopy(
-                        compound_next.get("compound_command_sequence")
+                        continuation_next.get("compound_command_sequence")
                     )
                     result["prompt"] = (
                         "前一子目标已通过物理验真；我已释放它的执行细节，"
                         "并按最新世界状态开始复合任务的下一子目标。"
                     )
-                elif compound_next:
+                    if repair_next:
+                        result["prompt"] = (
+                            "阻塞关系已通过物理验真并解除；我已释放临时修复图，"
+                            "并按最新世界状态恢复原目标。"
+                        )
+                elif continuation_next:
                     result["compound_command_sequence"] = deepcopy(
-                        compound_next.get("compound_command_sequence")
+                        continuation_next.get("compound_command_sequence")
                     )
-                    immediate_next = compound_next.get("immediate_result")
+                    immediate_next = continuation_next.get("immediate_result")
                     if immediate_next:
                         result["next_stage_candidate"] = deepcopy(immediate_next)
                         result["prompt"] = immediate_next.get("prompt") or result["prompt"]
@@ -8553,6 +8962,9 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
                 )
         else:
             intent["lifecycle"] = "awaiting_correction"
+            result.setdefault("destination_ref", (intent.get("role_bindings") or {}).get("destination"))
+            _record_stage_recovery_contract(session, intent, result)
+            _attach_runtime_diagnostic(result, session, intent.get("current_stage"))
             result["long_horizon_intent"] = _long_intent_view(intent)
     if (result.get("long_horizon_intent") or {}).get("lifecycle") != "completed":
         session["event_history"].append({"utterance": job["utterance"], "result": result.get("status"), "route_kind": result.get("route_kind")})

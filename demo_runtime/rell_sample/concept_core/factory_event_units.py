@@ -182,6 +182,23 @@ FACTORY_EVENT_CONCEPT_UNITS: list[dict[str, Any]] = [
         postcondition="对象随执行体到达目标区域；是否继续持有或稳定放置由任务期模式槽决定",
     ),
     _event(
+        "factory_event_relocate",
+        "解除对象占位关系事件概念",
+        "relocate_object",
+        ["移开", "移走", "挪开", "搬开", "搬走", "拿开", "清走"],
+        "relocate_object",
+        {
+            "object": {"role": "theme", "entity_type": "movable_object"},
+            "source": {"role": "origin", "entity_type": "support_or_spatial_occupancy"},
+            "destination": {"role": "target", "entity_type": "compatible_recovery_location", "optional": True},
+        },
+        ["object_grounded", "object_movable", "current_occupancy_relation_grounded"],
+        ["source_footprint_released", "object_at_compatible_recovery_location"],
+        ["object_at_previous_support"],
+        ["object_absent_from_previous_support", "recovery_location_relation_verified"],
+        postcondition="对象不再占用原空间或承载关系，并在兼容的恢复位置形成新的可验真关系",
+    ),
+    _event(
         "factory_event_push_pull",
         "受力位移事件概念",
         "apply_directional_force",

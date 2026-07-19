@@ -15,6 +15,7 @@ EVENT_LEXICAL_PRIMITIVES: tuple[dict[str, Any], ...] = (
     {"operator": "place_object", "concept_id": "factory_event_place", "heads": ("放回", "搁", "摆", "放"), "canonical": "放到"},
     {"operator": "handover_object", "concept_id": "factory_event_handover", "heads": ("递给", "交给", "拿给", "送给", "递过去", "交过去"), "canonical": "递给"},
     {"operator": "transport_object", "concept_id": "factory_event_transport", "heads": ("拿过来", "带过来", "端过来", "带到", "拿到", "送到", "端到", "带走", "拿来"), "canonical": "带到"},
+    {"operator": "relocate_object", "concept_id": "factory_event_relocate", "heads": ("移开", "移走", "挪开", "搬开", "搬走", "拿开", "清走"), "canonical": "移开"},
     {"operator": "apply_directional_force", "concept_id": "factory_event_push_pull", "heads": ("拖", "挪", "推", "拉"), "canonical": "推动"},
     {"operator": "change_open_state", "concept_id": "factory_event_open_close", "heads": ("打开", "关上", "关闭", "合上"), "canonical": "打开"},
     {"operator": "change_device_activation", "concept_id": "factory_event_activate_deactivate", "heads": ("启动", "开启", "关掉", "开机", "关机"), "canonical": "启动"},
@@ -475,6 +476,8 @@ def _canonical_utterance(speech_act: str, query_type: str | None, events: list[d
                 part = f"把{target_name}带到{transport_destination}"
             else:
                 part = None
+        elif operator == "relocate_object":
+            part = f"移开{target_name}" if target_name else "移开占用物"
         elif operator == "navigate_to" and destination_name:
             part = f"走到{destination_name}"
         elif operator == "observe_entity" and target_name:
@@ -554,6 +557,7 @@ def compose_language_concepts(
         "fill_container",
         "handover_object",
         "transport_object",
+        "relocate_object",
         "apply_directional_force", "change_open_state", "change_device_activation", "remove_surface_contaminant",
     } for item in events) or (any(item["operator"] == "navigate_to" for item in events) and not relative_direction)
     if requires_object and not objects:

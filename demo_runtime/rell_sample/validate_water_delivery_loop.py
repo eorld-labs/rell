@@ -858,6 +858,93 @@ def verify_generic_movable_asset_transfer_binding() -> dict:
     return {"theme": "thermos_room_temp", "destination": "hospitality_counter_b", "blocked_by_current_footprint": True}
 
 
+def verify_support_occupancy_repair_and_parent_resume() -> dict:
+    session = start_session("home_humanoid", "hospitality_guest")
+    session_id = session["session_id"]
+    live = SESSIONS[session_id]
+    glass = next(
+        item for item in live["runtime_objects"]
+        if item["entity_id"] == "glass_tall"
+    )
+    glass.pop("support_ref", None)
+    glass["attached_to_executor"] = True
+    glass["held_by_effector"] = "left_hand"
+    _holding_by_effector(live)["left_hand"] = "glass_tall"
+    _sync_primary_holding(live)
+
+    placement = begin_motion_command(
+        session_id,
+        "\u628a\u900f\u660e\u9ad8\u811a\u73bb\u7483\u676f\u653e\u5230\u64cd\u4f5c\u53f0B\u4e0a",
+    )
+    require(
+        placement.get("status") == "requires_human_confirmation",
+        f"occupied-support setup did not reach placement confirmation: {placement}",
+    )
+    pending = get_session(session_id)["pending_confirmation"]
+    blocked = drain(
+        confirm_pending_motion(
+            session_id, pending["confirmation_id"], True
+        )
+    )
+    require(
+        blocked.get("status") == "placement_blocked"
+        and set(blocked.get("occupied_object_refs", []))
+        == {"newspaper_a", "newspaper_b"},
+        f"placement failure did not expose its physical blockers: {blocked}",
+    )
+    blocked_live = get_session(session_id)
+    blocked_intent = (blocked_live.get("long_horizon_intents") or {}).get(
+        blocked_live.get("active_intent_id")
+    ) or {}
+    repair_contract = (
+        (blocked_intent.get("resume_envelope") or {}).get("repair_contract") or {}
+    )
+    require(
+        repair_contract.get("contract_type") == "release_support_occupancy"
+        and repair_contract.get("destination_ref") == "hospitality_counter_b"
+        and repair_contract.get("theme_ref") == "glass_tall",
+        f"failed stage did not retain a bounded causal repair contract: {blocked_intent}",
+    )
+
+    recovery = begin_motion_command(
+        session_id,
+        "\u597d\uff0c\u79fb\u5f00\u62a5\u7eb8\uff0c\u7136\u540e\u518d\u653e\u676f\u5b50",
+    )
+    require(
+        recovery.get("status") == "motion_started"
+        and recovery.get("support_clearance_recovery", {}).get("resume_after_verification") is True,
+        f"repair instruction did not insert a verified temporary causal graph: {recovery}",
+    )
+    outcomes = drain_service(recovery)
+    require(
+        [item.get("terminal_fact") for item in outcomes]
+        == ["blocked_support_occupancy_released", "object_supported_at_destination"],
+        f"repair graph did not resume the exact blocked parent goal: {outcomes}",
+    )
+    final = get_session(session_id)
+    objects = {item["entity_id"]: item for item in final["runtime_objects"]}
+    require(
+        objects["newspaper_a"].get("contained_by") == "trash_bin_hospitality"
+        and objects["newspaper_b"].get("contained_by") == "trash_bin_hospitality"
+        and not objects["newspaper_a"].get("support_ref")
+        and not objects["newspaper_b"].get("support_ref"),
+        f"repair terminal relations were not physically committed: {objects}",
+    )
+    require(
+        objects["glass_tall"].get("support_ref") == "hospitality_counter_b"
+        and final.get("active_intent_id") is None
+        and not final.get("intent_activation_stack"),
+        f"parent placement did not resume with its original roles: {final}",
+    )
+    return {
+        "repair_fact": "blocked_support_occupancy_released",
+        "resumed_parent_fact": "object_supported_at_destination",
+        "theme": "glass_tall",
+        "destination": "hospitality_counter_b",
+        "repair_destination": "trash_bin_hospitality",
+    }
+
+
 def main() -> None:
     report = {
         "scene_a": complete_authorized_service("home_semantic_3d_a"),
@@ -882,6 +969,7 @@ def main() -> None:
         "historical_event_return": verify_historical_event_return_replans_current_route(),
         "relational_destination_grounding": verify_relational_destination_grounding_and_slot_resume(),
         "generic_movable_asset_transfer": verify_generic_movable_asset_transfer_binding(),
+        "support_occupancy_repair": verify_support_occupancy_repair_and_parent_resume(),
     }
     print(report)
 

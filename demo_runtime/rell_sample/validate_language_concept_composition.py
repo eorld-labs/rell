@@ -279,6 +279,21 @@ def main() -> None:
     require(carrier_frames[2].get("canonical_frame", {}).get("operators") == ["place_object", "transport_object"], f"directional complement '拿过来' was reduced to grasp instead of transport: {carrier_frames[2]}")
     require((carrier_frames[2].get("role_bindings", {}).get("destination") or {}).get("concept_id") == "concept_portable_support_carrier", f"portable support carrier was not represented as a typed destination role: {carrier_frames[2]}")
 
+    repair_compound = compose("好，移开报纸，然后再放杯子")
+    repair_frames = repair_compound.get("event_frames", [])
+    require(
+        [frame.get("canonical_frame", {}).get("operators") for frame in repair_frames]
+        == [["relocate_object"], ["place_object"]],
+        f"precondition repair was flattened into the later placement event: {repair_compound}",
+    )
+    require(
+        next(
+            item for item in FACTORY_EVENT_CONCEPT_UNITS
+            if item.get("concept_kernel", {}).get("operator") == "relocate_object"
+        ).get("factory_semantics", {}).get("stores_concrete_trajectory") is False,
+        "relocation was added as a scene phrase instead of a reusable state-transition concept",
+    )
+
     samples = []
     for _ in range(300):
         started = perf_counter_ns()
@@ -295,6 +310,7 @@ def main() -> None:
         "negation_no_motion": "passed",
         "event_scoped_compound_language": "passed",
         "carrier_dataflow_language": "passed",
+        "support_precondition_repair_language": "passed",
         "latency_ms": {"median": round(median(samples), 4), "p95": round(p95, 4), "maximum": round(max(samples), 4)},
     })
 
