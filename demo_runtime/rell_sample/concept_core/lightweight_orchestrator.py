@@ -5,6 +5,8 @@ from copy import deepcopy
 from time import perf_counter_ns
 from typing import Any
 
+from .task_horizon import classify_execution_horizon
+
 
 _REGISTRY_CACHE: dict[str, dict[str, Any]] = {}
 
@@ -254,7 +256,7 @@ def build_lightweight_causal_candidate(
     ordered_nodes = [nodes[node_id] for node_id in ordered]
     blocked_nodes = [node for node in ordered_nodes if node["gate"] != "candidate_ready_for_orchestration"]
     completed_ns = perf_counter_ns()
-    return {
+    candidate = {
         "schema_version": "2.0.0",
         "planner_type": "contract_compiled_backward_causal_search",
         "goal_node_id": goal_node_id,
@@ -284,6 +286,14 @@ def build_lightweight_causal_candidate(
         "must_recheck_world_revision_before_each_node": True,
         "runtime_fact_committed": False,
     }
+    candidate["execution_horizon"] = classify_execution_horizon(
+        goal_facts=[goal_fact] if goal_fact else [],
+        nodes=ordered_nodes,
+        edges=edges,
+        verified_facts=established,
+        decomposition_gaps=[*unresolved, *cycles],
+    )
+    return candidate
 
 
 def build_lightweight_orchestrator_catalog(event_concepts: list[dict[str, Any]]) -> dict[str, Any]:

@@ -10,6 +10,7 @@ from time import perf_counter_ns
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from concept_core.factory_event_units import FACTORY_EVENT_CONCEPT_UNITS, build_factory_inability_diagnosis, find_factory_event_concepts_by_text
 from concept_core.concept_gap_dialogue import continue_concept_gap_dialogue, start_concept_gap_dialogue
@@ -33,6 +34,7 @@ from concept_core.situated_event_reasoning import (
     facts_from_runtime_state,
     record_verified_fact as record_intent_verified_fact,
 )
+from concept_core.task_horizon import classify_execution_horizon
 from concept_core.visual_concept_packs import build_visual_pack_catalog
 from causal_task_graph_runtime import (
     apply_condition_answer,
@@ -314,6 +316,7 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator", scene_id
         "process_gap_dialogue": None,
         "human_reported_fact_candidates": [],
         "causal_graph_clarification": None,
+        "completed_motion_receipts": [],
     }
     if scene_id == "hospitality_guest":
         hospitality_graph = build_hospitality_task_graph(session["runtime_objects"])
@@ -327,7 +330,37 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator", scene_id
     return deepcopy(session)
 
 
+def _refresh_intent_execution_horizon(intent: dict[str, Any]) -> dict[str, Any]:
+    dependency = intent.get("dependency_graph") or {}
+    runtime = intent.get("causal_graph_runtime") or {}
+    verified = set(intent.get("verified_facts", []))
+    verified.update(established_graph_facts(runtime))
+    pending_condition = runtime.get("pending_condition")
+    previous = (intent.get("execution_horizon") or {}).get("horizon_class")
+    horizon = classify_execution_horizon(
+        goal_facts=[intent.get("goal_fact")] if intent.get("goal_fact") else [],
+        nodes=dependency.get("nodes", []),
+        edges=dependency.get("edges", []),
+        join_nodes=dependency.get("join_nodes", []),
+        verified_facts=verified,
+        unresolved_conditions=[pending_condition] if pending_condition else [],
+        lifecycle=intent.get("lifecycle"),
+        previous_horizon_class=previous,
+    )
+    if horizon["dynamic_transition"]["changed"]:
+        history = intent.setdefault("horizon_transition_history", [])
+        history.append({
+            **deepcopy(horizon["dynamic_transition"]),
+            "verified_fact_count": len(verified),
+        })
+        if len(history) > 8:
+            del history[:-8]
+    intent["execution_horizon"] = horizon
+    return horizon
+
+
 def _long_intent_view(intent: dict[str, Any]) -> dict[str, Any]:
+    execution_horizon = _refresh_intent_execution_horizon(intent)
     return {
         "intent_id": intent["intent_id"],
         "intent_type": intent.get("intent_type"),
@@ -343,6 +376,10 @@ def _long_intent_view(intent: dict[str, Any]) -> dict[str, Any]:
         "trajectory_persisted": False,
         "hierarchical_intent_graph": deepcopy(intent.get("hierarchical_intent_graph")),
         "causal_graph_runtime": deepcopy(intent.get("causal_graph_runtime")),
+        "execution_horizon": deepcopy(execution_horizon),
+        "horizon_transition_history": deepcopy(
+            intent.get("horizon_transition_history", [])
+        ),
     }
 
 
@@ -468,6 +505,7 @@ def _attach_hierarchical_intent_graph(intent: dict[str, Any]) -> None:
         root_goal_facts=[intent["goal_fact"]],
         stages=dependency.get("nodes", []),
     )
+    _refresh_intent_execution_horizon(intent)
 
 
 def _conceptual_reference_for_entity(entity: dict[str, Any]) -> str:
@@ -2374,9 +2412,51 @@ def _independent_event_frames(
     return frames
 
 
+def _refresh_compound_execution_horizon(sequence: dict[str, Any]) -> dict[str, Any]:
+    subtasks = sequence.get("subtasks", [])
+    goal_fact_by_id = {
+        item.get("subtask_id"): f"subtask_goal:{item.get('subtask_id')}"
+        for item in subtasks
+        if item.get("subtask_id")
+    }
+    nodes = [
+        {
+            "node_id": item.get("subtask_id"),
+            "produces": [goal_fact_by_id[item.get("subtask_id")]],
+            "status": "completed" if item.get("status") == "completed" else "pending",
+        }
+        for item in subtasks
+        if item.get("subtask_id") in goal_fact_by_id
+    ]
+    edges = [
+        {"from": dependency, "to": item.get("subtask_id")}
+        for item in subtasks
+        for dependency in item.get("depends_on", [])
+        if dependency in goal_fact_by_id and item.get("subtask_id") in goal_fact_by_id
+    ]
+    verified = [
+        goal_fact_by_id[item.get("subtask_id")]
+        for item in subtasks
+        if item.get("status") == "completed"
+        and item.get("subtask_id") in goal_fact_by_id
+    ]
+    previous = (sequence.get("execution_horizon") or {}).get("horizon_class")
+    horizon = classify_execution_horizon(
+        goal_facts=list(goal_fact_by_id.values()),
+        nodes=nodes,
+        edges=edges,
+        verified_facts=verified,
+        lifecycle="completed" if sequence.get("status") == "completed" else "active",
+        previous_horizon_class=previous,
+    )
+    sequence["execution_horizon"] = horizon
+    return horizon
+
+
 def _compound_sequence_view(sequence: dict[str, Any] | None) -> dict[str, Any] | None:
     if not sequence:
         return None
+    execution_horizon = _refresh_compound_execution_horizon(sequence)
     return {
         "sequence_id": sequence.get("sequence_id"),
         "status": sequence.get("status"),
@@ -2399,6 +2479,7 @@ def _compound_sequence_view(sequence: dict[str, Any] | None) -> dict[str, Any] |
             "physical_facts_rederived_before_each_subtask": True,
             "old_role_bindings_not_reused_as_current_facts": True,
         },
+        "execution_horizon": deepcopy(execution_horizon),
     }
 
 
@@ -7166,7 +7247,7 @@ def _finalize_motion_result(
             SESSIONS[session_id]["process_gap_dialogue"] = process_gap_dialogue
         result["session"] = get_session(session_id)
         return {"status": result.get("status"), "immediate_result": result, "session": get_session(session_id)}
-    job_id = "motion_" + hashlib.sha1(f"{session_id}|{len(MOTION_JOBS) + 1}".encode()).hexdigest()[:12]
+    job_id = "motion_" + uuid4().hex[:12]
     job = {
         "job_id": job_id,
         "session_id": session_id,
@@ -8020,6 +8101,46 @@ def _replan_state_fingerprint(
     return hashlib.sha1(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:16]
 
 
+def _finalize_motion_job(
+    job: dict[str, Any], result: dict[str, Any], frame: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """Release leaf motion state and publish one compact terminal receipt."""
+    job_id = job["job_id"]
+    session_id = job["session_id"]
+    # Preparing a successor can transactionally replace the stored session.
+    # Always commit the receipt to the latest canonical snapshot.
+    session = SESSIONS[session_id]
+    receipts = session.setdefault("completed_motion_receipts", [])
+    receipts.append({
+        "job_id": job_id,
+        "status": result.get("status"),
+        "terminal_fact": result.get("terminal_fact"),
+        "long_intent_id": job.get("long_intent_id"),
+        "long_stage_id": job.get("long_stage_id"),
+        "execution_horizon_class": (
+            (result.get("long_horizon_intent") or {})
+            .get("execution_horizon", {})
+            .get("horizon_class")
+        ),
+        "trajectory_released": True,
+        "motion_frames_released": True,
+    })
+    if len(receipts) > 16:
+        del receipts[:-16]
+    MOTION_JOBS.pop(job_id, None)
+    session_view = get_session(session_id)
+    result["session"] = session_view
+    response = {
+        "status": "motion_completed",
+        "job_id": job_id,
+        "result": result,
+        "session": session_view,
+    }
+    if frame is not None:
+        response["frame"] = frame
+    return response
+
+
 def _replan_stalled_result(
     job: dict[str, Any], session: dict[str, Any], obstacle: dict[str, Any] | None, fingerprint: str
 ) -> dict[str, Any]:
@@ -8052,7 +8173,7 @@ def _replan_stalled_result(
         "frames": [],
         "session": get_session(job["session_id"]),
     }
-    return {"status": "motion_completed", "job_id": job["job_id"], "result": result, "session": result["session"]}
+    return _finalize_motion_job(job, result)
 
 
 def _resume_after_local_path_change(job: dict[str, Any], session: dict[str, Any], reason: str, obstacle: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -8144,7 +8265,7 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
                 "experience": deepcopy(experience),
                 "session": get_session(job["session_id"]),
             }
-            return {"status": "motion_completed", "job_id": job_id, "result": result, "session": get_session(job["session_id"])}
+            return _finalize_motion_job(job, result)
         reason = "runtime_policy_revision_changed" if session["policy_revision"] != job["planned_policy_revision"] else "runtime_world_revision_changed"
         if session["policy_revision"] == job["planned_policy_revision"]:
             return _resume_after_local_path_change(job, session, reason)
@@ -8176,7 +8297,7 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
                 "experience": deepcopy(experience),
                 "session": get_session(job["session_id"]),
             }
-            return {"status": "motion_completed", "job_id": job_id, "result": result, "session": get_session(job["session_id"])}
+            return _finalize_motion_job(job, result)
         return _resume_after_local_path_change(job, session, "next_frame_swept_body_not_clear", collider)
     session["state"]["executor_position"] = list(frame["position"])
     if frame.get("yaw_deg") is not None:
@@ -8433,10 +8554,9 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
         else:
             intent["lifecycle"] = "awaiting_correction"
             result["long_horizon_intent"] = _long_intent_view(intent)
-    result["session"] = get_session(job["session_id"])
     if (result.get("long_horizon_intent") or {}).get("lifecycle") != "completed":
         session["event_history"].append({"utterance": job["utterance"], "result": result.get("status"), "route_kind": result.get("route_kind")})
-    return {"status": "motion_completed", "job_id": job_id, "frame": frame, "result": result, "session": get_session(job["session_id"])}
+    return _finalize_motion_job(job, result, frame)
 
 
 def _first_collision(

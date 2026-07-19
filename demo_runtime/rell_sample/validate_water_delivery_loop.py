@@ -32,6 +32,14 @@ def drain(started: dict) -> dict:
     while True:
         step = step_motion_command(job_id)
         if step.get("status") == "motion_completed":
+            require(job_id not in MOTION_JOBS, f"completed motion retained its trajectory job: {job_id}")
+            receipts = (step.get("session") or {}).get("completed_motion_receipts", [])
+            require(
+                receipts
+                and receipts[-1].get("job_id") == job_id
+                and receipts[-1].get("trajectory_released") is True,
+                f"completed motion did not retain only a compact release receipt: {step}",
+            )
             return step["result"]
         require(step.get("status") == "frame_verified_and_committed", f"motion failed: {step}")
 
