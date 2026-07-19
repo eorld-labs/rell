@@ -6,6 +6,7 @@ from time import perf_counter_ns
 from concept_core.factory_event_units import FACTORY_EVENT_CONCEPT_UNITS
 from concept_core.language_concept_composer import compose_language_concepts
 from concept_core.perceptual_grounding import load_object_concepts
+from concept_core.semantic_grounding import build_semantic_constraint_frame
 from embodied_scene import SESSIONS, begin_motion_command, confirm_pending_motion, get_session, start_session, step_motion_command
 
 
@@ -219,6 +220,17 @@ def main() -> None:
     require(explicit_beneficiary_service.get("speech_act") == "task_request" and [item.get("operator") for item in explicit_beneficiary_service.get("event_candidates", [])] == ["fill_container"], f"explicit fill event was not composed at the concept layer: {explicit_beneficiary_service}")
     require(explicit_beneficiary_service.get("canonical_frame", {}).get("goal_relation") == "container_filled", f"fill event did not project its physical postcondition: {explicit_beneficiary_service}")
 
+    scoped_compound = compose("好，现在帮我把杯子放到桌子上去，用高脚杯给我倒一杯水")
+    scoped_frames = scoped_compound.get("event_frames", [])
+    require(len(scoped_frames) == 2, f"independent event clauses were flattened into one role frame: {scoped_compound}")
+    require([frame.get("canonical_frame", {}).get("operators") for frame in scoped_frames] == [["place_object"], ["fill_container"]], f"compound event operators were not clause scoped: {scoped_frames}")
+    require((scoped_frames[0].get("role_bindings", {}).get("destination") or {}).get("matched_alias") == "桌子", f"the first placement destination absorbed a later container mention: {scoped_frames[0]}")
+    scoped_second_semantics = build_semantic_constraint_frame(
+        scoped_frames[1]["utterance"], scoped_frames[1]
+    )
+    stemmed_predicates = scoped_second_semantics.get("attribute_predicates", [])
+    require(stemmed_predicates and all(item.get("role") == "theme" for item in stemmed_predicates), f"the second clause's container-form constraint leaked into another event role: {scoped_second_semantics}")
+
     samples = []
     for _ in range(300):
         started = perf_counter_ns()
@@ -233,6 +245,7 @@ def main() -> None:
         "visibility_paraphrases": len(visibility_forms),
         "unknown_predicate_learning": "passed",
         "negation_no_motion": "passed",
+        "event_scoped_compound_language": "passed",
         "latency_ms": {"median": round(median(samples), 4), "p95": round(p95, 4), "maximum": round(max(samples), 4)},
     })
 

@@ -11,7 +11,7 @@ EVENT_LEXICAL_PRIMITIVES: tuple[dict[str, Any], ...] = (
     {"operator": "orient_executor", "concept_id": "factory_event_orient", "heads": ("转向", "面向", "朝向", "转"), "canonical": "转向"},
     {"operator": "grasp_object", "concept_id": "factory_event_grasp", "heads": ("捡", "拾", "抓", "取", "拿"), "canonical": "拿起"},
     {"operator": "release_object", "concept_id": "factory_event_release", "heads": ("释放", "撒手", "松开", "放开"), "canonical": "放开"},
-    {"operator": "fill_container", "concept_id": "factory_event_fill_container", "heads": ("接一杯水", "接杯水", "接水", "取水", "装水"), "canonical": "接水"},
+    {"operator": "fill_container", "concept_id": "factory_event_fill_container", "heads": ("接一杯水", "接杯水", "接水", "取水", "装水", "倒一杯水", "倒杯水"), "canonical": "接水"},
     {"operator": "place_object", "concept_id": "factory_event_place", "heads": ("放回", "搁", "摆", "放"), "canonical": "放到"},
     {"operator": "handover_object", "concept_id": "factory_event_handover", "heads": ("递给", "交给", "拿给", "送给", "递过去", "交过去"), "canonical": "递给"},
     {"operator": "transport_object", "concept_id": "factory_event_transport", "heads": ("带到", "拿到", "送到", "端到", "带走", "拿来"), "canonical": "带到"},
@@ -42,6 +42,16 @@ FUNCTION_WORDS += ("嗯嗯", "嗯", "好的", "好")
 
 def normalize_language_text(text: str) -> str:
     return re.sub(r"[\s，。！？、,.!?；;：:]+", "", (text or "").strip().lower())
+
+
+def _event_clause_surfaces(utterance: str) -> list[str]:
+    """Split discourse boundaries without assigning cross-clause roles."""
+    surfaces = [
+        item.strip()
+        for item in re.split(r"(?:[，,；;。！？!?]+|然后|接着|随后|再然后)", utterance or "")
+        if item.strip()
+    ]
+    return surfaces if len(surfaces) > 1 else []
 
 
 def _longest_non_overlapping_mentions(text: str, candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -437,6 +447,7 @@ def compose_language_concepts(
     object_concepts: list[dict[str, Any]],
     context_entities: list[dict[str, Any]] | None = None,
     learned_adapters: list[dict[str, Any]] | None = None,
+    _build_event_frames: bool = True,
 ) -> dict[str, Any]:
     normalized = normalize_language_text(utterance)
     definition = _definition_candidate(normalized, event_concepts)
@@ -525,7 +536,7 @@ def compose_language_concepts(
         else "request_minimum_semantic_clarification" if canonical
         else "report_known_and_unknown_language_parts"
     )
-    return {
+    result = {
         "schema_version": "1.0.0",
         "utterance": utterance,
         "normalized_utterance": normalized,
@@ -588,3 +599,23 @@ def compose_language_concepts(
         "runtime_fact_committed": False,
         "direct_execution_allowed": False,
     }
+    result["event_frames"] = []
+    if _build_event_frames:
+        clause_frames = []
+        for clause in _event_clause_surfaces(utterance):
+            frame = compose_language_concepts(
+                clause,
+                event_concepts=event_concepts,
+                object_concepts=object_concepts,
+                context_entities=context_entities,
+                learned_adapters=learned_adapters,
+                _build_event_frames=False,
+            )
+            if frame.get("speech_act") != "task_request" or not frame.get("event_candidates"):
+                continue
+            frame["frame_id"] = f"event_frame_{len(clause_frames)}"
+            frame["clause_index"] = len(clause_frames)
+            clause_frames.append(frame)
+        if len(clause_frames) > 1:
+            result["event_frames"] = clause_frames
+    return result

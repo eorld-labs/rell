@@ -306,6 +306,7 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator", scene_id
         "completed_intent_archive": [],
         "active_intent_id": None,
         "intent_activation_stack": [],
+        "compound_command_sequence": None,
         "relational_reference_dialogue": None,
         "situated_event_frame_history": [],
         "role_clarification_dialogue": None,
@@ -1588,7 +1589,14 @@ def _prepare_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) 
             archive_key="completed_intent_archive",
         )
         session.get("long_horizon_intents", {}).pop(intent["intent_id"], None)
-        return {"status": "long_intent_completed", "long_horizon_intent": completed_view}
+        compound_next = _advance_compound_command_sequence(
+            session, intent["intent_id"]
+        )
+        return {
+            "status": "long_intent_completed",
+            "long_horizon_intent": completed_view,
+            "compound_next_started": compound_next,
+        }
     if stage["status"] != "stage_ready":
         intent["lifecycle"] = "awaiting_rebinding"
         return {
@@ -1990,6 +1998,29 @@ def _compose_session_language(session: dict[str, Any], utterance: str) -> dict[s
         world_revision=session.get("world_revision", 0),
         evidence_bindings=_process_slot_evidence_bindings(session, analysis),
     )
+    scoped_event_frames = []
+    for event_frame in analysis.get("event_frames", []):
+        frame = deepcopy(event_frame)
+        frame_semantic = build_semantic_constraint_frame(frame["utterance"], frame)
+        frame_grounded = build_grounded_intent_frame(frame_semantic, observation_evidence)
+        frame["semantic_constraint_frame"] = frame_semantic
+        frame["observation_evidence"] = observation_evidence
+        frame["grounded_intent_frame"] = frame_grounded
+        frame["process_template_resolution"] = resolve_process_request(
+            frame["utterance"],
+            frame,
+            runtime_objects=session.get("runtime_objects", []),
+            runtime_state=session.get("state", {}),
+            semantic_regions=_scene_for_session(session).get("semantic_regions", []),
+            executor_profile=session.get("executor_profile", {}),
+            world_revision=session.get("world_revision", 0),
+            evidence_bindings=_process_slot_evidence_bindings(session, frame),
+        )
+        _project_resolved_process_roles(
+            session, frame, frame["process_template_resolution"]
+        )
+        scoped_event_frames.append(frame)
+    analysis["event_frames"] = scoped_event_frames
     gap_dialogue_collecting = (
         (session.get("concept_gap_dialogue") or {}).get("status")
         == "collecting_minimum_causal_contract"
@@ -2138,7 +2169,173 @@ def _language_understanding_view(analysis: dict[str, Any]) -> dict[str, Any]:
         "discourse_roles": deepcopy(analysis.get("discourse_roles", {})),
         "ellipsis_candidates": deepcopy(analysis.get("ellipsis_candidates", [])),
         "contextual_goal_resolution": deepcopy(analysis.get("contextual_goal_resolution")),
+        "event_frames": [
+            {
+                "frame_id": frame.get("frame_id"),
+                "clause_index": frame.get("clause_index"),
+                "utterance": frame.get("utterance"),
+                "operators": deepcopy((frame.get("canonical_frame") or {}).get("operators", [])),
+                "goal_relation": (frame.get("canonical_frame") or {}).get("goal_relation"),
+                "role_bindings": deepcopy(frame.get("role_bindings", {})),
+                "attribute_predicates": deepcopy(
+                    (frame.get("semantic_constraint_frame") or {}).get("attribute_predicates", [])
+                ),
+            }
+            for frame in analysis.get("event_frames", [])
+        ],
     }
+
+
+def _event_frame_bound_ref(frame: dict[str, Any], role: str = "theme") -> str | None:
+    process_binding = (
+        ((frame.get("process_template_resolution") or {}).get("bindings") or {}).get(role)
+        or {}
+    )
+    grounded_binding = (
+        ((frame.get("grounded_intent_frame") or {}).get("roles") or {}).get(role)
+        or {}
+    ).get("binding") or {}
+    return process_binding.get("value_ref") or grounded_binding.get("entity_ref")
+
+
+def _independent_event_frames(
+    utterance: str, analysis: dict[str, Any]
+) -> list[dict[str, Any]]:
+    frames = list(analysis.get("event_frames", []))
+    if len(frames) < 2 or "一起" in utterance:
+        return []
+    bound_themes = [
+        ref for ref in (_event_frame_bound_ref(frame) for frame in frames) if ref
+    ]
+    # A single causal chain such as "pick up X, then place it" remains one
+    # intent. Distinct currently grounded themes require independent role
+    # scopes and therefore an ordered compound sequence.
+    if len(set(bound_themes)) < 2:
+        return []
+    return frames
+
+
+def _compound_sequence_view(sequence: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not sequence:
+        return None
+    return {
+        "sequence_id": sequence.get("sequence_id"),
+        "status": sequence.get("status"),
+        "current_subtask_index": sequence.get("current_subtask_index"),
+        "subtasks": [
+            {
+                "subtask_id": item.get("subtask_id"),
+                "status": item.get("status"),
+                "operators": deepcopy(item.get("operators", [])),
+                "goal_relation": item.get("goal_relation"),
+                "explicit_theme_ref": item.get("explicit_theme_ref"),
+            }
+            for item in sequence.get("subtasks", [])
+        ],
+        "retention_contract": {
+            "completed_subtask_language_released": True,
+            "physical_facts_rederived_before_each_subtask": True,
+            "old_role_bindings_not_reused_as_current_facts": True,
+        },
+    }
+
+
+def _dispatch_compound_subtask(session: dict[str, Any]) -> dict[str, Any] | None:
+    sequence = session.get("compound_command_sequence") or {}
+    index = int(sequence.get("current_subtask_index", 0))
+    subtasks = sequence.get("subtasks", [])
+    if sequence.get("status") != "active" or index >= len(subtasks):
+        return None
+    subtask = subtasks[index]
+    sequence["dispatching"] = True
+    try:
+        started = begin_motion_command(
+            session["session_id"],
+            subtask["utterance"],
+            compound_dispatch=True,
+        )
+    finally:
+        session = SESSIONS.get(session["session_id"], session)
+        live_sequence = session.get("compound_command_sequence") or sequence
+        live_sequence["dispatching"] = False
+    sequence = session.get("compound_command_sequence") or sequence
+    subtask = sequence["subtasks"][index]
+    subtask["status"] = "active"
+    subtask["intent_id"] = session.get("active_intent_id")
+    started["compound_command_sequence"] = _compound_sequence_view(sequence)
+    _debug_runtime(
+        "compound_subtask_dispatched",
+        session,
+        sequence_id=sequence.get("sequence_id"),
+        subtask_id=subtask.get("subtask_id"),
+        operators=subtask.get("operators", []),
+        explicit_theme_ref=subtask.get("explicit_theme_ref"),
+    )
+    return started
+
+
+def _start_compound_command_sequence(
+    session: dict[str, Any], utterance: str, analysis: dict[str, Any]
+) -> dict[str, Any] | None:
+    frames = _independent_event_frames(utterance, analysis)
+    if not frames:
+        return None
+    sequence_id = "compound_" + hashlib.sha1(
+        f"{session['session_id']}|{session['interaction_turn']}|{utterance}".encode("utf-8")
+    ).hexdigest()[:12]
+    sequence = {
+        "sequence_id": sequence_id,
+        "status": "active",
+        "source_utterance_hash": hashlib.sha1(utterance.encode("utf-8")).hexdigest(),
+        "current_subtask_index": 0,
+        "dispatching": False,
+        "subtasks": [
+            {
+                "subtask_id": f"{sequence_id}:{index}",
+                "utterance": frame["utterance"],
+                "operators": deepcopy((frame.get("canonical_frame") or {}).get("operators", [])),
+                "goal_relation": (frame.get("canonical_frame") or {}).get("goal_relation"),
+                "explicit_theme_ref": _event_frame_bound_ref(frame),
+                "status": "pending",
+                "intent_id": None,
+            }
+            for index, frame in enumerate(frames)
+        ],
+    }
+    session["compound_command_sequence"] = sequence
+    _debug_runtime(
+        "compound_sequence_created",
+        session,
+        sequence_id=sequence_id,
+        subtask_count=len(sequence["subtasks"]),
+    )
+    return _dispatch_compound_subtask(session)
+
+
+def _advance_compound_command_sequence(
+    session: dict[str, Any], completed_intent_id: str | None
+) -> dict[str, Any] | None:
+    sequence = session.get("compound_command_sequence") or {}
+    if sequence.get("status") != "active" or sequence.get("dispatching"):
+        return None
+    index = int(sequence.get("current_subtask_index", 0))
+    subtasks = sequence.get("subtasks", [])
+    if index >= len(subtasks):
+        return None
+    current = subtasks[index]
+    expected_intent_id = current.get("intent_id")
+    if expected_intent_id and completed_intent_id and expected_intent_id != completed_intent_id:
+        return None
+    current["status"] = "completed"
+    current["utterance"] = None
+    current["intent_id"] = None
+    sequence["current_subtask_index"] = index + 1
+    if sequence["current_subtask_index"] >= len(subtasks):
+        sequence["status"] = "completed"
+        completed_view = _compound_sequence_view(sequence)
+        session["compound_command_sequence"] = None
+        return {"status": "compound_sequence_completed", "compound_command_sequence": completed_view}
+    return _dispatch_compound_subtask(session)
 
 
 def _append_verified_episode(
@@ -6719,16 +6916,24 @@ def begin_motion_command(
     scoped_authorization: dict[str, Any] | None = None,
     internal_stage: bool = False,
     grounded_role_bindings: dict[str, Any] | None = None,
+    compound_dispatch: bool = False,
 ) -> dict[str, Any]:
     session = SESSIONS.get(session_id)
     if not session:
         return {"error": "embodied_session_not_found", "session_id": session_id}
     text = utterance.strip()
-    if not internal_stage and not scoped_authorization:
+    if not internal_stage and not scoped_authorization and not compound_dispatch:
         session["interaction_turn"] = int(session.get("interaction_turn", 0)) + 1
         if len(session.get("event_history", [])) > 32:
             del session["event_history"][:-32]
-    _debug_runtime("input_received", session, utterance=text, internal_stage=internal_stage, scoped_authorization=bool(scoped_authorization))
+    _debug_runtime(
+        "input_received",
+        session,
+        utterance=text,
+        internal_stage=internal_stage,
+        scoped_authorization=bool(scoped_authorization),
+        compound_dispatch=compound_dispatch,
+    )
     count_match = re.search(r"(?:有|看到|当前有)?\s*(?:几个|多少个)\s*(杯子|杯|容器|人|客人|桌子|台子)", text)
     if count_match:
         noun = count_match.group(1)
@@ -6888,6 +7093,12 @@ def begin_motion_command(
     if evidence_gap_resolution:
         return evidence_gap_resolution
     language_analysis = _compose_session_language(session, text)
+    if not internal_stage and not scoped_authorization and not compound_dispatch:
+        compound_started = _start_compound_command_sequence(
+            session, text, language_analysis
+        )
+        if compound_started:
+            return compound_started
     hospitality_intent = None
     if not internal_stage and not scoped_authorization and session.get("scene_id") == "hospitality_guest":
         existing_hospitality = (session.get("long_horizon_intents") or {}).get(session.get("active_intent_id"))
@@ -7757,6 +7968,38 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
                 result.pop("pending_confirmation", None)
                 result["execution_plan_state"] = "released_on_task_completion"
                 result["prompt"] = "当前阶段已验真，长程目标的终止事实也已成立。"
+                compound_next = stage_outcome.get("compound_next_started") or {}
+                if compound_next.get("job_id"):
+                    result["next_stage_started"] = {
+                        "status": compound_next.get("status"),
+                        "job_id": compound_next["job_id"],
+                        "frame_count": compound_next.get("frame_count"),
+                        "long_stage": deepcopy(compound_next.get("long_stage")),
+                        "long_horizon_intent": deepcopy(compound_next.get("long_horizon_intent")),
+                        "candidate_execution_plan": deepcopy(compound_next.get("candidate_execution_plan")),
+                        "compound_command_sequence": deepcopy(compound_next.get("compound_command_sequence")),
+                    }
+                    result["long_horizon_intent"] = deepcopy(
+                        compound_next.get("long_horizon_intent")
+                    ) or result["long_horizon_intent"]
+                    result["candidate_execution_plan"] = deepcopy(
+                        compound_next.get("candidate_execution_plan")
+                    )
+                    result["compound_command_sequence"] = deepcopy(
+                        compound_next.get("compound_command_sequence")
+                    )
+                    result["prompt"] = (
+                        "前一子目标已通过物理验真；我已释放它的执行细节，"
+                        "并按最新世界状态开始复合任务的下一子目标。"
+                    )
+                elif compound_next:
+                    result["compound_command_sequence"] = deepcopy(
+                        compound_next.get("compound_command_sequence")
+                    )
+                    immediate_next = compound_next.get("immediate_result")
+                    if immediate_next:
+                        result["next_stage_candidate"] = deepcopy(immediate_next)
+                        result["prompt"] = immediate_next.get("prompt") or result["prompt"]
             elif stage_outcome.get("job_id"):
                 next_stage_plan = deepcopy(stage_outcome.get("candidate_execution_plan"))
                 result["next_stage_started"] = {

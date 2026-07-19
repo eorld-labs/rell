@@ -49,6 +49,9 @@ def drain_service_with_confirmations(session_id: str, started: dict) -> list[dic
     outcomes = []
     current = started
     while current:
+        if current.get("status") == "requires_human_confirmation" and not current.get("job_id"):
+            current = begin_motion_command(session_id, "确认")
+            continue
         immediate = current.get("immediate_result")
         if immediate and immediate.get("status") == "requires_human_confirmation":
             current = begin_motion_command(session_id, "确认")
@@ -63,6 +66,55 @@ def drain_service_with_confirmations(session_id: str, started: dict) -> list[dic
         ):
             current = begin_motion_command(session_id, "确认")
     return outcomes
+
+
+def verify_event_scoped_compound_sequence() -> dict:
+    session = start_session("home_humanoid", "hospitality_guest")
+    session_id = session["session_id"]
+    initial = begin_motion_command(session_id, "用白色杯子给我接杯水")
+    require(
+        [item.get("terminal_fact") for item in drain_service(initial)]
+        == ["target_object_in_gripper", "container_filled", "human_received_filled_container"],
+        "compound setup service did not establish the current human-held cup",
+    )
+
+    started = begin_motion_command(
+        session_id,
+        "好，现在帮我把杯子放到桌子上去，用高脚杯给我倒一杯水",
+    )
+    sequence = started.get("compound_command_sequence") or {}
+    require(started.get("status") == "process_slot_clarification_required", f"the first scoped destination gap was not surfaced: {started}")
+    require(
+        [item.get("explicit_theme_ref") for item in sequence.get("subtasks", [])]
+        == ["mug_white", "glass_tall"],
+        f"explicit later theme was overridden by the current holder relation: {sequence}",
+    )
+    selected_destination = begin_motion_command(session_id, "操作台A")
+    outcomes = drain_service_with_confirmations(session_id, selected_destination)
+    facts = [item.get("terminal_fact") for item in outcomes]
+    require(
+        facts
+        == [
+            "target_object_in_gripper",
+            "object_supported_at_destination",
+            "target_object_in_gripper",
+            "container_filled",
+            "human_received_filled_container",
+        ],
+        f"ordered compound goals did not complete from current facts: {outcomes}",
+    )
+    role_sequence = [
+        (item.get("long_horizon_intent") or {}).get("role_bindings", {}).get("theme")
+        for item in outcomes
+    ]
+    require(role_sequence[:2] == ["mug_white", "glass_tall"] and set(role_sequence[2:]) == {"glass_tall"}, f"event-local themes crossed subtask boundaries: {role_sequence}")
+    live = get_session(session_id)
+    require(live.get("compound_command_sequence") is None, f"completed compound details remained in working memory: {live.get('compound_command_sequence')}")
+    mug = next(item for item in live["runtime_objects"] if item["entity_id"] == "mug_white")
+    glass = next(item for item in live["runtime_objects"] if item["entity_id"] == "glass_tall")
+    require(mug.get("support_ref") == "hospitality_counter_a", f"first subtask did not commit its verified support relation: {mug}")
+    require(glass.get("received_by") == "guest" and glass.get("liquid_state") == "filled", f"second subtask did not use the explicitly constrained container: {glass}")
+    return {"stage_facts": facts, "theme_sequence": role_sequence, "working_memory_released": True}
 
 
 def complete_authorized_service(scene_id: str) -> dict:
@@ -595,6 +647,7 @@ def main() -> None:
         "hospitality_selected_container_service": verify_hospitality_container_selection_service_chain(),
         "current_relation_precedes_category_ambiguity": verify_current_relation_precedes_category_ambiguity(),
         "explicit_container_precedes_ambiguity": verify_explicit_container_binding_precedes_ambiguity(),
+        "event_scoped_compound_sequence": verify_event_scoped_compound_sequence(),
         "terminal_relation_effect_gate": verify_terminal_relation_gates_effect_commit(),
         "role_scoped_transfer_after_handover": verify_role_scoped_transfer_after_handover(),
         "historical_event_return": verify_historical_event_return_replans_current_route(),
