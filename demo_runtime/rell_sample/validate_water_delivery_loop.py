@@ -82,8 +82,14 @@ def complete_authorized_service(scene_id: str) -> dict:
     require(live.get("active_intent_id") is None, f"long intent not completed: {live.get('long_horizon_intents')}")
     require(not live.get("long_horizon_intents"), f"completed intent remained eligible for arbitration: {live.get('long_horizon_intents')}")
     completed_intent = live.get("completed_intent_archive", [])[-1]
-    require(completed_intent.get("hierarchical_intent_graph", {}).get("lifecycle") == "completed", f"runtime stages did not close the unified hierarchical intent graph: {completed_intent}")
-    require(completed_intent.get("arbitration_eligible") is False and completed_intent.get("verified_facts_scope") == "historical_intent_execution_evidence", f"completed facts were not archived with an explicit historical scope: {completed_intent}")
+    require(completed_intent.get("lifecycle") == "completed" and completed_intent.get("arbitration_eligible") is False, f"completed task capsule remained arbitration eligible: {completed_intent}")
+    require(completed_intent.get("stage_graph_retained") is False and completed_intent.get("task_verified_fact_ledger_retained") is False, f"short-task machinery survived completion compaction: {completed_intent}")
+    require("hierarchical_intent_graph" not in completed_intent and "verified_facts" not in completed_intent, f"completed archive retained detailed task state: {completed_intent}")
+    require(completed_intent.get("physical_effects_remain_in_current_world") is True, f"task compaction discarded the physical-world boundary: {completed_intent}")
+    require(not live.get("event_history") and not live.get("grounded_intent_frame_history") and not live.get("situated_event_frame_history"), f"released short-task parsing or execution history still occupies working memory: {live}")
+    released_projection = live.get("last_context_projection") or {}
+    require(released_projection.get("active_task_summary") is None, f"released projection retained an active task: {released_projection}")
+    require(any(item.get("predicate") == "received_by" and item.get("subject") == container.get("entity_id") for item in released_projection.get("current_world_facts", [])), f"released projection was not refreshed from terminal physical relations: {released_projection}")
     require("candidate_execution_plan" not in outcomes[-1] and outcomes[-1].get("execution_plan_state") == "released_on_task_completion", f"completed result retained a stale candidate plan: {outcomes[-1]}")
     require("container_filled" in stage_facts and "human_received_filled_container" in stage_facts, f"stage facts missing: {stage_facts}")
     return {"scene_id": scene_id, "stage_facts": stage_facts, "route_kinds": route_kinds, "intent_graph": "completed"}
@@ -428,6 +434,9 @@ def verify_current_relation_precedes_category_ambiguity() -> dict:
     session_id = session["session_id"]
     begin_motion_command(session_id, "给我接一杯水")
     drain_service(begin_motion_command(session_id, "白色马克杯"))
+    released = get_session(session_id)
+    require((released.get("last_context_projection") or {}).get("active_task_summary") is None, f"completed task remained in the projected working set: {released.get('last_context_projection')}")
+    require((released.get("last_context_projection") or {}).get("retention_contract", {}).get("completed_task_snapshot_released") is True, f"context projection did not record task release: {released.get('last_context_projection')}")
 
     repeated = begin_motion_command(
         session_id,
@@ -436,12 +445,19 @@ def verify_current_relation_precedes_category_ambiguity() -> dict:
     intent = repeated.get("long_horizon_intent") or {}
     runtime_intent = SESSIONS[session_id]["long_horizon_intents"][SESSIONS[session_id]["active_intent_id"]]
     evidence = (runtime_intent.get("role_binding_evidence") or {}).get("theme") or {}
+    projected = (runtime_intent.get("source_language_frame") or {}).get("context_projection") or {}
     require(repeated.get("status") == "motion_started", f"verified holder relation fell back to category ambiguity: {repeated}")
     require(intent.get("role_bindings", {}).get("theme") == "mug_white", f"current human-held object was not bound as the new theme: {repeated}")
     require(evidence.get("basis") == "current_verified_relation:held_by_human" and evidence.get("current_snapshot_revalidated") is True, f"relational binding did not expose current-world provenance: {evidence}")
+    require(projected.get("active_task_summary") is None, f"new task-creating input inherited the completed task summary: {projected}")
+    require(any(item.get("predicate") == "received_by" and item.get("subject") == "mug_white" for item in projected.get("current_world_facts", [])), f"new input did not project the current holder relation: {projected}")
     outcomes = drain_service(repeated)
     facts = [item.get("terminal_fact") for item in outcomes]
     require(facts == ["target_object_in_gripper", "container_filled", "human_received_filled_container"], f"relation-bound repeat service did not complete: {outcomes}")
+    compacted = get_session(session_id)
+    require(len(compacted.get("completed_intent_archive", [])) == 2, f"goal-level capsules did not remain bounded to completed tasks: {compacted.get('completed_intent_archive')}")
+    require(len(compacted.get("dialogue_focus_entities", [])) <= 4 and len(compacted.get("episodic_fact_memory", [])) <= 32, f"bounded recent context exceeded its retention contract: {compacted}")
+    require(not compacted.get("event_history") and compacted.get("last_language_understanding") is None, f"second completed task retained short-term execution or parse detail: {compacted}")
     return {"theme": "mug_white", "binding_basis": evidence["basis"], "stage_facts": facts}
 
 

@@ -14,6 +14,7 @@ from typing import Any
 from concept_core.factory_event_units import FACTORY_EVENT_CONCEPT_UNITS, build_factory_inability_diagnosis, find_factory_event_concepts_by_text
 from concept_core.concept_gap_dialogue import continue_concept_gap_dialogue, start_concept_gap_dialogue
 from concept_core.contextual_affordance import resolve_contextual_affordance_request
+from concept_core.context_projection import build_context_projection, compact_intent_capsule
 from concept_core.functional_object_reasoning import build_functional_object_catalog, build_functional_profile, evaluate_role_compatibility
 from concept_core.factory_state_facts import build_factory_state_catalog, derive_runtime_fact_snapshot, explain_prerequisite_gaps
 from concept_core.lightweight_orchestrator import build_lightweight_causal_candidate, build_lightweight_orchestrator_catalog
@@ -278,6 +279,8 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator", scene_id
         "world_revision": 0,
         "event_history": [],
         "episodic_fact_memory": [],
+        "interaction_turn": 0,
+        "last_context_projection": None,
         "concept_gap_dialogue": None,
         "open_world_observation": None,
         "confirmed_visual_bindings": [],
@@ -329,6 +332,119 @@ def _long_intent_view(intent: dict[str, Any]) -> dict[str, Any]:
         "hierarchical_intent_graph": deepcopy(intent.get("hierarchical_intent_graph")),
         "causal_graph_runtime": deepcopy(intent.get("causal_graph_runtime")),
     }
+
+
+def _archive_and_release_task_context(
+    session: dict[str, Any],
+    intent: dict[str, Any],
+    *,
+    lifecycle: str,
+    release_reason: str,
+    archive_key: str,
+) -> dict[str, Any]:
+    capsule = compact_intent_capsule(
+        intent,
+        world_revision=int(session.get("world_revision", 0)),
+        lifecycle=lifecycle,
+        release_reason=release_reason,
+    )
+    archive = session.setdefault(archive_key, [])
+    archive.append(capsule)
+    if len(archive) > 16:
+        del archive[:-16]
+
+    runtime_index = {
+        item.get("entity_id"): item
+        for item in session.get("runtime_objects", [])
+        if item.get("entity_id") and item.get("active") is not False
+    }
+    concepts = _language_object_concepts()
+    role_refs = []
+    for value in (intent.get("role_bindings") or {}).values():
+        values = value if isinstance(value, list) else [value]
+        role_refs.extend(ref for ref in values if isinstance(ref, str))
+    terminal_focus = []
+    for ref in dict.fromkeys(role_refs):
+        entity = runtime_index.get(ref)
+        if not entity:
+            continue
+        concept = next(
+            (
+                item for item in concepts
+                if entity.get("kind") in item.get("compatible_kinds", [])
+            ),
+            {},
+        )
+        terminal_focus.append({
+            "entity_ref": ref,
+            "label": entity.get("label"),
+            "concept_id": concept.get("concept_id"),
+            "display_name": concept.get("display_name") or entity.get("label"),
+            "compatible_kinds": list(concept.get("compatible_kinds", [entity.get("kind")])),
+            "functional_affordances": list(concept.get("functional_affordances", [])),
+            "focus_source": "released_task_terminal_role",
+            "world_revision": session.get("world_revision"),
+            "created_turn": int(session.get("interaction_turn", 0)),
+            "expires_after_turn": int(session.get("interaction_turn", 0)) + 4,
+        })
+        if len(terminal_focus) >= 4:
+            break
+    session["dialogue_focus_entities"] = terminal_focus
+
+    # Task mechanics are disposable. Physical effects remain in runtime_objects
+    # and verified causal transitions remain only as compact episode capsules.
+    for key in (
+        "event_history",
+        "perception_history",
+        "confirmed_visual_bindings",
+        "language_interpretation_history",
+        "grounded_intent_frame_history",
+        "situated_event_frame_history",
+        "observation_evidence_ledger",
+        "human_reported_fact_candidates",
+    ):
+        session[key] = []
+    session["current_observation_evidence"] = None
+    session["last_language_understanding"] = None
+    session["pending_confirmation"] = None
+    session["pending_water_container_ref"] = None
+    session["open_world_observation"] = None
+    terminal_roles = {
+        f"terminal_role_{index}": {
+            "entity_ref": item.get("entity_ref"),
+            "compatible_kinds": item.get("compatible_kinds", []),
+        }
+        for index, item in enumerate(terminal_focus)
+        if item.get("entity_ref")
+    }
+    projection = build_context_projection(
+        {"role_bindings": terminal_roles, "entity_mentions": [], "event_candidates": []},
+        runtime_objects=session.get("runtime_objects", []),
+        current_facts=facts_from_runtime_state(
+            session.get("runtime_objects", []),
+            session.get("state", {}),
+            int(session.get("world_revision", 0)),
+        ),
+        active_intent=None,
+        recent_episodes=session.get("episodic_fact_memory", []),
+        dialogue_focus_entities=terminal_focus,
+        world_revision=int(session.get("world_revision", 0)),
+        current_turn=int(session.get("interaction_turn", 0)),
+    )
+    projection.setdefault("retention_contract", {})[
+        "completed_task_snapshot_released"
+    ] = True
+    session["last_context_projection"] = projection
+    for key in (
+        "concept_gap_dialogue",
+        "relational_reference_dialogue",
+        "role_clarification_dialogue",
+        "evidence_gap_dialogue",
+        "process_gap_dialogue",
+        "causal_graph_clarification",
+    ):
+        session[key] = None
+    return capsule
 
 
 def _attach_hierarchical_intent_graph(intent: dict[str, Any]) -> None:
@@ -508,6 +624,7 @@ def _create_transfer_intent(
             "destination_binding_policy": deepcopy(
                 (language_analysis or {}).get("canonical_frame", {}).get("destination_binding_policy")
             ),
+            "context_projection": deepcopy((language_analysis or {}).get("context_projection")),
             "fact_effect": "language_binds_goal_and_roles_but_does_not_commit_physical_facts",
         },
         "goal_contract": {
@@ -893,6 +1010,7 @@ def _create_water_delivery_intent(
             "grounded_role_bindings": deepcopy(
                 ((language_analysis or {}).get("grounded_intent_frame") or {}).get("resolved_role_bindings", {})
             ),
+            "context_projection": deepcopy((language_analysis or {}).get("context_projection")),
             "world_revision": session.get("world_revision"),
             "language_binds_constraints_not_physical_facts": True,
         },
@@ -1359,10 +1477,13 @@ def _prepare_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) 
             "arbitration_eligible": False,
             "snapshot_state": "released_from_active_arbitration",
         })
-        archive = session.setdefault("completed_intent_archive", [])
-        archive.append(deepcopy(completed_view))
-        if len(archive) > 128:
-            del archive[:-128]
+        _archive_and_release_task_context(
+            session,
+            intent,
+            lifecycle="completed",
+            release_reason="goal_fact_physically_verified",
+            archive_key="completed_intent_archive",
+        )
         session.get("long_horizon_intents", {}).pop(intent["intent_id"], None)
         return {"status": "long_intent_completed", "long_horizon_intent": completed_view}
     if stage["status"] != "stage_ready":
@@ -1619,8 +1740,8 @@ def _current_observation_evidence(
         ledger = session.setdefault("observation_evidence_ledger", [])
         if not ledger or ledger[-1].get("evidence_set_id") != evidence.get("evidence_set_id"):
             ledger.append(deepcopy(evidence))
-        if len(ledger) > 64:
-            del ledger[:-64]
+        if len(ledger) > 8:
+            del ledger[:-8]
     return evidence
 
 
@@ -1661,7 +1782,12 @@ def _language_context_entities(session: dict[str, Any]) -> list[dict[str, Any]]:
                 "compatible_kinds": deepcopy(concept.get("compatible_kinds", [])),
                 "focus_source": "human_confirmed_visual_binding",
             })
+    current_turn = int(session.get("interaction_turn", 0))
     for item in session.get("dialogue_focus_entities", []):
+        if int(item.get("expires_after_turn", current_turn)) < current_turn:
+            continue
+        if item.get("entity_ref") and item.get("world_revision", session["world_revision"]) != session["world_revision"]:
+            continue
         key = str(item.get("entity_ref") or item.get("concept_id") or item.get("label"))
         if key:
             focused.setdefault(key, deepcopy(item))
@@ -1751,15 +1877,6 @@ def _compose_session_language(session: dict[str, Any], utterance: str) -> dict[s
     analysis["semantic_constraint_frame"] = semantic_frame
     analysis["observation_evidence"] = observation_evidence
     analysis["grounded_intent_frame"] = grounded_frame
-    situated_frame = compile_situated_event_frame(
-        utterance,
-        analysis,
-        current_facts=facts_from_runtime_state(
-            session.get("runtime_objects", []), session.get("state", {}), session.get("world_revision", 0)
-        ),
-        recent_episodes=session.get("episodic_fact_memory", []),
-    )
-    analysis["situated_event_frame"] = situated_frame
     analysis["process_template_resolution"] = resolve_process_request(
         utterance,
         analysis,
@@ -1776,14 +1893,41 @@ def _compose_session_language(session: dict[str, Any], utterance: str) -> dict[s
     )
     if not gap_dialogue_collecting:
         _project_resolved_process_roles(session, analysis, analysis["process_template_resolution"])
+    current_facts = facts_from_runtime_state(
+        session.get("runtime_objects", []),
+        session.get("state", {}),
+        session.get("world_revision", 0),
+    )
+    active_intent = (session.get("long_horizon_intents") or {}).get(
+        session.get("active_intent_id")
+    )
+    context_projection = build_context_projection(
+        analysis,
+        runtime_objects=session.get("runtime_objects", []),
+        current_facts=current_facts,
+        active_intent=active_intent,
+        recent_episodes=session.get("episodic_fact_memory", []),
+        dialogue_focus_entities=session.get("dialogue_focus_entities", []),
+        world_revision=int(session.get("world_revision", 0)),
+        current_turn=int(session.get("interaction_turn", 0)),
+    )
+    analysis["context_projection"] = context_projection
+    session["last_context_projection"] = deepcopy(context_projection)
+    situated_frame = compile_situated_event_frame(
+        utterance,
+        analysis,
+        current_facts=context_projection["current_world_facts"],
+        recent_episodes=context_projection["recent_episode_capsules"],
+    )
+    analysis["situated_event_frame"] = situated_frame
     grounded_history = session.setdefault("grounded_intent_frame_history", [])
     grounded_history.append(deepcopy(grounded_frame))
-    if len(grounded_history) > 128:
-        del grounded_history[:-128]
+    if len(grounded_history) > 16:
+        del grounded_history[:-16]
     frame_history = session.setdefault("situated_event_frame_history", [])
     frame_history.append(deepcopy(situated_frame))
-    if len(frame_history) > 128:
-        del frame_history[:-128]
+    if len(frame_history) > 16:
+        del frame_history[:-16]
     for candidate in situated_frame.get("reported_state_candidates", []):
         session.setdefault("human_reported_fact_candidates", []).append({
             **deepcopy(candidate),
@@ -1791,7 +1935,7 @@ def _compose_session_language(session: dict[str, Any], utterance: str) -> dict[s
             "world_revision": session["world_revision"],
             "runtime_fact_committed": False,
         })
-    session["last_language_understanding"] = deepcopy(analysis)
+    session["last_language_understanding"] = _language_understanding_view(analysis)
     grounded_focus = [
         result.get("binding")
         for result in (grounded_frame.get("roles") or {}).values()
@@ -1816,6 +1960,8 @@ def _compose_session_language(session: dict[str, Any], utterance: str) -> dict[s
                 }),
                 "focus_source": "current_grounded_intent_frame",
                 "world_revision": observation_evidence.get("world_revision"),
+                "created_turn": int(session.get("interaction_turn", 0)),
+                "expires_after_turn": int(session.get("interaction_turn", 0)) + 4,
             }
             for item in grounded_focus
         ]
@@ -1828,6 +1974,9 @@ def _compose_session_language(session: dict[str, Any], utterance: str) -> dict[s
                 "functional_affordances": deepcopy(item.get("functional_affordances", [])),
                 "compatible_kinds": deepcopy(item.get("compatible_kinds", [])),
                 "focus_source": "latest_explicit_language_mention",
+                "world_revision": session.get("world_revision"),
+                "created_turn": int(session.get("interaction_turn", 0)),
+                "expires_after_turn": int(session.get("interaction_turn", 0)) + 4,
             }
             for item in explicit_mentions
         ]
@@ -1856,6 +2005,7 @@ def _language_understanding_view(analysis: dict[str, Any]) -> dict[str, Any]:
         "process_template_resolution": deepcopy(analysis.get("process_template_resolution")),
         "semantic_constraint_frame": deepcopy(analysis.get("semantic_constraint_frame")),
         "grounded_intent_frame": deepcopy(analysis.get("grounded_intent_frame")),
+        "context_projection": deepcopy(analysis.get("context_projection")),
     }
 
 
@@ -1885,6 +2035,8 @@ def _append_verified_episode(
         "raw_trajectory_persisted": False,
     }
     memory.append(episode)
+    if len(memory) > 32:
+        del memory[:-32]
     return episode
 
 
@@ -6393,14 +6545,13 @@ def _continue_causal_graph_clarification(
         ):
             intent["lifecycle"] = "superseded"
             intent["current_stage"] = None
-            released = _long_intent_view(intent)
-            released.update({
-                "closed_world_revision": session["world_revision"],
-                "arbitration_eligible": False,
-                "snapshot_state": "released_on_new_task",
-                "release_reason": "new_goal_directed_task_superseded_pending_condition",
-            })
-            session.setdefault("released_intent_archive", []).append(released)
+            _archive_and_release_task_context(
+                session,
+                intent,
+                lifecycle="superseded",
+                release_reason="new_goal_directed_task_superseded_pending_condition",
+                archive_key="released_intent_archive",
+            )
             session.get("long_horizon_intents", {}).pop(intent["intent_id"], None)
             if session.get("active_intent_id") == intent["intent_id"]:
                 session["active_intent_id"] = None
@@ -6441,6 +6592,10 @@ def begin_motion_command(
     if not session:
         return {"error": "embodied_session_not_found", "session_id": session_id}
     text = utterance.strip()
+    if not internal_stage and not scoped_authorization:
+        session["interaction_turn"] = int(session.get("interaction_turn", 0)) + 1
+        if len(session.get("event_history", [])) > 32:
+            del session["event_history"][:-32]
     _debug_runtime("input_received", session, utterance=text, internal_stage=internal_stage, scoped_authorization=bool(scoped_authorization))
     count_match = re.search(r"(?:有|看到|当前有)?\s*(?:几个|多少个)\s*(杯子|杯|容器|人|客人|桌子|台子)", text)
     if count_match:
@@ -7496,7 +7651,8 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
             intent["lifecycle"] = "awaiting_correction"
             result["long_horizon_intent"] = _long_intent_view(intent)
     result["session"] = get_session(job["session_id"])
-    session["event_history"].append({"utterance": job["utterance"], "result": result.get("status"), "route_kind": result.get("route_kind")})
+    if (result.get("long_horizon_intent") or {}).get("lifecycle") != "completed":
+        session["event_history"].append({"utterance": job["utterance"], "result": result.get("status"), "route_kind": result.get("route_kind")})
     return {"status": "motion_completed", "job_id": job_id, "frame": frame, "result": result, "session": get_session(job["session_id"])}
 
 
