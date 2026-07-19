@@ -82,6 +82,23 @@ def main() -> None:
         not non_support_relation.get("role_bindings", {}).get("destination_relation_object"),
         f"container contents were misread as a support relation: {non_support_relation}",
     )
+    reordered_modifiers = compose(
+        "把杯子放到桌子上有蓝色玻璃高脚杯的桌子上去"
+    )
+    reordered_frame = build_semantic_constraint_frame(
+        "把杯子放到桌子上有蓝色玻璃高脚杯的桌子上去",
+        reordered_modifiers,
+    )
+    modifier_fields = {
+        item.get("observation_field")
+        for item in reordered_frame.get("roles", {})
+        .get("destination_relation_object", {})
+        .get("constraints", [])
+    }
+    require(
+        modifier_fields == {"color", "material", "container_form"},
+        f"modifier order changed the composed concept predicates: {reordered_frame}",
+    )
 
     co_location = compose("去把苹果拿过来，和杯子一起放在桌子上")
     require(

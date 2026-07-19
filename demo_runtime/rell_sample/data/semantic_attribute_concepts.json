@@ -15,6 +15,9 @@
         "yellow": ["黄色", "黄的"],
         "gray": ["灰色", "灰的"],
         "brown": ["棕色", "褐色", "棕的"]
+      },
+      "value_parents": {
+        "light_blue": "blue"
       }
     },
     {
@@ -25,6 +28,18 @@
         "transparent": ["透明", "透明的", "透亮"],
         "translucent": ["半透明", "半透明的"],
         "opaque": ["不透明", "不透明的"]
+      }
+    },
+    {
+      "concept_id": "concept_material_family",
+      "display_name": "材料族",
+      "observation_field": "material",
+      "values": {
+        "glass": ["玻璃", "玻璃制", "玻璃材质"],
+        "ceramic": ["陶瓷", "陶制", "瓷质"],
+        "wood": ["木质", "木制"],
+        "metal": ["金属", "金属制"],
+        "plastic": ["塑料", "塑料制"]
       }
     },
     {

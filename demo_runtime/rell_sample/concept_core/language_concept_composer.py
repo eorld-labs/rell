@@ -292,6 +292,8 @@ def _destination_relation_modifier(
         "relation_predicate": "supported_by",
         "relation_target_role": "destination",
         "relation_surface": text[marker_start:destination_start + len(str(destination.get("matched_alias") or ""))],
+        "relation_span_start": marker_start,
+        "relation_span_end": destination_start,
         "source": "relational_noun_phrase",
     })
     return modifier

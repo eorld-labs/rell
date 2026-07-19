@@ -23,6 +23,22 @@ def load_semantic_attribute_concepts() -> dict[str, Any]:
     return json.loads(DATA_FILE.read_text(encoding="utf-8"))
 
 
+def _accepted_observed_values(concept: dict[str, Any], requested: str) -> list[str]:
+    """Expand a requested attribute value to its declared semantic descendants."""
+    parents = concept.get("value_parents") or {}
+    accepted = {requested}
+    for candidate in concept.get("values", {}):
+        current = candidate
+        visited = set()
+        while current in parents and current not in visited:
+            visited.add(current)
+            current = parents[current]
+            if current == requested:
+                accepted.add(candidate)
+                break
+    return sorted(accepted)
+
+
 def build_semantic_constraint_frame(
     utterance: str,
     language_analysis: dict[str, Any] | None,
@@ -48,6 +64,8 @@ def build_semantic_constraint_frame(
             "relation_predicate": role.get("relation_predicate"),
             "relation_target_role": role.get("relation_target_role"),
             "relation_surface": role.get("relation_surface"),
+            "relation_span_start": role.get("relation_span_start"),
+            "relation_span_end": role.get("relation_span_end"),
             "constraints": [],
         }
 
@@ -64,6 +82,9 @@ def build_semantic_constraint_frame(
                     "display_name": concept.get("display_name"),
                     "observation_field": concept["observation_field"],
                     "value": value,
+                    "accepted_observed_values": _accepted_observed_values(
+                        concept, value
+                    ),
                     "surface": alias,
                     "start": start,
                     "end": start + len(_normalize(alias)),
@@ -97,11 +118,24 @@ def build_semantic_constraint_frame(
             role_start, role_end = role.get("start"), role.get("end")
             if not isinstance(role_start, int) or not isinstance(role_end, int):
                 continue
+            span_start = role.get("relation_span_start")
+            span_end = role.get("relation_span_end")
+            inside_relation_scope = bool(
+                isinstance(span_start, int)
+                and isinstance(span_end, int)
+                and span_start <= predicate["start"]
+                and predicate["end"] <= span_end
+            )
             overlap = predicate["start"] < role_end and predicate["end"] > role_start
             distance = 0 if overlap else min(abs(predicate["end"] - role_start), abs(role_end - predicate["start"]))
-            if overlap or distance <= 6:
-                ranked.append((0 if overlap else distance, 0 if role["role"] in {"theme", "target"} else 1, role))
-        target_role = min(ranked, key=lambda item: (item[0], item[1]))[2] if ranked else roles.get("theme") or roles.get("target")
+            if inside_relation_scope or overlap or distance <= 6:
+                ranked.append((
+                    0 if inside_relation_scope else 1,
+                    0 if overlap else distance,
+                    0 if role["role"] in {"theme", "target"} else 1,
+                    role,
+                ))
+        target_role = min(ranked, key=lambda item: (item[0], item[1], item[2]))[3] if ranked else roles.get("theme") or roles.get("target")
         if target_role:
             target_role["constraints"].append(deepcopy(predicate))
             predicate["role"] = target_role["role"]
@@ -219,7 +253,9 @@ def ground_semantic_role(
                 "observed": (entity.get("observed_attributes") or {}).get(constraint.get("observation_field")),
             }
             for constraint in constraints
-            if (entity.get("observed_attributes") or {}).get(constraint.get("observation_field")) != constraint.get("value")
+            if (entity.get("observed_attributes") or {}).get(
+                constraint.get("observation_field")
+            ) not in constraint.get("accepted_observed_values", [constraint.get("value")])
         ]
         record = {**deepcopy(entity), "constraint_mismatches": mismatches}
         (rejected if mismatches else matched).append(record)

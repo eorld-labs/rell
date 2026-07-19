@@ -50,6 +50,69 @@ def verify_instance_rename_does_not_change_concept_grounding() -> dict:
     return {"renamed_surface": mug["label"], "entity_ref": "mug_white", "basis": evidence["basis"]}
 
 
+def verify_attribute_subsumption_and_modifier_composition() -> dict:
+    session = start_session("home_humanoid", "hospitality_guest")
+    live = SESSIONS[session["session_id"]]
+    analysis = _compose_session_language(
+        live,
+        "我喝完了，把杯子放到桌子上有蓝色玻璃高脚杯的桌子上去",
+    )
+    modifier = analysis["semantic_constraint_frame"]["roles"][
+        "destination_relation_object"
+    ]
+    constraints = {
+        item["observation_field"]: item
+        for item in modifier.get("constraints", [])
+    }
+    grounding = analysis["grounded_intent_frame"]["roles"][
+        "destination_relation_object"
+    ]
+    require(
+        set(constraints) == {"color", "material", "container_form"},
+        f"independently ordered noun modifiers were not composed: {modifier}",
+    )
+    require(
+        set(constraints["color"].get("accepted_observed_values", []))
+        == {"blue", "light_blue"},
+        f"a requested parent color did not include its declared subtype: {constraints['color']}",
+    )
+    require(
+        grounding.get("status") == "resolved"
+        and grounding.get("binding", {}).get("entity_ref") == "glass_tall",
+        f"composed parent-color/material/form constraints did not ground: {grounding}",
+    )
+
+    narrow_session = start_session("home_humanoid", "hospitality_guest")
+    narrow_live = SESSIONS[narrow_session["session_id"]]
+    narrow_glass = next(
+        item for item in narrow_live["runtime_objects"]
+        if item["entity_id"] == "glass_tall"
+    )
+    narrow_glass["perceptual_attributes"] = {
+        "color": "blue",
+        "material": "glass",
+    }
+    narrow = _compose_session_language(
+        narrow_live,
+        "把杯子放在有浅蓝色玻璃高脚杯的桌子上",
+    )
+    narrow_grounding = narrow["grounded_intent_frame"]["roles"][
+        "destination_relation_object"
+    ]
+    require(
+        narrow_grounding.get("status") == "missing",
+        f"a child color request incorrectly accepted its broader parent observation: {narrow_grounding}",
+    )
+    return {
+        "requested_color": "blue",
+        "accepted_observed_colors": ["blue", "light_blue"],
+        "material": "glass",
+        "form": "stemmed_glass",
+        "entity_ref": "glass_tall",
+        "subsumption_direction_verified": True,
+    }
+
+
 def verify_query_then_task_matches_direct_task() -> dict:
     direct_session = start_session("home_humanoid", "hospitality_guest")
     direct = begin_motion_command(direct_session["session_id"], "用白色马克杯给我接一杯水")
@@ -102,6 +165,7 @@ def verify_world_revision_invalidates_epistemic_evidence() -> dict:
 def main() -> None:
     report = {
         "concept_composition": verify_compositional_constraints_not_atomic_instance_alias(),
+        "attribute_subsumption": verify_attribute_subsumption_and_modifier_composition(),
         "rename_invariance": verify_instance_rename_does_not_change_concept_grounding(),
         "query_task_consistency": verify_query_then_task_matches_direct_task(),
         "equal_evidence_ambiguity": verify_equal_concept_evidence_remains_ambiguous(),

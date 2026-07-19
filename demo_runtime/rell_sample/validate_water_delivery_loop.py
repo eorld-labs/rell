@@ -740,7 +740,7 @@ def verify_relational_destination_grounding_and_slot_resume() -> dict:
     drain_service(begin_motion_command(direct_id, "用白色马克杯给我接一杯水"))
     direct = begin_motion_command(
         direct_id,
-        "我喝完了，把杯子放到桌子上面有高脚玻璃杯的桌子上",
+        "我喝完了，把杯子放到桌子上有蓝色玻璃高脚杯的桌子上去",
     )
     direct_intent = direct.get("long_horizon_intent") or (
         direct.get("immediate_result") or {}
