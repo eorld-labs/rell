@@ -1431,6 +1431,17 @@ def _create_payload_carrier_delivery_intent(
             "carrier": carrier["entity_id"],
             "recipient": recipient["entity_id"],
         },
+        "role_binding_evidence": {
+            "payload": deepcopy(subtask.get("payload_binding_evidence")),
+            "carrier": {
+                "basis": "current_affordance_grounding",
+                "physical_fact_committed": False,
+            },
+            "recipient": {
+                "basis": "deictic_discourse_role",
+                "physical_fact_committed": False,
+            },
+        },
         "goal_contract": {
             "requires": [
                 "payload_grounded",
@@ -2978,6 +2989,9 @@ def _compound_sequence_view(sequence: dict[str, Any] | None) -> dict[str, Any] |
                 "payload_ref": item.get("payload_ref"),
                 "carrier_ref": item.get("carrier_ref"),
                 "delivery_mode": item.get("delivery_mode"),
+                "payload_binding_evidence": deepcopy(
+                    item.get("payload_binding_evidence")
+                ),
             }
             for item in sequence.get("subtasks", [])
         ],
@@ -3074,8 +3088,79 @@ def _dispatch_compound_subtask(session: dict[str, Any]) -> dict[str, Any] | None
     return started
 
 
+def _contextual_compound_payload_binding(
+    session: dict[str, Any],
+    frame: dict[str, Any],
+    analysis: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Bind an omitted payload only from a reported event and current facts."""
+    explicit_ref = _event_frame_bound_ref(frame)
+    if explicit_ref:
+        return {
+            "entity_ref": explicit_ref,
+            "basis": "explicit_event_frame_role",
+            "physical_fact_committed": False,
+        }
+    operators = set((frame.get("canonical_frame") or {}).get("operators", []))
+    if "fill_container" not in operators:
+        return None
+    reported_consumption = any(
+        item.get("event_type") == "consumption_completed"
+        and item.get("physical_state_change_committed") is False
+        for item in analysis.get("reported_event_candidates", [])
+    )
+    source_holder_role = (analysis.get("discourse_roles") or {}).get(
+        "source_holder"
+    ) or {}
+    holder_ref = (session.get("interaction_role_bindings") or {}).get(
+        source_holder_role.get("reference")
+    )
+    if not reported_consumption or not holder_ref:
+        return None
+
+    projected = (analysis.get("context_projection") or {}).get(
+        "relational_role_candidates", {}
+    )
+    projected_refs = {
+        item.get("entity_ref")
+        for role in ("theme", "target")
+        for item in projected.get(role, [])
+        if item.get("relation") == "received_by"
+        and item.get("relation_object_ref") == holder_ref
+        and item.get("world_revision") == session.get("world_revision")
+    }
+    concepts = load_object_concepts()["concepts"]
+    candidates = []
+    for entity in session.get("runtime_objects", []):
+        if (
+            entity.get("active") is False
+            or entity.get("received_by") != holder_ref
+            or (projected_refs and entity.get("entity_id") not in projected_refs)
+        ):
+            continue
+        profile = build_functional_profile(entity, concepts)
+        if "receive_liquid" in profile.get("functional_affordances", []):
+            candidates.append(entity)
+    if len(candidates) != 1:
+        return None
+    return {
+        "entity_ref": candidates[0]["entity_id"],
+        "basis": "reported_event_plus_current_verified_recipient_relation",
+        "reported_event": "consumption_completed",
+        "relation": "received_by",
+        "relation_object_ref": holder_ref,
+        "world_revision": session.get("world_revision"),
+        "current_snapshot_revalidated": True,
+        "prior_goal_roles_reused": False,
+        "physical_fact_committed": False,
+    }
+
+
 def _compile_compound_subtasks(
-    session: dict[str, Any], frames: list[dict[str, Any]], sequence_id: str
+    session: dict[str, Any],
+    frames: list[dict[str, Any]],
+    sequence_id: str,
+    analysis: dict[str, Any],
 ) -> list[dict[str, Any]]:
     subtasks: list[dict[str, Any]] = []
     objects = {item.get("entity_id"): item for item in session.get("runtime_objects", [])}
@@ -3087,7 +3172,10 @@ def _compile_compound_subtasks(
         next_operators = set(
             ((next_frame or {}).get("canonical_frame") or {}).get("operators", [])
         )
-        payload_ref = _event_frame_bound_ref(frame)
+        payload_binding = _contextual_compound_payload_binding(
+            session, frame, analysis
+        )
+        payload_ref = (payload_binding or {}).get("entity_ref")
         carrier_ref = _event_frame_bound_ref(next_frame or {}, "destination")
         carrier = objects.get(carrier_ref)
         carrier_profile = (
@@ -3095,10 +3183,17 @@ def _compile_compound_subtasks(
             if carrier else {}
         )
         recipient_ref = (session.get("interaction_role_bindings") or {}).get("human_speaker")
+        full_recipient_requested = bool(
+            ((analysis.get("discourse_roles") or {}).get("recipient") or {}).get(
+                "reference"
+            )
+            == "human_speaker"
+        )
         next_recipient_requested = bool(
             ((next_frame or {}).get("role_bindings") or {}).get("recipient")
             or (((next_frame or {}).get("discourse_roles") or {}).get("recipient") or {}).get("reference")
             == "human_speaker"
+            or full_recipient_requested
         )
         sources = [
             item for item in session.get("runtime_objects", [])
@@ -3147,7 +3242,8 @@ def _compile_compound_subtasks(
             subtasks.append({
                 "subtask_id": f"{sequence_id}:{subtask_index}",
                 "subtask_kind": "payload_carrier_delivery",
-                "utterance": f"{frame['utterance']}，{next_frame['utterance']}",
+                "utterance": analysis.get("utterance")
+                or f"{frame['utterance']}，{next_frame['utterance']}",
                 "operators": ["fill_container", "place_object", "transport_object", "handover_object"],
                 "goal_relation": (
                     "recipient_received_carrier_with_payload"
@@ -3156,6 +3252,7 @@ def _compile_compound_subtasks(
                 ),
                 "explicit_theme_ref": payload_ref,
                 "payload_ref": payload_ref,
+                "payload_binding_evidence": deepcopy(payload_binding),
                 "carrier_ref": carrier_ref,
                 "source_ref": sources[0]["entity_id"],
                 "recipient_ref": recipient_ref,
@@ -3217,7 +3314,9 @@ def _start_compound_command_sequence(
         "source_utterance_hash": hashlib.sha1(utterance.encode("utf-8")).hexdigest(),
         "current_subtask_index": 0,
         "dispatching": False,
-        "subtasks": _compile_compound_subtasks(session, frames, sequence_id),
+        "subtasks": _compile_compound_subtasks(
+            session, frames, sequence_id, analysis
+        ),
     }
     session["compound_command_sequence"] = sequence
     _debug_runtime(

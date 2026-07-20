@@ -368,6 +368,35 @@ def main() -> None:
         f"carrier handover was flattened into direct payload delivery or assigned a duplicate destination role: {carrier_handover}",
     )
 
+    reported_carrier_refill = compose(
+        "我喝完了，再接一杯水。这次被杯子放在托盘里然后给我"
+    )
+    reported_carrier_frames = reported_carrier_refill.get("event_frames", [])
+    require(
+        len(reported_carrier_frames) == 2
+        and reported_carrier_frames[0].get("canonical_frame", {}).get("operators")
+        == ["fill_container"]
+        and reported_carrier_frames[1].get("canonical_frame", {}).get("operators")
+        == ["place_object"]
+        and (
+            reported_carrier_refill.get("discourse_roles", {}).get("recipient")
+            or {}
+        ).get("reference")
+        == "human_speaker"
+        and (
+            reported_carrier_refill.get("discourse_roles", {}).get(
+                "source_holder"
+            )
+            or {}
+        ).get("reference")
+        == "human_speaker"
+        and (
+            reported_carrier_refill.get("reported_event_candidates", [{}])[0]
+        ).get("event_type")
+        == "consumption_completed",
+        f"reported refill, carrier support, and elliptical recipient roles were not preserved across clauses: {reported_carrier_refill}",
+    )
+
     argument_order_carrier = compose("杯子还在我手中，你要来拿过去杯子，然后再把水接了放在托盘上给我就行")
     argument_order_frames = argument_order_carrier.get("event_frames", [])
     require(

@@ -896,6 +896,81 @@ def verify_reported_consumption_repeat_refill() -> dict:
     }
 
 
+def verify_reported_refill_compiles_carrier_delivery() -> dict:
+    session = start_session("home_humanoid", "hospitality_guest")
+    session_id = session["session_id"]
+    drain_service(
+        begin_motion_command(session_id, "给我用白色杯子接一杯水")
+    )
+    runtime = SESSIONS[session_id]
+    next(
+        item for item in runtime["runtime_objects"]
+        if item["entity_id"] == "mug_white"
+    )["label"] = "未登记饮具甲"
+    next(
+        item for item in runtime["runtime_objects"]
+        if item["entity_id"] == "wooden_tray"
+    )["label"] = "未登记承载器甲"
+
+    started = begin_motion_command(
+        session_id,
+        "我喝完了，再接一杯水。这次被杯子放在托盘里然后给我",
+    )
+    sequence = started.get("compound_command_sequence") or {}
+    subtasks = sequence.get("subtasks", [])
+    intent = started.get("long_horizon_intent") or {}
+    evidence = (
+        subtasks[0].get("payload_binding_evidence") if subtasks else {}
+    ) or {}
+    require(
+        started.get("status") == "motion_started"
+        and len(subtasks) == 1
+        and subtasks[0].get("subtask_kind") == "payload_carrier_delivery"
+        and subtasks[0].get("payload_ref") == "mug_white"
+        and subtasks[0].get("carrier_ref") == "wooden_tray"
+        and subtasks[0].get("delivery_mode")
+        == "payload_only_carrier_retained"
+        and intent.get("intent_type") == "verified_payload_carrier_delivery",
+        f"reported refill was split into an ungrounded fill and an unreachable carrier placement: {started}",
+    )
+    require(
+        evidence.get("basis")
+        == "reported_event_plus_current_verified_recipient_relation"
+        and evidence.get("relation") == "received_by"
+        and evidence.get("relation_object_ref") == "guest"
+        and evidence.get("current_snapshot_revalidated") is True
+        and evidence.get("prior_goal_roles_reused") is False
+        and evidence.get("physical_fact_committed") is False,
+        f"omitted payload was not bound through the current verified relation boundary: {evidence}",
+    )
+    outcomes = drain_service(started)
+    facts = [item.get("terminal_fact") for item in outcomes]
+    live = get_session(session_id)
+    objects = {item["entity_id"]: item for item in live["runtime_objects"]}
+    require(
+        facts
+        == [
+            "target_object_in_gripper",
+            "container_filled",
+            "object_supported_at_destination",
+            "target_object_in_gripper",
+            "human_received_filled_container",
+        ]
+        and objects["mug_white"].get("received_by") == "guest"
+        and objects["mug_white"].get("support_ref") is None
+        and objects["wooden_tray"].get("received_by") is None
+        and "wooden_tray" in _holding_by_effector(live).values(),
+        f"context-bound carrier delivery did not preserve payload and carrier ownership: {outcomes}",
+    )
+    return {
+        "payload": "mug_white",
+        "carrier": "wooden_tray",
+        "binding_basis": evidence.get("basis"),
+        "rename_invariant": True,
+        "stage_facts": facts,
+    }
+
+
 def verify_structured_role_answer_does_not_rewrite_source_text() -> dict:
     session = start_session("home_humanoid", "hospitality_guest")
     session_id = session["session_id"]
@@ -1333,6 +1408,7 @@ def main() -> None:
         "hospitality_selected_container_service": verify_hospitality_container_selection_service_chain(),
         "current_relation_precedes_category_ambiguity": verify_current_relation_precedes_category_ambiguity(),
         "reported_consumption_repeat_refill": verify_reported_consumption_repeat_refill(),
+        "reported_refill_carrier_delivery": verify_reported_refill_compiles_carrier_delivery(),
         "structured_role_answer": verify_structured_role_answer_does_not_rewrite_source_text(),
         "explicit_container_precedes_ambiguity": verify_explicit_container_binding_precedes_ambiguity(),
         "event_scoped_compound_sequence": verify_event_scoped_compound_sequence(),
