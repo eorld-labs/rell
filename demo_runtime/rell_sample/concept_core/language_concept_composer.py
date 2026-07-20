@@ -335,6 +335,77 @@ def _resolve_serial_event_dependencies(
     return retained, dependencies
 
 
+def _extract_historical_event_constraints(
+    text: str,
+    events: list[dict[str, Any]],
+    objects: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Separate events inside temporal relative clauses from current commands."""
+    retained: list[dict[str, Any]] = []
+    constraints: list[dict[str, Any]] = []
+    temporal_markers = ("刚才", "刚刚", "之前", "先前", "上次")
+    for event in events:
+        event_start = int(event.get("start", -1))
+        event_end = int(event.get("end", -1))
+        marker_matches = [
+            (marker, text.rfind(marker, 0, event_start + 1))
+            for marker in temporal_markers
+        ]
+        marker, marker_start = max(marker_matches, key=lambda item: item[1])
+        possessive_end = text.find("的", event_end)
+        if marker_start < 0 or possessive_end < 0:
+            retained.append(event)
+            continue
+        if any(
+            punctuation in text[marker_start:possessive_end]
+            for punctuation in "，。！？、,.!?；;"
+        ):
+            retained.append(event)
+            continue
+        event_themes = [
+            item
+            for item in objects
+            if int(item.get("start", -1)) >= event_end
+            and int(item.get("end", -1)) <= possessive_end
+            and "graspable" in item.get("functional_affordances", [])
+        ]
+        heads = [
+            item
+            for item in objects
+            if int(item.get("start", -1)) > possessive_end
+            and "support_object" in item.get("functional_affordances", [])
+        ]
+        if len(event_themes) != 1 or not heads:
+            retained.append(event)
+            continue
+        head = min(heads, key=lambda item: int(item.get("start", 0)))
+        relation = (
+            "source_support_of_verified_event"
+            if event.get("operator") == "grasp_object"
+            else "location_of_verified_event"
+        )
+        constraints.append({
+            "operator": event.get("operator"),
+            "matched_surface": event.get("matched_surface"),
+            "event_start": event_start,
+            "event_end": event_end,
+            "constraint_start": marker_start,
+            "constraint_end": int(head.get("end", possessive_end + 1)),
+            "temporal_marker": marker,
+            "temporal_scope": "recent_verified_runtime_past",
+            "actor_reference": (
+                "executor" if "你" in text[marker_start:event_start] else None
+            ),
+            "theme": deepcopy(event_themes[0]),
+            "head": deepcopy(head),
+            "head_role": "destination",
+            "relation": relation,
+            "source": "temporal_relative_clause_composition",
+            "physical_fact_committed": False,
+        })
+    return retained, constraints
+
+
 def _ellipsis_candidates(text: str) -> list[dict[str, Any]]:
     candidates = []
     match = re.search(r"(?P<event>接|取|倒|装|来)(?:一)?杯(?!子|水|茶|咖啡|饮料)", text)
@@ -624,11 +695,23 @@ def _unknown_surface(
     events: list[dict[str, Any]],
     objects: list[dict[str, Any]],
     reported_events: list[dict[str, Any]],
+    historical_event_constraints: list[dict[str, Any]] | None = None,
 ) -> str | None:
     residual = text
     spans = [
         (item["start"], item["end"])
-        for item in [*events, *objects, *reported_events]
+        for item in [
+            *events,
+            *objects,
+            *reported_events,
+            *(
+                {
+                    "start": item.get("constraint_start"),
+                    "end": item.get("constraint_end"),
+                }
+                for item in (historical_event_constraints or [])
+            ),
+        ]
         if isinstance(item.get("start"), int)
     ]
     for start, end in sorted(spans, reverse=True):
@@ -657,6 +740,9 @@ def compose_language_concepts(
     )
     objects, unresolved = _resolve_pronouns(normalized, objects, context_entities or [])
     events, event_dependencies = _resolve_serial_event_dependencies(normalized, events, objects)
+    events, historical_event_constraints = _extract_historical_event_constraints(
+        normalized, events, objects
+    )
     discourse_roles = _discourse_roles(normalized)
     reported_events = _reported_events(normalized)
     ellipsis_candidates = _ellipsis_candidates(normalized)
@@ -714,7 +800,13 @@ def compose_language_concepts(
         if not roles.get("recipient"):
             unresolved.append("handover_recipient_not_grounded")
 
-    unknown_surface = _unknown_surface(normalized, events, objects, reported_events)
+    unknown_surface = _unknown_surface(
+        normalized,
+        events,
+        objects,
+        reported_events,
+        historical_event_constraints,
+    )
     confidence = 0.15
     if speech_act != "unknown":
         confidence += 0.18
@@ -753,6 +845,7 @@ def compose_language_concepts(
         "discourse_roles": discourse_roles,
         "reported_event_candidates": deepcopy(reported_events),
         "event_dependencies": deepcopy(event_dependencies),
+        "historical_event_constraints": deepcopy(historical_event_constraints),
         "ellipsis_candidates": ellipsis_candidates,
         "modifiers": {
             "negated": speech_act == "prohibition",

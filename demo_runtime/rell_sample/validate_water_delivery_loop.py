@@ -1008,6 +1008,59 @@ def verify_historical_event_return_replans_current_route() -> dict:
     return {"source_support_ref": reference["source_support_ref"], "old_trajectory_reused": False}
 
 
+def verify_inline_historical_event_destination_grounding() -> dict:
+    session = start_session("home_humanoid", "hospitality_guest")
+    session_id = session["session_id"]
+    drain_service(
+        begin_motion_command(session_id, "用白色马克杯给我接一杯水")
+    )
+    started = begin_motion_command(
+        session_id,
+        "我喝完了，现在把杯子放到刚才你拿杯子的桌子上",
+    )
+    immediate = started.get("immediate_result") or started
+    intent = started.get("long_horizon_intent") or immediate.get(
+        "long_horizon_intent"
+    ) or {}
+    resolution = started.get("historical_reference_resolution") or immediate.get(
+        "historical_reference_resolution"
+    ) or {}
+    require(
+        started.get("status") == "requires_human_confirmation"
+        and intent.get("role_bindings", {}).get("theme") == "mug_white"
+        and intent.get("role_bindings", {}).get("destination")
+        == "hospitality_counter_a"
+        and resolution.get("status") == "historical_event_role_resolved"
+        and resolution.get("evidence_source")
+        == "recent_verified_grasp_source_fact"
+        and resolution.get("binding_strength") == "unique_verified_event_role"
+        and resolution.get("old_trajectory_reused") is False,
+        f"inline historical event relation did not bind the verified grasp source: {started}",
+    )
+    require(
+        get_session(session_id).get("process_gap_dialogue") is None,
+        f"verified historical event role fell back to an A/B destination slot: {get_session(session_id)}",
+    )
+    outcomes = drain_service_with_confirmations(session_id, started)
+    final = get_session(session_id)
+    mug = next(
+        item for item in final["runtime_objects"]
+        if item["entity_id"] == "mug_white"
+    )
+    require(
+        outcomes[-1].get("terminal_fact") == "object_supported_at_destination"
+        and mug.get("support_ref") == "hospitality_counter_a"
+        and mug.get("received_by") is None,
+        f"historically grounded destination did not survive physical execution: {outcomes}",
+    )
+    return {
+        "theme": "mug_white",
+        "destination": "hospitality_counter_a",
+        "evidence": "recent_verified_grasp_source_fact",
+        "old_trajectory_reused": False,
+    }
+
+
 def verify_historical_destination_answer_precedes_task_supersession() -> dict:
     session = start_session("home_humanoid", "hospitality_guest")
     session_id = session["session_id"]
@@ -1287,6 +1340,7 @@ def main() -> None:
         "terminal_relation_effect_gate": verify_terminal_relation_gates_effect_commit(),
         "role_scoped_transfer_after_handover": verify_role_scoped_transfer_after_handover(),
         "historical_event_return": verify_historical_event_return_replans_current_route(),
+        "inline_historical_event_destination": verify_inline_historical_event_destination_grounding(),
         "historical_destination_answer": verify_historical_destination_answer_precedes_task_supersession(),
         "relational_destination_grounding": verify_relational_destination_grounding_and_slot_resume(),
         "generic_movable_asset_transfer": verify_generic_movable_asset_transfer_binding(),

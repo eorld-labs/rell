@@ -3574,6 +3574,91 @@ def _historical_support_reference_candidate(
         return None
     theme = analysis.get("role_bindings", {}).get("theme") or {}
     theme_concept_id = theme.get("concept_id")
+    event_constraints = [
+        item
+        for item in analysis.get("historical_event_constraints", [])
+        if item.get("operator") == "grasp_object"
+        and item.get("relation") == "source_support_of_verified_event"
+        and item.get("head_role") == "destination"
+    ]
+    if len(event_constraints) == 1:
+        constraint = event_constraints[0]
+        historical_theme = constraint.get("theme") or {}
+        process_bindings = (
+            analysis.get("process_template_resolution") or {}
+        ).get("bindings", {})
+        resolved_theme_ref = (process_bindings.get("theme") or {}).get("value_ref")
+        reference_entities = [
+            item
+            for item in session["runtime_objects"]
+            if item.get("active") is not False
+            and item.get("kind") in historical_theme.get("compatible_kinds", [])
+            and (not resolved_theme_ref or item.get("entity_id") == resolved_theme_ref)
+        ]
+        speaker_ref = (session.get("interaction_role_bindings") or {}).get(
+            "human_speaker"
+        )
+        relationally_focused = [
+            item
+            for item in reference_entities
+            if item.get("received_by") == speaker_ref
+            or _is_held(session, item.get("entity_id"))
+        ]
+        if len(relationally_focused) == 1:
+            reference_entities = relationally_focused
+        if len(reference_entities) != 1:
+            return None
+        reference = reference_entities[0]
+        support_episode = _query_recent_support_episode(
+            session, reference["entity_id"]
+        )
+        destination_ref = (support_episode or {}).get("destination_ref")
+        destination = next(
+            (
+                item
+                for item in session["runtime_objects"]
+                if item.get("entity_id") == destination_ref
+                and item.get("kind") == "operation_surface"
+            ),
+            None,
+        )
+        theme_name = (
+            theme.get("matched_alias")
+            or theme.get("label")
+            or theme.get("display_name")
+        )
+        if not theme_name:
+            return None
+        candidate_analysis = deepcopy(analysis)
+        candidate_analysis["canonical_utterance"] = (
+            f"把{theme_name}放到{destination['label']}" if destination else None
+        )
+        candidate_analysis["unresolved_slots"] = (
+            [] if destination else ["historical_event_source_support_not_found"]
+        )
+        candidate_analysis["decision"] = (
+            "route_contextually_resolved_historical_event_role"
+            if destination
+            else "request_minimum_semantic_clarification"
+        )
+        candidate_analysis["historical_reference_candidate"] = {
+            "theme_label": theme_name,
+            "theme_entity_ref": reference["entity_id"],
+            "reference_entity_ref": reference["entity_id"],
+            "reference_label": reference["label"],
+            "relation": "source_support_of_verified_grasp",
+            "destination_entity_ref": destination["entity_id"] if destination else None,
+            "destination_label": destination["label"] if destination else None,
+            "evidence_source": (support_episode or {}).get("evidence_source")
+            or "support_relation_not_found",
+            "episode_id": (support_episode or {}).get("episode_id"),
+            "episode_operator": (support_episode or {}).get("operator"),
+            "historical_event_constraint": deepcopy(constraint),
+            "semantic_confirmation_required": False,
+            "binding_strength": "unique_verified_event_role",
+            "physical_fact_committed": False,
+        }
+        return candidate_analysis
     reference_mentions = [
         item for item in analysis.get("entity_mentions", [])
         if item.get("concept_id") != theme_concept_id
@@ -8656,6 +8741,44 @@ def begin_motion_command(
         return {"status": immediate["status"], "immediate_result": immediate, "session": get_session(session_id)}
     if historical_reference:
         candidate = historical_reference["historical_reference_candidate"]
+        if (
+            candidate.get("destination_entity_ref")
+            and candidate.get("theme_entity_ref")
+            and candidate.get("binding_strength") == "unique_verified_event_role"
+            and candidate.get("semantic_confirmation_required") is False
+        ):
+            canonical = historical_reference.get("canonical_utterance")
+            grounded_historical = _compose_session_language(
+                session,
+                canonical,
+                grounded_role_bindings={
+                    "theme": candidate["theme_entity_ref"],
+                    "destination": candidate["destination_entity_ref"],
+                },
+            )
+            historical_intent = _create_transfer_intent(
+                session, canonical, grounded_historical
+            )
+            if historical_intent:
+                prepared = _prepare_long_intent_stage(session, historical_intent)
+                resolution = {
+                    "status": "historical_event_role_resolved",
+                    "theme_entity_ref": candidate["theme_entity_ref"],
+                    "destination_entity_ref": candidate["destination_entity_ref"],
+                    "evidence_source": candidate.get("evidence_source"),
+                    "episode_ref": candidate.get("episode_id"),
+                    "binding_strength": candidate.get("binding_strength"),
+                    "current_world_revalidation_required": True,
+                    "old_trajectory_reused": False,
+                    "physical_fact_committed": False,
+                }
+                prepared["historical_reference_resolution"] = deepcopy(resolution)
+                if prepared.get("immediate_result"):
+                    prepared["immediate_result"]["historical_reference_resolution"] = deepcopy(
+                        resolution
+                    )
+                prepared["session"] = get_session(session_id)
+                return prepared
         if not candidate.get("destination_entity_ref"):
             session["relational_reference_dialogue"] = {
                 "status": "collecting_missing_historical_relation",

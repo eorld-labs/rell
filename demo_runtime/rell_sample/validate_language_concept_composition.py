@@ -306,6 +306,41 @@ def main() -> None:
         f"an explicit locative complement was collapsed with the serial auxiliary: {explicit_serial_destination}",
     )
 
+    historical_relative = compose(
+        "我喝完了，现在把杯子放到刚才你拿杯子的桌子上"
+    )
+    historical_constraints = historical_relative.get(
+        "historical_event_constraints", []
+    )
+    require(
+        [item.get("operator") for item in historical_relative.get("event_candidates", [])]
+        == ["place_object"]
+        and historical_relative.get("canonical_utterance") == "把杯子放到桌子"
+        and historical_relative.get("unknown_surface") is None,
+        f"historical relative-clause event leaked into the current execution chain: {historical_relative}",
+    )
+    require(
+        len(historical_constraints) == 1
+        and historical_constraints[0].get("operator") == "grasp_object"
+        and historical_constraints[0].get("relation")
+        == "source_support_of_verified_event"
+        and historical_constraints[0].get("temporal_scope")
+        == "recent_verified_runtime_past"
+        and historical_constraints[0].get("head_role") == "destination"
+        and historical_constraints[0].get("physical_fact_committed") is False,
+        f"historical event role was not represented as an auditable constraint: {historical_relative}",
+    )
+    generic_historical_relative = compose("把苹果放到之前你拿苹果的桌子上")
+    require(
+        [item.get("operator") for item in generic_historical_relative.get("event_candidates", [])]
+        == ["place_object"]
+        and (
+            generic_historical_relative.get("historical_event_constraints", [{}])[0]
+        ).get("theme", {}).get("concept_id")
+        == "concept_edible_apple",
+        f"historical event composition was tied to the cup scenario: {generic_historical_relative}",
+    )
+
     scoped_compound = compose("好，现在帮我把杯子放到桌子上去，用高脚杯给我倒一杯水")
     scoped_frames = scoped_compound.get("event_frames", [])
     require(len(scoped_frames) == 2, f"independent event clauses were flattened into one role frame: {scoped_compound}")
