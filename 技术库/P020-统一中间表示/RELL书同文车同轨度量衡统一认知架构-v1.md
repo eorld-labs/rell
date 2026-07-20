@@ -617,3 +617,78 @@ target_object_in_gripper = true
 ```
 
 当这条闭环成为唯一主路径后，场景测试仍然会不断暴露问题，但每次修复将提升整个底座，而不是只让某一句话暂时可用。
+
+## 二十、最小版本工程落点
+
+2026-07-20 已形成 RCIR 最小可执行版本，工程入口为：
+
+- `demo_runtime/rell_sample/concept_core/cognitive_ir.py`；
+- `schemas/rcir_bundle.schema.json`；
+- `demo_runtime/rell_sample/validate_cognitive_ir.py`；
+- `demo_runtime/rell_sample/docs/rcir_minimal_evidence_chain.md`。
+
+当前版本已经实现：
+
+1. 单轮权威 `RCIR Bundle`；
+2. 不含原句的 `SituatedEventGraph`；
+3. 带世界版本和证据引用的 `WorldFactLedger`；
+4. 带结构化角色绑定的 `GroundedCausalGraph`；
+5. Bundle 权威摘要和篡改检测；
+6. 现有任务角色解析对 RCIR 的主链消费；
+7. 新轮次替换和任务完成后的紧凑收据释放；
+8. 改名不变性、事实版本一致性和原句不下沉回归。
+
+当前仍属于迁移起点，而不是最终完成态。旧情境事件结构暂时并行存在，部分内部阶段仍经过旧语言入口，经验检索、恢复和全部复合任务编译器尚未强制改为只消费 RCIR。下一里程碑仍以“自然语言以下模块不再重新解析原文”为完成标准。
+
+## 二十一、最小落地补充协议与强制不变量
+
+### 21.1 角色落地失败追问合同
+
+角色落地不再由各场景自行生成“请选择某个物体”的固定问句，而是进入统一循环：
+
+```text
+多候选 EntityRef
+  -> 比较当前可观察属性
+  -> 选择使最大剩余候选数最小的属性
+  -> 请求该最小属性约束
+  -> 将回答编译为概念谓词
+  -> 在当前 world_revision 重新观测和落地
+  -> 唯一则继续，否则再次追问
+```
+
+该合同只处理颜色、材质、形态、尺寸、透明度、温度和状态等可观察属性，不读取对象显示名，不提交物理事实。世界版本变化后，旧追问合同失效，必须重新观测。
+
+### 21.2 旧经验到新环境的迁移合同
+
+可信经验的执行权威被收缩为 `PortableExperienceContract`。允许迁移：
+
+- 角色类型槽位和所需可供性；
+- `requires / produces / destroys` 因果效果；
+- 验真条件和终止条件；
+- 算子顺序、拓扑、方向及物理不变量。
+
+禁止迁移：
+
+- 旧 `EntityRef` 和原目标语言；
+- 绝对坐标、关节角、固定时长；
+- 教师按键、单次轨迹和旧本体参数。
+
+每次召回都必须在当前世界证据上重新绑定角色、按当前本体重新规划运动，并在规划前执行当前事实裁剪。旧经验记录可在迁移期保留用于审计和兼容，但不再是执行权威。
+
+### 21.3 五条优先不变量
+
+最小版本已将以下规则从文档要求升级为代码断言和回归测试：
+
+1. `language_does_not_commit_physical_fact`：人类报告只形成事件候选；
+2. `perception_candidate_is_not_runtime_fact`：感知证据保持 `epistemic_only`，不能直接改变执行状态；
+3. `downstream_does_not_reparse_surface_text`：RCIR 以下禁止原始文本字段；
+4. `current_verified_relation_precedes_history_and_category`：唯一当前验真关系优先于历史、经验和类别候选；
+5. `every_recovery_reenters_current_fact_pruning`：每次续推或恢复生成绑定当前世界版本的裁剪审计令牌，旧路径不得复用。
+
+对应工程落点：
+
+- `concept_core/rcir_contracts.py`：追问合同和经验迁移合同；
+- `concept_core/cognitive_ir.py`：五条不变量的编译期与校验期断言；
+- `embodied_experience_store.py`：可信经验召回时生成并暴露可迁移合同；
+- `embodied_scene.py::_prepare_long_intent_stage`：统一当前事实裁剪屏障；
+- `validate_cognitive_ir.py`：合同、证据边界、优先级和恢复路径回归。

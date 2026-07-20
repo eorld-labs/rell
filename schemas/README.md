@@ -13,6 +13,7 @@
 | `fact_observation.schema.json` | 定义目标因果事实的独立观测通道、成立判断和最终成立状态。 |
 | `engine_contract.schema.json` | 定义运行时执行计划、监控循环、恢复和执行轨迹接口。 |
 | `executor_profile.schema.json` | 预留执行体能力画像，用于承接 P008 主体物理约束和后续空间可进入性准入。 |
+| `rcir_bundle.schema.json` | 定义单轮权威情境事件图、世界事实账本、已落地因果图及其不可绕过的证据边界。 |
 
 ## 兼容入口
 

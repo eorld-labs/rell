@@ -25,6 +25,8 @@
 - `data/digital_kitchen_cognitive_model.json`：模拟执行体加载语义先验后形成的主体侧空间认知模型。
 - `digital_space.py`：空间语义先验到主体侧空间认知模型的端侧内化逻辑。
 - `runtime_core.py`：P016 Runtime Core、MockRobotAdapter 和 SimulatedRobotAdapter。
+- `concept_core/cognitive_ir.py`：RCIR 最小统一认知中间表示，将情境事件图、世界事实账本和已落地因果图封装为可校验的单轮权威 Bundle。
+- `concept_core/rcir_contracts.py`：通用角色歧义追问合同与无实例、无轨迹的可迁移经验合同。
 - `adapters/adapter_contract.py`：Robot Adapter 统一接口和能力词汇表。
 - `adapters/vendor_robot_adapter_stub.py`：真机 SDK 接入占位 Adapter。
 - `docs/adapter_contract.md`：Runtime 与 Robot Adapter 的异步边界。
@@ -81,6 +83,7 @@ demo_runtime/output/rell_sample
 python .\demo_runtime\rell_sample\validate_runtime_sample.py
 python .\demo_runtime\rell_sample\validate_simulated_robot_sample.py
 python .\demo_runtime\rell_sample\validate_adapter_contract.py
+python .\demo_runtime\rell_sample\validate_cognitive_ir.py
 python .\demo_runtime\rell_sample\validate_digital_space.py
 ```
 

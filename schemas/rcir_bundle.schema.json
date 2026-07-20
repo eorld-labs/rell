@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/rcir_bundle.schema.json",
+  "title": "RELL Cognitive IR Bundle",
+  "description": "同一交互轮次的权威情境事件图、世界事实账本和已落地因果图。",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "ir_kind",
+    "bundle_id",
+    "authority_digest",
+    "world_revision",
+    "interaction_turn",
+    "situated_event_graph",
+    "world_fact_ledger",
+    "grounded_causal_graph",
+    "architecture_invariants"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "ir_kind": {
+      "const": "rell_cognitive_ir_bundle"
+    },
+    "bundle_id": {
+      "type": "string",
+      "pattern": "^rcir_[a-f0-9]{16}$"
+    },
+    "authority_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "world_revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "interaction_turn": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "situated_event_graph": {
+      "$ref": "#/$defs/situatedEventGraph"
+    },
+    "world_fact_ledger": {
+      "$ref": "#/$defs/worldFactLedger"
+    },
+    "grounded_causal_graph": {
+      "$ref": "#/$defs/groundedCausalGraph"
+    },
+    "architecture_invariants": {
+      "type": "object",
+      "required": [
+        "one_turn_one_authoritative_semantic_graph",
+        "downstream_surface_reparse_allowed",
+        "language_does_not_commit_physical_fact",
+        "perception_candidate_is_not_runtime_fact",
+        "downstream_does_not_reparse_surface_text",
+        "current_verified_relation_precedes_history_and_category",
+        "every_recovery_reenters_current_fact_pruning",
+        "current_world_ledger_is_authoritative",
+        "every_binding_has_evidence_and_world_revision",
+        "current_fact_pruning_required_before_execution"
+      ],
+      "properties": {
+        "one_turn_one_authoritative_semantic_graph": { "const": true },
+        "downstream_surface_reparse_allowed": { "const": false },
+        "language_does_not_commit_physical_fact": { "const": true },
+        "perception_candidate_is_not_runtime_fact": { "const": true },
+        "downstream_does_not_reparse_surface_text": { "const": true },
+        "current_verified_relation_precedes_history_and_category": { "const": true },
+        "every_recovery_reenters_current_fact_pruning": { "const": true },
+        "current_world_ledger_is_authoritative": { "const": true },
+        "every_binding_has_evidence_and_world_revision": { "const": true },
+        "current_fact_pruning_required_before_execution": { "const": true }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "situatedEventGraph": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "ir_kind",
+        "graph_id",
+        "world_revision",
+        "source_language",
+        "events",
+        "roles",
+        "goal",
+        "authority"
+      ],
+      "properties": {
+        "schema_version": { "const": "1.0.0" },
+        "ir_kind": { "const": "situated_event_graph" },
+        "graph_id": { "type": "string" },
+        "world_revision": { "type": "integer", "minimum": 0 },
+        "source_language": {
+          "type": "object",
+          "required": ["utterance_ref", "character_count", "raw_text_included"],
+          "properties": {
+            "utterance_ref": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+            "character_count": { "type": "integer", "minimum": 0 },
+            "raw_text_included": { "const": false }
+          },
+          "additionalProperties": false
+        },
+        "events": { "type": "array", "items": { "type": "object" } },
+        "roles": { "type": "object" },
+        "goal": { "type": "object" },
+        "authority": {
+          "type": "object",
+          "required": [
+            "authoritative_for_turn",
+            "downstream_surface_reparse_allowed",
+            "language_commits_physical_facts"
+          ],
+          "properties": {
+            "authoritative_for_turn": { "const": true },
+            "downstream_surface_reparse_allowed": { "const": false },
+            "language_commits_physical_facts": { "const": false }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": true
+    },
+    "worldFactLedger": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "ir_kind",
+        "ledger_id",
+        "world_revision",
+        "facts",
+        "evidence",
+        "authoritative_current_fact_ids"
+      ],
+      "properties": {
+        "schema_version": { "const": "1.0.0" },
+        "ir_kind": { "const": "world_fact_ledger" },
+        "ledger_id": { "type": "string" },
+        "world_revision": { "type": "integer", "minimum": 0 },
+        "facts": { "type": "array", "items": { "type": "object" } },
+        "evidence": { "type": "array", "items": { "type": "object" } },
+        "authoritative_current_fact_ids": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "groundedCausalGraph": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "ir_kind",
+        "graph_id",
+        "world_revision",
+        "situated_graph_ref",
+        "world_ledger_ref",
+        "goal_facts",
+        "role_bindings",
+        "nodes",
+        "current_fact_pruning_required",
+        "direct_execution_allowed",
+        "runtime_fact_committed"
+      ],
+      "properties": {
+        "schema_version": { "const": "1.0.0" },
+        "ir_kind": { "const": "grounded_causal_graph" },
+        "graph_id": { "type": "string" },
+        "world_revision": { "type": "integer", "minimum": 0 },
+        "situated_graph_ref": { "type": "string" },
+        "world_ledger_ref": { "type": "string" },
+        "goal_facts": { "type": "array", "items": { "type": "object" } },
+        "role_bindings": { "type": "object" },
+        "nodes": { "type": "array", "items": { "type": "object" } },
+        "current_fact_pruning_required": { "const": true },
+        "direct_execution_allowed": { "const": false },
+        "runtime_fact_committed": { "const": false }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

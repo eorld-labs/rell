@@ -14,6 +14,7 @@ from uuid import uuid4
 
 from concept_core.factory_event_units import FACTORY_EVENT_CONCEPT_UNITS, build_factory_inability_diagnosis, find_factory_event_concepts_by_text
 from concept_core.concept_gap_dialogue import continue_concept_gap_dialogue, start_concept_gap_dialogue
+from concept_core.cognitive_ir import compact_rcir_receipt, compile_rcir_bundle
 from concept_core.contextual_affordance import resolve_contextual_affordance_request
 from concept_core.context_projection import build_context_projection, compact_intent_capsule
 from concept_core.functional_object_reasoning import build_functional_object_catalog, build_functional_profile, evaluate_role_compatibility
@@ -268,6 +269,19 @@ def _sync_primary_holding(session: dict[str, Any]) -> None:
     session["state"]["holding"] = next((ref for ref in holding.values() if ref), None)
 
 
+def _append_rcir_receipt(
+    session: dict[str, Any], bundle: dict[str, Any], release_reason: str
+) -> None:
+    receipt = compact_rcir_receipt(bundle, release_reason=release_reason)
+    receipts = session.setdefault("rcir_receipts", [])
+    if receipts and receipts[-1].get("bundle_id") == receipt.get("bundle_id"):
+        receipts[-1] = receipt
+    else:
+        receipts.append(receipt)
+    if len(receipts) > 16:
+        del receipts[:-16]
+
+
 def _held_effector(session: dict[str, Any], object_ref: str) -> str | None:
     return next((channel for channel, ref in _holding_by_effector(session).items() if ref == object_ref), None)
 
@@ -336,6 +350,8 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator", scene_id
         "episodic_fact_memory": [],
         "interaction_turn": 0,
         "last_context_projection": None,
+        "current_rcir": None,
+        "rcir_receipts": [],
         "concept_gap_dialogue": None,
         "open_world_observation": None,
         "confirmed_visual_bindings": [],
@@ -424,6 +440,9 @@ def _long_intent_view(intent: dict[str, Any]) -> dict[str, Any]:
         "horizon_transition_history": deepcopy(
             intent.get("horizon_transition_history", [])
         ),
+        "current_fact_pruning_audit": deepcopy(
+            intent.get("current_fact_pruning_audit")
+        ),
     }
 
 
@@ -483,6 +502,14 @@ def _archive_and_release_task_context(
         if len(terminal_focus) >= 4:
             break
     session["dialogue_focus_entities"] = terminal_focus
+
+    if session.get("current_rcir"):
+        _append_rcir_receipt(
+            session,
+            session["current_rcir"],
+            "task_context_released_after_goal_transition",
+        )
+        session["current_rcir"] = None
 
     # Task mechanics are disposable. Physical effects remain in runtime_objects
     # and verified causal transitions remain only as compact episode capsules.
@@ -1032,6 +1059,43 @@ def _resolve_current_role_binding(
     current_candidates = [item for item in candidates if item.get("active") is not False]
     analysis = language_analysis or {}
     current_by_ref = {item.get("entity_id"): item for item in current_candidates}
+    rcir = analysis.get("rcir") or {}
+    rcir_binding = (
+        ((rcir.get("grounded_causal_graph") or {}).get("role_bindings") or {})
+        .get(role, {})
+    )
+    rcir_ref = rcir_binding.get("entity_ref")
+    if (
+        not confirmed_entity_ref
+        and rcir_binding.get("status") == "resolved"
+        and rcir_ref in current_by_ref
+        and rcir_binding.get("world_revision") == session.get("world_revision")
+    ):
+        rcir_evidence = rcir_binding.get("evidence") or {}
+        return {
+            "status": "resolved",
+            "entity": current_by_ref[rcir_ref],
+            "entity_ref": rcir_ref,
+            "evidence": {
+                "basis": rcir_evidence.get("basis")
+                or "rcir_current_world_binding",
+                "strength": int(rcir_evidence.get("strength") or 0),
+                "world_revision": rcir_binding.get("world_revision"),
+                "observation_evidence_set_id": rcir_evidence.get(
+                    "evidence_ref"
+                ),
+                "matched_constraints": [],
+                "current_snapshot_revalidated": True,
+                "rcir_bundle_id": rcir.get("bundle_id"),
+                "rcir_authority_digest": rcir.get("authority_digest"),
+            },
+            "compatible_candidates": deepcopy(current_candidates),
+            "grounded_role": {
+                "status": "resolved",
+                "binding": deepcopy(rcir_binding),
+                "source": "authoritative_rcir_grounded_causal_graph",
+            },
+        }
     # The unified process resolver may already have reduced a concept role by
     # a current verified relation (for example, the only object possessed by
     # the addressed human). Do not discard that stronger binding and restart
@@ -1853,8 +1917,46 @@ def _derive_causal_graph_stage(session: dict[str, Any], intent: dict[str, Any]) 
         }
 
 
+def _enter_current_fact_pruning_barrier(
+    session: dict[str, Any], intent: dict[str, Any]
+) -> dict[str, Any]:
+    current_facts = facts_from_runtime_state(
+        session.get("runtime_objects", []),
+        session.get("state", {}),
+        int(session.get("world_revision", 0)),
+    )
+    fact_keys = sorted(
+        (
+            str(item.get("predicate") or ""),
+            str(item.get("subject") or ""),
+            str(item.get("object") or ""),
+        )
+        for item in current_facts
+    )
+    digest = hashlib.sha256(
+        json.dumps(fact_keys, ensure_ascii=False, separators=(",", ":")).encode(
+            "utf-8"
+        )
+    ).hexdigest()
+    previous = intent.get("current_fact_pruning_audit") or {}
+    audit = {
+        "invariant": "every_recovery_reenters_current_fact_pruning",
+        "applied": True,
+        "world_revision": int(session.get("world_revision", 0)),
+        "current_fact_digest": digest,
+        "entry_count": int(previous.get("entry_count", 0)) + 1,
+        "old_path_reused": False,
+        "verified_intent_facts_considered": sorted(
+            set(intent.get("verified_facts") or [])
+        ),
+    }
+    intent["current_fact_pruning_audit"] = audit
+    return audit
+
+
 def _prepare_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) -> dict[str, Any]:
     intent_id = intent["intent_id"]
+    pruning_audit = _enter_current_fact_pruning_barrier(session, intent)
     if intent.get("causal_graph_runtime") is not None:
         stage = _derive_causal_graph_stage(session, intent)
         if stage.get("status") == "causal_graph_clarification_required":
@@ -1894,6 +1996,9 @@ def _prepare_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) 
         }
     elif stage is None:
         stage = _derive_long_intent_stage(session, intent)
+    stage["current_fact_pruning_applied"] = True
+    stage["current_fact_pruning_world_revision"] = pruning_audit["world_revision"]
+    stage["current_fact_pruning_digest"] = pruning_audit["current_fact_digest"]
     _debug_runtime("stage_pruned", session, intent_id=intent_id, stage=stage.get("stage_id"), pruned_steps=stage.get("pruned_steps", []), resume_basis=stage.get("resume_basis"))
     if stage["status"] == "completed":
         repair_parent_intent_id = intent.get("resume_parent_intent_id")
@@ -1946,6 +2051,13 @@ def _prepare_long_intent_stage(session: dict[str, Any], intent: dict[str, Any]) 
             "reason": stage["reason"],
             "long_horizon_intent": _long_intent_view(intent),
         }
+    if (
+        stage.get("current_fact_pruning_applied") is not True
+        or stage.get("current_fact_pruning_world_revision")
+        != session.get("world_revision")
+        or pruning_audit.get("old_path_reused") is not False
+    ):
+        raise AssertionError("recovery_bypassed_current_fact_pruning")
     intent["lifecycle"] = "active"
     intent["current_stage"] = deepcopy(stage)
     graph = intent.get("hierarchical_intent_graph") or {}
@@ -2498,6 +2610,21 @@ def _compose_session_language(
         recent_episodes=context_projection["recent_episode_capsules"],
     )
     analysis["situated_event_frame"] = situated_frame
+    rcir = compile_rcir_bundle(
+        utterance,
+        analysis,
+        current_facts=current_facts,
+        world_revision=int(session.get("world_revision", 0)),
+        interaction_turn=int(session.get("interaction_turn", 0)),
+        interaction_role_bindings=session.get("interaction_role_bindings", {}),
+    )
+    previous_rcir = session.get("current_rcir")
+    if previous_rcir and previous_rcir.get("bundle_id") != rcir.get("bundle_id"):
+        _append_rcir_receipt(
+            session, previous_rcir, "superseded_by_new_authoritative_turn"
+        )
+    session["current_rcir"] = deepcopy(rcir)
+    analysis["rcir"] = rcir
     grounded_history = session.setdefault("grounded_intent_frame_history", [])
     grounded_history.append(deepcopy(grounded_frame))
     if len(grounded_history) > 16:
@@ -2580,6 +2707,7 @@ def _language_understanding_view(analysis: dict[str, Any]) -> dict[str, Any]:
         "candidate_only": True,
         "runtime_fact_committed": False,
         "situated_event_frame": deepcopy(analysis.get("situated_event_frame")),
+        "rcir": deepcopy(analysis.get("rcir")),
         "process_template_resolution": deepcopy(analysis.get("process_template_resolution")),
         "semantic_constraint_frame": deepcopy(analysis.get("semantic_constraint_frame")),
         "grounded_intent_frame": deepcopy(analysis.get("grounded_intent_frame")),

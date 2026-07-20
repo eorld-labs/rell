@@ -9,6 +9,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from concept_core.rcir_contracts import (
+    build_portable_experience_contract,
+    validate_portable_experience_contract,
+)
+
 
 DEFAULT_STORE_PATH = Path(__file__).resolve().parents[1] / "output" / "rell_sample" / "runtime" / "embodied_local_experiences.json"
 
@@ -20,7 +25,28 @@ def get_store_path() -> Path:
 
 def load_trusted_experiences() -> list[dict[str, Any]]:
     payload = _load_payload(get_store_path())
-    return [deepcopy(item) for item in payload["experiences"] if item.get("status") == "trusted_local_experience"]
+    experiences = []
+    for item in payload["experiences"]:
+        if item.get("status") != "trusted_local_experience":
+            continue
+        current = deepcopy(item)
+        contract = current.get("portable_experience_contract")
+        if not contract:
+            contract = build_portable_experience_contract(current)
+            current["portable_experience_contract"] = contract
+        validation = validate_portable_experience_contract(contract)
+        if not validation["valid"]:
+            raise ValueError(
+                "trusted_experience_portability_boundary_invalid:"
+                + ",".join(validation["errors"])
+            )
+        current["execution_authority"] = {
+            "source": "portable_experience_contract",
+            "legacy_record_is_execution_authority": False,
+            "current_world_rebinding_required": True,
+        }
+        experiences.append(current)
+    return experiences
 
 
 def get_trusted_experience(experience_id: str) -> dict[str, Any] | None:
@@ -95,6 +121,14 @@ def _build_portable_record(experience: dict[str, Any]) -> dict[str, Any]:
             "requires_runtime_rebinding_on_every_session": True,
         },
         "persisted_at": datetime.now(timezone.utc).isoformat(),
+    }
+    portable_experience["portable_experience_contract"] = (
+        build_portable_experience_contract(portable_experience)
+    )
+    portable_experience["execution_authority"] = {
+        "source": "portable_experience_contract",
+        "legacy_record_is_execution_authority": False,
+        "current_world_rebinding_required": True,
     }
     canonical = json.dumps(portable_experience, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     portable_experience["integrity"] = {

@@ -10,6 +10,23 @@ from .concept_bridge import (
     build_unsupported_runtime_query_result,
 )
 from .concept_evidence import build_concept_evidence_packet, build_gap_evidence_packet
+from .cognitive_ir import (
+    assert_no_surface_text_below_rcir_boundary,
+    assert_perception_candidate_is_not_runtime_fact,
+    assert_rcir_architecture_invariants,
+    build_grounded_causal_graph,
+    build_situated_event_graph,
+    build_world_fact_ledger,
+    compact_rcir_receipt,
+    compile_rcir_bundle,
+    validate_rcir_bundle,
+)
+from .rcir_contracts import (
+    apply_grounding_constraint,
+    build_grounding_clarification_contract,
+    build_portable_experience_contract,
+    validate_portable_experience_contract,
+)
 from .concept_lifecycle import build_concept_lifecycle_view, record_concept_fallback, record_concept_reuse
 from .concept_parser import resolve_action_concepts
 from .concept_gap_dialogue import continue_concept_gap_dialogue, start_concept_gap_dialogue
@@ -83,6 +100,19 @@ __all__ = [
     "build_cloud_recall_packet",
     "build_concept_evidence_packet",
     "build_gap_evidence_packet",
+    "assert_no_surface_text_below_rcir_boundary",
+    "assert_perception_candidate_is_not_runtime_fact",
+    "assert_rcir_architecture_invariants",
+    "apply_grounding_constraint",
+    "build_grounding_clarification_contract",
+    "build_grounded_causal_graph",
+    "build_situated_event_graph",
+    "build_world_fact_ledger",
+    "build_portable_experience_contract",
+    "compact_rcir_receipt",
+    "compile_rcir_bundle",
+    "validate_rcir_bundle",
+    "validate_portable_experience_contract",
     "build_released_runtime_query_result",
     "build_runtime_state_query_result",
     "build_supported_runtime_questions",
