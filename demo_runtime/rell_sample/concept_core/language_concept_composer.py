@@ -140,6 +140,34 @@ def _event_mentions(
     return deduplicated
 
 
+def _infer_argument_order_events(
+    text: str, events: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Infer known events from argument-predicate order, independent of word order."""
+    if any(item.get("operator") == "fill_container" for item in events):
+        return events
+    patterns = (
+        r"(?:把)?(?:水|饮料)接(?:了|好|满)?",
+        r"(?:杯子|容器)接(?:好|满)?(?:水|饮料)",
+    )
+    inferred = list(events)
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if not match:
+            continue
+        inferred.append({
+            "concept_id": "factory_event_fill_container",
+            "operator": "fill_container",
+            "matched_surface": match.group(0),
+            "canonical_surface": "接水",
+            "start": match.start(),
+            "end": match.end(),
+            "source": "argument_predicate_composition",
+        })
+        break
+    return sorted(inferred, key=lambda item: (item.get("start", 0), item.get("end", 0)))
+
+
 def _definition_candidate(text: str, event_concepts: list[dict[str, Any]]) -> dict[str, Any] | None:
     patterns = (
         r"[‘'\"“]?([^‘’'\"“”]{1,10})[’'\"”]?(?:就是|意思是|等于)([^，。！？,.!?]{1,14})",
@@ -603,7 +631,10 @@ def compose_language_concepts(
     normalized = normalize_language_text(utterance)
     definition = _definition_candidate(normalized, event_concepts)
     objects = _object_mentions(normalized, object_concepts)
-    events = _event_mentions(normalized, event_concepts, learned_adapters or [])
+    events = _infer_argument_order_events(
+        normalized,
+        _event_mentions(normalized, event_concepts, learned_adapters or []),
+    )
     objects, unresolved = _resolve_pronouns(normalized, objects, context_entities or [])
     events, event_dependencies = _resolve_serial_event_dependencies(normalized, events, objects)
     discourse_roles = _discourse_roles(normalized)

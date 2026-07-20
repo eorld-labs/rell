@@ -323,6 +323,35 @@ def main() -> None:
         f"carrier handover was flattened into direct payload delivery or assigned a duplicate destination role: {carrier_handover}",
     )
 
+    argument_order_carrier = compose("杯子还在我手中，你要来拿过去杯子，然后再把水接了放在托盘上给我就行")
+    argument_order_frames = argument_order_carrier.get("event_frames", [])
+    require(
+        len(argument_order_frames) == 2
+        and argument_order_frames[1].get("canonical_frame", {}).get("operators")
+        == ["fill_container", "place_object"],
+        f"patient-before-predicate fill and carrier placement were not retained in one event scope: {argument_order_carrier}",
+    )
+    inferred_fill = next(
+        (
+            item
+            for item in argument_order_carrier.get("event_candidates", [])
+            if item.get("operator") == "fill_container"
+        ),
+        {},
+    )
+    require(
+        inferred_fill.get("source") == "argument_predicate_composition"
+        and inferred_fill.get("matched_surface") == "把水接了"
+        and "transport_supported_payload"
+        in set(
+            (
+                argument_order_frames[1].get("role_bindings", {}).get("destination")
+                or {}
+            ).get("functional_affordances", [])
+        ),
+        f"argument-order fill inference or carrier affordance was not auditable: {argument_order_carrier}",
+    )
+
     repair_compound = compose("好，移开报纸，然后再放杯子")
     repair_frames = repair_compound.get("event_frames", [])
     require(

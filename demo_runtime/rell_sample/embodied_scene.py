@@ -2840,10 +2840,29 @@ def _independent_event_frames(
     bound_themes = [
         ref for ref in (_event_frame_bound_ref(frame) for frame in frames) if ref
     ]
+    carrier_linked = any(
+        "fill_container" in set((frame.get("canonical_frame") or {}).get("operators", []))
+        and (
+            "transport_supported_payload" in set(
+                ((frame.get("role_bindings") or {}).get("destination") or {}).get(
+                    "functional_affordances", []
+                )
+            )
+            or any(
+                "transport_supported_payload" in set(
+                    ((later.get("role_bindings") or {}).get("destination") or {}).get(
+                        "functional_affordances", []
+                    )
+                )
+                for later in frames[index + 1:]
+            )
+        )
+        for index, frame in enumerate(frames)
+    )
     # A single causal chain such as "pick up X, then place it" remains one
     # intent. Distinct currently grounded themes require independent role
     # scopes and therefore an ordered compound sequence.
-    if len(set(bound_themes)) < 2:
+    if len(set(bound_themes)) < 2 and not carrier_linked:
         return []
     return frames
 
@@ -3024,14 +3043,28 @@ def _compile_compound_subtasks(
             if carrier else {}
         )
         recipient_ref = (session.get("interaction_role_bindings") or {}).get("human_speaker")
+        next_recipient_requested = bool(
+            ((next_frame or {}).get("role_bindings") or {}).get("recipient")
+            or (((next_frame or {}).get("discourse_roles") or {}).get("recipient") or {}).get("reference")
+            == "human_speaker"
+        )
         sources = [
             item for item in session.get("runtime_objects", [])
             if item.get("active") is not False and item.get("kind") == "water_source"
         ]
+        delivery_requested = bool(
+            {"transport_object", "handover_object"}.intersection(next_operators)
+            or next_recipient_requested
+        )
         carrier_flow = bool(
-            "fill_container" in operators
-            and "place_object" in next_operators
-            and bool({"transport_object", "handover_object"}.intersection(next_operators))
+            (
+                "fill_container" in operators
+                or (
+                    "grasp_object" in operators
+                    and "fill_container" in next_operators
+                )
+            )
+            and delivery_requested
             and payload_ref
             and carrier_ref
             and recipient_ref
@@ -3079,6 +3112,26 @@ def _start_compound_command_sequence(
     frames = _independent_event_frames(utterance, analysis)
     if not frames:
         return None
+    active_intent_id = session.get("active_intent_id")
+    active_intent = (session.get("long_horizon_intents") or {}).get(active_intent_id)
+    if active_intent:
+        active_intent["lifecycle"] = "superseded"
+        active_intent["current_stage"] = None
+        _archive_and_release_task_context(
+            session,
+            active_intent,
+            lifecycle="superseded",
+            release_reason="new_compound_goal_superseded_active_task",
+            archive_key="released_intent_archive",
+        )
+        session.get("long_horizon_intents", {}).pop(active_intent_id, None)
+        session["active_intent_id"] = None
+        session["intent_activation_stack"] = []
+        _debug_runtime(
+            "active_intent_superseded_by_new_compound_goal",
+            session,
+            released_intent_id=active_intent_id,
+        )
     sequence_id = "compound_" + hashlib.sha1(
         f"{session['session_id']}|{session['interaction_turn']}|{utterance}".encode("utf-8")
     ).hexdigest()[:12]
@@ -8089,9 +8142,15 @@ def begin_motion_command(
         if compound_started:
             return compound_started
     hospitality_intent = None
-    if not internal_stage and not scoped_authorization and session.get("scene_id") == "hospitality_guest":
+    if not internal_stage and not scoped_authorization and not compound_dispatch and session.get("scene_id") == "hospitality_guest":
         existing_hospitality = (session.get("long_horizon_intents") or {}).get(session.get("active_intent_id"))
-        if existing_hospitality and existing_hospitality.get("intent_type") == "hospitality_guest_service":
+        if (
+            existing_hospitality
+            and existing_hospitality.get("intent_type") == "hospitality_guest_service"
+            and causal_graph_activation_matches(
+                existing_hospitality.get("task_graph") or {}, language_analysis
+            )
+        ):
             hospitality_intent = existing_hospitality
         else:
             hospitality_intent = _create_hospitality_intent(

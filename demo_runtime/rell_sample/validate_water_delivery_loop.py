@@ -280,6 +280,75 @@ def verify_carrier_mediated_compound_sequence() -> dict:
         and direct_objects["glass_tall"].get("received_by") is None,
         f"carrier-mediated terminal relations were not preserved: {direct_objects}",
     )
+
+    stale_session = start_session("home_humanoid", "hospitality_guest")
+    stale_id = stale_session["session_id"]
+    drain_service(begin_motion_command(stale_id, "用玻璃高脚杯给我接杯水"))
+    stale_live = SESSIONS[stale_id]
+    stale_objects = {
+        item["entity_id"]: item for item in stale_live["runtime_objects"]
+    }
+    stale_glass = stale_objects["glass_tall"]
+    stale_glass["liquid_state"] = "empty"
+    stale_glass["fill_level"] = 0.0
+    require(
+        stale_glass.get("received_by") == "guest"
+        and math.dist(stale_glass["position"], stale_objects["guest"]["position"])
+        <= 0.5,
+        f"verified setup handover did not establish a physically consistent human-held cup: {stale_glass}",
+    )
+    old_hospitality = begin_motion_command(
+        stale_id,
+        "客人来了，准备一杯红茶和一杯常温水，用托盘端到服务台。"
+        "桌上的旧报纸顺手扔了。如果玻璃杯不适合泡茶，换成马克杯。",
+    )
+    old_intent_id = stale_live.get("active_intent_id")
+    require(
+        old_hospitality.get("status") == "causal_graph_clarification_required"
+        and old_intent_id,
+        f"stale hospitality clarification setup failed: {old_hospitality}",
+    )
+    rebound = begin_motion_command(
+        stale_id,
+        "杯子还在我手中，你要来拿过去杯子，然后再把水接了放在托盘上给我就行",
+    )
+    rebound_sequence = rebound.get("compound_command_sequence") or {}
+    rebound_subtasks = rebound_sequence.get("subtasks", [])
+    require(
+        len(rebound_subtasks) == 1
+        and rebound_subtasks[0].get("subtask_kind") == "payload_carrier_delivery"
+        and rebound_subtasks[0].get("payload_ref") == "glass_tall"
+        and rebound_subtasks[0].get("carrier_ref") == "wooden_tray",
+        f"human-held payload and carrier destination were not compiled into one replacement goal: {rebound}",
+    )
+    rebound_outcomes = drain_service(rebound)
+    rebound_facts = [item.get("terminal_fact") for item in rebound_outcomes]
+    require(
+        rebound_facts == [
+            "target_object_in_gripper",
+            "container_filled",
+            "object_supported_at_destination",
+            "target_object_in_gripper",
+            "object_received_by_recipient",
+        ]
+        and "human_received_filled_container" not in rebound_facts,
+        f"replacement carrier goal did not execute from current physical facts: {rebound_outcomes}",
+    )
+    rebound_live = get_session(stale_id)
+    rebound_objects = {
+        item["entity_id"]: item for item in rebound_live["runtime_objects"]
+    }
+    released_ids = {
+        item.get("intent_id")
+        for item in rebound_live.get("released_intent_archive", [])
+    }
+    require(
+        old_intent_id in released_ids
+        and rebound_objects["wooden_tray"].get("received_by") == "guest"
+        and rebound_objects["glass_tall"].get("support_ref") == "wooden_tray"
+        and rebound_objects["glass_tall"].get("received_by") is None,
+        f"old graph ownership or replacement terminal relations were incorrect: {rebound_live}",
+    )
     return {
         "stage_facts": facts,
         "payload": "glass_tall",
@@ -287,6 +356,7 @@ def verify_carrier_mediated_compound_sequence() -> dict:
         "disturbed_support_gate": "passed",
         "pending_slot_supersession": "passed",
         "place_handover_compilation": "passed",
+        "stale_graph_supersession": "passed",
     }
 
 
