@@ -154,16 +154,24 @@ def verify_carrier_mediated_compound_sequence() -> dict:
             "container_filled",
             "object_supported_at_destination",
             "target_object_in_gripper",
-            "object_received_by_recipient",
+            "human_received_filled_container",
         ],
         f"carrier-mediated dataflow did not preserve causal order: {outcomes}",
     )
-    require("human_received_filled_container" not in facts, f"payload was handed over before its downstream carrier consumer ran: {facts}")
     live = get_session(session_id)
     tray = next(item for item in live["runtime_objects"] if item["entity_id"] == "wooden_tray")
     glass = next(item for item in live["runtime_objects"] if item["entity_id"] == "glass_tall")
-    require(tray.get("received_by") == "guest", f"carrier was not delivered to the recipient: {tray}")
-    require(glass.get("support_ref") == "wooden_tray" and glass.get("liquid_state") == "filled" and not glass.get("received_by"), f"payload support was not preserved through carrier transport: {glass}")
+    require(
+        tray.get("received_by") is None
+        and "wooden_tray" in _holding_by_effector(live).values(),
+        f"instrumental carrier was transferred instead of retained: {tray}",
+    )
+    require(
+        glass.get("support_ref") is None
+        and glass.get("liquid_state") == "filled"
+        and glass.get("received_by") == "guest",
+        f"payload was not separated from the carrier and delivered: {glass}",
+    )
     require(live.get("compound_command_sequence") is None, f"completed carrier graph remained in working memory: {live.get('compound_command_sequence')}")
 
     disturbed_session = start_session("home_humanoid", "hospitality_guest")
@@ -184,9 +192,10 @@ def verify_carrier_mediated_compound_sequence() -> dict:
             current = begin_motion_command(disturbed_id, "确认")
             continue
         job = MOTION_JOBS.get(current.get("job_id")) or {}
-        if (job.get("post_completion") or {}).get("action") == "handover":
+        if (job.get("post_completion") or {}).get("action") == "handover_supported_payload":
             require(
-                job["post_completion"].get("expected_supported_payload_refs") == ["glass_tall"],
+                job["post_completion"].get("payload_ref") == "glass_tall"
+                and job["post_completion"].get("carrier_ref") == "wooden_tray",
                 f"expected payload constraint did not reach the handover commit job: {job}",
             )
             disturbed_live = SESSIONS[disturbed_id]
@@ -226,7 +235,7 @@ def verify_carrier_mediated_compound_sequence() -> dict:
         f"blocked handover released or transferred the carrier: {disturbed_tray}",
     )
     require(
-        "recipient_received_carrier_with_payload" not in disturbed_intent.get("verified_facts", []),
+        "recipient_received_payload_carrier_retained" not in disturbed_intent.get("verified_facts", []),
         f"blocked handover committed the composite terminal fact: {disturbed_intent}",
     )
 
@@ -254,7 +263,8 @@ def verify_carrier_mediated_compound_sequence() -> dict:
         len(direct_subtasks) == 1
         and direct_subtasks[0].get("subtask_kind") == "payload_carrier_delivery"
         and direct_subtasks[0].get("payload_ref") == "glass_tall"
-        and direct_subtasks[0].get("carrier_ref") == "wooden_tray",
+        and direct_subtasks[0].get("carrier_ref") == "wooden_tray"
+        and direct_subtasks[0].get("delivery_mode") == "payload_only_carrier_retained",
         f"place-plus-handover carrier request was split into direct payload delivery: {direct}",
     )
     direct_outcomes = drain_service(direct)
@@ -265,9 +275,8 @@ def verify_carrier_mediated_compound_sequence() -> dict:
             "container_filled",
             "object_supported_at_destination",
             "target_object_in_gripper",
-            "object_received_by_recipient",
-        ]
-        and "human_received_filled_container" not in direct_facts,
+            "human_received_filled_container",
+        ],
         f"carrier handover delivered the payload before the carrier graph completed: {direct_outcomes}",
     )
     direct_live = get_session(direct_id)
@@ -275,10 +284,65 @@ def verify_carrier_mediated_compound_sequence() -> dict:
         item["entity_id"]: item for item in direct_live["runtime_objects"]
     }
     require(
-        direct_objects["wooden_tray"].get("received_by") == "guest"
-        and direct_objects["glass_tall"].get("support_ref") == "wooden_tray"
-        and direct_objects["glass_tall"].get("received_by") is None,
+        direct_objects["wooden_tray"].get("received_by") is None
+        and "wooden_tray" in _holding_by_effector(direct_live).values()
+        and direct_objects["glass_tall"].get("support_ref") is None
+        and direct_objects["glass_tall"].get("received_by") == "guest",
         f"carrier-mediated terminal relations were not preserved: {direct_objects}",
+    )
+
+    explicit_carrier_session = start_session("home_humanoid", "hospitality_guest")
+    explicit_carrier_id = explicit_carrier_session["session_id"]
+    explicit_carrier = begin_motion_command(
+        explicit_carrier_id,
+        "用高脚杯倒一杯水，放到托盘上并把托盘拿给我",
+    )
+    explicit_subtasks = (
+        explicit_carrier.get("compound_command_sequence") or {}
+    ).get("subtasks", [])
+    require(
+        len(explicit_subtasks) == 1
+        and explicit_subtasks[0].get("delivery_mode") == "carrier_with_payload",
+        f"explicit carrier ownership transfer was not preserved: {explicit_carrier}",
+    )
+    explicit_facts = [
+        item.get("terminal_fact") for item in drain_service(explicit_carrier)
+    ]
+    explicit_live = get_session(explicit_carrier_id)
+    explicit_objects = {
+        item["entity_id"]: item for item in explicit_live["runtime_objects"]
+    }
+    require(
+        explicit_facts[-1] == "object_received_by_recipient"
+        and explicit_objects["wooden_tray"].get("received_by") == "guest"
+        and explicit_objects["glass_tall"].get("support_ref") == "wooden_tray",
+        f"explicit carrier transfer did not commit carrier ownership: {explicit_live}",
+    )
+
+    corrected = begin_motion_command(
+        explicit_carrier_id,
+        "我的意思是你把杯子给我，托盘你拿着",
+    )
+    correction = corrected.get("task_correction_applied") or {}
+    require(
+        corrected.get("status") == "motion_started"
+        and correction.get("correction_type")
+        == "payload_transfer_carrier_retention",
+        f"ownership correction was routed as language teaching or a fresh grasp: {corrected}",
+    )
+    corrected_facts = [item.get("terminal_fact") for item in drain_service(corrected)]
+    corrected_live = get_session(explicit_carrier_id)
+    corrected_objects = {
+        item["entity_id"]: item for item in corrected_live["runtime_objects"]
+    }
+    require(
+        corrected_facts
+        == ["target_object_in_gripper", "human_received_filled_container"]
+        and corrected_objects["wooden_tray"].get("received_by") is None
+        and "wooden_tray" in _holding_by_effector(corrected_live).values()
+        and corrected_objects["glass_tall"].get("received_by") == "guest"
+        and corrected_objects["glass_tall"].get("support_ref") is None,
+        f"correction did not repair current ownership relations: {corrected_live}",
     )
 
     stale_session = start_session("home_humanoid", "hospitality_guest")
@@ -329,9 +393,8 @@ def verify_carrier_mediated_compound_sequence() -> dict:
             "container_filled",
             "object_supported_at_destination",
             "target_object_in_gripper",
-            "object_received_by_recipient",
-        ]
-        and "human_received_filled_container" not in rebound_facts,
+            "human_received_filled_container",
+        ],
         f"replacement carrier goal did not execute from current physical facts: {rebound_outcomes}",
     )
     rebound_live = get_session(stale_id)
@@ -344,9 +407,10 @@ def verify_carrier_mediated_compound_sequence() -> dict:
     }
     require(
         old_intent_id in released_ids
-        and rebound_objects["wooden_tray"].get("received_by") == "guest"
-        and rebound_objects["glass_tall"].get("support_ref") == "wooden_tray"
-        and rebound_objects["glass_tall"].get("received_by") is None,
+        and rebound_objects["wooden_tray"].get("received_by") is None
+        and "wooden_tray" in _holding_by_effector(rebound_live).values()
+        and rebound_objects["glass_tall"].get("support_ref") is None
+        and rebound_objects["glass_tall"].get("received_by") == "guest",
         f"old graph ownership or replacement terminal relations were incorrect: {rebound_live}",
     )
     return {
@@ -356,6 +420,8 @@ def verify_carrier_mediated_compound_sequence() -> dict:
         "disturbed_support_gate": "passed",
         "pending_slot_supersession": "passed",
         "place_handover_compilation": "passed",
+        "carrier_ownership_policy": "passed",
+        "ownership_correction": "passed",
         "stale_graph_supersession": "passed",
     }
 

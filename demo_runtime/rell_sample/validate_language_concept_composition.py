@@ -163,6 +163,16 @@ def main() -> None:
     definition = compose("端就是拿起的意思")
     require(definition["speech_act"] == "language_teaching", f"explicit language definition was not recognized: {definition}")
     require(definition["definition_candidate"]["operator"] == "grasp_object", f"definition did not bind the known concept kernel: {definition}")
+    ownership_correction = compose("我的意思是你把杯子给我，托盘你拿着")
+    require(
+        ownership_correction.get("speech_act") == "task_request"
+        and ownership_correction.get("definition_candidate") is None
+        and (ownership_correction.get("discourse_roles", {}).get("task_correction") or {}).get("reference")
+        == "current_or_recent_task_outcome"
+        and (ownership_correction.get("discourse_roles", {}).get("executor_retention") or {}).get("reference")
+        == "executor",
+        f"outcome correction was misclassified as vocabulary teaching: {ownership_correction}",
+    )
 
     implicit_place = compose(
         "放到桌子上去",

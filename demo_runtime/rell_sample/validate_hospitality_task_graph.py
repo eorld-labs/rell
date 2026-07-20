@@ -89,8 +89,19 @@ def main() -> None:
     runtime_objects = {item["entity_id"]: item for item in live["runtime_objects"]}
     require(live["active_intent_id"] is None, f"completed graph remained active: {live}")
     require(runtime_objects["newspaper_a"].get("contained_by") == runtime_objects["newspaper_b"].get("contained_by") == "trash_bin_hospitality", f"discard effects were not committed: {runtime_objects}")
-    require(runtime_objects["mug_white"].get("support_ref") == runtime_objects["glass_tall"].get("support_ref") == "wooden_tray", f"join node did not load both vessels: {runtime_objects}")
-    require(runtime_objects["wooden_tray"].get("received_by") == "guest", f"terminal handover relation missing: {runtime_objects}")
+    require(
+        runtime_objects["mug_white"].get("received_by")
+        == runtime_objects["glass_tall"].get("received_by")
+        == "guest"
+        and runtime_objects["mug_white"].get("support_ref") is None
+        and runtime_objects["glass_tall"].get("support_ref") is None,
+        f"terminal payload handover relation missing: {runtime_objects}",
+    )
+    require(
+        runtime_objects["wooden_tray"].get("received_by") is None
+        and runtime_objects["wooden_tray"].get("attached_to_executor") is True,
+        f"instrumental tray was transferred instead of retained: {runtime_objects}",
+    )
     post_task = begin_motion_command(
         graph_session["session_id"],
         "客人喝完了，把杯子还是放回桌子上",

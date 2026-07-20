@@ -189,19 +189,24 @@ def build_hospitality_task_graph(
             },
             {
                 "node_id": "handover_to_guest",
-                "label": "将托盘交给客人",
+                "label": "将饮品交给客人并保留托盘",
                 "priority": 80,
                 "requires": ["tray_at_handover_zone", "recipient_ready"],
                 "produces": [HOSPITALITY_GOAL],
-                "verification": ["recipient_possession_verified"],
+                "verification": ["payload_possession_verified", "carrier_retention_verified"],
                 "execution_contract": {
                     "mode": "motion_effect",
                     "process_template": "handover_object",
                     "target_role": "recipient",
                     "route_roles": ["recipient"],
-                    "process_chain": ["verify_recipient_readiness", "transfer_carrier", "release_effector", "verify_recipient_possession"],
+                    "process_chain": ["verify_recipient_readiness", "transfer_supported_payloads", "retain_carrier", "verify_payload_possession_and_carrier_retention"],
                     "effects": [
-                        {"operator": "handover_role_to_role", "theme_role": "tray", "recipient_role": "recipient"}
+                        {
+                            "operator": "handover_supported_roles_to_role_retain_carrier",
+                            "carrier_role": "tray",
+                            "payload_roles": ["tea_vessel", "water_vessel"],
+                            "recipient_role": "recipient",
+                        }
                     ],
                 },
             },

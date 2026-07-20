@@ -169,6 +169,8 @@ def _infer_argument_order_events(
 
 
 def _definition_candidate(text: str, event_concepts: list[dict[str, Any]]) -> dict[str, Any] | None:
+    if re.match(r"^(?:我|你|他|她|我们|你们|他们)(?:的)?意思(?:就)?是", text):
+        return None
     patterns = (
         r"[‘'\"“]?([^‘’'\"“”]{1,10})[’'\"”]?(?:就是|意思是|等于)([^，。！？,.!?]{1,14})",
         r"[‘'\"“]?([^‘’'\"“”]{1,10})[’'\"”]?和([^，。！？,.!?]{1,14})(?:一样|是一个意思)",
@@ -226,6 +228,12 @@ def _query_type(text: str, events: list[dict[str, Any]], objects: list[dict[str,
 
 def _discourse_roles(text: str) -> dict[str, dict[str, Any]]:
     roles: dict[str, dict[str, Any]] = {}
+    if any(marker in text for marker in ("我的意思是", "我是说", "我说的是", "不是这个意思")):
+        roles["task_correction"] = {
+            "reference": "current_or_recent_task_outcome",
+            "relation": "revises_delivery_or_ownership_goal",
+            "source": "explicit_discourse_repair_marker",
+        }
     if any(marker in text for marker in ("帮我", "替我", "为我")):
         roles["beneficiary"] = {
             "reference": "human_speaker",
@@ -244,6 +252,18 @@ def _discourse_roles(text: str) -> dict[str, dict[str, Any]]:
             "relation": "holds_reported_consumed_container_candidate",
             "source": "deictic_reported_event_role",
             "physical_state_change_committed": False,
+        }
+    if any(
+        re.search(pattern, text)
+        for pattern in (
+            r"(?:你|机器人)(?:继续|还|就)?(?:拿着|端着|托着|留着|保持拿着)",
+            r"(?:拿着|端着|托着|留着)(?:就行|即可|不要给我)?$",
+        )
+    ):
+        roles["executor_retention"] = {
+            "reference": "executor",
+            "relation": "retains_explicitly_contrasted_theme",
+            "source": "explicit_possession_contrast",
         }
     return roles
 
