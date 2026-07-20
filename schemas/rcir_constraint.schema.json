@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eorld.example/schemas/rcir_constraint.schema.json",
+  "title": "RCIR Constraint",
+  "type": "object",
+  "required": ["schema_version", "type", "constraint_id", "constraint_type", "scope_ref", "operator", "value", "status", "world_revision", "evidence_refs", "depends_on_refs"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "type": { "const": "Constraint" },
+    "constraint_id": { "type": "string", "pattern": "^constraint_[a-f0-9]{16}$" },
+    "constraint_type": { "enum": ["attribute", "spatial", "physical", "safety", "preference", "process_boundary", "epistemic"] },
+    "scope_ref": { "type": "string" },
+    "operator": { "enum": ["eq", "neq", "lt", "lte", "gt", "gte", "in", "not_in", "requires", "forbids"] },
+    "value": {},
+    "status": { "enum": ["candidate", "active", "satisfied", "violated", "stale", "invalidated"] },
+    "world_revision": { "type": "integer", "minimum": 0 },
+    "evidence_refs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "depends_on_refs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "invalidation_reason": { "type": "string" },
+    "invalidated_at_world_revision": { "type": "integer", "minimum": 0 }
+  },
+  "additionalProperties": false
+}

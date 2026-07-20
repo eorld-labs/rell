@@ -14,6 +14,15 @@
 | `engine_contract.schema.json` | 定义运行时执行计划、监控循环、恢复和执行轨迹接口。 |
 | `executor_profile.schema.json` | 预留执行体能力画像，用于承接 P008 主体物理约束和后续空间可进入性准入。 |
 | `rcir_bundle.schema.json` | 定义单轮权威情境事件图、世界事实账本、已落地因果图及其不可绕过的证据边界。 |
+| `rcir_concept.schema.json` | 定义跨语言、跨实例复用的 `Concept`。 |
+| `rcir_entity_ref.schema.json` | 定义与名称、别名和模态分离的稳定 `EntityRef`。 |
+| `rcir_predicate.schema.json` | 定义候选、目标和当前事实共用的 `Predicate`。 |
+| `rcir_event.schema.json` | 定义报告、观察、请求和验真变化共用的 `Event`。 |
+| `rcir_goal.schema.json` | 定义只引用目标谓词且受世界版本约束的 `Goal`。 |
+| `rcir_constraint.schema.json` | 定义属性、空间、物理、安全和过程边界 `Constraint`。 |
+| `rcir_evidence_envelope.schema.json` | 定义证据来源、资格、世界版本、依赖和事实晋级权限。 |
+| `rcir_type_relations.json` | 定义七类基本类型间的允许关系、权限含义和禁止旁路。 |
+| `inquiry_contract.schema.json` | 定义认识目标、竞争假设、消解路线、关闭条件及 P018/P016 网关。 |
 
 ## 兼容入口
 

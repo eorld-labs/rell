@@ -6,6 +6,7 @@ from copy import deepcopy
 from typing import Any
 
 from .rcir_contracts import build_grounding_clarification_contract
+from .rcir_primitives import make_evidence_envelope
 
 
 RCIR_SCHEMA_VERSION = "1.0.0"
@@ -36,6 +37,10 @@ ARCHITECTURE_INVARIANTS = (
     "downstream_does_not_reparse_surface_text",
     "current_verified_relation_precedes_history_and_category",
     "every_recovery_reenters_current_fact_pruning",
+    "qualified_evidence_required_for_execution_fact",
+    "versioned_dependency_invalidation_required",
+    "shared_event_predicate_evidence_readback",
+    "no_secondary_fact_or_control_source",
 )
 
 
@@ -63,6 +68,65 @@ def _evidence_class(source: str | None) -> tuple[str, int]:
     return "unclassified_current_evidence", 100
 
 
+def _fact_evidence_envelope(
+    source: str,
+    *,
+    fact_id: str,
+    fact_revision: int,
+    world_revision: int,
+    strength: int,
+) -> dict[str, Any]:
+    if source == "runtime_verified":
+        source_type = "p016_physical_verification"
+        epistemic_status = "physically_verified"
+        physical_verification = True
+        verifier = "P016"
+        independent_channels = 2
+    elif source == "runtime_snapshot":
+        source_type = "runtime_snapshot"
+        epistemic_status = "corroborated"
+        physical_verification = False
+        verifier = None
+        independent_channels = 1
+    elif source in {"sensor_verified", "multimodal_verified"}:
+        source_type = "multimodal_observation"
+        epistemic_status = "corroborated"
+        physical_verification = False
+        verifier = None
+        independent_channels = 2
+    elif source == "human_report":
+        source_type = "human_report"
+        epistemic_status = "candidate"
+        physical_verification = False
+        verifier = None
+        independent_channels = 0
+    elif source in {"perception_candidate", "sensor_candidate"}:
+        source_type = "perception_candidate"
+        epistemic_status = "candidate"
+        physical_verification = False
+        verifier = None
+        independent_channels = 1
+    else:
+        source_type = "diagnostic_signal"
+        epistemic_status = "candidate"
+        physical_verification = False
+        verifier = None
+        independent_channels = 0
+    return make_evidence_envelope(
+        source_type,
+        epistemic_status=epistemic_status,
+        world_revision=fact_revision,
+        supports_refs=[fact_id],
+        strength=strength,
+        independent_channels=independent_channels,
+        physical_verification=physical_verification,
+        current_world_bound=fact_revision == world_revision,
+        verifier=verifier,
+        depends_on_refs=[fact_id],
+        payload={"legacy_source_adapter": source},
+    )
+
+
 def build_world_fact_ledger(
     current_facts: list[dict[str, Any]],
     *,
@@ -71,6 +135,7 @@ def build_world_fact_ledger(
     """Compile versioned facts and evidence without display names or language."""
     facts = []
     evidence_by_id: dict[str, dict[str, Any]] = {}
+    evidence_adapter_audit: dict[str, dict[str, Any]] = {}
     stale_fact_ids = []
     ordered = sorted(
         current_facts,
@@ -84,27 +149,6 @@ def build_world_fact_ledger(
         fact_revision = int(raw.get("world_revision", world_revision))
         source = str(raw.get("evidence") or "unknown")
         evidence_class, strength = _evidence_class(source)
-        evidence_seed = {
-            "class": evidence_class,
-            "source_type": source,
-            "world_revision": fact_revision,
-        }
-        evidence_id = _stable_id("evidence", evidence_seed)
-        evidence_by_id.setdefault(
-            evidence_id,
-            {
-                "evidence_id": evidence_id,
-                "evidence_class": evidence_class,
-                "source_type": source,
-                "strength": strength,
-                "world_revision": fact_revision,
-                "status": (
-                    "current" if fact_revision == world_revision else "stale"
-                ),
-                "physical_fact_committed": fact_revision == world_revision,
-                "invalid_after_world_revision_change": True,
-            },
-        )
         fact_seed = {
             "predicate": raw.get("predicate"),
             "subject": raw.get("subject"),
@@ -112,12 +156,41 @@ def build_world_fact_ledger(
             "world_revision": fact_revision,
         }
         fact_id = _stable_id("fact", fact_seed)
+        envelope = _fact_evidence_envelope(
+            source,
+            fact_id=fact_id,
+            fact_revision=fact_revision,
+            world_revision=world_revision,
+            strength=strength,
+        )
+        evidence_id = envelope["envelope_id"]
+        evidence_by_id.setdefault(
+            evidence_id,
+            envelope,
+        )
+        evidence_adapter_audit.setdefault(
+            evidence_id,
+            {
+                "envelope_ref": evidence_id,
+                "evidence_class": evidence_class,
+                "legacy_source_type": source,
+            },
+        )
+        current_eligible = bool(
+            fact_revision == world_revision and envelope["fact_commit_eligible"]
+        )
         record = {
             "fact_id": fact_id,
             **fact_seed,
-            "status": "established" if fact_revision == world_revision else "stale",
+            "status": (
+                "established"
+                if current_eligible
+                else "stale"
+                if fact_revision != world_revision
+                else "candidate_missing_qualified_evidence"
+            ),
             "evidence_ref": evidence_id,
-            "current_world_usable": fact_revision == world_revision,
+            "current_world_usable": current_eligible,
         }
         facts.append(record)
         if fact_revision != world_revision:
@@ -127,7 +200,12 @@ def build_world_fact_ledger(
         "ir_kind": "world_fact_ledger",
         "world_revision": world_revision,
         "facts": facts,
-        "evidence": sorted(evidence_by_id.values(), key=lambda item: item["evidence_id"]),
+        "evidence": sorted(
+            evidence_by_id.values(), key=lambda item: item["envelope_id"]
+        ),
+        "evidence_source_adapter_audit": sorted(
+            evidence_adapter_audit.values(), key=lambda item: item["envelope_ref"]
+        ),
         "authoritative_current_fact_ids": [
             item["fact_id"] for item in facts if item["current_world_usable"]
         ],
@@ -636,6 +714,9 @@ def build_grounded_causal_graph(
         "grounding_clarification_contracts": clarification_contracts,
         "binding_status": "grounded" if not unresolved_roles else "incomplete",
         "ready_for_orchestration": not unresolved_roles,
+        "fact_authority_ref": world_ledger.get("ledger_id"),
+        "control_gateway": "P018",
+        "verification_gateway": "P016",
         "current_fact_pruning_required": True,
         "direct_execution_allowed": False,
         "runtime_fact_committed": False,
@@ -693,6 +774,10 @@ def compile_rcir_bundle(
             "downstream_does_not_reparse_surface_text": True,
             "current_verified_relation_precedes_history_and_category": True,
             "every_recovery_reenters_current_fact_pruning": True,
+            "qualified_evidence_required_for_execution_fact": True,
+            "versioned_dependency_invalidation_required": True,
+            "shared_event_predicate_evidence_readback": True,
+            "no_secondary_fact_or_control_source": True,
             "current_world_ledger_is_authoritative": True,
             "every_binding_has_evidence_and_world_revision": True,
             "current_fact_pruning_required_before_execution": True,

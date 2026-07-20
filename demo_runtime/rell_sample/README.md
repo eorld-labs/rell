@@ -27,6 +27,8 @@
 - `runtime_core.py`：P016 Runtime Core、MockRobotAdapter 和 SimulatedRobotAdapter。
 - `concept_core/cognitive_ir.py`：RCIR 最小统一认知中间表示，将情境事件图、世界事实账本和已落地因果图封装为可校验的单轮权威 Bundle。
 - `concept_core/rcir_contracts.py`：通用角色歧义追问合同与无实例、无轨迹的可迁移经验合同。
+- `concept_core/rcir_primitives.py`：七类 RCIR 基本类型、实体身份连续性、证据晋级门、版本依赖失效器和唯一事实权威读取面。
+- `concept_core/cognitive_inquiry.py`：认识目标状态机，主动观察和安全试验统一经过 P018 仲裁及 P016/合格多模态证据验真。
 - `adapters/adapter_contract.py`：Robot Adapter 统一接口和能力词汇表。
 - `adapters/vendor_robot_adapter_stub.py`：真机 SDK 接入占位 Adapter。
 - `docs/adapter_contract.md`：Runtime 与 Robot Adapter 的异步边界。
@@ -84,6 +86,7 @@ python .\demo_runtime\rell_sample\validate_runtime_sample.py
 python .\demo_runtime\rell_sample\validate_simulated_robot_sample.py
 python .\demo_runtime\rell_sample\validate_adapter_contract.py
 python .\demo_runtime\rell_sample\validate_cognitive_ir.py
+python .\demo_runtime\rell_sample\validate_rcir_stage_a_b.py
 python .\demo_runtime\rell_sample\validate_digital_space.py
 ```
 

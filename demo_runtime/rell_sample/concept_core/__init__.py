@@ -27,6 +27,30 @@ from .rcir_contracts import (
     build_portable_experience_contract,
     validate_portable_experience_contract,
 )
+from .rcir_primitives import (
+    CognitiveAuthorityLedger,
+    EntityIdentityRegistry,
+    assert_shared_authority_contract,
+    invalidate_versioned_artifacts,
+    make_concept,
+    make_constraint,
+    make_entity_ref,
+    make_event,
+    make_evidence_envelope,
+    make_goal,
+    make_predicate,
+    validate_primitive,
+)
+from .cognitive_inquiry import (
+    COGNITIVE_SIGNAL_KINDS,
+    CognitiveInquiryRuntime,
+    adapt_cognitive_signal,
+    generate_competing_hypotheses,
+    make_inquiry_contract,
+    run_concept_validation_loop,
+    run_quality_profile_drift_loop,
+    run_recovery_boundary_probe_loop,
+)
 from .concept_lifecycle import build_concept_lifecycle_view, record_concept_fallback, record_concept_reuse
 from .concept_parser import resolve_action_concepts
 from .concept_gap_dialogue import continue_concept_gap_dialogue, start_concept_gap_dialogue
@@ -89,6 +113,10 @@ from .semantic_grounding import (
 
 __all__ = [
     "ACTION_CONCEPT_UNITS",
+    "CognitiveAuthorityLedger",
+    "COGNITIVE_SIGNAL_KINDS",
+    "CognitiveInquiryRuntime",
+    "EntityIdentityRegistry",
     "FACTORY_EVENT_CONCEPT_UNITS",
     "FACTORY_RELATION_CONCEPTS",
     "FUNCTIONAL_ROLE_CONTRACTS",
@@ -104,6 +132,8 @@ __all__ = [
     "assert_perception_candidate_is_not_runtime_fact",
     "assert_rcir_architecture_invariants",
     "apply_grounding_constraint",
+    "adapt_cognitive_signal",
+    "assert_shared_authority_contract",
     "build_grounding_clarification_contract",
     "build_grounded_causal_graph",
     "build_situated_event_graph",
@@ -131,6 +161,8 @@ __all__ = [
     "build_lightweight_orchestrator_catalog",
     "compile_causal_operator_registry",
     "compose_language_concepts",
+    "invalidate_versioned_artifacts",
+    "generate_competing_hypotheses",
     "normalize_language_text",
     "PROCESS_TEMPLATES",
     "ProcessTemplate",
@@ -154,4 +186,16 @@ __all__ = [
     "build_semantic_constraint_frame",
     "ground_semantic_role",
     "load_semantic_attribute_concepts",
+    "make_concept",
+    "make_constraint",
+    "make_entity_ref",
+    "make_event",
+    "make_evidence_envelope",
+    "make_goal",
+    "make_inquiry_contract",
+    "make_predicate",
+    "run_concept_validation_loop",
+    "run_quality_profile_drift_loop",
+    "run_recovery_boundary_probe_loop",
+    "validate_primitive",
 ]

@@ -58,6 +58,10 @@
         "downstream_does_not_reparse_surface_text",
         "current_verified_relation_precedes_history_and_category",
         "every_recovery_reenters_current_fact_pruning",
+        "qualified_evidence_required_for_execution_fact",
+        "versioned_dependency_invalidation_required",
+        "shared_event_predicate_evidence_readback",
+        "no_secondary_fact_or_control_source",
         "current_world_ledger_is_authoritative",
         "every_binding_has_evidence_and_world_revision",
         "current_fact_pruning_required_before_execution"
@@ -70,6 +74,10 @@
         "downstream_does_not_reparse_surface_text": { "const": true },
         "current_verified_relation_precedes_history_and_category": { "const": true },
         "every_recovery_reenters_current_fact_pruning": { "const": true },
+        "qualified_evidence_required_for_execution_fact": { "const": true },
+        "versioned_dependency_invalidation_required": { "const": true },
+        "shared_event_predicate_evidence_readback": { "const": true },
+        "no_secondary_fact_or_control_source": { "const": true },
         "current_world_ledger_is_authoritative": { "const": true },
         "every_binding_has_evidence_and_world_revision": { "const": true },
         "current_fact_pruning_required_before_execution": { "const": true }
@@ -163,6 +171,9 @@
         "goal_facts",
         "role_bindings",
         "nodes",
+        "fact_authority_ref",
+        "control_gateway",
+        "verification_gateway",
         "current_fact_pruning_required",
         "direct_execution_allowed",
         "runtime_fact_committed"
@@ -177,6 +188,9 @@
         "goal_facts": { "type": "array", "items": { "type": "object" } },
         "role_bindings": { "type": "object" },
         "nodes": { "type": "array", "items": { "type": "object" } },
+        "fact_authority_ref": { "type": "string" },
+        "control_gateway": { "const": "P018" },
+        "verification_gateway": { "const": "P016" },
         "current_fact_pruning_required": { "const": true },
         "direct_execution_allowed": { "const": false },
         "runtime_fact_committed": { "const": false }

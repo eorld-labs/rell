@@ -1946,6 +1946,15 @@ def _enter_current_fact_pruning_barrier(
         "current_fact_digest": digest,
         "entry_count": int(previous.get("entry_count", 0)) + 1,
         "old_path_reused": False,
+        "fact_authority_ref": (
+            ((session.get("current_rcir") or {}).get("world_fact_ledger") or {}).get(
+                "ledger_id"
+            )
+            or "current_runtime_world_fact_projection"
+        ),
+        "control_gateway": "P018",
+        "verification_gateway": "P016",
+        "direct_execution_allowed": False,
         "verified_intent_facts_considered": sorted(
             set(intent.get("verified_facts") or [])
         ),

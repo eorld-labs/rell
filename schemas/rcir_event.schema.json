@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eorld.example/schemas/rcir_event.schema.json",
+  "title": "RCIR Event",
+  "type": "object",
+  "required": ["schema_version", "type", "event_id", "event_type", "participant_refs", "temporal_scope", "status", "world_revision", "evidence_refs", "produces_predicate_refs"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "type": { "const": "Event" },
+    "event_id": { "type": "string", "pattern": "^event_[a-f0-9]{16}$" },
+    "event_type": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$" },
+    "actor_ref": { "type": ["string", "null"] },
+    "participant_refs": { "type": "object", "additionalProperties": { "type": "string" } },
+    "temporal_scope": { "enum": ["reported_past", "current", "requested_future", "verified_transition"] },
+    "status": { "enum": ["candidate", "authorized", "observed", "verified", "rejected", "invalidated"] },
+    "world_revision": { "type": "integer", "minimum": 0 },
+    "evidence_refs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "produces_predicate_refs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "arbitration_ref": { "type": ["string", "null"] },
+    "verification_ref": { "type": ["string", "null"] },
+    "invalidation_reason": { "type": "string" },
+    "invalidated_at_world_revision": { "type": "integer", "minimum": 0 }
+  },
+  "additionalProperties": false
+}

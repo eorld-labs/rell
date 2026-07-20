@@ -585,6 +585,7 @@ def main() -> None:
     run_python("validate_language_concept_composition.py")
     run_python("validate_semantic_grounding_architecture.py")
     run_python("validate_cognitive_ir.py")
+    run_python("validate_rcir_stage_a_b.py")
     run_python("validate_situated_event_reasoning.py")
     run_python("validate_process_template_resolution.py")
     run_python("validate_context_projection.py")

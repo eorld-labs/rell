@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eorld.example/schemas/rcir_evidence_envelope.schema.json",
+  "title": "RCIR EvidenceEnvelope",
+  "type": "object",
+  "required": ["schema_version", "type", "envelope_id", "source_type", "epistemic_status", "world_revision", "supports_refs", "strength", "qualification", "fact_commit_eligible", "invalidation"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "type": { "const": "EvidenceEnvelope" },
+    "envelope_id": { "type": "string", "pattern": "^evidence_[a-f0-9]{16}$" },
+    "source_type": { "enum": ["human_report", "perception_candidate", "multimodal_observation", "runtime_snapshot", "p016_physical_verification", "trusted_experience", "diagnostic_signal", "safe_probe_result"] },
+    "epistemic_status": { "enum": ["candidate", "corroborated", "physically_verified", "refuted", "stale", "invalidated"] },
+    "world_revision": { "type": "integer", "minimum": 0 },
+    "supports_refs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "strength": { "type": "integer", "minimum": 0, "maximum": 1000 },
+    "qualification": {
+      "type": "object",
+      "required": ["independent_channels", "physical_verification", "current_world_bound"],
+      "properties": {
+        "independent_channels": { "type": "integer", "minimum": 0 },
+        "physical_verification": { "type": "boolean" },
+        "current_world_bound": { "type": "boolean" },
+        "verifier": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "fact_commit_eligible": { "type": "boolean" },
+    "invalidation": {
+      "type": "object",
+      "required": ["invalid_after_world_revision_change", "depends_on_refs"],
+      "properties": {
+        "invalid_after_world_revision_change": { "type": "boolean" },
+        "depends_on_refs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+      },
+      "additionalProperties": false
+    },
+    "payload_digest": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+    "invalidation_reason": { "type": "string" },
+    "invalidated_at_world_revision": { "type": "integer", "minimum": 0 }
+  },
+  "additionalProperties": false
+}

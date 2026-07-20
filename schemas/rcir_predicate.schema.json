@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eorld.example/schemas/rcir_predicate.schema.json",
+  "title": "RCIR Predicate",
+  "type": "object",
+  "required": ["schema_version", "type", "predicate_id", "name", "arguments", "polarity", "modality", "status", "world_revision", "evidence_refs"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "type": { "const": "Predicate" },
+    "predicate_id": { "type": "string", "pattern": "^predicate_[a-f0-9]{16}$" },
+    "name": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$" },
+    "arguments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["role", "value_type", "value"],
+        "properties": {
+          "role": { "type": "string" },
+          "value_type": { "enum": ["EntityRef", "Concept", "literal", "role_variable"] },
+          "value": {}
+        },
+        "additionalProperties": false
+      }
+    },
+    "polarity": { "enum": ["positive", "negative"] },
+    "modality": { "enum": ["current_fact", "goal_candidate", "reported_candidate", "perception_candidate", "hypothesis", "template_boundary"] },
+    "status": { "enum": ["candidate", "established", "refuted", "stale", "invalidated"] },
+    "world_revision": { "type": "integer", "minimum": 0 },
+    "evidence_refs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "depends_on_refs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "invalidation_reason": { "type": "string" },
+    "invalidated_at_world_revision": { "type": "integer", "minimum": 0 }
+  },
+  "additionalProperties": false
+}

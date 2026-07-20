@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0.0",
+  "relation_table": [
+    {"source_type": "Concept", "relation": "classifies", "target_type": "EntityRef", "cardinality": "many_to_many", "authority": "semantic_only"},
+    {"source_type": "EntityRef", "relation": "fills_argument", "target_type": "Predicate", "cardinality": "many_to_many", "authority": "current_world_binding"},
+    {"source_type": "Event", "relation": "produces_or_refutes", "target_type": "Predicate", "cardinality": "one_to_many", "authority": "requires_evidence"},
+    {"source_type": "Goal", "relation": "targets", "target_type": "Predicate", "cardinality": "one_to_many", "authority": "candidate_until_verified"},
+    {"source_type": "Constraint", "relation": "restricts", "target_type": "Concept|EntityRef|Event|Goal", "cardinality": "many_to_many", "authority": "scope_and_version_bound"},
+    {"source_type": "EvidenceEnvelope", "relation": "supports_or_refutes", "target_type": "EntityRef|Predicate|Event|Constraint", "cardinality": "many_to_many", "authority": "only_fact_commit_eligible_envelopes_can_establish_current_fact"},
+    {"source_type": "Predicate", "relation": "satisfies", "target_type": "Goal", "cardinality": "many_to_many", "authority": "same_predicate_id_required"}
+  ],
+  "forbidden_relations": [
+    "Concept directly commits Predicate",
+    "human_report directly establishes current_fact",
+    "perception_candidate directly establishes current_fact",
+    "Goal directly controls actuator",
+    "InquiryContract creates a second fact ledger"
+  ]
+}

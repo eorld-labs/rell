@@ -296,6 +296,10 @@ def build_portable_experience_contract(experience: dict[str, Any]) -> dict[str, 
             "rebind_all_roles_from_current_world_evidence": True,
             "replan_motion_for_current_embodiment": True,
             "current_fact_pruning_required": True,
+            "fact_authority": "WorldFactLedger",
+            "control_gateway": "P018",
+            "verification_gateway": "P016",
+            "direct_execution_allowed": False,
             "non_transferable_fields": sorted(NON_TRANSFERABLE_EXPERIENCE_FIELDS),
         },
     }
@@ -337,6 +341,14 @@ def validate_portable_experience_contract(contract: dict[str, Any]) -> dict[str,
     ):
         if policy.get(flag) is not True:
             errors.append(f"migration_policy_missing:{flag}")
+    if policy.get("fact_authority") != "WorldFactLedger":
+        errors.append("experience_contract_created_secondary_fact_source")
+    if policy.get("control_gateway") != "P018":
+        errors.append("experience_contract_bypassed_p018")
+    if policy.get("verification_gateway") != "P016":
+        errors.append("experience_contract_bypassed_p016")
+    if policy.get("direct_execution_allowed") is not False:
+        errors.append("experience_contract_has_direct_execution_authority")
     for slot in contract.get("role_type_slots") or []:
         if slot.get("binding_scope") != "rebind_from_current_world_evidence":
             errors.append(f"role_binding_not_portable:{slot.get('role')}")

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eorld.example/schemas/rcir_concept.schema.json",
+  "title": "RCIR Concept",
+  "type": "object",
+  "required": ["schema_version", "type", "concept_id", "super_concept_refs", "perceptual_invariants", "functional_affordances", "state_predicate_refs", "lifecycle_status"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "type": { "const": "Concept" },
+    "concept_id": { "type": "string", "pattern": "^concept_[A-Za-z0-9_.:-]+$" },
+    "super_concept_refs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "perceptual_invariants": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "functional_affordances": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "state_predicate_refs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "lifecycle_status": { "enum": ["candidate", "validating", "trusted", "rejected", "superseded"] },
+    "evidence_refs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "execution_authority": { "const": false }
+  },
+  "additionalProperties": false
+}
