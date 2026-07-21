@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/schemas/rcir_scope_graph.schema.json",
+  "title": "RCIR ScopeGraph",
+  "type": "object",
+  "required": ["schema_version", "scope_kind", "scope_graph_id", "event_refs", "attachments", "discourse_edges", "nearest_event_heuristic_is_authoritative", "candidate_only", "runtime_fact_committed"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "scope_kind": {"const": "ScopeGraph"},
+    "scope_graph_id": {"type": "string", "pattern": "^scope_graph_[a-f0-9]{16}$"},
+    "event_refs": {"type": "array", "items": {"type": "string"}},
+    "attachments": {"type": "array", "items": {"type": "object"}},
+    "discourse_edges": {"type": "array", "items": {"type": "object"}},
+    "nearest_event_heuristic_is_authoritative": {"const": false},
+    "candidate_only": {"const": true},
+    "runtime_fact_committed": {"const": false}
+  },
+  "additionalProperties": false
+}

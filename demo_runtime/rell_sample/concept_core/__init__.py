@@ -88,6 +88,19 @@ from .lightweight_orchestrator import (
     compile_causal_operator_registry,
 )
 from .language_concept_composer import compose_language_concepts, normalize_language_text
+from .machine_dictionary import (
+    dictionary_architecture_summary,
+    dictionary_index,
+    load_machine_dictionary,
+    lookup_surface_candidates,
+    realize_dictionary_entry,
+    validate_machine_dictionary,
+)
+from .composition_grammar import (
+    build_interpretation_lattice,
+    build_scope_graph,
+    make_referent_expression,
+)
 from .process_template_resolver import (
     PROCESS_TEMPLATES,
     ProcessTemplate,
@@ -173,6 +186,15 @@ __all__ = [
     "build_lightweight_orchestrator_catalog",
     "compile_causal_operator_registry",
     "compose_language_concepts",
+    "dictionary_architecture_summary",
+    "dictionary_index",
+    "load_machine_dictionary",
+    "lookup_surface_candidates",
+    "realize_dictionary_entry",
+    "validate_machine_dictionary",
+    "build_interpretation_lattice",
+    "build_scope_graph",
+    "make_referent_expression",
     "invalidate_versioned_artifacts",
     "generate_competing_hypotheses",
     "normalize_language_text",

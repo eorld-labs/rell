@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/schemas/rcir_interpretation_lattice.schema.json",
+  "title": "RCIR Frontend InterpretationLattice",
+  "type": "object",
+  "required": ["schema_version", "lattice_kind", "lattice_id", "source_ref", "world_revision", "candidates", "status", "authoritative_semantic_graph_emitted", "raw_text_allowed_below_lattice", "runtime_fact_committed"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "lattice_kind": {"const": "InterpretationLattice"},
+    "lattice_id": {"type": "string", "pattern": "^interpretation_lattice_[a-f0-9]{16}$"},
+    "source_ref": {"type": "string", "minLength": 1},
+    "world_revision": {"type": "integer", "minimum": 0},
+    "candidates": {"type": "array", "items": {"type": "object"}},
+    "status": {"enum": ["resolved", "unresolved"]},
+    "selected_candidate_ref": {"type": ["string", "null"]},
+    "inquiry_contract": {"type": ["object", "null"]},
+    "authoritative_semantic_graph_emitted": {"type": "boolean"},
+    "raw_text_allowed_below_lattice": {"const": false},
+    "runtime_fact_committed": {"const": false}
+  },
+  "additionalProperties": false
+}

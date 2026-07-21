@@ -1,0 +1,122 @@
+{
+  "schema_version": "1.0.0",
+  "dictionary_id": "rell_machine_dictionary_core_v1",
+  "architecture": {
+    "glyph": "irreducible primitive predicate, operator, or modifier",
+    "word": "compound concept, operator contract, or process template",
+    "sentence": "RCIR SituatedEventGraph plus GroundedCausalGraph",
+    "discourse": "task and inquiry graphs over shared evidence and world facts"
+  },
+  "entries": [
+    {
+      "entry_id": "predicate.supported_by",
+      "entry_kind": "primitive_predicate",
+      "semantic_value": "supported_by",
+      "irreducible": true,
+      "components": [],
+      "roles": {"theme": "physical_referent", "support": "support_capable_referent"},
+      "language_adapters": {"zh": [{"surface": "上", "selection_constraints": {"syntactic_positions": ["after_noun"], "host_classifications": ["support_surface"]}}, {"surface": "承托", "canonical": true}], "en": [{"surface": "supported by", "canonical": true}]},
+      "verification_contract": ["contact_verified", "gravity_support_verified", "stability_verified"],
+      "fact_commit_authority": "P016_via_WorldFactLedger_only"
+    },
+    {
+      "entry_id": "predicate.contained_by",
+      "entry_kind": "primitive_predicate",
+      "semantic_value": "contained_by",
+      "irreducible": true,
+      "components": [],
+      "roles": {"theme": "physical_referent", "container": "containment_capable_referent"},
+      "language_adapters": {"zh": [{"surface": "里", "canonical": true}, {"surface": "里面"}], "en": [{"surface": "inside", "canonical": true}]},
+      "verification_contract": ["boundary_containment_verified"],
+      "fact_commit_authority": "P016_via_WorldFactLedger_only"
+    },
+    {
+      "entry_id": "predicate.near",
+      "entry_kind": "primitive_predicate",
+      "semantic_value": "near",
+      "irreducible": true,
+      "components": [],
+      "roles": {"theme": "spatial_referent", "landmark": "spatial_referent"},
+      "language_adapters": {"zh": [{"surface": "旁边", "canonical": true}, {"surface": "附近"}], "en": [{"surface": "near", "canonical": true}]},
+      "verification_contract": ["reference_frame_valid", "distance_within_band"],
+      "fact_commit_authority": "P016_via_WorldFactLedger_only"
+    },
+    {
+      "entry_id": "operator.navigate_to",
+      "entry_kind": "primitive_operator",
+      "semantic_value": "navigate_to",
+      "irreducible": true,
+      "components": [],
+      "roles": {"executor": "embodied_agent", "destination": "spatial_referent"},
+      "language_adapters": {"zh": [{"surface": "走到", "canonical": true}, {"surface": "去"}], "en": [{"surface": "navigate to", "canonical": true}]},
+      "causal_contract": {"requires": ["destination_grounded"], "projects": ["executor_at_destination"], "verification": ["terminal_spatial_relation_verified"]},
+      "fact_commit_authority": "P016_via_WorldFactLedger_only"
+    },
+    {
+      "entry_id": "operator.grasp_object",
+      "entry_kind": "primitive_operator",
+      "semantic_value": "grasp_object",
+      "irreducible": true,
+      "components": [],
+      "roles": {"executor": "embodied_agent", "theme": "graspable_referent"},
+      "language_adapters": {"zh": [{"surface": "拿", "canonical": true}, {"surface": "抓"}], "en": [{"surface": "grasp", "canonical": true}]},
+      "causal_contract": {"requires": ["theme_grounded", "theme_reachable"], "projects": ["held_by_theme_executor"], "verification": ["gripper_contact_and_follow_verified"]},
+      "fact_commit_authority": "P016_via_WorldFactLedger_only"
+    },
+    {
+      "entry_id": "operator.place_object",
+      "entry_kind": "primitive_operator",
+      "semantic_value": "place_object",
+      "irreducible": true,
+      "components": [],
+      "roles": {"executor": "embodied_agent", "theme": "movable_referent", "destination": "spatial_referent"},
+      "language_adapters": {"zh": [{"surface": "放", "canonical": true}, {"surface": "放到"}], "en": [{"surface": "place", "canonical": true}]},
+      "causal_contract": {"requires": ["held_by_theme_executor", "destination_grounded"], "projects": ["requested_spatial_relation"], "verification": ["terminal_spatial_relation_verified"]},
+      "fact_commit_authority": "P016_via_WorldFactLedger_only"
+    },
+    {
+      "entry_id": "modifier.aspect_attainment",
+      "entry_kind": "modifier",
+      "semantic_value": "aspect_attainment",
+      "irreducible": true,
+      "components": [],
+      "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "上", "selection_constraints": {"syntactic_positions": ["after_verb"]}}], "en": [{"surface": "successfully", "canonical": true}]},
+      "verification_contract": ["modifier_does_not_commit_fact"],
+      "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.direction_upward",
+      "entry_kind": "modifier",
+      "semantic_value": "direction_upward",
+      "irreducible": true,
+      "components": [],
+      "roles": {"event": "motion_event_ref"},
+      "language_adapters": {"zh": [{"surface": "上", "selection_constraints": {"syntactic_positions": ["before_location"], "host_classifications": ["vertical_region"]}}], "en": [{"surface": "upward", "canonical": true}]},
+      "verification_contract": ["modifier_does_not_commit_fact"],
+      "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "contract.fill_container",
+      "entry_kind": "operator_contract",
+      "semantic_value": "fill_container",
+      "irreducible": false,
+      "components": ["operator.grasp_object", "predicate.contained_by"],
+      "roles": {"theme": "liquid_receiving_referent", "source": "liquid_source_referent"},
+      "language_adapters": {"zh": [{"surface": "接水", "canonical": true}], "en": [{"surface": "fill container", "canonical": true}]},
+      "causal_contract": {"requires": ["container_grounded", "liquid_source_grounded"], "projects": ["contains_liquid"], "verification": ["liquid_level_verified", "container_integrity_preserved"]},
+      "fact_commit_authority": "P016_via_WorldFactLedger_only"
+    },
+    {
+      "entry_id": "template.deliver_filled_container",
+      "entry_kind": "process_template",
+      "semantic_value": "deliver_filled_container",
+      "irreducible": false,
+      "components": ["operator.grasp_object", "contract.fill_container", "operator.navigate_to"],
+      "roles": {"theme": "liquid_receiving_referent", "recipient": "human_referent"},
+      "language_adapters": {"zh": [{"surface": "给我接杯水", "canonical": true}], "en": [{"surface": "bring me a glass of water", "canonical": true}]},
+      "causal_contract": {"requires": ["container_available", "source_available"], "projects": ["human_received_filled_container"], "verification": ["recipient_possession_verified"]},
+      "fact_commit_authority": "P016_via_WorldFactLedger_only"
+    }
+  ]
+}

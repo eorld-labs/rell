@@ -27,6 +27,10 @@
 | `rcir_reference_resolution.schema.json` | 定义指代候选、权威层级、时态来源、歧义询问及非事实提交边界。 |
 | `rcir_salience_projection.schema.json` | 定义从当前事实、任务角色和对话焦点派生且不可持久化为第二状态源的显著性投影。 |
 | `rcir_rule_evaluation.schema.json` | 定义经 P018 仲裁、经 P016 验真的规则结果及其非事实源边界。 |
+| `rell_machine_dictionary.schema.json` | 定义“字—词—句—篇”体系中的可执行机器字典条目、组合层级和事实权限。 |
+| `rcir_referent_expression.schema.json` | 定义当前实体、选择器、集合、子区域、未来实体和交互角色的统一指代表达。 |
+| `rcir_interpretation_lattice.schema.json` | 定义权威语义图生成前的多解释候选格及歧义询问边界。 |
+| `rcir_scope_graph.schema.json` | 定义修饰、否定、量化及语篇关系对事件的显式作用域。 |
 
 ## 兼容入口
 

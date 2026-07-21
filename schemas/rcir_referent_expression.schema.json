@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/schemas/rcir_referent_expression.schema.json",
+  "title": "RCIR ReferentExpression",
+  "type": "object",
+  "required": ["schema_version", "referent_kind", "referent_id", "concept_refs", "constraints", "members", "grounding_required", "candidate_only", "runtime_fact_committed"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "referent_kind": {"enum": ["entity_ref", "entity_selector", "set_selector", "subregion_selector", "future_entity_selector", "interaction_role", "event_role"]},
+    "referent_id": {"type": "string", "pattern": "^referent_[a-f0-9]{16}$"},
+    "entity_ref": {"type": ["string", "null"]},
+    "concept_refs": {"type": "array", "items": {"type": "string"}},
+    "constraints": {"type": "array", "items": {"type": "object"}},
+    "members": {"type": "array", "items": {"type": "object"}},
+    "parent_ref": {"type": ["object", "null"]},
+    "generation_condition": {"type": ["object", "null"]},
+    "interaction_role": {"type": ["string", "null"]},
+    "world_revision": {"type": ["integer", "null"], "minimum": 0},
+    "grounding_required": {"type": "boolean"},
+    "candidate_only": {"type": "boolean"},
+    "runtime_fact_committed": {"const": false}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"referent_kind": {"const": "entity_ref"}}},
+      "then": {"properties": {"entity_ref": {"type": "string"}, "grounding_required": {"const": false}, "candidate_only": {"const": false}}}
+    },
+    {
+      "if": {"properties": {"referent_kind": {"const": "future_entity_selector"}}},
+      "then": {"properties": {"entity_ref": {"type": "null"}, "generation_condition": {"type": "object"}, "grounding_required": {"const": true}, "candidate_only": {"const": true}}}
+    }
+  ],
+  "additionalProperties": false
+}
