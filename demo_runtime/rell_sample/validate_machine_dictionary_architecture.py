@@ -15,6 +15,7 @@ from concept_core.machine_dictionary import (
     lookup_surface_candidates,
     realize_dictionary_entry,
 )
+from embodied_scene import SESSIONS, begin_motion_command, start_session
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -76,6 +77,15 @@ def main() -> None:
         [{"from": "event_grasp", "to": "event_place", "relation": "sequence"}],
     )
     require(scope["nearest_event_heuristic_is_authoritative"] is False, "scope graph retained nearest-event authority")
+    unresolved_scope = build_scope_graph(
+        [],
+        [{"modifier_ref": "modifier_completed", "target_event_ref": None, "scope": "event"}],
+    )
+    require(
+        not unresolved_scope["scope_complete"]
+        and unresolved_scope["unresolved_attachments"],
+        "missing event scope was guessed or discarded",
+    )
 
     lattice = build_interpretation_lattice(
         source_ref="sha256:test",
@@ -96,6 +106,27 @@ def main() -> None:
     ):
         json.loads((ROOT / "schemas" / name).read_text(encoding="utf-8"))
 
+    session = start_session("home_humanoid", "hospitality_guest")
+    begin_motion_command(
+        session["session_id"], "把白色马克杯放到操作台A"
+    )
+    online = SESSIONS[session["session_id"]]["last_language_understanding"][
+        "machine_dictionary_projection"
+    ]
+    require(
+        online["mode"] == "shadow_equivalence_migration"
+        and online["can_control_execution"] is False,
+        "dictionary migration path gained execution authority",
+    )
+    require(
+        "operator.place_object" in online["operator_refs"],
+        f"online language path did not consume the machine dictionary: {online}",
+    )
+    require(
+        online["interpretation_lattice"]["status"] == "resolved",
+        f"known online command did not compile through dictionary lattice: {online}",
+    )
+
     print("RELL machine dictionary architecture validation passed.")
     print({
         "core_compound_boundary": "passed",
@@ -103,6 +134,7 @@ def main() -> None:
         "future_selector_identity_boundary": "passed",
         "explicit_scope_graph": "passed",
         "dictionary_round_trip": "passed",
+        "online_shadow_projection": "passed",
     })
 
 

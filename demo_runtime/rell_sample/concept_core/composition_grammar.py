@@ -73,14 +73,28 @@ def build_scope_graph(
     discourse_edges: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     allowed_targets = set(event_refs)
-    invalid = [item for item in attachments if item.get("target_event_ref") not in allowed_targets]
+    invalid = [
+        item
+        for item in attachments
+        if item.get("scope") != "global"
+        and item.get("target_event_ref") is not None
+        and item.get("target_event_ref") not in allowed_targets
+    ]
     if invalid:
         raise ValueError(f"scope attachment targets unknown event: {invalid}")
+    unresolved = [
+        deepcopy(item)
+        for item in attachments
+        if item.get("scope") != "global"
+        and item.get("target_event_ref") is None
+    ]
     graph = {
         "schema_version": "1.0.0",
         "scope_kind": "ScopeGraph",
         "event_refs": list(event_refs),
         "attachments": deepcopy(attachments),
+        "unresolved_attachments": unresolved,
+        "scope_complete": not unresolved,
         "discourse_edges": deepcopy(discourse_edges or []),
         "nearest_event_heuristic_is_authoritative": False,
         "candidate_only": True,

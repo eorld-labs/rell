@@ -128,6 +128,46 @@ def realize_dictionary_entry(
     return (canonical or (adapters[0] if adapters else {})).get("surface")
 
 
+def scan_surface_candidate_groups(
+    text: str,
+    *,
+    language: str = "zh",
+    payload: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    source = payload or load_machine_dictionary()
+    surfaces = sorted(
+        {
+            adapter.get("surface")
+            for entry in source.get("entries", [])
+            for adapter in entry.get("language_adapters", {}).get(language, [])
+            if adapter.get("surface")
+        },
+        key=lambda value: (-len(str(value)), str(value)),
+    )
+    groups = []
+    for surface in surfaces:
+        start = text.find(surface)
+        while start >= 0:
+            lookup = lookup_surface_candidates(
+                surface, language=language, payload=source
+            )
+            groups.append(
+                {
+                    "surface_ref": lookup["surface_ref"],
+                    "span": [start, start + len(surface)],
+                    "candidate_entry_refs": [
+                        item["entry_ref"] for item in lookup["candidates"]
+                    ],
+                    "status": lookup["status"],
+                    "selected_entry_ref": lookup["selected_entry_ref"],
+                    "candidate_only": True,
+                    "runtime_fact_committed": False,
+                }
+            )
+            start = text.find(surface, start + 1)
+    return sorted(groups, key=lambda item: (item["span"][0], -(item["span"][1] - item["span"][0])))
+
+
 def dictionary_architecture_summary(payload: dict[str, Any] | None = None) -> dict[str, Any]:
     source = payload or load_machine_dictionary()
     counts = {
@@ -150,5 +190,6 @@ __all__ = [
     "load_machine_dictionary",
     "lookup_surface_candidates",
     "realize_dictionary_entry",
+    "scan_surface_candidate_groups",
     "validate_machine_dictionary",
 ]

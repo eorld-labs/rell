@@ -27,6 +27,9 @@ from concept_core.runtime_reasoning import (
     evaluate_runtime_rules,
     explanation_from_structured_state,
 )
+from concept_core.dictionary_frontend import (
+    project_analysis_to_machine_dictionary,
+)
 from concept_core.rcir_dialogue_realizer import realize_rcir_dialogue
 from concept_core.contextual_affordance import resolve_contextual_affordance_request
 from concept_core.context_projection import build_context_projection, compact_intent_capsule
@@ -3511,6 +3514,13 @@ def _compose_session_language(
                     "basis": "current_verified_relation_after_goal_schema_projection",
                     "prior_goal_role_reused": False,
                 }
+    analysis["machine_dictionary_projection"] = (
+        project_analysis_to_machine_dictionary(
+            str(analysis.get("normalized_utterance") or ""),
+            analysis,
+            world_revision=int(session.get("world_revision", 0)),
+        )
+    )
     rule_evaluation = evaluate_runtime_rules(
         analysis,
         session.get("runtime_objects", []),
@@ -3654,6 +3664,9 @@ def _language_understanding_view(analysis: dict[str, Any]) -> dict[str, Any]:
         "rule_evaluation": deepcopy(analysis.get("rule_evaluation")),
         "structured_explanation": deepcopy(
             analysis.get("structured_explanation")
+        ),
+        "machine_dictionary_projection": deepcopy(
+            analysis.get("machine_dictionary_projection")
         ),
         "canonical_utterance": analysis.get("canonical_utterance"),
         "semantic_canonical_utterance": analysis.get("canonical_utterance"),

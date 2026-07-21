@@ -94,6 +94,7 @@ from .machine_dictionary import (
     load_machine_dictionary,
     lookup_surface_candidates,
     realize_dictionary_entry,
+    scan_surface_candidate_groups,
     validate_machine_dictionary,
 )
 from .composition_grammar import (
@@ -101,6 +102,7 @@ from .composition_grammar import (
     build_scope_graph,
     make_referent_expression,
 )
+from .dictionary_frontend import project_analysis_to_machine_dictionary
 from .process_template_resolver import (
     PROCESS_TEMPLATES,
     ProcessTemplate,
@@ -191,10 +193,12 @@ __all__ = [
     "load_machine_dictionary",
     "lookup_surface_candidates",
     "realize_dictionary_entry",
+    "scan_surface_candidate_groups",
     "validate_machine_dictionary",
     "build_interpretation_lattice",
     "build_scope_graph",
     "make_referent_expression",
+    "project_analysis_to_machine_dictionary",
     "invalidate_versioned_artifacts",
     "generate_competing_hypotheses",
     "normalize_language_text",
