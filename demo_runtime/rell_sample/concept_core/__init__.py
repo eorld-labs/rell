@@ -51,6 +51,13 @@ from .cognitive_inquiry import (
     run_quality_profile_drift_loop,
     run_recovery_boundary_probe_loop,
 )
+from .runtime_cognitive_inquiries import (
+    SIGNAL_INQUIRY_POLICIES,
+    arbitrate_compiled_inquiry,
+    build_directed_inquiry_update,
+    compile_signal_candidate_to_inquiry,
+    refresh_runtime_inquiries,
+)
 from .concept_lifecycle import build_concept_lifecycle_view, record_concept_fallback, record_concept_reuse
 from .concept_parser import resolve_action_concepts
 from .concept_gap_dialogue import continue_concept_gap_dialogue, start_concept_gap_dialogue
@@ -116,6 +123,7 @@ __all__ = [
     "CognitiveAuthorityLedger",
     "COGNITIVE_SIGNAL_KINDS",
     "CognitiveInquiryRuntime",
+    "SIGNAL_INQUIRY_POLICIES",
     "EntityIdentityRegistry",
     "FACTORY_EVENT_CONCEPT_UNITS",
     "FACTORY_RELATION_CONCEPTS",
@@ -133,6 +141,8 @@ __all__ = [
     "assert_rcir_architecture_invariants",
     "apply_grounding_constraint",
     "adapt_cognitive_signal",
+    "arbitrate_compiled_inquiry",
+    "build_directed_inquiry_update",
     "assert_shared_authority_contract",
     "build_grounding_clarification_contract",
     "build_grounded_causal_graph",
@@ -141,6 +151,7 @@ __all__ = [
     "build_portable_experience_contract",
     "compact_rcir_receipt",
     "compile_rcir_bundle",
+    "compile_signal_candidate_to_inquiry",
     "validate_rcir_bundle",
     "validate_portable_experience_contract",
     "build_released_runtime_query_result",
@@ -197,5 +208,6 @@ __all__ = [
     "run_concept_validation_loop",
     "run_quality_profile_drift_loop",
     "run_recovery_boundary_probe_loop",
+    "refresh_runtime_inquiries",
     "validate_primitive",
 ]

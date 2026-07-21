@@ -22,6 +22,7 @@ from concept_core.cognitive_ir import (
 from concept_core.runtime_cognitive_signals import (
     derive_runtime_cognitive_signal_candidates,
 )
+from concept_core.runtime_cognitive_inquiries import refresh_runtime_inquiries
 from concept_core.contextual_affordance import resolve_contextual_affordance_request
 from concept_core.context_projection import build_context_projection, compact_intent_capsule
 from concept_core.functional_object_reasoning import build_functional_object_catalog, build_functional_profile, evaluate_role_compatibility
@@ -210,6 +211,9 @@ def _attach_runtime_diagnostic(result: dict[str, Any], session: dict[str, Any], 
     diagnostic_history.append(deepcopy(diagnostic))
     if len(diagnostic_history) > 32:
         del diagnostic_history[:-32]
+    _refresh_runtime_cognitive_signal_candidates(
+        session, reason="runtime_diagnostic_committed"
+    )
     if not result.get("prompt"):
         result["prompt"] = (
             f"当前阶段{diagnostic['stage'] or '未命名'}已暂停。"
@@ -377,6 +381,29 @@ def _refresh_runtime_cognitive_signal_candidates(
             existing_keys.add(key)
     if len(stored) > 32:
         del stored[:-32]
+    active_intent = (session.get("long_horizon_intents") or {}).get(
+        session.get("active_intent_id")
+    ) or {}
+    task_active = active_intent.get("lifecycle") in {
+        "active",
+        "awaiting_correction",
+        "awaiting_confirmation",
+    }
+    natural_observation_expected = bool(
+        task_active
+        and (
+            session.get("active_motion_job_id")
+            or active_intent.get("current_stage")
+        )
+    )
+    refresh_runtime_inquiries(
+        signal_candidates=stored,
+        stored_inquiries=session.setdefault("cognitive_inquiry_working_set", []),
+        world_revision=current_revision,
+        fact_authority_ref=current_authority_ref,
+        task_active=task_active,
+        natural_observation_expected=natural_observation_expected,
+    )
     return deepcopy(stored)
 _LANGUAGE_OBJECT_CONCEPT_CACHE: list[dict[str, Any]] | None = None
 
@@ -510,6 +537,7 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator", scene_id
         "rcir_receipts": [],
         "cognitive_inquiry_history": [],
         "cognitive_signal_candidates": [],
+        "cognitive_inquiry_working_set": [],
         "runtime_diagnostic_history": [],
         "retired_fact_authority_refs": [],
         "concept_gap_dialogue": None,
@@ -2488,6 +2516,9 @@ def get_cognitive_inquiry_context(session_id: str) -> dict[str, Any]:
         "world_fact_ledger": deepcopy(ledger),
         "history_count": len(session.get("cognitive_inquiry_history", [])),
         "cognitive_signal_candidates": signal_candidates,
+        "cognitive_inquiry_working_set": deepcopy(
+            session.get("cognitive_inquiry_working_set", [])
+        ),
         "control_gateway": "P018",
         "verification_gateway": "P016",
         "direct_execution_allowed": False,

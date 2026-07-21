@@ -17,6 +17,11 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from api_server import RellSampleHandler
+from embodied_scene import (
+    SESSIONS,
+    _attach_runtime_diagnostic,
+    get_cognitive_inquiry_context,
+)
 
 
 ROOT = Path(__file__).resolve().parent
@@ -34,12 +39,15 @@ SOURCE_FILES = (
     "demo_runtime/rell_sample/api_server.py",
     "demo_runtime/rell_sample/cognitive_inquiry_service.py",
     "demo_runtime/rell_sample/concept_core/cognitive_inquiry.py",
+    "demo_runtime/rell_sample/concept_core/runtime_cognitive_signals.py",
+    "demo_runtime/rell_sample/concept_core/runtime_cognitive_inquiries.py",
     "demo_runtime/rell_sample/concept_core/cognitive_ir.py",
     "demo_runtime/rell_sample/concept_core/rcir_primitives.py",
     "demo_runtime/rell_sample/embodied_scene.py",
     "demo_runtime/rell_sample/embodied_home.html",
     "demo_runtime/rell_sample/validate_cognitive_inquiry_api.py",
     "demo_runtime/rell_sample/validate_rcir_stage_a_b.py",
+    "demo_runtime/rell_sample/validate_runtime_cognitive_signal_adapter.py",
     "demo_runtime/rell_sample/collect_rcir_evidence.py",
     "demo_runtime/rell_sample/docs/api_contract.md",
     "demo_runtime/rell_sample/docs/rcir_stage_a_b_engineering_evidence.md",
@@ -165,6 +173,7 @@ def collect_validations(output: Path) -> list[dict[str, Any]]:
     commands = (
         [sys.executable, "demo_runtime/rell_sample/validate_cognitive_inquiry_api.py"],
         [sys.executable, "demo_runtime/rell_sample/validate_rcir_stage_a_b.py"],
+        [sys.executable, "demo_runtime/rell_sample/validate_runtime_cognitive_signal_adapter.py"],
         [sys.executable, "demo_runtime/rell_sample/validate_cognitive_ir.py"],
         [sys.executable, "demo_runtime/rell_sample/validate_simulated_robot_sample.py"],
         ["git", "diff", "--check"],
@@ -223,6 +232,22 @@ def main() -> None:
                 output / "原始事务" / f"{index:02d}-{scenario}.json", transaction
             )
             results[scenario] = transaction["response"]["body"]
+
+        live_session = SESSIONS[session_id]
+        for _ in range(3):
+            _attach_runtime_diagnostic(
+                {
+                    "status": "verification_failed",
+                    "reason": "evidence_collection_repeatable_boundary",
+                },
+                live_session,
+                {"stage_id": "evidence_collection_generic_stage"},
+            )
+        autonomous_context = get_cognitive_inquiry_context(session_id)
+        write_json(
+            output / "原始事务" / "07A-运行异常自动认识目标.json",
+            autonomous_context,
+        )
 
         final = request_transaction(
             base_url, "GET", f"/embodied/session/{session_id}"
@@ -310,6 +335,24 @@ def main() -> None:
             "reject": rejected["concept_decision"],
             "distinct_inquiry_ids": promoted["inquiry_id"] != rejected["inquiry_id"],
         },
+        "autonomous_runtime_inquiry": {
+            "diagnostic_count": len(live_session["runtime_diagnostic_history"]),
+            "signal_candidate_count": len(
+                autonomous_context["cognitive_signal_candidates"]
+            ),
+            "working_inquiry_count": len(
+                autonomous_context["cognitive_inquiry_working_set"]
+            ),
+            "generated_without_explicit_inquiry_api": bool(
+                autonomous_context["cognitive_inquiry_working_set"]
+            ),
+            "all_candidate_only": all(
+                item["candidate_only"] is True
+                and item["runtime_fact_committed"] is False
+                and item["direct_execution_allowed"] is False
+                for item in autonomous_context["cognitive_inquiry_working_set"]
+            ),
+        },
         "execution_boundary": {
             "all_p018_authorized": all(
                 item["p018_arbitration"]["decision"] == "authorized"
@@ -377,6 +420,7 @@ def main() -> None:
     reproduction = f"""# 在仓库根目录运行
 python .\\demo_runtime\\rell_sample\\validate_cognitive_inquiry_api.py
 python .\\demo_runtime\\rell_sample\\validate_rcir_stage_a_b.py
+python .\\demo_runtime\\rell_sample\\validate_runtime_cognitive_signal_adapter.py
 python .\\demo_runtime\\rell_sample\\validate_cognitive_ir.py
 python .\\demo_runtime\\rell_sample\\validate_simulated_robot_sample.py
 git diff --check
@@ -402,9 +446,10 @@ python .\\demo_runtime\\rell_sample\\collect_rcir_evidence.py
 2. `原始事务/04-recovery_boundary_probe.json`：8 次窗口内 5 次同类恢复、P018 安全试验授权、P016 双通道验真和模板边界结论。
 3. `原始事务/05-concept_promote.json` 与 `06-concept_reject.json`：相同认识方法在陌生实例上分别晋级和否决候选概念。
 4. `账本快照/`：运行前后 WorldFactLedger 以及压缩认识历史，证明会话绑定和引用留存。
-5. `09-实施例关键事实摘要.json`：从原始事务机械提取的核心事实，不能代替原始事务。
-6. `源码状态/`：实际运行源码副本、每个文件 SHA-256、工作区补丁和 Git 基线。
-7. `验证日志/` 与 `10-验证矩阵.json`：验证命令、退出码、耗时和原始标准输出。
+5. `原始事务/07A-运行异常自动认识目标.json`：同一会话连续三次同类结构化失败后自动形成认知信号和 InquiryContract 工作集，未调用显式认识目标 API。
+6. `09-实施例关键事实摘要.json`：从原始事务机械提取的核心事实，不能代替原始事务。
+7. `源码状态/`：实际运行源码副本、每个文件 SHA-256、工作区补丁和 Git 基线。
+8. `验证日志/` 与 `10-验证矩阵.json`：验证命令、退出码、耗时和原始标准输出。
 
 ## 完整性规则
 
@@ -416,7 +461,7 @@ python .\\demo_runtime\\rell_sample\\collect_rcir_evidence.py
 
 - 本包证明的是本机软件实施例，不是真机实验记录。
 - 恢复边界闭环实际调用仓库的 `run_simulated_runtime_sample(..., "simulated_success")`，P016 为模拟执行体双通道验真。
-- 当前认识闭环由 API/UI 显式触发，尚未证明运行异常能够自动创建认识目标。
+- 已证明达到阈值的同类运行诊断会自动创建结构化认识目标；主动观察和安全试验仍只形成等待 P018 仲裁的候选。
 - 会话认识历史为内存态；本包通过最终会话响应将其固化到文件。
 - 本包只覆盖 RCIR 阶段 A/B 和认识目标服务接入，不代表整个具身系统全量验收。
 """

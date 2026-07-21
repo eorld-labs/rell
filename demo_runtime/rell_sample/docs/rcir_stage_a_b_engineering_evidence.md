@@ -1,6 +1,6 @@
 # RCIR 阶段 A/B 工程证据
 
-日期：2026-07-20
+日期：2026-07-21
 
 ## 一、范围
 
@@ -153,4 +153,47 @@ direct_execution_allowed = false
 
 ```powershell
 python .\demo_runtime\rell_sample\validate_cognitive_inquiry_api.py
+```
+
+## 七、运行时自主认识目标桥接
+
+运行时不再只保存认知信号候选。`concept_core/runtime_cognitive_inquiries.py`
+将当前世界版本内的信号自动编译为正式 `InquiryContract`，并维护在会话的
+`cognitive_inquiry_working_set` 中。该桥接只消费结构化诊断、已验真事件、
+`EntityRef`、谓词和证据引用，不消费原始语言。
+
+自动闭环分为四个受限步骤：
+
+```text
+非权威 CognitiveSignal
+  -> 竞争假设和待回答谓词
+  -> 符合正式 schema 的 InquiryContract
+  -> 最小打扰取证路线仲裁
+  -> 带 EvidenceEnvelope 的定向更新候选
+```
+
+取证路线按当前运行状态选择：任务自然会产生相关证据时优先被动观察；
+任务空闲时才允许形成主动观察或安全试验候选；涉及动作的候选固定声明
+`control_gateway=P018`、`verification_gateway=P016` 和
+`direct_execution_allowed=false`。旧世界版本或旧账本权威下的认识目标立即
+进入 `invalidated`，不能继续产生动作候选。
+
+回答不会无边界更新全局记忆。每类认识目标在编译时声明唯一更新目标：
+
+| 信号类型 | 认识缺口 | 定向更新目标 |
+|---|---|---|
+| 重复恢复 | `process_anomaly` | 过程模板适用边界候选 |
+| 未解释重复模式 | `concept_gap` | P012/P019 概念候选生命周期 |
+| 质量档案漂移 | `model_drift` | 质量档案候选 |
+| 事实生命周期缺口 | `lifecycle_question` | WorldFactLedger 事实候选 |
+
+人类报告或单通道感知只保留为待补证据的假设；双通道佐证或 P016 物理验真
+可以形成发往对应领域网关的更新候选，但桥接层自身始终保持
+`runtime_fact_committed=false`。实例改名或替换为陌生实体时，只要已验真事件的
+因果签名相同，生成的模式键、待回答谓词和竞争假设保持不变。
+
+独立回归：
+
+```powershell
+python .\demo_runtime\rell_sample\validate_runtime_cognitive_signal_adapter.py
 ```
