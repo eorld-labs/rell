@@ -410,6 +410,10 @@ def build_situated_event_graph(
             "goal_relation": (frame.get("canonical_frame") or {}).get(
                 "goal_relation"
             ),
+            "incoming_discourse_relation": frame.get(
+                "incoming_discourse_relation"
+            ),
+            "discourse_polarity": frame.get("discourse_polarity", "asserted"),
         }
         for index, frame in enumerate(language_analysis.get("event_frames", []))
     ]
@@ -429,6 +433,11 @@ def build_situated_event_graph(
         "reported_events": reported_events,
         "historical_event_constraints": historical_constraints,
         "event_scopes": event_scopes,
+        "discourse_edges": deepcopy(
+            (language_analysis.get("discourse_event_graph") or {}).get(
+                "edges", []
+            )
+        ),
         "roles": roles,
         "discourse_roles": discourse_roles,
         "goal": {

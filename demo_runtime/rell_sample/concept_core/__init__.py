@@ -58,6 +58,7 @@ from .runtime_cognitive_inquiries import (
     compile_signal_candidate_to_inquiry,
     refresh_runtime_inquiries,
 )
+from .rcir_dialogue_realizer import realize_rcir_dialogue
 from .concept_lifecycle import build_concept_lifecycle_view, record_concept_fallback, record_concept_reuse
 from .concept_parser import resolve_action_concepts
 from .concept_gap_dialogue import continue_concept_gap_dialogue, start_concept_gap_dialogue
@@ -209,5 +210,6 @@ __all__ = [
     "run_quality_profile_drift_loop",
     "run_recovery_boundary_probe_loop",
     "refresh_runtime_inquiries",
+    "realize_rcir_dialogue",
     "validate_primitive",
 ]

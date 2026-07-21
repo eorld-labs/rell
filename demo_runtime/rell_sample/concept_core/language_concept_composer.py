@@ -12,7 +12,7 @@ EVENT_LEXICAL_PRIMITIVES: tuple[dict[str, Any], ...] = (
     {"operator": "grasp_object", "concept_id": "factory_event_grasp", "heads": ("捡", "拾", "抓", "取", "拿"), "canonical": "拿起"},
     {"operator": "release_object", "concept_id": "factory_event_release", "heads": ("释放", "撒手", "松开", "放开"), "canonical": "放开"},
     {"operator": "fill_container", "concept_id": "factory_event_fill_container", "heads": ("接一杯水", "取一杯水", "接杯水", "取杯水", "接好水", "装满水", "盛点水", "盛水", "续满", "续水", "接水", "取水", "装水", "倒一杯水", "倒杯水"), "canonical": "接水"},
-    {"operator": "place_object", "concept_id": "factory_event_place", "heads": ("放回", "送回", "归还", "搁", "摆", "放"), "canonical": "放到"},
+    {"operator": "place_object", "concept_id": "factory_event_place", "heads": ("放回", "送回", "搁回", "摆回", "归还", "搁", "摆", "放"), "canonical": "放到"},
     {"operator": "handover_object", "concept_id": "factory_event_handover", "heads": ("递回来", "交回来", "递给", "交给", "拿给", "送给", "递过去", "交过去", "递回", "交回"), "canonical": "递给"},
     {"operator": "transport_object", "concept_id": "factory_event_transport", "heads": ("拿过来", "带过来", "送过来", "端过来", "带到", "拿到", "送到", "端到", "带走", "拿来", "送来", "端来"), "canonical": "带到"},
     {"operator": "relocate_object", "concept_id": "factory_event_relocate", "heads": ("移开", "移走", "挪开", "搬开", "搬走", "拿开", "清走"), "canonical": "移开"},
@@ -45,19 +45,169 @@ def normalize_language_text(text: str) -> str:
     return re.sub(r"[\s，。！？、,.!?；;：:]+", "", (text or "").strip().lower())
 
 
-def _event_clause_surfaces(utterance: str) -> list[str]:
-    """Split discourse boundaries without assigning cross-clause roles."""
+def _discourse_clause_specs(utterance: str) -> list[dict[str, Any]]:
+    """Split clauses and preserve their typed discourse relation."""
+    correction = re.match(
+        r"^(?:我的意思是)?(?:不是|并不是)(?P<rejected>.+?)[，,]?(?:而是|是要)(?P<replacement>.+)$",
+        (utterance or "").strip(),
+    )
+    if not correction:
+        correction = re.match(
+            r"^(?:别|不要)(?P<rejected>.+?)[，,]?(?:改成|换成)(?P<replacement>.+)$",
+            (utterance or "").strip(),
+        )
+    if correction:
+        return [
+            {
+                "surface": correction.group("rejected").strip(),
+                "incoming_relation": None,
+                "discourse_polarity": "rejected",
+            },
+            {
+                "surface": correction.group("replacement").strip(),
+                "incoming_relation": "correction",
+                "discourse_polarity": "asserted",
+            },
+        ]
     prepared = re.sub(
         r"((?:接好|装好|盛好|续满|填满|加满)(?:了)?(?:水|饮料))后(?=(?:把|将|搁|放|摆|端|拿|送|递|交))",
         r"\1，",
         utterance or "",
     )
-    surfaces = [
-        item.strip()
-        for item in re.split(r"(?:[，,；;。！？!?]+|然后|接着|随后|再然后)", prepared)
-        if item.strip()
+    prepared = re.sub(
+        r"(?:以后|之后|而后)(?=(?:把|将|用|换|拿|取|搁|放|摆|端|送|递|交|高脚|白色|透明|杯|托盘))",
+        "，",
+        prepared,
+    )
+    prepared = re.sub(
+        r"后(?=(?:把|将|用|换|拿|取|搁|放|摆|端|送|递|交|高脚|白色|透明|杯|托盘))",
+        "，",
+        prepared,
+    )
+    connector_pattern = re.compile(
+        r"([，,；;。！？!?]+|再然后|然后|接着|随后|同时|并同时|而是|再(?=(?:把|将|用|换|拿|取|搁|放|摆|端|送|递|交|高脚|白色|透明|杯|托盘)))"
+    )
+    pieces = connector_pattern.split(prepared)
+    specs: list[dict[str, Any]] = []
+    pending_relation = "sequence"
+    for piece in pieces:
+        if not piece:
+            continue
+        if connector_pattern.fullmatch(piece):
+            pending_relation = (
+                "parallel"
+                if "同时" in piece
+                else "correction"
+                if piece == "而是"
+                else "sequence"
+            )
+            continue
+        surface = re.sub(r"^(?:先|再先)", "", piece.strip())
+        if not surface:
+            continue
+        specs.append(
+            {
+                "surface": surface,
+                "incoming_relation": None if not specs else pending_relation,
+                "discourse_polarity": "asserted",
+            }
+        )
+        pending_relation = "sequence"
+    return specs if len(specs) > 1 else []
+
+
+def _event_clause_surfaces(utterance: str) -> list[str]:
+    return [item["surface"] for item in _discourse_clause_specs(utterance)]
+
+
+def _propagate_event_frame_roles(
+    frames: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Resolve local ellipsis by typed event-role flow, never by text rewriting."""
+    previous_theme: dict[str, Any] | None = None
+    for index, frame in enumerate(frames):
+        roles = frame.setdefault("role_bindings", {})
+        operators = set((frame.get("canonical_frame") or {}).get("operators", []))
+        current_theme = roles.get("theme") or roles.get("target")
+        if (
+            not current_theme
+            and previous_theme
+            and frame.get("incoming_discourse_relation") in {"sequence", "parallel"}
+            and operators.intersection(
+                {
+                    "fill_container",
+                    "place_object",
+                    "handover_object",
+                    "transport_object",
+                    "release_object",
+                }
+            )
+        ):
+            inherited = deepcopy(previous_theme)
+            inherited["binding_source"] = "typed_prior_event_theme_flow"
+            inherited["inherited_from_frame_id"] = frames[index - 1].get("frame_id")
+            inherited["physical_fact_committed"] = False
+            roles["theme"] = inherited
+            frame.setdefault("canonical_frame", {}).setdefault("roles", {})[
+                "theme"
+            ] = deepcopy(inherited)
+            frame["unresolved_slots"] = [
+                item
+                for item in frame.get("unresolved_slots", [])
+                if item
+                not in {
+                    "required_object_role_not_grounded",
+                    "held_theme_not_grounded",
+                    "handover_theme_not_grounded",
+                }
+            ]
+            current_theme = inherited
+        if current_theme and frame.get("discourse_polarity") != "rejected":
+            previous_theme = deepcopy(current_theme)
+    return frames
+
+
+def _build_discourse_event_graph(frames: list[dict[str, Any]]) -> dict[str, Any]:
+    nodes = [
+        {
+            "frame_ref": frame.get("frame_id"),
+            "clause_index": frame.get("clause_index"),
+            "operators": deepcopy(
+                (frame.get("canonical_frame") or {}).get("operators", [])
+            ),
+            "goal_relation": (frame.get("canonical_frame") or {}).get(
+                "goal_relation"
+            ),
+            "role_keys": sorted((frame.get("role_bindings") or {}).keys()),
+            "discourse_polarity": frame.get("discourse_polarity", "asserted"),
+            "candidate_only": True,
+        }
+        for frame in frames
     ]
-    return surfaces if len(surfaces) > 1 else []
+    edges = []
+    for index, frame in enumerate(frames[1:], start=1):
+        inherited_roles = [
+            role
+            for role, value in (frame.get("role_bindings") or {}).items()
+            if isinstance(value, dict)
+            and value.get("binding_source") == "typed_prior_event_theme_flow"
+        ]
+        edges.append(
+            {
+                "from_frame_ref": frames[index - 1].get("frame_id"),
+                "to_frame_ref": frame.get("frame_id"),
+                "relation": frame.get("incoming_discourse_relation") or "sequence",
+                "inherited_roles": inherited_roles,
+                "prior_effect_reused_as_current_fact": False,
+            }
+        )
+    return {
+        "nodes": nodes,
+        "edges": edges,
+        "raw_text_included": False,
+        "candidate_only": True,
+        "runtime_fact_committed": False,
+    }
 
 
 def _longest_non_overlapping_mentions(text: str, candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -149,8 +299,6 @@ def _infer_argument_order_events(
     text: str, events: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
     """Infer known events from argument-predicate order, independent of word order."""
-    if any(item.get("operator") == "fill_container" for item in events):
-        return events
     patterns = (
         r"(?:把)?(?:水|饮料)接(?:了|好|满)?",
         r"(?:杯子|容器)接(?:好|满)?(?:水|饮料)",
@@ -158,20 +306,35 @@ def _infer_argument_order_events(
         r"(?:杯子|容器)?(?:接好|装好|装满|盛好|盛|续满|续上)(?:点|些|一杯)?(?:常温|热|凉)?(?:水|饮料)",
     )
     inferred = list(events)
-    for pattern in patterns:
-        match = re.search(pattern, text)
-        if not match:
-            continue
-        inferred.append({
-            "concept_id": "factory_event_fill_container",
-            "operator": "fill_container",
-            "matched_surface": match.group(0),
-            "canonical_surface": "接水",
-            "start": match.start(),
-            "end": match.end(),
-            "source": "argument_predicate_composition",
-        })
-        break
+    if not any(item.get("operator") == "fill_container" for item in inferred):
+        for pattern in patterns:
+            match = re.search(pattern, text)
+            if not match:
+                continue
+            inferred.append({
+                "concept_id": "factory_event_fill_container",
+                "operator": "fill_container",
+                "matched_surface": match.group(0),
+                "canonical_surface": "接水",
+                "start": match.start(),
+                "end": match.end(),
+                "source": "argument_predicate_composition",
+            })
+            break
+    if not inferred:
+        handover = re.search(r"(?:把|将).+?(?:给我|交到我手(?:里|上|中))", text)
+        if handover:
+            inferred.append(
+                {
+                    "concept_id": "factory_event_handover",
+                    "operator": "handover_object",
+                    "matched_surface": handover.group(0),
+                    "canonical_surface": "递给",
+                    "start": handover.start(),
+                    "end": handover.end(),
+                    "source": "argument_result_relation_composition",
+                }
+            )
     return sorted(inferred, key=lambda item: (item.get("start", 0), item.get("end", 0)))
 
 
@@ -207,7 +370,11 @@ def _definition_candidate(text: str, event_concepts: list[dict[str, Any]]) -> di
 def _speech_act(text: str, events: list[dict[str, Any]], definition: dict[str, Any] | None) -> str:
     if definition:
         return "language_teaching"
-    if any(marker in text for marker in ("不要", "别", "不许", "禁止")) and events:
+    if (
+        any(marker in text for marker in ("不要", "别", "不许", "禁止"))
+        and not any(marker in text for marker in ("而是", "改成", "换成"))
+        and events
+    ):
         return "prohibition"
     if any(marker in text for marker in QUESTION_MARKERS) or text.endswith(("吗", "么", "呢")):
         return "state_query"
@@ -235,7 +402,7 @@ def _query_type(text: str, events: list[dict[str, Any]], objects: list[dict[str,
 
 def _discourse_roles(text: str) -> dict[str, dict[str, Any]]:
     roles: dict[str, dict[str, Any]] = {}
-    if any(marker in text for marker in ("我的意思是", "我是说", "我说的是", "不是这个意思")):
+    if any(marker in text for marker in ("我的意思是", "我是说", "我说的是", "不是这个意思", "而是", "改成")):
         roles["task_correction"] = {
             "reference": "current_or_recent_task_outcome",
             "relation": "revises_delivery_or_ownership_goal",
@@ -378,6 +545,9 @@ def _extract_historical_event_constraints(
         "原先",
         "原来",
         "上次",
+        "上回",
+        "方才",
+        "此前",
     )
     for event in events:
         event_start = int(event.get("start", -1))
@@ -494,18 +664,37 @@ def _ellipsis_candidates(text: str) -> list[dict[str, Any]]:
 
 def _resolve_pronouns(text: str, objects: list[dict[str, Any]], context_entities: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[str]]:
     present = [pronoun for pronoun in PRONOUNS if pronoun in text]
-    if not present or objects:
+    if not present:
         return objects, []
+    pronoun = present[0]
+    pronoun_start = text.find(pronoun)
+    preceding = [
+        item
+        for item in objects
+        if int(item.get("end", -1)) <= pronoun_start
+        and "graspable" in item.get("functional_affordances", [])
+    ]
+    if preceding:
+        entity = deepcopy(preceding[-1])
+        entity.update(
+            {
+                "matched_alias": pronoun,
+                "source": "intra_turn_role_coreference",
+                "start": pronoun_start,
+                "end": pronoun_start + len(pronoun),
+            }
+        )
+        return [*objects, entity], []
     unique = {str(item.get("entity_ref") or item.get("concept_id") or item.get("label")): item for item in context_entities}
     if len(unique) == 1:
         entity = deepcopy(next(iter(unique.values())))
         entity.update({
-            "matched_alias": present[0],
+            "matched_alias": pronoun,
             "source": "dialogue_focus_binding",
-            "start": text.find(present[0]),
-            "end": text.find(present[0]) + len(present[0]),
+            "start": pronoun_start,
+            "end": pronoun_start + len(pronoun),
         })
-        return [entity], []
+        return [*objects, entity], []
     return objects, ["pronoun_reference_not_unique"]
 
 
@@ -865,6 +1054,21 @@ def compose_language_concepts(
     query_type = _query_type(normalized, events, objects) if speech_act == "state_query" else None
     context_entities = context_entities or []
     roles = _roles(events, objects, context_entities, normalized)
+    if (
+        discourse_roles.get("recipient")
+        and not roles.get("recipient")
+        and any(
+            item.get("operator")
+            in {"fill_container", "handover_object", "transport_object"}
+            for item in events
+        )
+    ):
+        roles["recipient"] = {
+            "matched_alias": "我",
+            "entity_type": "human_recipient",
+            "reference": discourse_roles["recipient"].get("reference"),
+            "source": "deictic_discourse_recipient_role",
+        }
     relative_direction = next(
         (direction for direction, markers in {
             "forward": ("往前", "向前", "前进"),
@@ -875,7 +1079,10 @@ def compose_language_concepts(
         None,
     )
     if not relative_direction:
-        relative_match = re.search(r"(?:往|向)?(?:你|机器人|自己)?(?:的)?(前|后|左|右)(?:边|方)?", normalized)
+        direction_scope = normalized
+        for discourse_marker in ("随后", "然后", "之后", "以后", "而后", "先后"):
+            direction_scope = direction_scope.replace(discourse_marker, "")
+        relative_match = re.search(r"(?:往|向)?(?:你|机器人|自己)?(?:的)?(前|后|左|右)(?:边|方)?", direction_scope)
         if relative_match:
             relative_direction = {"前": "forward", "后": "backward", "左": "left", "右": "right"}[relative_match.group(1)]
     if relative_direction:
@@ -970,7 +1177,10 @@ def compose_language_concepts(
             "operators": [item["operator"] for item in events],
             "query_type": query_type,
             "roles": deepcopy(roles),
-            "goal_relation": "object_supported_at_destination" if (
+            "goal_relation": "human_received_filled_container" if (
+                any(item["operator"] == "fill_container" for item in events)
+                and roles.get("recipient")
+            ) else "object_supported_at_destination" if (
                 any(item["operator"] == "place_object" for item in events)
                 or (
                     any(item["operator"] == "transport_object" for item in events)
@@ -1003,9 +1213,17 @@ def compose_language_concepts(
         "direct_execution_allowed": False,
     }
     result["event_frames"] = []
+    result["discourse_event_graph"] = {
+        "nodes": [],
+        "edges": [],
+        "raw_text_included": False,
+        "candidate_only": True,
+        "runtime_fact_committed": False,
+    }
     if _build_event_frames:
         clause_frames = []
-        for clause in _event_clause_surfaces(utterance):
+        for clause_spec in _discourse_clause_specs(utterance):
+            clause = clause_spec["surface"]
             frame = compose_language_concepts(
                 clause,
                 event_concepts=event_concepts,
@@ -1018,7 +1236,16 @@ def compose_language_concepts(
                 continue
             frame["frame_id"] = f"event_frame_{len(clause_frames)}"
             frame["clause_index"] = len(clause_frames)
+            frame["incoming_discourse_relation"] = clause_spec[
+                "incoming_relation"
+            ]
+            frame["discourse_polarity"] = clause_spec.get(
+                "discourse_polarity", "asserted"
+            )
             clause_frames.append(frame)
         if len(clause_frames) > 1:
-            result["event_frames"] = clause_frames
+            result["event_frames"] = _propagate_event_frame_roles(clause_frames)
+            result["discourse_event_graph"] = _build_discourse_event_graph(
+                result["event_frames"]
+            )
     return result

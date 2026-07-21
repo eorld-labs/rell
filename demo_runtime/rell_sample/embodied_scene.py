@@ -23,6 +23,7 @@ from concept_core.runtime_cognitive_signals import (
     derive_runtime_cognitive_signal_candidates,
 )
 from concept_core.runtime_cognitive_inquiries import refresh_runtime_inquiries
+from concept_core.rcir_dialogue_realizer import realize_rcir_dialogue
 from concept_core.contextual_affordance import resolve_contextual_affordance_request
 from concept_core.context_projection import build_context_projection, compact_intent_capsule
 from concept_core.functional_object_reasoning import build_functional_object_catalog, build_functional_profile, evaluate_role_compatibility
@@ -3011,6 +3012,75 @@ def _compose_session_language(
         analysis["decision"] = "route_contextually_resolved_goal_schema"
         analysis["confidence"] = max(float(analysis.get("confidence") or 0.0), 0.86)
         analysis["confidence_band"] = "high"
+        relational_themes = (
+            context_projection.get("relational_role_candidates", {}).get(
+                "theme", []
+            )
+        )
+        if len(relational_themes) == 1:
+            entity_ref = relational_themes[0]["entity_ref"]
+            entity = next(
+                (
+                    item
+                    for item in session.get("runtime_objects", [])
+                    if item.get("entity_id") == entity_ref
+                ),
+                None,
+            )
+            prior_theme = analysis.get("role_bindings", {}).get("theme") or {}
+            if entity:
+                analysis.setdefault("role_bindings", {})["theme"] = {
+                    **deepcopy(prior_theme),
+                    "entity_ref": entity_ref,
+                    "value_ref": entity_ref,
+                    "label": entity.get("label"),
+                    "label_hint": entity.get("label"),
+                    "compatible_kinds": [entity.get("kind")],
+                    "source": "continued_goal_current_verified_relation",
+                    "binding_evidence": deepcopy(relational_themes[0]),
+                }
+                speaker_ref = (
+                    session.get("interaction_role_bindings") or {}
+                ).get("human_speaker")
+                if speaker_ref:
+                    analysis["role_bindings"]["recipient"] = {
+                        "entity_ref": speaker_ref,
+                        "value_ref": speaker_ref,
+                        "entity_type": "human_recipient",
+                        "reference": "human_speaker",
+                        "source": "continued_goal_current_interaction_role",
+                    }
+                semantic_frame = build_semantic_constraint_frame(
+                    utterance, analysis
+                )
+                grounded_frame = build_grounded_intent_frame(
+                    semantic_frame, observation_evidence
+                )
+                analysis["semantic_constraint_frame"] = semantic_frame
+                analysis["grounded_intent_frame"] = grounded_frame
+                analysis["process_template_resolution"] = resolve_process_request(
+                    utterance,
+                    analysis,
+                    runtime_objects=session.get("runtime_objects", []),
+                    runtime_state=session.get("state", {}),
+                    semantic_regions=_scene_for_session(session).get(
+                        "semantic_regions", []
+                    ),
+                    executor_profile=session.get("executor_profile", {}),
+                    world_revision=session.get("world_revision", 0),
+                    evidence_bindings=[deepcopy(relational_themes[0])],
+                )
+                _project_resolved_process_roles(
+                    session, analysis, analysis["process_template_resolution"]
+                )
+                analysis["contextual_goal_resolution"][
+                    "current_role_rebinding"
+                ] = {
+                    "theme": entity_ref,
+                    "recipient": speaker_ref,
+                    "basis": "current_verified_relation_after_goal_schema_projection",
+                    "prior_goal_role_reused": False,
+                }
     situated_frame = compile_situated_event_frame(
         utterance,
         analysis,
@@ -3034,6 +3104,26 @@ def _compose_session_language(
     session["current_rcir"] = deepcopy(rcir)
     session["world_fact_ledger"] = deepcopy(rcir["world_fact_ledger"])
     analysis["rcir"] = rcir
+    entity_labels = {
+        str(item.get("entity_id")): str(item.get("label") or item.get("entity_id"))
+        for item in session.get("runtime_objects", [])
+        if item.get("entity_id")
+    }
+    entity_labels.update(
+        {
+            str(entity_ref): ("你" if role == "human_speaker" else "机器人")
+            for role, entity_ref in (
+                session.get("interaction_role_bindings") or {}
+            ).items()
+            if entity_ref
+        }
+    )
+    analysis["rcir_dialogue_projection"] = realize_rcir_dialogue(
+        rcir, entity_labels=entity_labels
+    )
+    session["last_rcir_dialogue_projection"] = deepcopy(
+        analysis["rcir_dialogue_projection"]
+    )
     grounded_history = session.setdefault("grounded_intent_frame_history", [])
     grounded_history.append(deepcopy(grounded_frame))
     if len(grounded_history) > 16:
@@ -3108,6 +3198,12 @@ def _language_understanding_view(analysis: dict[str, Any]) -> dict[str, Any]:
         ],
         "role_bindings": deepcopy(analysis.get("role_bindings", {})),
         "canonical_utterance": analysis.get("canonical_utterance"),
+        "semantic_canonical_utterance": analysis.get("canonical_utterance"),
+        "human_understanding_response": (
+            (analysis.get("rcir_dialogue_projection") or {}).get(
+                "human_response"
+            )
+        ),
         "unknown_surface": analysis.get("unknown_surface"),
         "unresolved_slots": deepcopy(analysis.get("unresolved_slots", [])),
         "confidence": analysis.get("confidence"),
@@ -3117,6 +3213,12 @@ def _language_understanding_view(analysis: dict[str, Any]) -> dict[str, Any]:
         "runtime_fact_committed": False,
         "situated_event_frame": deepcopy(analysis.get("situated_event_frame")),
         "rcir": deepcopy(analysis.get("rcir")),
+        "rcir_dialogue_projection": deepcopy(
+            analysis.get("rcir_dialogue_projection")
+        ),
+        "discourse_event_graph": deepcopy(
+            analysis.get("discourse_event_graph")
+        ),
         "process_template_resolution": deepcopy(analysis.get("process_template_resolution")),
         "semantic_constraint_frame": deepcopy(analysis.get("semantic_constraint_frame")),
         "grounded_intent_frame": deepcopy(analysis.get("grounded_intent_frame")),
@@ -3128,6 +3230,12 @@ def _language_understanding_view(analysis: dict[str, Any]) -> dict[str, Any]:
             {
                 "frame_id": frame.get("frame_id"),
                 "clause_index": frame.get("clause_index"),
+                "incoming_discourse_relation": frame.get(
+                    "incoming_discourse_relation"
+                ),
+                "discourse_polarity": frame.get(
+                    "discourse_polarity", "asserted"
+                ),
                 "utterance": frame.get("utterance"),
                 "operators": deepcopy((frame.get("canonical_frame") or {}).get("operators", [])),
                 "goal_relation": (frame.get("canonical_frame") or {}).get("goal_relation"),
@@ -3433,7 +3541,11 @@ def _continue_support_clearance_dialogue(
 def _independent_event_frames(
     utterance: str, analysis: dict[str, Any]
 ) -> list[dict[str, Any]]:
-    frames = list(analysis.get("event_frames", []))
+    frames = [
+        frame
+        for frame in analysis.get("event_frames", [])
+        if frame.get("discourse_polarity", "asserted") != "rejected"
+    ]
     if len(frames) < 2 or "一起" in utterance:
         return []
     bound_themes = [
@@ -3531,6 +3643,9 @@ def _compound_sequence_view(sequence: dict[str, Any] | None) -> dict[str, Any] |
                 "payload_binding_evidence": deepcopy(
                     item.get("payload_binding_evidence")
                 ),
+                "role_binding_evidence": deepcopy(
+                    item.get("role_binding_evidence")
+                ),
             }
             for item in sequence.get("subtasks", [])
         ],
@@ -3622,6 +3737,24 @@ def _dispatch_compound_subtask(session: dict[str, Any]) -> dict[str, Any] | None
         live_sequence["dispatching"] = False
     sequence = session.get("compound_command_sequence") or sequence
     subtask = sequence["subtasks"][index]
+    active_intent = (session.get("long_horizon_intents") or {}).get(
+        session.get("active_intent_id")
+    ) or {}
+    resolved_roles = active_intent.get("role_bindings") or {}
+    role_fields = {
+        "theme": "explicit_theme_ref",
+        "destination": "explicit_destination_ref",
+        "recipient": "explicit_recipient_ref",
+    }
+    for role, field in role_fields.items():
+        if not subtask.get(field) and resolved_roles.get(role):
+            subtask[field] = resolved_roles[role]
+            subtask.setdefault("role_binding_evidence", {})[role] = {
+                "basis": "current_subtask_structured_grounding",
+                "world_revision": session.get("world_revision"),
+                "surface_text_reparsed": False,
+                "physical_fact_committed": False,
+            }
     subtask["status"] = "active"
     subtask["intent_id"] = session.get("active_intent_id")
     started["compound_command_sequence"] = _compound_sequence_view(sequence)
@@ -9064,6 +9197,9 @@ def _finalize_motion_result(
     role_clarification_dialogue = deepcopy(live.get("role_clarification_dialogue"))
     evidence_gap_dialogue = deepcopy(live.get("evidence_gap_dialogue"))
     process_gap_dialogue = deepcopy(live.get("process_gap_dialogue"))
+    language_understanding = deepcopy(live.get("last_language_understanding"))
+    if language_understanding and not result.get("language_understanding"):
+        result["language_understanding"] = language_understanding
     SESSIONS[session_id] = before
     frames = result.get("frames", [])
     if not frames:
@@ -9111,6 +9247,7 @@ def _finalize_motion_result(
         "body_self_judgment": result.get("body_self_judgment"),
         "route_evidence": result.get("route_evidence"),
         "historical_reference": deepcopy(result.get("historical_reference")),
+        "language_understanding": deepcopy(language_understanding),
         "session": get_session(session_id),
     }
 

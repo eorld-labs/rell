@@ -226,6 +226,47 @@ def build_context_projection(
             if candidates:
                 relational_role_candidates[role_name] = candidates
 
+    continued_goal_facts = {
+        item.get("goal_fact")
+        for item in recent_goal_capsules
+        if item.get("goal_fact")
+    }
+    speaker_ref = interaction_role_bindings.get("human_speaker")
+    if (
+        "human_received_filled_container" in continued_goal_facts
+        and speaker_ref
+        and not relational_role_candidates.get("theme")
+    ):
+        theme_role = roles.get("theme") or roles.get("target") or {}
+        theme_kinds = set(theme_role.get("compatible_kinds") or [])
+        current_recipients = []
+        for fact in current_facts:
+            entity_ref = fact.get("subject")
+            if (
+                fact.get("predicate") != "received_by"
+                or fact.get("object") != speaker_ref
+                or entity_ref not in runtime_index
+                or (
+                    theme_kinds
+                    and runtime_index[entity_ref].get("kind") not in theme_kinds
+                )
+            ):
+                continue
+            current_recipients.append(
+                {
+                    "entity_ref": entity_ref,
+                    "relation": "received_by",
+                    "relation_object_ref": speaker_ref,
+                    "evidence": "current_physically_verified_relation",
+                    "world_revision": world_revision,
+                    "current_snapshot_revalidated": True,
+                    "binding_purpose": "continued_goal_schema_current_role_rebinding",
+                    "prior_goal_role_reused": False,
+                }
+            )
+        if current_recipients:
+            relational_role_candidates["theme"] = current_recipients
+
     active_task_summary = None
     if active_intent and active_intent.get("lifecycle") in {
         "active", "awaiting_correction", "suspended", "awaiting_rebinding"

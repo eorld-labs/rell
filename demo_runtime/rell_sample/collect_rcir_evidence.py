@@ -42,15 +42,22 @@ SOURCE_FILES = (
     "demo_runtime/rell_sample/concept_core/runtime_cognitive_signals.py",
     "demo_runtime/rell_sample/concept_core/runtime_cognitive_inquiries.py",
     "demo_runtime/rell_sample/concept_core/cognitive_ir.py",
+    "demo_runtime/rell_sample/concept_core/context_projection.py",
+    "demo_runtime/rell_sample/concept_core/language_concept_composer.py",
+    "demo_runtime/rell_sample/concept_core/rcir_dialogue_realizer.py",
     "demo_runtime/rell_sample/concept_core/rcir_primitives.py",
     "demo_runtime/rell_sample/embodied_scene.py",
     "demo_runtime/rell_sample/embodied_home.html",
     "demo_runtime/rell_sample/validate_cognitive_inquiry_api.py",
     "demo_runtime/rell_sample/validate_rcir_stage_a_b.py",
     "demo_runtime/rell_sample/validate_runtime_cognitive_signal_adapter.py",
+    "demo_runtime/rell_sample/validate_discourse_event_graph.py",
+    "demo_runtime/rell_sample/validate_language_paraphrase_properties.py",
+    "demo_runtime/rell_sample/validate_contextual_language_runtime.py",
     "demo_runtime/rell_sample/collect_rcir_evidence.py",
     "demo_runtime/rell_sample/docs/api_contract.md",
     "demo_runtime/rell_sample/docs/rcir_stage_a_b_engineering_evidence.md",
+    "demo_runtime/rell_sample/docs/rcir_discourse_language_bridge.md",
     "schemas/inquiry_contract.schema.json",
     "schemas/rcir_type_relations.json",
 )
@@ -174,6 +181,9 @@ def collect_validations(output: Path) -> list[dict[str, Any]]:
         [sys.executable, "demo_runtime/rell_sample/validate_cognitive_inquiry_api.py"],
         [sys.executable, "demo_runtime/rell_sample/validate_rcir_stage_a_b.py"],
         [sys.executable, "demo_runtime/rell_sample/validate_runtime_cognitive_signal_adapter.py"],
+        [sys.executable, "demo_runtime/rell_sample/validate_discourse_event_graph.py"],
+        [sys.executable, "demo_runtime/rell_sample/validate_language_paraphrase_properties.py"],
+        [sys.executable, "demo_runtime/rell_sample/validate_contextual_language_runtime.py"],
         [sys.executable, "demo_runtime/rell_sample/validate_cognitive_ir.py"],
         [sys.executable, "demo_runtime/rell_sample/validate_simulated_robot_sample.py"],
         ["git", "diff", "--check"],
@@ -421,6 +431,9 @@ def main() -> None:
 python .\\demo_runtime\\rell_sample\\validate_cognitive_inquiry_api.py
 python .\\demo_runtime\\rell_sample\\validate_rcir_stage_a_b.py
 python .\\demo_runtime\\rell_sample\\validate_runtime_cognitive_signal_adapter.py
+python .\\demo_runtime\\rell_sample\\validate_discourse_event_graph.py
+python .\\demo_runtime\\rell_sample\\validate_language_paraphrase_properties.py
+python .\\demo_runtime\\rell_sample\\validate_contextual_language_runtime.py
 python .\\demo_runtime\\rell_sample\\validate_cognitive_ir.py
 python .\\demo_runtime\\rell_sample\\validate_simulated_robot_sample.py
 git diff --check
