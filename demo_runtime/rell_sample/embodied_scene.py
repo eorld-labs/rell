@@ -19,6 +19,9 @@ from concept_core.cognitive_ir import (
     compact_rcir_receipt,
     compile_rcir_bundle,
 )
+from concept_core.runtime_cognitive_signals import (
+    derive_runtime_cognitive_signal_candidates,
+)
 from concept_core.contextual_affordance import resolve_contextual_affordance_request
 from concept_core.context_projection import build_context_projection, compact_intent_capsule
 from concept_core.functional_object_reasoning import build_functional_object_catalog, build_functional_profile, evaluate_role_compatibility
@@ -165,6 +168,18 @@ def _attach_runtime_diagnostic(result: dict[str, Any], session: dict[str, Any], 
     elif "ambig" in reason or "candidate" in reason:
         category = "role_or_perception_ambiguity"
     diagnostic = {
+        "diagnostic_id": "diagnostic_" + hashlib.sha1(
+            "|".join(
+                [
+                    str(session.get("session_id")),
+                    str(session.get("world_revision")),
+                    str(len(session.get("runtime_diagnostic_history", [])) + 1),
+                    str(category),
+                    str((stage or {}).get("stage_id") or result.get("stage_id")),
+                    str(reason),
+                ]
+            ).encode("utf-8")
+        ).hexdigest()[:16],
         "category": category,
         "stage": (stage or {}).get("stage_id") or result.get("stage_id"),
         "reason": reason,
@@ -187,9 +202,14 @@ def _attach_runtime_diagnostic(result: dict[str, Any], session: dict[str, Any], 
             "support_occupancy_constraint",
             "unknown_runtime_failure",
         },
+        "world_revision": int(session.get("world_revision", 0)),
     }
     result["runtime_diagnostic"] = diagnostic
     session["last_runtime_diagnostic"] = deepcopy(diagnostic)
+    diagnostic_history = session.setdefault("runtime_diagnostic_history", [])
+    diagnostic_history.append(deepcopy(diagnostic))
+    if len(diagnostic_history) > 32:
+        del diagnostic_history[:-32]
     if not result.get("prompt"):
         result["prompt"] = (
             f"当前阶段{diagnostic['stage'] or '未命名'}已暂停。"
@@ -230,6 +250,134 @@ def _record_stage_recovery_contract(
         "world_revision": session.get("world_revision"),
         "old_path_discarded": True,
     }
+
+
+def _refresh_authoritative_world_fact_ledger(
+    session: dict[str, Any], *, reason: str
+) -> dict[str, Any]:
+    """Refresh the sole live fact projection from current runtime observations."""
+    revision = int(session.get("world_revision", 0))
+    projected = build_world_fact_ledger(
+        facts_from_runtime_state(
+            session.get("runtime_objects", []),
+            session.get("state", {}),
+            revision,
+        ),
+        world_revision=revision,
+    )
+    previous = session.get("world_fact_ledger") or {}
+    if previous.get("ledger_id") == projected.get("ledger_id"):
+        for key in (
+            "cognitive_evidence",
+            "cognitive_predicates",
+            "cognitive_events",
+            "active_inquiry_ref",
+            "cognitive_extension_is_secondary_fact_source",
+        ):
+            if key in previous:
+                projected[key] = deepcopy(previous[key])
+    elif previous.get("ledger_id"):
+        retired = session.setdefault("retired_fact_authority_refs", [])
+        retired.append(
+            {
+                "fact_authority_ref": previous["ledger_id"],
+                "world_revision": previous.get("world_revision"),
+                "reason": reason,
+                "replacement_fact_authority_ref": projected.get("ledger_id"),
+            }
+        )
+        if len(retired) > 16:
+            del retired[:-16]
+    projected["refresh_reason"] = reason
+    projected["live_runtime_projection"] = True
+    session["world_fact_ledger"] = projected
+    session["current_rcir_ledger_is_immutable_turn_snapshot"] = True
+    return projected
+
+
+def _authoritative_current_facts(
+    session: dict[str, Any], *, reason: str
+) -> list[dict[str, Any]]:
+    ledger = _refresh_authoritative_world_fact_ledger(session, reason=reason)
+    evidence = {
+        item.get("envelope_id"): item for item in ledger.get("evidence", [])
+    }
+    source_map = {
+        "p016_physical_verification": "runtime_verified",
+        "runtime_snapshot": "runtime_snapshot",
+        "multimodal_observation": "multimodal_verified",
+    }
+    return [
+        {
+            "predicate": item.get("predicate"),
+            "subject": item.get("subject"),
+            "object": item.get("object"),
+            "world_revision": item.get("world_revision"),
+            "evidence": source_map.get(
+                (evidence.get(item.get("evidence_ref")) or {}).get("source_type"),
+                "qualified_ledger_evidence",
+            ),
+            "evidence_ref": item.get("evidence_ref"),
+            "fact_id": item.get("fact_id"),
+            "fact_authority_ref": ledger.get("ledger_id"),
+        }
+        for item in ledger.get("facts", [])
+        if item.get("current_world_usable") is True
+    ]
+
+
+def _refresh_runtime_cognitive_signal_candidates(
+    session: dict[str, Any], *, reason: str
+) -> list[dict[str, Any]]:
+    ledger = _refresh_authoritative_world_fact_ledger(session, reason=reason)
+    candidates = derive_runtime_cognitive_signal_candidates(
+        verified_episodes=session.get("episodic_fact_memory", []),
+        runtime_diagnostics=session.get("runtime_diagnostic_history", []),
+        known_operators={
+            str(item.get("concept_kernel", {}).get("operator") or item.get("operator"))
+            for item in FACTORY_EVENT_CONCEPT_UNITS
+            if item.get("concept_kernel", {}).get("operator") or item.get("operator")
+        },
+        world_revision=int(session.get("world_revision", 0)),
+        fact_authority_ref=str(ledger.get("ledger_id") or ""),
+    )
+    stored = session.setdefault("cognitive_signal_candidates", [])
+    current_revision = int(session.get("world_revision", 0))
+    current_authority_ref = str(ledger.get("ledger_id") or "")
+    for candidate in stored:
+        is_current = bool(
+            candidate.get("world_revision") == current_revision
+            and candidate.get("fact_authority_ref") == current_authority_ref
+        )
+        candidate["current_world_usable"] = is_current
+        candidate["invalidated_by_world_change"] = not is_current
+        candidate["lifecycle_status"] = (
+            "current_candidate" if is_current else "stale_candidate"
+        )
+        if not is_current:
+            candidate["invalidation_reason"] = (
+                "world_revision_or_fact_authority_changed"
+            )
+    existing_keys = {
+        (
+            item.get("pattern_key"),
+            item.get("world_revision"),
+            item.get("fact_authority_ref"),
+        )
+        for item in stored
+    }
+    for candidate in candidates:
+        key = (
+            candidate.get("pattern_key"),
+            candidate.get("world_revision"),
+            candidate.get("fact_authority_ref"),
+        )
+        if key not in existing_keys:
+            stored.append(deepcopy(candidate))
+            existing_keys.add(key)
+    if len(stored) > 32:
+        del stored[:-32]
+    return deepcopy(stored)
 _LANGUAGE_OBJECT_CONCEPT_CACHE: list[dict[str, Any]] | None = None
 
 
@@ -361,6 +509,9 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator", scene_id
         ),
         "rcir_receipts": [],
         "cognitive_inquiry_history": [],
+        "cognitive_signal_candidates": [],
+        "runtime_diagnostic_history": [],
+        "retired_fact_authority_refs": [],
         "concept_gap_dialogue": None,
         "open_world_observation": None,
         "confirmed_visual_bindings": [],
@@ -549,10 +700,8 @@ def _archive_and_release_task_context(
     projection = build_context_projection(
         {"role_bindings": terminal_roles, "entity_mentions": [], "event_candidates": []},
         runtime_objects=session.get("runtime_objects", []),
-        current_facts=facts_from_runtime_state(
-            session.get("runtime_objects", []),
-            session.get("state", {}),
-            int(session.get("world_revision", 0)),
+        current_facts=_authoritative_current_facts(
+            session, reason="task_completion_context_projection"
         ),
         active_intent=None,
         recent_episodes=session.get("episodic_fact_memory", []),
@@ -1947,10 +2096,8 @@ def _derive_causal_graph_stage(session: dict[str, Any], intent: dict[str, Any]) 
 def _enter_current_fact_pruning_barrier(
     session: dict[str, Any], intent: dict[str, Any]
 ) -> dict[str, Any]:
-    current_facts = facts_from_runtime_state(
-        session.get("runtime_objects", []),
-        session.get("state", {}),
-        int(session.get("world_revision", 0)),
+    current_facts = _authoritative_current_facts(
+        session, reason="current_fact_pruning_barrier"
     )
     fact_keys = sorted(
         (
@@ -1974,9 +2121,7 @@ def _enter_current_fact_pruning_barrier(
         "entry_count": int(previous.get("entry_count", 0)) + 1,
         "old_path_reused": False,
         "fact_authority_ref": (
-            ((session.get("current_rcir") or {}).get("world_fact_ledger") or {}).get(
-                "ledger_id"
-            )
+            (session.get("world_fact_ledger") or {}).get("ledger_id")
             or "current_runtime_world_fact_projection"
         ),
         "control_gateway": "P018",
@@ -2245,6 +2390,9 @@ def get_session(session_id: str) -> dict[str, Any]:
     session = SESSIONS.get(session_id)
     if not session:
         return {"error": "embodied_session_not_found", "session_id": session_id}
+    _refresh_authoritative_world_fact_ledger(
+        session, reason="public_session_snapshot_requested"
+    )
     if session.get("scene_id") == "hospitality_guest":
         # Re-derive task prerequisites from the live world; never expose a stale
         # planning snapshot after an object is moved, discarded, or filled.
@@ -2261,24 +2409,19 @@ def get_cognitive_inquiry_context(session_id: str) -> dict[str, Any]:
     session = SESSIONS.get(session_id)
     if not session:
         return {"error": "embodied_session_not_found", "session_id": session_id}
-    facts = facts_from_runtime_state(
-        session.get("runtime_objects", []),
-        session.get("state", {}),
-        int(session.get("world_revision", 0)),
+    ledger = _refresh_authoritative_world_fact_ledger(
+        session, reason="cognitive_inquiry_context_requested"
     )
-    ledger = build_world_fact_ledger(
-        facts, world_revision=int(session.get("world_revision", 0))
+    signal_candidates = _refresh_runtime_cognitive_signal_candidates(
+        session, reason="cognitive_inquiry_context_signal_scan"
     )
-    session["world_fact_ledger"] = deepcopy(ledger)
-    current_rcir = session.get("current_rcir") or {}
-    if current_rcir:
-        current_rcir["world_fact_ledger"] = deepcopy(ledger)
     return {
         "session_id": session_id,
         "scene_id": session.get("scene_id"),
         "world_revision": int(session.get("world_revision", 0)),
         "world_fact_ledger": deepcopy(ledger),
         "history_count": len(session.get("cognitive_inquiry_history", [])),
+        "cognitive_signal_candidates": signal_candidates,
         "control_gateway": "P018",
         "verification_gateway": "P016",
         "direct_execution_allowed": False,
@@ -2314,12 +2457,6 @@ def record_cognitive_inquiry_result(
     ledger["cognitive_events"] = list((extension.get("events") or {}).values())
     ledger["active_inquiry_ref"] = result.get("inquiry_id")
     ledger["cognitive_extension_is_secondary_fact_source"] = False
-    current_rcir = session.get("current_rcir") or {}
-    if (
-        (current_rcir.get("world_fact_ledger") or {}).get("ledger_id")
-        == ledger.get("ledger_id")
-    ):
-        current_rcir["world_fact_ledger"] = deepcopy(ledger)
     history = session.setdefault("cognitive_inquiry_history", [])
     history.append(
         {
@@ -2733,10 +2870,8 @@ def _compose_session_language(
     )
     if not gap_dialogue_collecting:
         _project_resolved_process_roles(session, analysis, analysis["process_template_resolution"])
-    current_facts = facts_from_runtime_state(
-        session.get("runtime_objects", []),
-        session.get("state", {}),
-        session.get("world_revision", 0),
+    current_facts = _authoritative_current_facts(
+        session, reason="language_context_and_rcir_compilation"
     )
     active_intent = (session.get("long_horizon_intents") or {}).get(
         session.get("active_intent_id")
@@ -9695,6 +9830,9 @@ def _finalize_motion_job(
     })
     if len(receipts) > 16:
         del receipts[:-16]
+    _refresh_runtime_cognitive_signal_candidates(
+        session, reason="verified_motion_terminal_scan"
+    )
     MOTION_JOBS.pop(job_id, None)
     session_view = get_session(session_id)
     result["session"] = session_view

@@ -20,6 +20,11 @@ FACTORY_STATE_FACT_CONCEPTS: list[dict[str, Any]] = [
 
 
 FACT_PREREQUISITE_STRATEGIES: dict[str, dict[str, Any]] = {
+    "container_grounded": {"kind": "perception_or_clarification", "producer": "observe_or_clarify_container", "response": "先观察并唯一绑定承担盛装角色的对象"},
+    "liquid_source_grounded": {"kind": "perception_or_clarification", "producer": "observe_or_clarify_liquid_source", "response": "先观察并唯一绑定符合材料与状态约束的液体来源"},
+    "container_at_source": {"kind": "state_derived_subgoal", "producer": "position_container_at_bound_source", "response": "先根据当前本体和世界状态把容器送到已绑定来源的可操作位置"},
+    "object_movable": {"kind": "object_compatibility", "producer": None, "response": "先以对象功能、固定关系和受力边界证据确认对象可移动"},
+    "current_occupancy_relation_grounded": {"kind": "perception", "producer": "observe_current_occupancy_relation", "response": "先观察并验真对象当前占据的支撑位置与释放范围"},
     "object_grounded": {"kind": "perception", "producer": "observe_entity", "response": "先观察并唯一绑定目标对象"},
     "target_grounded": {"kind": "perception", "producer": "observe_entity", "response": "先观察并唯一绑定清洁或操作目标"},
     "device_grounded": {"kind": "perception", "producer": "observe_entity", "response": "先观察并唯一绑定目标设备"},

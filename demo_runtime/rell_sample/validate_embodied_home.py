@@ -92,14 +92,38 @@ def main() -> None:
     sit_sofa = execute_command(role_session_id, "坐到沙发上")
     require(not sit_sofa["available"] and any(item["condition"] == "sit_down_on_support" for item in sit_sofa["missing_conditions"]), f"wheeled body pretended it could sit: {sit_sofa}")
     move_sofa = execute_command(role_session_id, "搬开沙发")
-    require(not move_sofa["available"] and {item["kind"] for item in move_sofa["missing_conditions"]} >= {"body_capability", "object_claim", "runtime_object_state"}, f"unknown force, mobility and fixed state became executable: {move_sofa}")
+    move_factory = move_sofa.get("factory_concept", {})
+    move_incompatibilities = move_factory.get("incompatible_roles", [])
+    require(
+        move_sofa.get("status") == "factory_concept_recognized_execution_gap"
+        and move_sofa.get("reason") == "entity_not_compatible_with_semantic_role"
+        and move_factory.get("operator") == "relocate_object"
+        and move_factory.get("candidate_only") is True
+        and move_factory.get("direct_execution_allowed") is False
+        and any(
+            "movable" in item.get("missing_affordances", [])
+            and "fixed_asset" in item.get("forbidden_properties_present", [])
+            for item in move_incompatibilities
+        ),
+        f"unknown force, mobility and fixed state became executable: {move_sofa}",
+    )
     probe_sofa = execute_command(role_session_id, "摸一下沙发看看软不软")
     require(not probe_sofa["available"] and {item["kind"] for item in probe_sofa["missing_conditions"]} >= {"body_capability", "sensor_capability", "governance"}, f"unverified tactile probe bypassed body and governance: {probe_sofa}")
-    require({item["object_concept_id"] for item in [approach_sofa, avoid_sofa, sit_sofa, move_sofa, probe_sofa]} == {"concept_sofa"}, "task role switching mutated sofa identity")
-    require(all(item["role_binding_scope"] == "current_task_only" and not item["base_object_identity_mutated"] for item in [approach_sofa, avoid_sofa, sit_sofa, move_sofa, probe_sofa]), "context role polluted base object concept")
-    require(all(item["candidate_only"] and not item["direct_execution_allowed"] for item in [approach_sofa, avoid_sofa, sit_sofa, move_sofa, probe_sofa]), "context affordance bypassed orchestration")
+    contextual_role_results = [approach_sofa, avoid_sofa, sit_sofa, probe_sofa]
+    require(
+        {item["object_concept_id"] for item in contextual_role_results}
+        == {"concept_sofa"}
+        and any(
+            "concept_sofa"
+            in item.get("evidence", {}).get("matched_object_concepts", [])
+            for item in move_incompatibilities
+        ),
+        "task role switching mutated sofa identity",
+    )
+    require(all(item["role_binding_scope"] == "current_task_only" and not item["base_object_identity_mutated"] for item in contextual_role_results), "context role polluted base object concept")
+    require(all(item["candidate_only"] and not item["direct_execution_allowed"] for item in contextual_role_results) and move_factory.get("candidate_only") and not move_factory.get("direct_execution_allowed"), "context affordance bypassed orchestration")
     require(len(approach_sofa["technical_feature_mapping"]) == 5 and len(avoid_sofa["technical_feature_mapping"]) == 5, "spatial orchestration omitted technical feature mapping")
-    require(all(len(item["technical_feature_mapping"]) == 4 for item in [sit_sofa, move_sofa, probe_sofa]), "context affordance omitted technical feature mapping")
+    require(all(len(item["technical_feature_mapping"]) == 4 for item in [sit_sofa, probe_sofa]), "context affordance omitted technical feature mapping")
 
     state_catalog = build_factory_state_fact_catalog()
     require(len(state_catalog["state_fact_concepts"]) >= 10, f"factory state fact vocabulary is too narrow: {state_catalog}")

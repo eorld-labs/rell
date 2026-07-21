@@ -7000,21 +7000,55 @@ def attach_missing_fact_experience_candidates(action_concepts: list[dict[str, An
 
 def build_concept_grounding_gate(concept_resolution: dict[str, Any] | None) -> dict[str, Any]:
     blocked: list[dict[str, Any]] = []
-    for concept in (concept_resolution or {}).get("action_concepts", []):
+    superseded: list[dict[str, Any]] = []
+    action_concepts = (concept_resolution or {}).get("action_concepts", [])
+    grounded_operators = {
+        str(
+            concept.get("concept_package", {})
+            .get("concept_kernel", {})
+            .get("operator")
+            or concept.get("capability")
+            or ""
+        )
+        for concept in action_concepts
+        if concept.get("concept_package", {})
+        .get("grounding_summary", {})
+        .get("all_required_roles_grounded")
+    }
+    for concept in action_concepts:
         summary = concept.get("concept_package", {}).get("grounding_summary", {})
         if not summary.get("clarification_required"):
             continue
-        blocked.append({
+        operator = str(
+            concept.get("concept_package", {})
+            .get("concept_kernel", {})
+            .get("operator")
+            or concept.get("capability")
+            or ""
+        )
+        record = {
             "concept_id": concept.get("concept_id"),
             "display_name": concept.get("display_name"),
+            "operator": operator,
             "unresolved_roles": summary.get("unresolved_roles", []),
             "clarification_questions": summary.get("clarification_questions", []),
-        })
+        }
+        if operator and operator in grounded_operators:
+            record["supersession_reason"] = (
+                "equivalent_operator_has_fully_grounded_candidate"
+            )
+            superseded.append(record)
+            continue
+        blocked.append(record)
     questions = [question for item in blocked for question in item["clarification_questions"]]
     return {
         "gate_status": "blocked" if blocked else "passed",
         "clarification_required": bool(blocked),
         "blocked_concepts": blocked,
+        "superseded_redundant_concepts": superseded,
+        "candidate_arbitration_policy": (
+            "fully_grounded_canonical_operator_candidate_precedes_redundant_partial_candidates"
+        ),
         "clarification_questions": questions,
         "direct_execution_allowed": False,
         "must_reenter_orchestration_layer": True,
