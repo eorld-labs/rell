@@ -143,12 +143,52 @@ def main() -> None:
     require([item.get("terminal_fact") for item in deliver_outcomes] == ["target_object_in_gripper", "object_at_target_region", "object_supported_at_destination"], f"place-at-region transport did not derive its final placement stage: {deliver_outcomes}")
     require(delivered_apple.get("support_ref") == "counter_a" and deliver_live["state"].get("holding") is None, f"delivery mode did not establish stable placement: {delivered_apple}")
 
+    structured_session = start_session("home_humanoid", "hospitality_guest")
+    structured_runtime = SESSIONS[structured_session["session_id"]]
+    tray = next(
+        item
+        for item in structured_runtime["runtime_objects"]
+        if item["entity_id"] == "wooden_tray"
+    )
+    tray["attached_to_executor"] = True
+    tray["support_ref"] = None
+    structured_runtime["state"]["holding"] = "wooden_tray"
+    structured_runtime["state"]["holding_by_effector"]["left_hand"] = "wooden_tray"
+    destination_gap = begin_motion_command(
+        structured_session["session_id"], "把托盘放到桌子上去"
+    )
+    require(
+        destination_gap.get("status") == "process_slot_clarification_required",
+        f"ambiguous destination did not open a process slot: {destination_gap}",
+    )
+    destination_bound = begin_motion_command(
+        structured_session["session_id"], "操作台A"
+    )
+    bound_result = destination_bound.get("immediate_result") or destination_bound
+    slot_resolution = destination_bound.get("process_gap_resolution") or bound_result.get(
+        "process_gap_resolution", {}
+    )
+    require(
+        bound_result.get("status") == "requires_human_confirmation"
+        and slot_resolution.get("structured_role_refs")
+        == {
+            "theme": "wooden_tray",
+            "destination": "hospitality_counter_a",
+        }
+        and slot_resolution.get("surface_text_rewritten") is False
+        and slot_resolution.get("display_label_reparsed_as_constraint") is False
+        and slot_resolution.get("execution_utterance") == "把托盘放到桌子上去"
+        and structured_runtime.get("process_gap_dialogue") is None,
+        f"structured EntityRef roles were downgraded into display-label constraints: {destination_bound}",
+    )
+
     print("Process template and slot gap resolution validation passed.")
     print({
         "templates": 4,
         "unknown_surface": "捎给",
         "recipient_clarification": ["老张", "老李"],
         "transport_modes": ["retain_holding", "place_at_region"],
+        "structured_slot_binding": "display_label_not_reparsed",
     })
 
 

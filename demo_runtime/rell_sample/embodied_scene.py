@@ -4766,16 +4766,65 @@ def _continue_process_gap_dialogue(session: dict[str, Any], utterance: str) -> d
         }
     session["process_gap_dialogue"] = None
     canonical = updated.get("canonical_utterance")
-    resumed = begin_motion_command(session["session_id"], canonical) if canonical else None
-    if resumed is not None and (historical_evidence or matches[0].get("constraint_mismatch")):
+    structured_role_refs = {
+        role: binding.get("value_ref")
+        for role, binding in (updated.get("bindings") or {}).items()
+        if isinstance(binding, dict) and binding.get("value_ref")
+    }
+    constraint_substitution_authorized = bool(
+        matches[0].get("constraint_mismatch")
+    )
+    execution_utterance = (
+        canonical
+        if constraint_substitution_authorized
+        else dialogue["source_utterance"]
+    )
+    # A canonical sentence is explanatory output unless the human explicitly
+    # authorized an observed constraint substitute. Ordinary slot answers
+    # resume the original request with version-bound EntityRef roles so an
+    # entity display label cannot become a fresh lexical constraint.
+    resumed = (
+        begin_motion_command(
+            session["session_id"],
+            execution_utterance,
+            grounded_role_bindings=structured_role_refs,
+        )
+        if canonical
+        else None
+    )
+    if resumed is not None:
         gap_resolution = {
             "slot_id": gap.get("slot_id"),
             "value_ref": matches[0].get("value_ref"),
-            "evidence": deepcopy(historical_evidence) if historical_evidence else {
-                "kind": "human_authorized_observed_constraint_substitute",
-                "constraint_mismatch": deepcopy(matches[0].get("constraint_mismatch")),
-                "observed_attributes": deepcopy(matches[0].get("observed_attributes", {})),
-            },
+            "structured_role_refs": deepcopy(structured_role_refs),
+            "canonical_utterance_for_explanation": canonical,
+            "execution_utterance": execution_utterance,
+            "surface_text_rewritten": constraint_substitution_authorized,
+            "surface_rewrite_reason": (
+                "human_authorized_observed_constraint_substitution"
+                if constraint_substitution_authorized
+                else None
+            ),
+            "display_label_reparsed_as_constraint": False,
+            "binding_authority": "structured_entity_refs_at_current_world_revision",
+            "world_revision": session.get("world_revision"),
+            "evidence": (
+                deepcopy(historical_evidence)
+                if historical_evidence
+                else {
+                    "kind": (
+                        "human_authorized_observed_constraint_substitute"
+                        if matches[0].get("constraint_mismatch")
+                        else "explicit_process_slot_entity_binding"
+                    ),
+                    "constraint_mismatch": deepcopy(
+                        matches[0].get("constraint_mismatch")
+                    ),
+                    "observed_attributes": deepcopy(
+                        matches[0].get("observed_attributes", {})
+                    ),
+                }
+            ),
             "human_confirmed_substitution": bool(matches[0].get("constraint_mismatch")),
             "physical_fact_committed": False,
         }
