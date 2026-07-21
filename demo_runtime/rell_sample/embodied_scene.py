@@ -2386,6 +2386,72 @@ def _resume_active_intent(session: dict[str, Any]) -> dict[str, Any] | None:
     return _prepare_long_intent_stage(session, intent)
 
 
+def _resume_placement_after_spatial_capacity_report(
+    session: dict[str, Any], utterance: str
+) -> dict[str, Any] | None:
+    normalized = re.sub(r"[\s，。！？、,.!?]+", "", utterance)
+    if not any(
+        marker in normalized
+        for marker in (
+            "还有空间",
+            "空间还很大",
+            "空间很大",
+            "很大的空间",
+            "放得下",
+            "位置够",
+            "没有占满",
+            "没占满",
+        )
+    ):
+        return None
+    intent = (session.get("long_horizon_intents") or {}).get(
+        session.get("active_intent_id")
+    )
+    resume = (intent or {}).get("resume_envelope") or {}
+    stage = (intent or {}).get("current_stage") or {}
+    if (
+        not intent
+        or intent.get("lifecycle") != "awaiting_correction"
+        or stage.get("stage_id") != "place_at_destination"
+        or resume.get("reason")
+        not in {
+            "destination_has_no_non_overlapping_placement_pose",
+            "no_stable_support_pose_within_current_effector_workspace",
+        }
+    ):
+        return None
+    roles = intent.get("role_bindings") or {}
+    report = {
+        "predicate": "support_has_available_placement_space",
+        "subject": roles.get("destination"),
+        "theme": roles.get("theme"),
+        "status": "human_reported_candidate_requires_geometry_verification",
+        "world_revision": session.get("world_revision"),
+        "runtime_fact_committed": False,
+        "triggers": "coupled_standoff_and_placement_replanning",
+    }
+    session.setdefault("human_reported_fact_candidates", []).append(
+        deepcopy(report)
+    )
+    intent["lifecycle"] = "active"
+    intent["resume_envelope"] = {
+        **deepcopy(resume),
+        "reason": "human_reported_spatial_capacity_requires_reverification",
+        "reported_candidate": deepcopy(report),
+        "old_path_discarded": True,
+    }
+    resumed = _prepare_long_intent_stage(session, intent)
+    resumed["spatial_capacity_report"] = deepcopy(report)
+    target = resumed.get("immediate_result") or resumed
+    target["prompt"] = (
+        "你报告目标承载面仍有空间；我先把它作为待验真的观察候选，"
+        "没有直接写成物理事实。我已联合重算机器人接近站位与无碰撞放置点。"
+        + (target.get("prompt") or "")
+    )
+    resumed["session"] = get_session(session["session_id"])
+    return resumed
+
+
 def get_session(session_id: str) -> dict[str, Any]:
     session = SESSIONS.get(session_id)
     if not session:
@@ -6855,6 +6921,51 @@ def _placement_space_evidence(
     }
 
 
+def _support_placement_positions(
+    destination: dict[str, Any], held_object: dict[str, Any]
+) -> list[list[float]]:
+    margin_x = (float(destination["size"][0]) - float(held_object["size"][0])) / 2
+    margin_y = (float(destination["size"][1]) - float(held_object["size"][1])) / 2
+    if margin_x < 0 or margin_y < 0:
+        return []
+    center_x, center_y = map(float, destination["position"])
+    offset_x, offset_y = margin_x * 0.68, margin_y * 0.68
+    candidates = [
+        [center_x, center_y],
+        [center_x - offset_x, center_y], [center_x + offset_x, center_y],
+        [center_x, center_y - offset_y], [center_x, center_y + offset_y],
+        [center_x - offset_x, center_y - offset_y],
+        [center_x + offset_x, center_y + offset_y],
+    ]
+    for index in range(1, 6):
+        ratio = index / 6
+        candidates.extend([
+            [
+                center_x - margin_x + 2 * margin_x * ratio,
+                center_y - margin_y + 2 * margin_y * other / 6,
+            ]
+            for other in range(1, 6)
+        ])
+    return list({
+        (round(candidate[0], 6), round(candidate[1], 6)): candidate
+        for candidate in candidates
+    }.values())
+
+
+def _placement_position_collides(
+    position: list[float],
+    held_object: dict[str, Any],
+    occupied: list[dict[str, Any]],
+) -> bool:
+    return any(
+        abs(position[0] - float(item["position"][0]))
+        < (float(held_object["size"][0]) + float(item["size"][0])) / 2 + 0.03
+        and abs(position[1] - float(item["position"][1]))
+        < (float(held_object["size"][1]) + float(item["size"][1])) / 2 + 0.03
+        for item in occupied
+    )
+
+
 def _apply_verified_place(session: dict[str, Any], object_ref: str, destination_ref: str, source: str) -> dict[str, Any]:
     objects = {item["entity_id"]: item for item in session["runtime_objects"]}
     held_object = objects.get(object_ref)
@@ -6901,27 +7012,7 @@ def _apply_verified_place(session: dict[str, Any], object_ref: str, destination_
         item for item in session["runtime_objects"]
         if item.get("entity_id") != object_ref and item.get("support_ref") == destination_ref and not item.get("attached_to_executor")
     ]
-    center_x, center_y = map(float, destination["position"])
-    offset_x, offset_y = margin_x * 0.68, margin_y * 0.68
-    placement_candidates = [
-        [center_x, center_y],
-        [center_x - offset_x, center_y], [center_x + offset_x, center_y],
-        [center_x, center_y - offset_y], [center_x, center_y + offset_y],
-        [center_x - offset_x, center_y - offset_y], [center_x + offset_x, center_y + offset_y],
-    ]
-    # Add a geometry-derived interior lattice. The first candidates preserve
-    # the existing preference order; the lattice prevents a finite hand-picked
-    # set from mistaking a usable footprint for a full surface.
-    for index in range(1, 6):
-        ratio = index / 6
-        placement_candidates.extend([
-            [center_x - margin_x + 2 * margin_x * ratio, center_y - margin_y + 2 * margin_y * other / 6]
-            for other in range(1, 6)
-        ])
-    placement_candidates = list({
-        (round(candidate[0], 6), round(candidate[1], 6)): candidate
-        for candidate in placement_candidates
-    }.values())
+    placement_candidates = _support_placement_positions(destination, held_object)
     manipulation_reach = (
         float(session["executor_profile"]["body_envelope"]["radius_m"])
         + float(session["executor_profile"]["arm_reach_m"])
@@ -6948,12 +7039,7 @@ def _apply_verified_place(session: dict[str, Any], object_ref: str, destination_
         }
     placement_position = None
     for candidate in placement_candidates:
-        collision = any(
-            abs(candidate[0] - float(item["position"][0])) < (float(held_object["size"][0]) + float(item["size"][0])) / 2 + 0.03
-            and abs(candidate[1] - float(item["position"][1])) < (float(held_object["size"][1]) + float(item["size"][1])) / 2 + 0.03
-            for item in occupied
-        )
-        if not collision:
+        if not _placement_position_collides(candidate, held_object, occupied):
             placement_position = candidate
             break
     if placement_position is None:
@@ -7462,6 +7548,67 @@ def _build_object_relative_motion(
             "session": get_session(session["session_id"]),
         }
 
+    coupled_placement_evidence = None
+    if operator == "place_object":
+        theme_ref = contextual_affordance.get("theme_entity_ref")
+        held_object = next(
+            (
+                item
+                for item in session.get("runtime_objects", [])
+                if item.get("entity_id") == theme_ref
+            ),
+            None,
+        )
+        occupied = [
+            item
+            for item in session.get("runtime_objects", [])
+            if item.get("entity_id") != theme_ref
+            and item.get("support_ref") == entity.get("entity_id")
+            and not item.get("attached_to_executor")
+        ]
+        free_positions = (
+            [
+                position
+                for position in _support_placement_positions(entity, held_object)
+                if not _placement_position_collides(
+                    position, held_object, occupied
+                )
+            ]
+            if held_object
+            else []
+        )
+        coupled_feasible = []
+        for candidate in feasible:
+            reachable_positions = [
+                position
+                for position in free_positions
+                if math.dist(candidate["position"], position)
+                <= interaction_reach_m
+            ]
+            candidate["reachable_free_placement_count"] = len(
+                reachable_positions
+            )
+            candidate["selected_placement_position"] = (
+                deepcopy(reachable_positions[0]) if reachable_positions else None
+            )
+            if reachable_positions:
+                coupled_feasible.append(candidate)
+            else:
+                rejected.append({
+                    "side": candidate["side"],
+                    "position": deepcopy(candidate["position"]),
+                    "reason": "safe_route_but_no_free_placement_pose_within_effector_reach",
+                    "global_free_placement_count": len(free_positions),
+                })
+        coupled_placement_evidence = {
+            "global_free_placement_count": len(free_positions),
+            "route_and_placement_coupled": True,
+            "candidate_standoff_count": len(feasible),
+            "coupled_feasible_standoff_count": len(coupled_feasible),
+        }
+        if coupled_feasible:
+            feasible = coupled_feasible
+
     selected = min(feasible, key=lambda item: item["route_length_m"])
     frames: list[dict[str, Any]] = []
     segment_start = start
@@ -7505,6 +7652,10 @@ def _build_object_relative_motion(
             "candidate_count": len(side_candidates),
             "rejected_candidates": rejected,
             "motion_safety_contract": selected["plan"]["safety_contract"],
+            "coupled_placement_evidence": deepcopy(coupled_placement_evidence),
+            "selected_placement_position": deepcopy(
+                selected.get("selected_placement_position")
+            ),
             "world_revision": session["world_revision"],
         },
         "effective_execution_envelope": envelope,
@@ -9088,6 +9239,11 @@ def begin_motion_command(
             return _finalize_motion_result(
                 session_id, text, before_historical_navigation, historical_navigation, None
             )
+        capacity_recovery = _resume_placement_after_spatial_capacity_report(
+            session, text
+        )
+        if capacity_recovery:
+            return capacity_recovery
         graph_clarification = _continue_causal_graph_clarification(
             session, text, early_analysis
         )
@@ -9386,17 +9542,16 @@ def begin_motion_command(
             and candidate.get("binding_strength") == "unique_verified_event_role"
             and candidate.get("semantic_confirmation_required") is False
         ):
-            canonical = historical_reference.get("canonical_utterance")
             grounded_historical = _compose_session_language(
                 session,
-                canonical,
+                text,
                 grounded_role_bindings={
                     "theme": candidate["theme_entity_ref"],
                     "destination": candidate["destination_entity_ref"],
                 },
             )
             historical_intent = _create_transfer_intent(
-                session, canonical, grounded_historical
+                session, text, grounded_historical
             )
             if historical_intent:
                 prepared = _prepare_long_intent_stage(session, historical_intent)
@@ -9406,7 +9561,12 @@ def begin_motion_command(
                     "destination_entity_ref": candidate["destination_entity_ref"],
                     "evidence_source": candidate.get("evidence_source"),
                     "episode_ref": candidate.get("episode_id"),
+                    "historical_event_constraint": deepcopy(
+                        candidate.get("historical_event_constraint")
+                    ),
                     "binding_strength": candidate.get("binding_strength"),
+                    "binding_mode": "structured_historical_event_roles",
+                    "surface_text_rewritten": False,
                     "current_world_revalidation_required": True,
                     "old_trajectory_reused": False,
                     "physical_fact_committed": False,

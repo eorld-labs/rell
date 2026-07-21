@@ -664,6 +664,77 @@ def verify_post_handover_reacquisition_and_support_disambiguation() -> dict:
     }
 
 
+def verify_coupled_standoff_and_placement_recovery() -> dict:
+    session = start_session("home_humanoid", "hospitality_guest")
+    session_id = session["session_id"]
+    live = SESSIONS[session_id]
+    glass = next(
+        item for item in live["runtime_objects"]
+        if item["entity_id"] == "glass_tall"
+    )
+    glass["support_ref"] = None
+    glass["attached_to_executor"] = True
+    glass["held_by_effector"] = "left_hand"
+    live["state"]["holding"] = "glass_tall"
+    live["state"]["holding_by_effector"]["left_hand"] = "glass_tall"
+    live["state"]["executor_position"] = [1.57, -0.4]
+    live["state"]["active_region"] = "kitchen"
+
+    initial = begin_motion_command(session_id, "把高脚杯放到操作台A")
+    initial_result = initial.get("immediate_result") or initial
+    motion = initial_result.get("object_relative_motion") or {}
+    coupled = motion.get("coupled_placement_evidence") or {}
+    require(
+        initial_result.get("status") == "requires_human_confirmation"
+        and coupled.get("global_free_placement_count", 0) > 0
+        and coupled.get("coupled_feasible_standoff_count", 0) > 0
+        and motion.get("selected_placement_position") is not None,
+        f"placement planning did not couple a reachable standoff with a free support pose: {initial}",
+    )
+
+    live = SESSIONS[session_id]
+    active = live["long_horizon_intents"][live["active_intent_id"]]
+    active["lifecycle"] = "awaiting_correction"
+    active["resume_envelope"] = {
+        "reason": "destination_has_no_non_overlapping_placement_pose",
+        "world_revision": live["world_revision"],
+        "old_path_discarded": True,
+    }
+    live["pending_confirmation"] = None
+    corrected = begin_motion_command(session_id, "我看还有很大的空间呀")
+    corrected_result = corrected.get("immediate_result") or corrected
+    report = corrected.get("spatial_capacity_report") or corrected_result.get(
+        "spatial_capacity_report", {}
+    )
+    require(
+        corrected_result.get("status") == "requires_human_confirmation"
+        and report.get("status")
+        == "human_reported_candidate_requires_geometry_verification"
+        and report.get("runtime_fact_committed") is False
+        and "联合重算机器人接近站位与无碰撞放置点"
+        in corrected_result.get("prompt", ""),
+        f"spatial capacity disagreement was parsed as a new observation task: {corrected}",
+    )
+    confirmed = begin_motion_command(session_id, "确认")
+    outcome = drain(confirmed)
+    final = get_session(session_id)
+    final_glass = next(
+        item for item in final["runtime_objects"]
+        if item["entity_id"] == "glass_tall"
+    )
+    require(
+        outcome.get("terminal_fact") == "object_supported_at_destination"
+        and final_glass.get("support_ref") == "hospitality_counter_a",
+        f"coupled standoff and placement recovery did not reach P016 verification: {outcome}",
+    )
+    return {
+        "global_free_placement_count": coupled["global_free_placement_count"],
+        "selected_side": motion.get("selected_side"),
+        "human_report_committed_as_fact": False,
+        "terminal_fact": outcome.get("terminal_fact"),
+    }
+
+
 def verify_contrastive_evidence_gap_dialogue() -> dict:
     session = start_session("home_humanoid", "home_semantic_3d_b")
     session_id = session["session_id"]
@@ -1142,6 +1213,45 @@ def verify_inline_historical_event_destination_grounding() -> dict:
     }
 
 
+def verify_elliptical_historical_event_destination_grounding() -> dict:
+    session = start_session("home_humanoid", "hospitality_guest")
+    session_id = session["session_id"]
+    drain_service(
+        begin_motion_command(session_id, "用高脚玻璃杯给我倒一杯水")
+    )
+    started = begin_motion_command(
+        session_id,
+        "我喝完了，把杯子放到刚才拿起的桌子上",
+    )
+    immediate = started.get("immediate_result") or started
+    intent = started.get("long_horizon_intent") or immediate.get(
+        "long_horizon_intent"
+    ) or {}
+    resolution = started.get("historical_reference_resolution") or immediate.get(
+        "historical_reference_resolution"
+    ) or {}
+    constraint = resolution.get("historical_event_constraint") or {}
+    require(
+        started.get("status") == "requires_human_confirmation"
+        and (intent.get("role_bindings") or {}).get("theme") == "glass_tall"
+        and (intent.get("role_bindings") or {}).get("destination")
+        == "hospitality_counter_a"
+        and resolution.get("status") == "historical_event_role_resolved"
+        and resolution.get("evidence_source")
+        == "recent_verified_grasp_source_fact"
+        and constraint.get("theme_resolution")
+        == "elliptical_temporal_event_theme_from_unique_matrix_role"
+        and get_session(session_id).get("process_gap_dialogue") is None,
+        f"elliptical historical event fell back to category destination ambiguity: {started}",
+    )
+    return {
+        "theme": "glass_tall",
+        "destination": "hospitality_counter_a",
+        "theme_resolution": constraint.get("theme_resolution"),
+        "old_trajectory_reused": False,
+    }
+
+
 def verify_historical_destination_answer_precedes_task_supersession() -> dict:
     session = start_session("home_humanoid", "hospitality_guest")
     session_id = session["session_id"]
@@ -1407,6 +1517,7 @@ def main() -> None:
         "water_then_place_composition": verify_water_then_place_composition(),
         "snapshot_release_and_reacquisition": verify_completed_snapshot_release_and_physical_reacquisition(),
         "shared_support_footprint_recovery": verify_shared_support_footprint_recovery(),
+        "coupled_standoff_and_placement_recovery": verify_coupled_standoff_and_placement_recovery(),
         "post_handover_reacquisition": verify_post_handover_reacquisition_and_support_disambiguation(),
         "contrastive_evidence_gap_dialogue": verify_contrastive_evidence_gap_dialogue(),
         "generic_object_handover": verify_generic_object_handover(),
@@ -1423,6 +1534,7 @@ def main() -> None:
         "role_scoped_transfer_after_handover": verify_role_scoped_transfer_after_handover(),
         "historical_event_return": verify_historical_event_return_replans_current_route(),
         "inline_historical_event_destination": verify_inline_historical_event_destination_grounding(),
+        "elliptical_historical_event_destination": verify_elliptical_historical_event_destination_grounding(),
         "historical_destination_answer": verify_historical_destination_answer_precedes_task_supersession(),
         "relational_destination_grounding": verify_relational_destination_grounding_and_slot_resume(),
         "generic_movable_asset_transfer": verify_generic_movable_asset_transfer_binding(),

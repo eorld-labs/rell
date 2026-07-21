@@ -330,6 +330,28 @@ def main() -> None:
         and historical_constraints[0].get("physical_fact_committed") is False,
         f"historical event role was not represented as an auditable constraint: {historical_relative}",
     )
+    elliptical_historical = compose(
+        "我喝完了，把杯子放到刚才拿起的桌子上"
+    )
+    elliptical_constraints = elliptical_historical.get(
+        "historical_event_constraints", []
+    )
+    require(
+        len(elliptical_constraints) == 1
+        and elliptical_constraints[0].get("operator") == "grasp_object"
+        and elliptical_constraints[0].get("relation")
+        == "source_support_of_verified_event"
+        and elliptical_constraints[0].get("theme_resolution")
+        == "elliptical_temporal_event_theme_from_unique_matrix_role"
+        and (elliptical_constraints[0].get("theme") or {}).get("matched_alias")
+        == "杯子"
+        and [
+            item.get("operator")
+            for item in elliptical_historical.get("event_candidates", [])
+        ]
+        == ["place_object"],
+        f"matrix theme did not fill the elliptical historical event role: {elliptical_historical}",
+    )
     generic_historical_relative = compose("把苹果放到之前你拿苹果的桌子上")
     require(
         [item.get("operator") for item in generic_historical_relative.get("event_candidates", [])]

@@ -404,6 +404,7 @@ def _extract_historical_event_constraints(
             and int(item.get("end", -1)) <= possessive_end
             and "graspable" in item.get("functional_affordances", [])
         ]
+        theme_resolution = "explicit_inside_temporal_relative_clause"
         if not event_themes and any(
             pronoun in text[event_end:possessive_end]
             for pronoun in ("它", "这个", "那个")
@@ -416,6 +417,29 @@ def _extract_historical_event_constraints(
             ]
             if preceding_themes:
                 event_themes = [preceding_themes[-1]]
+                theme_resolution = "pronoun_resolved_to_preceding_matrix_theme"
+        if not event_themes and event.get("operator") == "grasp_object":
+            # In a placement request such as "place the cup on the table
+            # [it was] just picked up from", Chinese may omit the grasped
+            # object inside the temporal relative clause. The unique matrix
+            # theme can fill that event role; no category-wide guess is made.
+            matrix_themes = [
+                item
+                for item in objects
+                if int(item.get("end", -1)) <= marker_start
+                and "graspable" in item.get("functional_affordances", [])
+            ]
+            matrix_place_events = [
+                item
+                for item in events
+                if item.get("operator") == "place_object"
+                and int(item.get("start", -1)) < marker_start
+            ]
+            if len(matrix_themes) == 1 and matrix_place_events:
+                event_themes = [matrix_themes[0]]
+                theme_resolution = (
+                    "elliptical_temporal_event_theme_from_unique_matrix_role"
+                )
         heads = [
             item
             for item in objects
@@ -444,6 +468,7 @@ def _extract_historical_event_constraints(
                 "executor" if "你" in text[marker_start:event_start] else None
             ),
             "theme": deepcopy(event_themes[0]),
+            "theme_resolution": theme_resolution,
             "head": deepcopy(head),
             "head_role": "destination",
             "relation": relation,
