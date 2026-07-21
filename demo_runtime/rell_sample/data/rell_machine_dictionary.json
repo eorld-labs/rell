@@ -75,9 +75,451 @@
       "fact_commit_authority": "P016_via_WorldFactLedger_only"
     },
     {
+      "entry_id": "operator.observe_entity",
+      "entry_kind": "primitive_operator",
+      "semantic_value": "observe_entity",
+      "irreducible": true,
+      "components": [],
+      "roles": {"executor": "embodied_agent", "theme": "perceivable_referent"},
+      "language_adapters": {"zh": [{"surface": "观察", "canonical": true}, {"surface": "看看"}, {"surface": "找找"}], "en": [{"surface": "observe", "canonical": true}]},
+      "causal_contract": {"requires": ["sensor_available"], "projects": ["observation_candidate_available"], "verification": ["observation_bound_to_current_world_revision"]},
+      "fact_commit_authority": "P016_via_WorldFactLedger_only"
+    },
+    {
+      "entry_id": "operator.orient_executor",
+      "entry_kind": "primitive_operator",
+      "semantic_value": "orient_executor",
+      "irreducible": true,
+      "components": [],
+      "roles": {"executor": "embodied_agent", "direction": "direction_referent"},
+      "language_adapters": {"zh": [{"surface": "面向", "canonical": true}, {"surface": "转向"}], "en": [{"surface": "orient toward", "canonical": true}]},
+      "causal_contract": {"requires": ["direction_reference_grounded"], "projects": ["executor_heading_changed"], "verification": ["executor_heading_matches_target"]},
+      "fact_commit_authority": "P016_via_WorldFactLedger_only"
+    },
+    {
+      "entry_id": "operator.release_object",
+      "entry_kind": "primitive_operator",
+      "semantic_value": "release_object",
+      "irreducible": true,
+      "components": [],
+      "roles": {"executor": "embodied_agent", "theme": "held_referent"},
+      "language_adapters": {"zh": [{"surface": "放开", "canonical": true}, {"surface": "松开"}], "en": [{"surface": "release", "canonical": true}]},
+      "causal_contract": {"requires": ["theme_held"], "projects": ["theme_released"], "verification": ["theme_no_longer_follows_effector"]},
+      "fact_commit_authority": "P016_via_WorldFactLedger_only"
+    },
+    {
+      "entry_id": "operator.apply_directional_force",
+      "entry_kind": "primitive_operator",
+      "semantic_value": "apply_directional_force",
+      "irreducible": true,
+      "components": [],
+      "roles": {"executor": "embodied_agent", "theme": "movable_referent", "direction": "direction_referent"},
+      "language_adapters": {"zh": [{"surface": "推", "canonical": true}, {"surface": "拉"}], "en": [{"surface": "apply directional force", "canonical": true}]},
+      "causal_contract": {"requires": ["contact_pose_feasible", "force_limit_known"], "projects": ["theme_displaced"], "verification": ["theme_motion_observed", "force_within_limit"]},
+      "fact_commit_authority": "P016_via_WorldFactLedger_only"
+    },
+    {
+      "entry_id": "operator.stop_current_activity",
+      "entry_kind": "primitive_operator",
+      "semantic_value": "stop_current_activity",
+      "irreducible": true,
+      "components": [],
+      "roles": {"executor": "embodied_agent", "activity": "active_process_ref"},
+      "language_adapters": {"zh": [{"surface": "停止", "canonical": true}, {"surface": "停下"}, {"surface": "取消"}], "en": [{"surface": "stop", "canonical": true}]},
+      "causal_contract": {"requires": ["activity_active"], "projects": ["activity_stopped"], "verification": ["safe_hold_state_verified"]},
+      "fact_commit_authority": "P016_via_WorldFactLedger_only"
+    },
+    {
+      "entry_id": "operator.wait_until",
+      "entry_kind": "primitive_operator",
+      "semantic_value": "wait_until",
+      "irreducible": true,
+      "components": [],
+      "roles": {"executor": "embodied_agent", "condition": "fact_or_time_boundary"},
+      "language_adapters": {"zh": [{"surface": "等待", "canonical": true}, {"surface": "等等"}], "en": [{"surface": "wait until", "canonical": true}]},
+      "causal_contract": {"requires": ["safe_to_hold"], "projects": ["wait_condition_satisfied"], "verification": ["condition_or_resume_signal_observed"]},
+      "fact_commit_authority": "P016_via_WorldFactLedger_only"
+    },
+    {
+      "entry_id": "contract.handover_object",
+      "entry_kind": "operator_contract",
+      "semantic_value": "handover_object",
+      "irreducible": false,
+      "components": ["operator.grasp_object", "operator.navigate_to", "operator.release_object"],
+      "roles": {"theme": "graspable_referent", "recipient": "human_referent"},
+      "language_adapters": {"zh": [{"surface": "递给", "canonical": true}, {"surface": "交给"}], "en": [{"surface": "hand over", "canonical": true}]},
+      "causal_contract": {"requires": ["theme_held", "recipient_ready"], "projects": ["recipient_possesses_theme"], "verification": ["recipient_possession_verified"]},
+      "fact_commit_authority": "P016_via_WorldFactLedger_only"
+    },
+    {
+      "entry_id": "contract.transport_object",
+      "entry_kind": "operator_contract",
+      "semantic_value": "transport_object",
+      "irreducible": false,
+      "components": ["operator.grasp_object", "operator.navigate_to"],
+      "roles": {"theme": "movable_referent", "destination": "spatial_referent"},
+      "language_adapters": {"zh": [{"surface": "带到", "canonical": true}, {"surface": "拿到"}], "en": [{"surface": "transport", "canonical": true}]},
+      "causal_contract": {"requires": ["theme_held", "destination_grounded"], "projects": ["theme_at_destination_region"], "verification": ["theme_transport_relation_verified"]},
+      "fact_commit_authority": "P016_via_WorldFactLedger_only"
+    },
+    {
+      "entry_id": "contract.relocate_object",
+      "entry_kind": "operator_contract",
+      "semantic_value": "relocate_object",
+      "irreducible": false,
+      "components": ["operator.grasp_object", "operator.place_object"],
+      "roles": {"theme": "movable_referent", "source": "spatial_referent", "destination": "spatial_referent"},
+      "language_adapters": {"zh": [{"surface": "移开", "canonical": true}, {"surface": "挪开"}], "en": [{"surface": "relocate", "canonical": true}]},
+      "causal_contract": {"requires": ["theme_grounded", "occupancy_relation_grounded"], "projects": ["source_footprint_released"], "verification": ["theme_absent_from_previous_support"]},
+      "fact_commit_authority": "P016_via_WorldFactLedger_only"
+    },
+    {
+      "entry_id": "contract.change_open_state",
+      "entry_kind": "operator_contract",
+      "semantic_value": "change_open_state",
+      "irreducible": false,
+      "components": ["operator.grasp_object", "operator.apply_directional_force"],
+      "roles": {"theme": "openable_referent", "interaction_part": "mechanism_referent"},
+      "language_adapters": {"zh": [{"surface": "打开", "canonical": true}, {"surface": "关上"}], "en": [{"surface": "change open state", "canonical": true}]},
+      "causal_contract": {"requires": ["interaction_part_grounded", "mechanism_compatible"], "projects": ["open_state_changed"], "verification": ["open_state_verified"]},
+      "fact_commit_authority": "P016_via_WorldFactLedger_only"
+    },
+    {
+      "entry_id": "contract.change_device_activation",
+      "entry_kind": "operator_contract",
+      "semantic_value": "change_device_activation",
+      "irreducible": false,
+      "components": ["operator.navigate_to", "operator.apply_directional_force"],
+      "roles": {"device": "controllable_device_referent", "control": "device_control_referent"},
+      "language_adapters": {"zh": [{"surface": "启动", "canonical": true}, {"surface": "关掉"}], "en": [{"surface": "change device activation", "canonical": true}]},
+      "causal_contract": {"requires": ["control_grounded", "operation_authorized"], "projects": ["device_activation_changed"], "verification": ["device_state_feedback_observed"]},
+      "fact_commit_authority": "P016_via_WorldFactLedger_only"
+    },
+    {
+      "entry_id": "contract.transfer_material",
+      "entry_kind": "operator_contract",
+      "semantic_value": "transfer_material",
+      "irreducible": false,
+      "components": ["operator.grasp_object", "operator.place_object", "predicate.contained_by"],
+      "roles": {"theme": "transferable_material", "source": "source_referent", "destination": "receiving_referent"},
+      "language_adapters": {"zh": [{"surface": "倒入", "canonical": true}, {"surface": "装入"}], "en": [{"surface": "transfer material", "canonical": true}]},
+      "causal_contract": {"requires": ["source_contains_theme", "destination_can_receive_theme"], "projects": ["theme_at_destination"], "verification": ["material_flow_and_destination_change_verified"]},
+      "fact_commit_authority": "P016_via_WorldFactLedger_only"
+    },
+    {
+      "entry_id": "contract.remove_surface_contaminant",
+      "entry_kind": "operator_contract",
+      "semantic_value": "remove_surface_contaminant",
+      "irreducible": false,
+      "components": ["operator.grasp_object", "operator.apply_directional_force"],
+      "roles": {"theme": "cleanable_referent", "contaminant": "undesired_material_referent"},
+      "language_adapters": {"zh": [{"surface": "擦掉", "canonical": true}, {"surface": "清理"}], "en": [{"surface": "remove surface contaminant", "canonical": true}]},
+      "causal_contract": {"requires": ["theme_grounded", "cleaning_method_compatible"], "projects": ["contaminant_below_threshold"], "verification": ["surface_cleanliness_and_integrity_verified"]},
+      "fact_commit_authority": "P016_via_WorldFactLedger_only"
+    },
+    {
+      "entry_id": "modifier.speed_fast",
+      "entry_kind": "modifier",
+      "semantic_value": "speed_fast",
+      "modifier_dimension": "speed", "modifier_value": "fast", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "赶快", "canonical": true}, {"surface": "赶紧"}, {"surface": "快点"}, {"surface": "迅速"}, {"surface": "快速"}, {"surface": "尽快"}, {"surface": "快", "selection_constraints": {"syntactic_positions": ["before_action"]}}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.speed_slow", "entry_kind": "modifier", "semantic_value": "speed_slow",
+      "modifier_dimension": "speed", "modifier_value": "slow", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "慢慢", "canonical": true}, {"surface": "慢点"}, {"surface": "缓慢"}, {"surface": "徐徐"}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.speed_accelerate", "entry_kind": "modifier", "semantic_value": "speed_accelerate",
+      "modifier_dimension": "speed", "modifier_value": "accelerate", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "加速", "canonical": true}, {"surface": "加快"}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.speed_decelerate", "entry_kind": "modifier", "semantic_value": "speed_decelerate",
+      "modifier_dimension": "speed", "modifier_value": "decelerate", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "减速", "canonical": true}, {"surface": "放慢"}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.force_strong", "entry_kind": "modifier", "semantic_value": "force_strong",
+      "modifier_dimension": "force", "modifier_value": "strong", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "用力", "canonical": true}, {"surface": "使劲"}, {"surface": "大力"}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.force_gentle", "entry_kind": "modifier", "semantic_value": "force_gentle",
+      "modifier_dimension": "force", "modifier_value": "gentle", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "轻轻", "canonical": true}, {"surface": "轻点"}, {"surface": "轻柔"}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.careful", "entry_kind": "modifier", "semantic_value": "careful",
+      "modifier_dimension": "carefulness", "modifier_value": "careful", "default_scope": "global",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "小心", "canonical": true}, {"surface": "当心"}, {"surface": "谨慎"}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.attentive", "entry_kind": "modifier", "semantic_value": "attentive",
+      "modifier_dimension": "attentiveness", "modifier_value": "attentive", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "仔细", "canonical": true}, {"surface": "认真"}, {"surface": "专心"}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.orientation_horizontal", "entry_kind": "modifier", "semantic_value": "orientation_horizontal",
+      "modifier_dimension": "orientation", "modifier_value": "horizontal", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "横着", "canonical": true}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.orientation_vertical", "entry_kind": "modifier", "semantic_value": "orientation_vertical",
+      "modifier_dimension": "orientation", "modifier_value": "vertical", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "竖着", "canonical": true}, {"surface": "立着"}, {"surface": "直着"}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.orientation_inverted", "entry_kind": "modifier", "semantic_value": "orientation_inverted",
+      "modifier_dimension": "orientation", "modifier_value": "inverted", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "倒着", "canonical": true}, {"surface": "反着"}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.orientation_lateral", "entry_kind": "modifier", "semantic_value": "orientation_lateral",
+      "modifier_dimension": "orientation", "modifier_value": "lateral", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "侧着", "canonical": true}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.orientation_oblique", "entry_kind": "modifier", "semantic_value": "orientation_oblique",
+      "modifier_dimension": "orientation", "modifier_value": "oblique", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "斜着", "canonical": true}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.orientation_level", "entry_kind": "modifier", "semantic_value": "orientation_level",
+      "modifier_dimension": "orientation", "modifier_value": "level", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "平着", "canonical": true}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.body_empty_handed", "entry_kind": "modifier", "semantic_value": "body_empty_handed",
+      "modifier_dimension": "body_attachment", "modifier_value": "empty_handed", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "空手", "canonical": true}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.aspect_completive", "entry_kind": "modifier", "semantic_value": "aspect_completive",
+      "modifier_dimension": "aspect", "modifier_value": "completive", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "喝完", "canonical": true}, {"surface": "做完"}, {"surface": "接完"}, {"surface": "放完"}, {"surface": "完成"}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.aspect_durative", "entry_kind": "modifier", "semantic_value": "aspect_durative",
+      "modifier_dimension": "aspect", "modifier_value": "durative", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "正在", "canonical": true}, {"surface": "一直"}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.aspect_negated_perfective", "entry_kind": "modifier", "semantic_value": "aspect_negated_perfective",
+      "modifier_dimension": "aspect", "modifier_value": "negated_perfective", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "还没", "canonical": true}, {"surface": "尚未"}, {"surface": "还未"}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.temporal_immediate_past", "entry_kind": "modifier", "semantic_value": "temporal_immediate_past",
+      "modifier_dimension": "temporal", "modifier_value": "immediate_past", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "刚才", "canonical": true}, {"surface": "刚刚"}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.temporal_remote_past", "entry_kind": "modifier", "semantic_value": "temporal_remote_past",
+      "modifier_dimension": "temporal", "modifier_value": "remote_past", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "曾经", "canonical": true}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.temporal_immediate_future", "entry_kind": "modifier", "semantic_value": "temporal_immediate_future",
+      "modifier_dimension": "temporal", "modifier_value": "immediate_future", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "马上", "canonical": true}, {"surface": "立刻"}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.temporal_persistent", "entry_kind": "modifier", "semantic_value": "temporal_persistent",
+      "modifier_dimension": "temporal", "modifier_value": "persistent", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "始终", "canonical": true}, {"surface": "一直"}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.temporal_imminent", "entry_kind": "modifier", "semantic_value": "temporal_imminent",
+      "modifier_dimension": "temporal", "modifier_value": "imminent", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "快要", "canonical": true}, {"surface": "就要"}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.modality_capability_enabled", "entry_kind": "modifier", "semantic_value": "modality_capability_enabled",
+      "modifier_dimension": "modality", "modifier_value": "capability_enabled", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "能不能", "canonical": true}, {"surface": "可不可以"}, {"surface": "可以"}, {"surface": "能"}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.modality_capability_disabled", "entry_kind": "modifier", "semantic_value": "modality_capability_disabled",
+      "modifier_dimension": "modality", "modifier_value": "capability_disabled", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "不能", "canonical": true}, {"surface": "不可以"}, {"surface": "不行"}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.modality_uncertain", "entry_kind": "modifier", "semantic_value": "modality_uncertain",
+      "modifier_dimension": "modality", "modifier_value": "uncertain", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "可能", "canonical": true}, {"surface": "也许"}, {"surface": "或许"}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.modality_deontic", "entry_kind": "modifier", "semantic_value": "modality_deontic",
+      "modifier_dimension": "modality", "modifier_value": "deontic", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "应该", "canonical": true}, {"surface": "应当"}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.modality_required", "entry_kind": "modifier", "semantic_value": "modality_required",
+      "modifier_dimension": "modality", "modifier_value": "required", "default_scope": "global",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "必须", "canonical": true}, {"surface": "务必"}, {"surface": "千万"}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.politeness", "entry_kind": "modifier", "semantic_value": "politeness",
+      "modifier_dimension": "politeness", "modifier_value": "polite", "default_scope": "global",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "请", "canonical": true}, {"surface": "麻烦"}, {"surface": "劳驾"}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.intensity_brief_trial", "entry_kind": "modifier", "semantic_value": "intensity_brief_trial",
+      "modifier_dimension": "intensity", "modifier_value": "brief_trial", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "一下", "canonical": true}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.direction_return_toward", "entry_kind": "modifier", "semantic_value": "direction_return_toward",
+      "modifier_dimension": "direction", "modifier_value": "return_toward_reference", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "motion_event_ref"},
+      "language_adapters": {"zh": [{"surface": "回来", "canonical": true}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.direction_return_away", "entry_kind": "modifier", "semantic_value": "direction_return_away",
+      "modifier_dimension": "direction", "modifier_value": "return_away_from_reference", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "motion_event_ref"},
+      "language_adapters": {"zh": [{"surface": "回去", "canonical": true}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.direction_inward_toward", "entry_kind": "modifier", "semantic_value": "direction_inward_toward",
+      "modifier_dimension": "direction", "modifier_value": "inward_toward_reference", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "motion_event_ref"},
+      "language_adapters": {"zh": [{"surface": "进来", "canonical": true}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.direction_inward_away", "entry_kind": "modifier", "semantic_value": "direction_inward_away",
+      "modifier_dimension": "direction", "modifier_value": "inward_away_from_reference", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "motion_event_ref"},
+      "language_adapters": {"zh": [{"surface": "进去", "canonical": true}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.direction_outward_toward", "entry_kind": "modifier", "semantic_value": "direction_outward_toward",
+      "modifier_dimension": "direction", "modifier_value": "outward_toward_reference", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "motion_event_ref"},
+      "language_adapters": {"zh": [{"surface": "出来", "canonical": true}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.direction_outward_away", "entry_kind": "modifier", "semantic_value": "direction_outward_away",
+      "modifier_dimension": "direction", "modifier_value": "outward_away_from_reference", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "motion_event_ref"},
+      "language_adapters": {"zh": [{"surface": "出去", "canonical": true}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.direction_upward_toward", "entry_kind": "modifier", "semantic_value": "direction_upward_toward",
+      "modifier_dimension": "direction", "modifier_value": "upward_toward_reference", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "motion_event_ref"},
+      "language_adapters": {"zh": [{"surface": "上来", "canonical": true}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.direction_upward_away", "entry_kind": "modifier", "semantic_value": "direction_upward_away",
+      "modifier_dimension": "direction", "modifier_value": "upward_away_from_reference", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "motion_event_ref"},
+      "language_adapters": {"zh": [{"surface": "上去", "canonical": true}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.direction_downward_toward", "entry_kind": "modifier", "semantic_value": "direction_downward_toward",
+      "modifier_dimension": "direction", "modifier_value": "downward_toward_reference", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "motion_event_ref"},
+      "language_adapters": {"zh": [{"surface": "下来", "canonical": true}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.direction_downward_away", "entry_kind": "modifier", "semantic_value": "direction_downward_away",
+      "modifier_dimension": "direction", "modifier_value": "downward_away_from_reference", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "motion_event_ref"},
+      "language_adapters": {"zh": [{"surface": "下去", "canonical": true}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.direction_cross_toward", "entry_kind": "modifier", "semantic_value": "direction_cross_toward",
+      "modifier_dimension": "direction", "modifier_value": "cross_toward_reference", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "motion_event_ref"},
+      "language_adapters": {"zh": [{"surface": "过来", "canonical": true}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "modifier.direction_cross_away", "entry_kind": "modifier", "semantic_value": "direction_cross_away",
+      "modifier_dimension": "direction", "modifier_value": "cross_away_from_reference", "default_scope": "event",
+      "irreducible": true, "components": [], "roles": {"event": "motion_event_ref"},
+      "language_adapters": {"zh": [{"surface": "过去", "canonical": true}]},
+      "verification_contract": ["modifier_does_not_commit_fact"], "fact_commit_authority": "none"
+    },
+    {
       "entry_id": "modifier.aspect_attainment",
       "entry_kind": "modifier",
       "semantic_value": "aspect_attainment",
+      "modifier_dimension": "aspect",
+      "modifier_value": "attainment",
+      "default_scope": "event",
       "irreducible": true,
       "components": [],
       "roles": {"event": "event_ref"},
@@ -89,6 +531,9 @@
       "entry_id": "modifier.direction_upward",
       "entry_kind": "modifier",
       "semantic_value": "direction_upward",
+      "modifier_dimension": "direction",
+      "modifier_value": "upward",
+      "default_scope": "event",
       "irreducible": true,
       "components": [],
       "roles": {"event": "motion_event_ref"},

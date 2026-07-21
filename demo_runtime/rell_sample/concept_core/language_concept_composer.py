@@ -5,7 +5,11 @@ from copy import deepcopy
 from typing import Any
 
 from .modifier_composer import compile_modifier_contract, modifiers_for_event
-from .reference_resolution import resolve_references, resolved_reference_mentions
+from .reference_resolution import (
+    reference_resolution_referents,
+    resolve_references,
+    resolved_reference_mentions,
+)
 from .semantic_grounding import load_semantic_attribute_concepts
 
 
@@ -1342,6 +1346,9 @@ def compose_language_concepts(
         objects, unresolved = _resolve_pronouns(
             normalized, objects, context_entities or []
         )
+    reference_resolution["referent_expressions"] = reference_resolution_referents(
+        reference_resolution, context_entities or []
+    )
     events, event_dependencies = _resolve_serial_event_dependencies(normalized, events, objects)
     events, historical_event_constraints = _extract_historical_event_constraints(
         normalized, events, objects

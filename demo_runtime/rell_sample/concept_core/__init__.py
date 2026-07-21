@@ -89,8 +89,10 @@ from .lightweight_orchestrator import (
 )
 from .language_concept_composer import compose_language_concepts, normalize_language_text
 from .machine_dictionary import (
+    audit_event_concept_dictionary_coverage,
     dictionary_architecture_summary,
     dictionary_index,
+    dictionary_modifier_lexicon,
     load_machine_dictionary,
     lookup_surface_candidates,
     realize_dictionary_entry,
@@ -188,8 +190,10 @@ __all__ = [
     "build_lightweight_orchestrator_catalog",
     "compile_causal_operator_registry",
     "compose_language_concepts",
+    "audit_event_concept_dictionary_coverage",
     "dictionary_architecture_summary",
     "dictionary_index",
+    "dictionary_modifier_lexicon",
     "load_machine_dictionary",
     "lookup_surface_candidates",
     "realize_dictionary_entry",

@@ -21,6 +21,26 @@ ENTRY_KINDS = {
 }
 CORE_ENTRY_KINDS = {"primitive_predicate", "primitive_operator", "modifier"}
 
+_MIGRATION_CLASSIFICATION = {
+    "observe_entity": "primitive_operator",
+    "navigate_to": "primitive_operator",
+    "orient_executor": "primitive_operator",
+    "grasp_object": "primitive_operator",
+    "release_object": "primitive_operator",
+    "fill_container": "operator_contract",
+    "place_object": "primitive_operator",
+    "handover_object": "operator_contract",
+    "transport_object": "operator_contract",
+    "relocate_object": "operator_contract",
+    "apply_directional_force": "primitive_operator",
+    "change_open_state": "operator_contract",
+    "change_device_activation": "operator_contract",
+    "transfer_material": "operator_contract",
+    "remove_surface_contaminant": "operator_contract",
+    "stop_current_activity": "primitive_operator",
+    "wait_until": "primitive_operator",
+}
+
 
 def _stable_id(prefix: str, value: Any) -> str:
     payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
@@ -61,6 +81,11 @@ def validate_machine_dictionary(payload: dict[str, Any]) -> None:
                 raise ValueError(f"executable entry lacks causal contract: {item['entry_id']}")
         if item.get("fact_commit_authority") not in {"none", "P016_via_WorldFactLedger_only"}:
             raise ValueError(f"invalid fact authority: {item['entry_id']}")
+        if kind == "modifier":
+            if not all(item.get(key) for key in ("modifier_dimension", "modifier_value", "default_scope")):
+                raise ValueError(f"modifier lacks typed composition metadata: {item['entry_id']}")
+            if item.get("default_scope") not in {"event", "global"}:
+                raise ValueError(f"invalid modifier scope: {item['entry_id']}")
 
 
 def dictionary_index(payload: dict[str, Any] | None = None) -> dict[str, dict[str, Any]]:
@@ -184,9 +209,99 @@ def dictionary_architecture_summary(payload: dict[str, Any] | None = None) -> di
     }
 
 
+def dictionary_modifier_lexicon(
+    payload: dict[str, Any] | None = None, *, language: str = "zh"
+) -> list[dict[str, Any]]:
+    source = payload or load_machine_dictionary()
+    records = []
+    for entry in source.get("entries", []):
+        if entry.get("entry_kind") != "modifier":
+            continue
+        surfaces = [
+            item.get("surface")
+            for item in entry.get("language_adapters", {}).get(language, [])
+            if item.get("surface")
+        ]
+        if not surfaces:
+            continue
+        records.append(
+            {
+                "entry_ref": entry["entry_id"],
+                "dimension": entry["modifier_dimension"],
+                "value": entry["modifier_value"],
+                "scope": entry["default_scope"],
+                "surfaces": surfaces,
+                "adapters": [
+                    deepcopy(item)
+                    for item in entry.get("language_adapters", {}).get(language, [])
+                    if item.get("surface")
+                ],
+                "selection_constraints": [
+                    deepcopy(item.get("selection_constraints") or {})
+                    for item in entry.get("language_adapters", {}).get(language, [])
+                    if item.get("surface")
+                ],
+                "candidate_only": True,
+                "runtime_fact_committed": False,
+            }
+        )
+    return records
+
+
+def audit_event_concept_dictionary_coverage(
+    event_concepts: list[dict[str, Any]],
+    payload: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    source = payload or load_machine_dictionary()
+    semantic_index: dict[str, list[dict[str, Any]]] = {}
+    for entry in source.get("entries", []):
+        if entry.get("entry_kind") in {
+            "primitive_operator",
+            "operator_contract",
+            "process_template",
+            "domain_pack_entry",
+        }:
+            semantic_index.setdefault(str(entry.get("semantic_value")), []).append(entry)
+    records = []
+    for concept in event_concepts:
+        kernel = concept.get("concept_kernel") or {}
+        operator = str(kernel.get("operator") or "")
+        matches = semantic_index.get(operator, [])
+        status = "covered" if len(matches) == 1 else "conflict" if len(matches) > 1 else "missing"
+        records.append(
+            {
+                "concept_id": concept.get("concept_id"),
+                "operator": operator,
+                "status": status,
+                "entry_refs": [item["entry_id"] for item in matches],
+                "recommended_entry_kind": _MIGRATION_CLASSIFICATION.get(
+                    operator, "domain_pack_entry"
+                ),
+                "classification_basis": "irreducibility_and_causal_contract_boundary",
+            }
+        )
+    covered = [item for item in records if item["status"] == "covered"]
+    missing = [item for item in records if item["status"] == "missing"]
+    conflicts = [item for item in records if item["status"] == "conflict"]
+    return {
+        "audit_kind": "MachineDictionaryCoverageAudit",
+        "dictionary_ref": source.get("dictionary_id"),
+        "source_registry": "FACTORY_EVENT_CONCEPT_UNITS",
+        "total": len(records),
+        "covered_count": len(covered),
+        "missing_count": len(missing),
+        "conflict_count": len(conflicts),
+        "coverage_ratio": round(len(covered) / len(records), 6) if records else 1.0,
+        "records": records,
+        "migration_ready": not missing and not conflicts,
+        "can_control_execution": False,
+        "runtime_fact_committed": False,
+    }
 __all__ = [
+    "audit_event_concept_dictionary_coverage",
     "dictionary_architecture_summary",
     "dictionary_index",
+    "dictionary_modifier_lexicon",
     "load_machine_dictionary",
     "lookup_surface_candidates",
     "realize_dictionary_entry",

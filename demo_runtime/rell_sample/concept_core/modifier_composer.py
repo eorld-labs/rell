@@ -5,61 +5,78 @@ import re
 from copy import deepcopy
 from typing import Any
 
+from .machine_dictionary import dictionary_modifier_lexicon
+
 
 MODIFIER_SCHEMA_VERSION = "1.0.0"
 
-_PATTERNS: tuple[tuple[str, str, tuple[str, ...], str], ...] = (
-    ("speed", "fast", ("赶快", "赶紧", "快点", "迅速", "快速", "尽快"), "event"),
-    ("speed", "slow", ("慢慢", "慢点", "缓慢", "徐徐"), "event"),
-    ("speed", "accelerate", ("加速", "加快"), "event"),
-    ("speed", "decelerate", ("减速", "放慢"), "event"),
-    ("force", "strong", ("用力", "使劲", "大力"), "event"),
-    ("force", "gentle", ("轻轻", "轻点", "轻柔"), "event"),
-    ("carefulness", "careful", ("小心", "当心", "谨慎"), "global"),
-    ("attentiveness", "attentive", ("仔细", "认真", "专心"), "event"),
-    ("orientation", "horizontal", ("横着",), "event"),
-    ("orientation", "vertical", ("竖着", "立着", "直着"), "event"),
-    ("orientation", "inverted", ("倒着", "反着"), "event"),
-    ("orientation", "lateral", ("侧着",), "event"),
-    ("orientation", "oblique", ("斜着",), "event"),
-    ("orientation", "level", ("平着",), "event"),
-    ("body_attachment", "empty_handed", ("空手",), "event"),
-    ("aspect", "completive", ("喝完", "做完", "接完", "放完", "完成"), "event"),
-    ("aspect", "durative", ("正在", "一直"), "event"),
-    ("aspect", "negated_perfective", ("还没", "尚未", "还未"), "event"),
-    ("temporal", "immediate_past", ("刚才", "刚刚"), "event"),
-    ("temporal", "remote_past", ("曾经",), "event"),
-    ("temporal", "immediate_future", ("马上", "立刻"), "event"),
-    ("temporal", "persistent", ("始终", "一直"), "event"),
-    ("modality", "capability_enabled", ("能不能", "可不可以", "可以", "能"), "event"),
-    ("modality", "capability_disabled", ("不能", "不可以", "不行"), "event"),
-    ("modality", "uncertain", ("可能", "也许", "或许"), "event"),
-    ("modality", "deontic", ("应该", "应当"), "event"),
-    ("modality", "required", ("必须", "务必", "千万"), "global"),
-    ("politeness", "polite", ("请", "麻烦", "劳驾"), "global"),
-    ("intensity", "brief_trial", ("一下",), "event"),
-)
+def _dictionary_modifier_patterns() -> tuple[
+    tuple[tuple[str, str, tuple[str, ...], str, str], ...],
+    tuple[tuple[str, tuple[str, ...], str], ...],
+]:
+    ordinary, directional = [], []
+    for item in dictionary_modifier_lexicon():
+        adapters = item.get("adapters", [])
+        surfaces = tuple(
+            adapter["surface"]
+            for adapter in adapters
+            if not adapter.get("selection_constraints")
+        )
+        if not surfaces:
+            continue
+        if item["dimension"] == "direction" and "reference" in item["value"]:
+            directional.append((item["value"], surfaces, item["entry_ref"]))
+        elif item["value"] != "imminent":
+            ordinary.append(
+                (
+                    item["dimension"],
+                    item["value"],
+                    surfaces,
+                    item["scope"],
+                    item["entry_ref"],
+                )
+            )
+    return tuple(ordinary), tuple(directional)
 
-_DIRECTION_VALUES = (
-    ("return_toward_reference", ("回来",)),
-    ("return_away_from_reference", ("回去",)),
-    ("inward_toward_reference", ("进来",)),
-    ("inward_away_from_reference", ("进去",)),
-    ("outward_toward_reference", ("出来",)),
-    ("outward_away_from_reference", ("出去",)),
-    ("upward_toward_reference", ("上来",)),
-    ("upward_away_from_reference", ("上去",)),
-    ("downward_toward_reference", ("下来",)),
-    ("downward_away_from_reference", ("下去",)),
-    ("cross_toward_reference", ("过来",)),
-    ("cross_away_from_reference", ("过去",)),
-)
 
-_CONTEXTUAL_PATTERNS: tuple[tuple[str, str, re.Pattern[str], str], ...] = (
-    ("temporal", "imminent", re.compile(r"快要|就要"), "event"),
-    # A bare 快 before an action is manner; 快要/快...了 is temporal.
-    ("speed", "fast", re.compile(r"快(?=[拿取放走去来接倒递送搬移开关])"), "event"),
-)
+def _dictionary_contextual_patterns() -> tuple[
+    tuple[str, str, re.Pattern[str], str, str], ...
+]:
+    patterns = []
+    for item in dictionary_modifier_lexicon():
+        if (item["dimension"], item["value"]) == ("temporal", "imminent"):
+            surfaces = sorted(item["surfaces"], key=len, reverse=True)
+            patterns.append(
+                (
+                    item["dimension"],
+                    item["value"],
+                    re.compile("|".join(re.escape(value) for value in surfaces)),
+                    item["scope"],
+                    item["entry_ref"],
+                )
+            )
+        if (item["dimension"], item["value"]) == ("speed", "fast"):
+            contextual_surfaces = [
+                adapter["surface"]
+                for adapter in item.get("adapters", [])
+                if adapter.get("selection_constraints")
+            ]
+            for surface in contextual_surfaces:
+                # The surface comes from the dictionary; the lookahead is a
+                # composition rule distinguishing manner from imminence.
+                patterns.append(
+                    (
+                        item["dimension"],
+                        item["value"],
+                        re.compile(
+                            re.escape(surface)
+                            + r"(?=[拿取放走去来接倒递送搬移开关])"
+                        ),
+                        item["scope"],
+                        item["entry_ref"],
+                    )
+                )
+    return tuple(patterns)
 
 
 def _stable_id(prefix: str, payload: str) -> str:
@@ -87,6 +104,7 @@ def _modifier(
     scope: str,
     event_index: int | None,
     basis: str,
+    dictionary_entry_ref: str | None = None,
 ) -> dict[str, Any]:
     seed = f"{dimension}|{value}|{surface}|{start}|{end}|{event_index}"
     return {
@@ -98,6 +116,7 @@ def _modifier(
         "scope": scope,
         "event_index": event_index,
         "basis": basis,
+        "dictionary_entry_ref": dictionary_entry_ref,
         "candidate_only": True,
         "runtime_fact_committed": False,
         "direct_execution_allowed": False,
@@ -112,7 +131,8 @@ def compile_modifier_contract(
 ) -> dict[str, Any]:
     candidates: list[dict[str, Any]] = []
     occupied: list[tuple[int, int, str]] = []
-    for dimension, value, surfaces, declared_scope in _PATTERNS:
+    dictionary_patterns, direction_values = _dictionary_modifier_patterns()
+    for dimension, value, surfaces, declared_scope, entry_ref in dictionary_patterns:
         for surface in sorted(surfaces, key=len, reverse=True):
             for match in re.finditer(re.escape(surface), text):
                 if any(
@@ -131,11 +151,12 @@ def compile_modifier_contract(
                         match.end(),
                         scope,
                         None if scope == "global" else event_index,
-                        "closed_class_modifier_lexicon",
+                        "machine_dictionary_closed_class_adapter",
+                        entry_ref,
                     )
                 )
                 occupied.append((match.start(), match.end(), dimension))
-    for dimension, value, pattern, declared_scope in _CONTEXTUAL_PATTERNS:
+    for dimension, value, pattern, declared_scope, entry_ref in _dictionary_contextual_patterns():
         for match in pattern.finditer(text):
             if any(
                 match.start() < end
@@ -155,6 +176,7 @@ def compile_modifier_contract(
                     declared_scope,
                     None if declared_scope == "global" else event_index,
                     "contextual_closed_class_modifier",
+                    entry_ref,
                 )
             )
             occupied.append((match.start(), match.end(), dimension))
@@ -163,7 +185,7 @@ def compile_modifier_contract(
         event_end = int(event.get("end", event_start))
         window = text[event_start : min(len(text), event_end + 4)]
         surface = str(event.get("matched_surface") or "")
-        for value, forms in _DIRECTION_VALUES:
+        for value, forms, entry_ref in direction_values:
             matched = next((form for form in forms if form in surface or form in window), None)
             if not matched:
                 continue
@@ -180,6 +202,7 @@ def compile_modifier_contract(
                     "event",
                     event_index,
                     "directional_complement_decomposition",
+                    entry_ref,
                 )
             )
             break

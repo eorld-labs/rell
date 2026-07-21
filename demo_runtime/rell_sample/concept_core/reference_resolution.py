@@ -5,6 +5,8 @@ import re
 from copy import deepcopy
 from typing import Any
 
+from .composition_grammar import make_referent_expression
+
 
 REFERENCE_SCHEMA_VERSION = "1.0.0"
 
@@ -190,7 +192,7 @@ def resolve_references(
             }
             (resolved if unique else unresolved).append(record)
     seed = f"{text}|{len(resolved)}|{len(unresolved)}"
-    return {
+    resolution = {
         "schema_version": REFERENCE_SCHEMA_VERSION,
         "resolution_kind": "ReferenceResolution",
         "resolution_id": _stable_id("reference_resolution", seed),
@@ -217,6 +219,69 @@ def resolve_references(
             "current_verified_relation_precedes_salience": True,
         },
     }
+    resolution["referent_expressions"] = reference_resolution_referents(
+        resolution, context_entities
+    )
+    return resolution
+
+
+def reference_resolution_referents(
+    resolution: dict[str, Any], context_entities: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    index = {item.get("entity_ref"): item for item in context_entities}
+    referents = []
+    for record in [
+        *resolution.get("resolved_references", []),
+        *resolution.get("unresolved", []),
+    ]:
+        selected = record.get("selected")
+        if selected:
+            world_revision = (index.get(selected) or {}).get("world_revision")
+            expression = make_referent_expression(
+                "entity_ref",
+                entity_ref=selected,
+                world_revision=world_revision,
+            )
+        else:
+            candidate_refs = [
+                item.get("entity_ref")
+                for item in record.get("candidates", [])
+                if item.get("entity_ref")
+            ]
+            revisions = {
+                (index.get(ref) or {}).get("world_revision")
+                for ref in candidate_refs
+                if (index.get(ref) or {}).get("world_revision") is not None
+            }
+            expression = make_referent_expression(
+                "entity_selector",
+                concept_refs=(
+                    [record["selected_concept_id"]]
+                    if record.get("selected_concept_id")
+                    else []
+                ),
+                constraints=[
+                    {
+                        "constraint_kind": "reference_candidate_set",
+                        "candidate_entity_refs": candidate_refs,
+                        "reference_type": record.get("reference_type"),
+                        "source_resolution_id": resolution.get("resolution_id"),
+                        "candidate_only": True,
+                    }
+                ],
+                world_revision=next(iter(revisions)) if len(revisions) == 1 else None,
+            )
+        referents.append(
+            {
+                "surface_span": deepcopy(record.get("span")),
+                "surface_forwarded_downstream": False,
+                "reference_type": record.get("reference_type"),
+                "referent_expression": expression,
+                "requires_confirmation": bool(record.get("requires_confirmation")),
+                "runtime_fact_committed": False,
+            }
+        )
+    return referents
 
 
 def resolved_reference_mentions(

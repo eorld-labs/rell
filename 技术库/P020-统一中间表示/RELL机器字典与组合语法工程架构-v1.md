@@ -238,3 +238,16 @@ direction_upward  requires: 垂直空间目标
 - 核心与复合条目边界断言。
 
 后续再依次接入现有语言组合器、指代解析器、领域包和解释生成器。
+
+## 十二、2026-07-21等价迁移状态
+
+当前已进入`shadow_equivalence_migration`，完成以下工程连接：
+
+- `FACTORY_EVENT_CONCEPT_UNITS`中的17个事件算子均有且仅有一个机器字典条目；
+- 字典明确区分不可约算子与可组合因果合同，`fill_container`、`handover_object`等不再被平铺为核心原语；
+- 修饰编译器从机器字典读取闭类词项、方向补语和类型元数据，仅在组合层保留句法附着规则；
+- 指代解析器正式输出`ReferentExpression`：唯一落地产生`entity_ref`，多候选产生等待消歧的`entity_selector`；
+- 在线语言路径逐轮输出`MachineDictionaryProjection`、`ScopeGraph`和`InterpretationLattice`；
+- 覆盖审计、算子/角色/修饰等价、指代统一和权威边界均已进入全量回归入口。
+
+本阶段“覆盖完成”不等于“切换执行权威”。机器字典仍不得直接控制执行或提交事实。只有在自然语言变体、复杂语篇、失败恢复和冷启动场景的逐字段等价证据持续为零冲突后，才允许将字典编译结果提升为`SituatedEventGraph`的权威输入；P018与P016边界不随迁移改变。

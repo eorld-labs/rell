@@ -175,6 +175,11 @@ def project_analysis_to_machine_dictionary(
         "operator_refs": operator_refs,
         "missing_operator_semantics": missing_operators,
         "role_referents": role_referents,
+        "reference_referents": deepcopy(
+            (analysis.get("reference_resolution") or {}).get(
+                "referent_expressions", []
+            )
+        ),
         "scope_graph": scope_graph,
         "surface_candidate_groups": surface_groups,
         "unresolved_polysemy_count": len(unresolved_polysemy),

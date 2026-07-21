@@ -25,6 +25,9 @@
           "irreducible": {"type": "boolean"},
           "components": {"type": "array", "items": {"type": "string"}},
           "roles": {"type": "object"},
+          "modifier_dimension": {"type": "string", "minLength": 1},
+          "modifier_value": {"type": "string", "minLength": 1},
+          "default_scope": {"enum": ["event", "global"]},
           "language_adapters": {"type": "object"},
           "verification_contract": {"type": "array", "items": {"type": "string"}},
           "causal_contract": {
@@ -39,6 +42,12 @@
           },
           "fact_commit_authority": {"enum": ["none", "P016_via_WorldFactLedger_only"]}
         },
+        "allOf": [
+          {
+            "if": {"properties": {"entry_kind": {"const": "modifier"}}},
+            "then": {"required": ["modifier_dimension", "modifier_value", "default_scope"]}
+          }
+        ],
         "additionalProperties": false
       }
     }
