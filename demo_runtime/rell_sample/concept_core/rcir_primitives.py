@@ -88,6 +88,7 @@ def make_predicate(
     polarity: str = "positive",
     evidence_refs: list[str] | None = None,
     depends_on_refs: list[str] | None = None,
+    provenance: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     normalized_arguments = [
         _argument(
@@ -103,7 +104,7 @@ def make_predicate(
         "polarity": polarity,
         "world_revision": int(world_revision),
     }
-    return {
+    predicate = {
         "schema_version": PRIMITIVE_SCHEMA_VERSION,
         "type": "Predicate",
         "predicate_id": stable_id("predicate", semantic_key),
@@ -116,6 +117,9 @@ def make_predicate(
         "evidence_refs": sorted(set(evidence_refs or [])),
         "depends_on_refs": sorted(set(depends_on_refs or [])),
     }
+    if provenance is not None:
+        predicate["provenance"] = deepcopy(provenance)
+    return predicate
 
 
 def make_event(

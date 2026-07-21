@@ -588,6 +588,7 @@ def main() -> None:
     run_python("validate_contextual_language_runtime.py")
     run_python("validate_semantic_grounding_architecture.py")
     run_python("validate_cognitive_ir.py")
+    run_python("validate_relation_hypothesis_architecture.py")
     run_python("validate_rcir_stage_a_b.py")
     run_python("validate_runtime_cognitive_signal_adapter.py")
     run_python("validate_situated_event_reasoning.py")

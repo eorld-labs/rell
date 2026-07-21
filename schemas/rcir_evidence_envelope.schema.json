@@ -8,7 +8,7 @@
     "schema_version": { "const": "1.0.0" },
     "type": { "const": "EvidenceEnvelope" },
     "envelope_id": { "type": "string", "pattern": "^evidence_[a-f0-9]{16}$" },
-    "source_type": { "enum": ["human_report", "perception_candidate", "multimodal_observation", "runtime_snapshot", "p016_physical_verification", "trusted_experience", "diagnostic_signal", "safe_probe_result"] },
+    "source_type": { "enum": ["language_instruction", "human_report", "perception_candidate", "multimodal_observation", "runtime_snapshot", "p016_physical_verification", "trusted_experience", "diagnostic_signal", "safe_probe_result"] },
     "epistemic_status": { "enum": ["candidate", "corroborated", "physically_verified", "refuted", "stale", "invalidated"] },
     "world_revision": { "type": "integer", "minimum": 0 },
     "supports_refs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },

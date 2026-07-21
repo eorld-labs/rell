@@ -66,6 +66,8 @@ def build_semantic_constraint_frame(
             "relation_surface": role.get("relation_surface"),
             "relation_span_start": role.get("relation_span_start"),
             "relation_span_end": role.get("relation_span_end"),
+            "spatial_relation": role.get("spatial_relation"),
+            "spatial_relation_basis": role.get("spatial_relation_basis"),
             "quantity_constraint": deepcopy(
                 role.get("quantity_constraint")
             ),

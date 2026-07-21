@@ -9561,7 +9561,11 @@ def begin_motion_command(
     # semantic analysis on a copy so a read-only query cannot mutate focus,
     # pending slots, intent lifecycle, or the task-period world snapshot.
     early_analysis = None
-    if not internal_stage and not scoped_authorization:
+    relation_gate_enabled = not (
+        (session.get("concept_gap_dialogue") or {}).get("status")
+        == "collecting_minimum_causal_contract"
+    )
+    if not internal_stage and not scoped_authorization and relation_gate_enabled:
         early_analysis = _compose_session_language(deepcopy(session), text)
         if _is_support_inventory_state_query(text, early_analysis):
             return _answer_support_inventory_state_query(session, text, early_analysis)
@@ -9750,6 +9754,90 @@ def begin_motion_command(
     language_analysis = _compose_session_language(
         session, text, grounded_role_bindings=grounded_role_bindings
     )
+    if (
+        not internal_stage
+        and not scoped_authorization
+        and relation_gate_enabled
+        and len(language_analysis.get("event_frames", [])) <= 1
+    ):
+        grounded_rcir = (
+            (language_analysis.get("rcir") or {}).get("grounded_causal_graph")
+            or {}
+        )
+        relation_workset = grounded_rcir.get("relation_hypothesis_workset") or {}
+        relation_status = relation_workset.get("status")
+        relation_contract_gap = next(
+            (
+                item for item in grounded_rcir.get("open_conditions", [])
+                if item.get("kind") == "relation_operator_contract_missing"
+            ),
+            None,
+        )
+        if relation_status in {
+            "ambiguous_requires_inquiry",
+            "unresolved_missing_relation_contract",
+        } or relation_contract_gap:
+            relation_labels = {
+                "supported_by": "放在承载面上",
+                "contained_in": "放进容纳空间里",
+                "near": "放到目标附近",
+            }
+            candidates = [
+                {
+                    "predicate_ref": item.get("predicate_id"),
+                    "relation": item.get("name"),
+                    "description": relation_labels.get(
+                        item.get("name"), str(item.get("name") or "未知关系")
+                    ),
+                }
+                for item in relation_workset.get("candidates", [])
+            ]
+            inquiry = deepcopy(relation_workset.get("inquiry_contract"))
+            session["relation_hypothesis_dialogue"] = {
+                "status": "awaiting_relation_constraint",
+                "world_revision": session.get("world_revision"),
+                "theme_ref": relation_workset.get("theme_ref"),
+                "destination_ref": relation_workset.get("destination_ref"),
+                "candidate_relations": candidates,
+                "inquiry_ref": (inquiry or {}).get("inquiry_id"),
+                "rcir_bundle_ref": (language_analysis.get("rcir") or {}).get(
+                    "bundle_id"
+                ),
+                "raw_language_retained": False,
+            }
+            if relation_status == "ambiguous_requires_inquiry":
+                options = "，还是".join(item["description"] for item in candidates)
+                prompt = f"当前存在多个可行空间关系：{options}？请在完整请求中明确目标关系。"
+                status = "relation_inquiry_required"
+            elif relation_contract_gap:
+                selected_ref = relation_workset.get("selected_predicate_ref")
+                selected = next(
+                    (
+                        item for item in candidates
+                        if item.get("predicate_ref") == selected_ref
+                    ),
+                    None,
+                )
+                prompt = (
+                    f"我理解你要{(selected or {}).get('description', '建立该空间关系')}，"
+                    "但当前还没有对应的安全执行合同，不能直接执行。"
+                )
+                status = "relation_operator_contract_required"
+            else:
+                prompt = "我还不能确定目标应与目的地建立哪一种可验真的空间关系，请明确放在上面、里面或附近。"
+                status = "relation_constraint_required"
+            return {
+                "status": status,
+                "prompt": prompt,
+                "relation_candidates": candidates,
+                "inquiry_contract": inquiry,
+                "runtime_fact_committed": False,
+                "control_gateway": "P018",
+                "verification_gateway": "P016",
+                "session": get_session(session_id),
+            }
+    if relation_gate_enabled:
+        session["relation_hypothesis_dialogue"] = None
     if not internal_stage and not scoped_authorization and not compound_dispatch:
         carrier_correction = _start_carrier_ownership_correction(
             session, text, language_analysis

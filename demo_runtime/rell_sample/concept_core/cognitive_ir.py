@@ -7,6 +7,10 @@ from typing import Any
 
 from .rcir_contracts import build_grounding_clarification_contract
 from .rcir_primitives import make_evidence_envelope
+from .relation_hypothesis import (
+    assert_relation_hypothesis_boundary,
+    generate_relation_hypothesis_workset,
+)
 
 
 RCIR_SCHEMA_VERSION = "1.0.0"
@@ -41,6 +45,11 @@ ARCHITECTURE_INVARIANTS = (
     "versioned_dependency_invalidation_required",
     "shared_event_predicate_evidence_readback",
     "no_secondary_fact_or_control_source",
+    "ambiguous_relation_never_silently_becomes_unique",
+    "relation_generator_is_not_fact_authority",
+    "p016_writes_fact_only_through_world_fact_ledger",
+    "relation_generator_reads_only_current_ledger_projection",
+    "relation_candidates_are_ephemeral_task_memory",
 )
 
 
@@ -248,6 +257,8 @@ def _role_view(role_name: str, role: dict[str, Any]) -> dict[str, Any]:
         ),
         "relation_predicate": role.get("relation_predicate"),
         "relation_target_role": role.get("relation_target_role"),
+        "spatial_relation": role.get("spatial_relation"),
+        "spatial_relation_basis": role.get("spatial_relation_basis"),
         "quantity": role.get("quantity"),
         "classifier": role.get("classifier"),
         "selection_quantifier": role.get("selection_quantifier"),
@@ -767,6 +778,43 @@ def compile_rcir_bundle(
         ledger,
         interaction_role_bindings=interaction_role_bindings,
     )
+    relation_workset = generate_relation_hypothesis_workset(
+        situated,
+        grounded,
+        ledger,
+    )
+    grounded["relation_hypothesis_workset"] = relation_workset
+    if relation_workset.get("status") in {
+        "ambiguous_requires_inquiry",
+        "unresolved_missing_relation_contract",
+    }:
+        grounded["open_conditions"].append({
+            "kind": "relation_hypothesis_gap",
+            "status": relation_workset.get("status"),
+            "inquiry_ref": (
+                (relation_workset.get("inquiry_contract") or {}).get("inquiry_id")
+            ),
+        })
+        grounded["ready_for_orchestration"] = False
+        grounded["binding_status"] = "incomplete"
+    selected = next(
+        (
+            item for item in relation_workset.get("candidates", [])
+            if item.get("predicate_id")
+            == relation_workset.get("selected_predicate_ref")
+        ),
+        None,
+    )
+    if selected and selected.get("name") != "supported_by":
+        grounded["open_conditions"].append({
+            "kind": "relation_operator_contract_missing",
+            "predicate_ref": selected.get("predicate_id"),
+        })
+        grounded["ready_for_orchestration"] = False
+        grounded["binding_status"] = "incomplete"
+    grounded["graph_id"] = _stable_id("grounded_graph", {
+        key: value for key, value in grounded.items() if key != "graph_id"
+    })
     bundle = {
         "schema_version": RCIR_SCHEMA_VERSION,
         "ir_kind": "rell_cognitive_ir_bundle",
@@ -795,6 +843,11 @@ def compile_rcir_bundle(
             "versioned_dependency_invalidation_required": True,
             "shared_event_predicate_evidence_readback": True,
             "no_secondary_fact_or_control_source": True,
+            "ambiguous_relation_never_silently_becomes_unique": True,
+            "relation_generator_is_not_fact_authority": True,
+            "p016_writes_fact_only_through_world_fact_ledger": True,
+            "relation_generator_reads_only_current_ledger_projection": True,
+            "relation_candidates_are_ephemeral_task_memory": True,
             "current_world_ledger_is_authoritative": True,
             "every_binding_has_evidence_and_world_revision": True,
             "current_fact_pruning_required_before_execution": True,
@@ -867,6 +920,12 @@ def assert_rcir_architecture_invariants(
     if observation_evidence is not None:
         assert_perception_candidate_is_not_runtime_fact(observation_evidence, ledger)
     grounded = bundle.get("grounded_causal_graph") or {}
+    relation_workset = grounded.get("relation_hypothesis_workset") or {}
+    assert_relation_hypothesis_boundary(relation_workset)
+    if relation_workset.get("status") == "ambiguous_requires_inquiry" and grounded.get(
+        "ready_for_orchestration"
+    ) is not False:
+        raise AssertionError("ambiguous_relation_bypassed_inquiry_gate")
     if grounded.get("current_fact_pruning_required") is not True:
         raise AssertionError("current_fact_pruning_boundary_missing")
     if any(

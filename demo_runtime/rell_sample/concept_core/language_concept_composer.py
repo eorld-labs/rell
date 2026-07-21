@@ -1005,6 +1005,29 @@ def _roles(
             roles["companion"]["semantic_relation"] = "co_located_with_theme_at_destination"
         if "theme" not in roles and len(held) == 1:
             roles["theme"] = {**deepcopy(held[0]), "binding_source": "implicit_unique_verified_holding_fact"}
+        destination = roles.get("destination")
+        if destination and isinstance(destination.get("start"), int):
+            relation_scope = text[int(destination["start"]):]
+            relation_scope = re.split(
+                r"(?:然后|随后|之后|再|并且|同时|，|。|；)",
+                relation_scope,
+                maxsplit=1,
+            )[0][:16]
+            explicit_relation = next(
+                (
+                    relation
+                    for markers, relation in (
+                        (("上面", "上边", "上"), "on_support_surface"),
+                        (("里面", "内部", "里"), "inside_container"),
+                        (("旁边", "附近", "旁"), "near_landmark"),
+                    )
+                    if any(marker in relation_scope for marker in markers)
+                ),
+                None,
+            )
+            if explicit_relation:
+                destination["spatial_relation"] = explicit_relation
+                destination["spatial_relation_basis"] = "explicit_spatial_marker"
     else:
         if movable:
             roles["theme"] = deepcopy(movable[0])
@@ -1050,10 +1073,13 @@ def _roles(
             suffix = text[int(destination.get("end", 0)):] if isinstance(destination.get("end"), int) else ""
             if alias and suffix.startswith(("上", "上面", "上边")):
                 destination["spatial_relation"] = "on_support_surface"
+                destination["spatial_relation_basis"] = "explicit_spatial_marker"
             elif alias and suffix.startswith(("旁", "旁边", "附近")):
                 destination["spatial_relation"] = "near_landmark"
+                destination["spatial_relation_basis"] = "explicit_spatial_marker"
             elif alias and suffix.startswith(("里", "里面", "内部")):
                 destination["spatial_relation"] = "inside_container"
+                destination["spatial_relation_basis"] = "explicit_spatial_marker"
         else:
             complement = text[transport_event["end"]:]
             complement = re.sub(r"(?:里面|内部|附近|旁边|上面|上边|上|里|去)$", "", complement)

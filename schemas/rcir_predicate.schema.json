@@ -28,6 +28,31 @@
     "world_revision": { "type": "integer", "minimum": 0 },
     "evidence_refs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
     "depends_on_refs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "provenance": {
+      "type": "object",
+      "required": ["inference_kind", "premise_refs", "temporal_window"],
+      "properties": {
+        "inference_kind": { "enum": ["explicit_spatial_marker", "current_verified_relation", "verified_event_relation", "defaulted_from_affordance"] },
+        "inference_rule": { "type": "string" },
+        "premise_refs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "strength": { "type": "integer", "minimum": 0, "maximum": 1000 },
+        "temporal_window": {
+          "type": "object",
+          "required": ["interaction_turn", "temporal_scope", "valid_from_world_revision", "expires_on_world_revision_change"],
+          "properties": {
+            "interaction_turn": { "type": "integer", "minimum": 0 },
+            "temporal_scope": { "enum": ["reported_past", "current", "requested_future", "requested_current_or_future", "verified_transition"] },
+            "valid_from_world_revision": { "type": "integer", "minimum": 0 },
+            "valid_until_world_revision": { "type": ["integer", "null"], "minimum": 0 },
+            "temporal_anchor_ref": { "type": ["string", "null"] },
+            "dialogue_distance": { "type": "integer", "minimum": 0 },
+            "expires_on_world_revision_change": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "invalidation_reason": { "type": "string" },
     "invalidated_at_world_revision": { "type": "integer", "minimum": 0 }
   },
