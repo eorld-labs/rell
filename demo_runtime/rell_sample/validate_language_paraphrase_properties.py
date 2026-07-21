@@ -6,6 +6,10 @@ from concept_core.perceptual_grounding import load_object_concepts
 
 
 OBJECT_CONCEPTS = load_object_concepts()["concepts"]
+SEMANTIC_REGIONS = [
+    {"region_id": "living_room", "label": "客厅"},
+    {"region_id": "kitchen", "label": "厨房"},
+]
 
 
 def require(condition: bool, message: str) -> None:
@@ -19,6 +23,7 @@ def compose(text: str, *, context_entities: list[dict] | None = None) -> dict:
         event_concepts=FACTORY_EVENT_CONCEPT_UNITS,
         object_concepts=OBJECT_CONCEPTS,
         context_entities=context_entities or [],
+        semantic_regions=SEMANTIC_REGIONS,
     )
 
 
@@ -138,12 +143,53 @@ def validate_correction_equivalence() -> int:
     return len(variants)
 
 
+def validate_inventory_query_equivalence() -> int:
+    region_variants = (
+        "房间里有什么",
+        "屋里都有啥",
+        "这里放着哪些",
+        "周围有什么",
+        "房间里有社么",
+        "客厅里有什么",
+        "厨房里摆着哪些",
+    )
+    for text in region_variants:
+        analysis = compose(text)
+        require(
+            analysis.get("speech_act") == "state_query"
+            and analysis.get("query_type") == "region_inventory"
+            and (analysis.get("canonical_frame") or {}).get("operators")
+            == ["observe_entity"]
+            and not analysis.get("unresolved_slots")
+            and analysis.get("canonical_utterance"),
+            f"region inventory paraphrase changed semantics: {text}: {analysis}",
+        )
+    typo = compose("房间里有社么")
+    require(
+        (typo.get("input_normalizations") or [{}])[0].get("canonical")
+        == "什么"
+        and (typo.get("input_normalizations") or [{}])[0].get(
+            "open_class_entity_rewritten"
+        )
+        is False,
+        str(typo),
+    )
+    support = compose("桌子上有社么")
+    require(
+        support.get("query_type") == "support_inventory"
+        and support.get("canonical_utterance") == "查看桌子上的当前对象",
+        str(support),
+    )
+    return len(region_variants) + 1
+
+
 def main() -> None:
     counts = {
         "historical_cross_product": validate_historical_cross_product(),
         "connector_equivalence": validate_connector_equivalence(),
         "pronoun_cardinality": validate_pronoun_cardinality(),
         "correction_equivalence": validate_correction_equivalence(),
+        "inventory_query_equivalence": validate_inventory_query_equivalence(),
     }
     print(f"Language paraphrase property validation passed: {counts}")
 

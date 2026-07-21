@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from embodied_scene import SESSIONS, begin_motion_command, start_session
+from embodied_scene import (
+    SESSIONS,
+    begin_motion_command,
+    start_session,
+    step_motion_command,
+)
 from evaluate_natural_language_variants import setup_human_held_cup
 
 
@@ -144,15 +149,98 @@ def validate_runtime_dialogue_uses_planner_refs() -> None:
     )
 
 
+def _finish_job(started: dict) -> dict:
+    if started.get("immediate_result"):
+        return started["immediate_result"]
+    job_id = started.get("job_id")
+    require(bool(job_id), str(started))
+    while True:
+        step = step_motion_command(job_id)
+        if step.get("status") == "motion_completed":
+            return step["result"]
+        require(
+            step.get("status") == "frame_verified_and_committed", str(step)
+        )
+
+
+def validate_region_inventory_query_runtime() -> None:
+    session = start_session("home_humanoid", "home_semantic_3d_a")
+    session_id = session["session_id"]
+    active = begin_motion_command(session_id, "给我接杯水")
+    active_intent_id = SESSIONS[session_id].get("active_intent_id")
+    require(active.get("job_id") and active_intent_id, str(active))
+    answered = begin_motion_command(session_id, "房间里有社么")
+    language = answered.get("language_understanding") or {}
+    require(
+        answered.get("status") == "region_inventory_state_answered"
+        and answered.get("region_ref") == "living_room"
+        and "apple_a" in answered.get("entity_refs", [])
+        and answered.get("runtime_fact_committed") is False
+        and answered.get("task_context_preserved") is True
+        and SESSIONS[session_id].get("active_intent_id") == active_intent_id
+        and language.get("canonical_utterance") == "查看当前区域中的对象"
+        and "当前区域里有哪些对象"
+        in str(language.get("human_understanding_response"))
+        and (language.get("input_normalizations") or [{}])[0].get(
+            "canonical"
+        )
+        == "什么"
+        and not SESSIONS[session_id].get("concept_gap_dialogue"),
+        str(answered),
+    )
+    explicit = begin_motion_command(session_id, "厨房里有什么")
+    require(
+        explicit.get("status") == "region_inventory_state_answered"
+        and explicit.get("region_ref") == "kitchen"
+        and "cup_a" in explicit.get("entity_refs", [])
+        and (explicit.get("language_understanding") or {}).get(
+            "canonical_utterance"
+        )
+        == "查看厨房中的对象",
+        str(explicit),
+    )
+
+
+def validate_compound_transition_language_ownership() -> None:
+    session = start_session("home_humanoid", "home_semantic_3d_a")
+    current = begin_motion_command(
+        session["session_id"], "给我接杯水，然后把苹果放到桌子上"
+    )
+    outcomes = []
+    for _ in range(3):
+        outcome = _finish_job(current)
+        outcomes.append(outcome)
+        current = outcome.get("next_stage_started")
+        if not current:
+            break
+    require(len(outcomes) == 3, str(outcomes))
+    transition = outcomes[-1]
+    language = transition.get("language_understanding") or {}
+    projection = language.get("rcir_dialogue_projection") or {}
+    require(
+        transition.get("terminal_fact") == "human_received_filled_container"
+        and language.get("canonical_utterance") == "拿起苹果"
+        and projection.get("resolved_entity_refs", {}).get("theme")
+        == "apple_a"
+        and "苹果" in str(language.get("human_understanding_response"))
+        and "白色杯子"
+        not in str(language.get("human_understanding_response")),
+        str(transition),
+    )
+
+
 def main() -> None:
     validate_historical_runtime_paraphrases()
     validate_compound_runtime_paraphrases()
     validate_goal_schema_continuation_paraphrases()
     validate_outcome_correction_runtime()
     validate_runtime_dialogue_uses_planner_refs()
+    validate_region_inventory_query_runtime()
+    validate_compound_transition_language_ownership()
     print(
         "Contextual language runtime validation passed: historical reference, "
-        "compound scope, goal-schema continuation, and outcome correction."
+        "compound scope, goal-schema continuation, outcome correction, "
+        "region inventory, and transition-language ownership."
     )
 
 

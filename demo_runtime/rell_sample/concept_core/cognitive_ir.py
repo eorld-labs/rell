@@ -445,6 +445,11 @@ def build_situated_event_graph(
             "fact_candidates": goal_facts,
             "candidate_only": True,
         },
+        "query": {
+            "query_type": language_analysis.get("query_type"),
+            "candidate_only": True,
+            "physical_fact_committed": False,
+        },
         "unresolved_variables": deepcopy(
             language_analysis.get("unresolved_slots", [])
         ),

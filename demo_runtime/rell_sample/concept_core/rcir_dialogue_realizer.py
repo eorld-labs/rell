@@ -24,6 +24,17 @@ ROLE_NAMES = {
     "source": "来源",
 }
 
+QUERY_PHRASES = {
+    "holding_state": "机器人当前持有什么",
+    "object_location": "目标对象当前在哪里",
+    "object_visibility": "当前是否能观察到目标对象",
+    "object_presence": "当前空间是否存在目标对象",
+    "support_inventory": "目标承载面上当前有哪些对象",
+    "region_inventory": "当前区域里有哪些对象",
+    "current_action": "机器人当前正在执行什么",
+    "next_step": "当前任务下一步是什么",
+}
+
 
 def _resolved_roles(bundle: dict[str, Any]) -> dict[str, str]:
     return {
@@ -106,6 +117,7 @@ def realize_rcir_dialogue(
     goal_relation = grounded.get("goal_relation") or (
         situated.get("goal") or {}
     ).get("goal_relation")
+    query_type = (situated.get("query") or {}).get("query_type")
     plan = _event_plan(bundle, roles, labels)
     unresolved_roles = [
         item.get("role")
@@ -113,7 +125,15 @@ def realize_rcir_dialogue(
         if item.get("kind") == "unresolved_role" and item.get("role")
     ]
     goal_phrase = _goal_phrase(goal_relation, roles, labels)
-    if unresolved_roles:
+    if situated.get("speech_act") == "state_query" and query_type:
+        query_phrase = QUERY_PHRASES.get(
+            query_type, f"当前状态中的 {query_type}"
+        )
+        response = (
+            f"我理解你在询问：{query_phrase}。"
+            "回答只读取当前世界状态与观察证据，不会把查询当成动作任务。"
+        )
+    elif unresolved_roles:
         missing = "、".join(
             ROLE_NAMES.get(role, str(role)) for role in unresolved_roles
         )
@@ -133,6 +153,7 @@ def realize_rcir_dialogue(
         "fact_authority_ref": ledger.get("ledger_id"),
         "world_revision": bundle.get("world_revision"),
         "goal_relation": goal_relation,
+        "query_type": query_type,
         "resolved_entity_refs": deepcopy(roles),
         "event_plan": plan,
         "unresolved_roles": unresolved_roles,

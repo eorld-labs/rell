@@ -2894,6 +2894,9 @@ def _compose_session_language(
         object_concepts=_session_object_language_concepts(session),
         context_entities=_language_context_entities(session),
         learned_adapters=session.get("language_adapters", []),
+        semantic_regions=_scene_for_session(session).get(
+            "semantic_regions", []
+        ),
     )
     structured_bindings: dict[str, dict[str, Any]] = {}
     for role, value in (grounded_role_bindings or {}).items():
@@ -3197,6 +3200,9 @@ def _language_understanding_view(analysis: dict[str, Any]) -> dict[str, Any]:
             for item in analysis.get("entity_mentions", [])
         ],
         "role_bindings": deepcopy(analysis.get("role_bindings", {})),
+        "input_normalizations": deepcopy(
+            analysis.get("input_normalizations", [])
+        ),
         "canonical_utterance": analysis.get("canonical_utterance"),
         "semantic_canonical_utterance": analysis.get("canonical_utterance"),
         "human_understanding_response": (
@@ -5840,6 +5846,75 @@ def _answer_support_inventory_state_query(
         "runtime_fact_committed": False,
         "task_context_preserved": True,
         "preserved_pending_confirmation_id": (session.get("pending_confirmation") or {}).get("confirmation_id"),
+        "preserved_active_intent_id": session.get("active_intent_id"),
+        "language_understanding": _language_understanding_view(analysis),
+        "session": get_session(session["session_id"]),
+    }
+
+
+def _is_region_inventory_state_query(analysis: dict[str, Any]) -> bool:
+    return (
+        analysis.get("speech_act") == "state_query"
+        and analysis.get("query_type") == "region_inventory"
+    )
+
+
+def _answer_region_inventory_state_query(
+    session: dict[str, Any], text: str, analysis: dict[str, Any]
+) -> dict[str, Any]:
+    """Answer a region inventory from the current versioned world snapshot."""
+    scene = _scene_for_session(session)
+    regions = scene.get("semantic_regions", [])
+    explicit = [
+        region
+        for region in regions
+        if str(region.get("label") or "")
+        and str(region.get("label")) in text
+    ]
+    region_ref = (
+        explicit[0].get("region_id")
+        if len(explicit) == 1
+        else session.get("state", {}).get("active_region")
+    )
+    region = next(
+        (item for item in regions if item.get("region_id") == region_ref), None
+    )
+    entities = []
+    for entity in session.get("runtime_objects", []):
+        if entity.get("active") is False:
+            continue
+        position = entity.get("position")
+        current_region = _region_for(position, scene) if position else None
+        if current_region == region_ref:
+            entities.append(entity)
+    labels = [
+        item.get("label") or item.get("entity_id") for item in entities
+    ]
+    region_label = (region or {}).get("label") or "当前区域"
+    prompt = (
+        f"按当前任务期世界快照，{region_label}里有{'、'.join(labels)}。"
+        if labels
+        else f"按当前任务期世界快照，{region_label}里当前没有已落地的对象。"
+    )
+    return {
+        "status": "region_inventory_state_answered",
+        "query_type": "region_inventory",
+        "prompt": prompt,
+        "region_ref": region_ref,
+        "region_label": region_label,
+        "entity_refs": [item.get("entity_id") for item in entities],
+        "labels": labels,
+        "state_evidence": {
+            "source": "current_task_period_world_snapshot",
+            "predicate": "inside_region",
+            "world_revision": session.get("world_revision"),
+            "query_does_not_commit_physical_fact": True,
+        },
+        "runtime_fact_committed": False,
+        "task_context_preserved": True,
+        "preserved_pending_confirmation_id": (
+            session.get("pending_confirmation") or {}
+        ).get("confirmation_id"),
         "preserved_active_intent_id": session.get("active_intent_id"),
         "language_understanding": _language_understanding_view(analysis),
         "session": get_session(session["session_id"]),
@@ -9397,6 +9472,10 @@ def begin_motion_command(
         early_analysis = _compose_session_language(deepcopy(session), text)
         if _is_support_inventory_state_query(text, early_analysis):
             return _answer_support_inventory_state_query(session, text, early_analysis)
+        if _is_region_inventory_state_query(early_analysis):
+            return _answer_region_inventory_state_query(
+                session, text, early_analysis
+            )
         if _is_historical_return_navigation_request(early_analysis):
             if session.get("pending_confirmation"):
                 _revoke_pending_confirmation(session, "superseded_by_historical_navigation_task_control")
@@ -10594,6 +10673,9 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
                 compound_next = stage_outcome.get("compound_next_started") or {}
                 continuation_next = repair_next or compound_next
                 if continuation_next.get("job_id"):
+                    continuation_language = deepcopy(
+                        continuation_next.get("language_understanding")
+                    )
                     result["next_stage_started"] = {
                         "status": continuation_next.get("status"),
                         "job_id": continuation_next["job_id"],
@@ -10602,7 +10684,10 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
                         "long_horizon_intent": deepcopy(continuation_next.get("long_horizon_intent")),
                         "candidate_execution_plan": deepcopy(continuation_next.get("candidate_execution_plan")),
                         "compound_command_sequence": deepcopy(continuation_next.get("compound_command_sequence")),
+                        "language_understanding": continuation_language,
                     }
+                    if continuation_language:
+                        result["language_understanding"] = continuation_language
                     result["long_horizon_intent"] = deepcopy(
                         continuation_next.get("long_horizon_intent")
                     ) or result["long_horizon_intent"]
@@ -10629,6 +10714,10 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
                     if immediate_next:
                         result["next_stage_candidate"] = deepcopy(immediate_next)
                         result["prompt"] = immediate_next.get("prompt") or result["prompt"]
+                        if immediate_next.get("language_understanding"):
+                            result["language_understanding"] = deepcopy(
+                                immediate_next["language_understanding"]
+                            )
             elif stage_outcome.get("job_id"):
                 next_stage_plan = deepcopy(stage_outcome.get("candidate_execution_plan"))
                 result["next_stage_started"] = {

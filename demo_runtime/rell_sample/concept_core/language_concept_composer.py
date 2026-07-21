@@ -25,7 +25,7 @@ EVENT_LEXICAL_PRIMITIVES: tuple[dict[str, Any], ...] = (
     {"operator": "wait_until", "concept_id": "factory_event_wait", "heads": ("等待", "等等", "等"), "canonical": "等待"},
 )
 
-QUESTION_MARKERS = ("吗", "么", "呢", "没有", "没", "是否", "有无", "有没有", "哪里", "哪儿", "什么", "为何", "为什么", "怎么")
+QUESTION_MARKERS = ("吗", "么", "呢", "没有", "没", "是否", "有无", "有没有", "哪里", "哪儿", "什么", "哪些", "啥", "为何", "为什么", "怎么")
 PRONOUNS = ("它们", "他们", "她们", "那个", "这个", "它", "他", "她", "那里", "那边", "这里", "这边")
 FUNCTION_WORDS = (
     "请", "麻烦", "帮我", "帮忙", "你", "我", "一下", "一个", "一件", "把", "给", "去", "来", "过来", "现在", "上", "里", "中",
@@ -41,8 +41,56 @@ FUNCTION_WORDS += ("人类", "家人", "主人", "用户", "接收人")
 FUNCTION_WORDS += ("嗯嗯", "嗯", "好的", "好")
 
 
+def _bounded_closed_class_query_normalization(
+    text: str,
+) -> tuple[str, list[dict[str, Any]]]:
+    """Repair one-edit interrogatives only inside an explicit state-query slot."""
+    audit: list[dict[str, Any]] = []
+    query_words = ("什么", "哪些")
+
+    def replace(match: re.Match[str]) -> str:
+        predicate, token = match.group(1), match.group(2)
+        if token == "这么":
+            return match.group(0)
+        candidates = [
+            word
+            for word in query_words
+            if len(word) == len(token)
+            and sum(left != right for left, right in zip(word, token)) == 1
+        ]
+        if len(candidates) != 1:
+            return match.group(0)
+        canonical = candidates[0]
+        audit.append(
+            {
+                "surface": token,
+                "canonical": canonical,
+                "token_class": "closed_class_interrogative",
+                "basis": "single_edit_within_explicit_state_predicate_slot",
+                "open_class_entity_rewritten": False,
+            }
+        )
+        return predicate + canonical
+
+    normalized = re.sub(
+        r"(有|看到|看见|放着|摆着)([\u4e00-\u9fff]{2})(?=$|东西|物体)",
+        replace,
+        text,
+    )
+    return normalized, audit
+
+
+def _normalize_language_text_with_audit(
+    text: str,
+) -> tuple[str, list[dict[str, Any]]]:
+    compact = re.sub(
+        r"[\s，。！？、,.!?；;：:]+", "", (text or "").strip().lower()
+    )
+    return _bounded_closed_class_query_normalization(compact)
+
+
 def normalize_language_text(text: str) -> str:
-    return re.sub(r"[\s，。！？、,.!?；;：:]+", "", (text or "").strip().lower())
+    return _normalize_language_text_with_audit(text)[0]
 
 
 def _discourse_clause_specs(utterance: str) -> list[dict[str, Any]]:
@@ -383,8 +431,23 @@ def _speech_act(text: str, events: list[dict[str, Any]], definition: dict[str, A
     return "unknown"
 
 
-def _query_type(text: str, events: list[dict[str, Any]], objects: list[dict[str, Any]]) -> str | None:
+def _query_type(
+    text: str,
+    events: list[dict[str, Any]],
+    objects: list[dict[str, Any]],
+    region_mentions: list[dict[str, Any]] | None = None,
+) -> str | None:
     operators = {item["operator"] for item in events}
+    inventory_tail = r"(?:都|还)?(?:有|放着|摆着)(?:什么|哪些|啥)"
+    if objects and re.search(rf"(?:上|上面){inventory_tail}", text):
+        return "support_inventory"
+    if re.search(
+        rf"(?:房间|屋里|屋内|这里|当前空间|这个空间|周围)(?:里|内)?{inventory_tail}",
+        text,
+    ):
+        return "region_inventory"
+    if region_mentions and re.search(rf"(?:里|内)?{inventory_tail}", text):
+        return "region_inventory"
     if any(marker in text for marker in ("手里", "手上", "拿着什么", "握着什么", "持有什么")):
         return "holding_state"
     if objects and any(marker in text for marker in ("在哪里", "在哪", "哪儿", "什么位置", "哪个区域")):
@@ -944,6 +1007,10 @@ def _canonical_utterance(speech_act: str, query_type: str | None, events: list[d
     target_region_name = target_region.get("matched_alias") or target_region.get("display_name")
     recipient_name = recipient.get("matched_alias") or recipient.get("label") or recipient.get("display_name")
     if speech_act == "state_query":
+        if query_type == "support_inventory" and target_name:
+            return f"查看{target_name}上的当前对象"
+        if query_type == "region_inventory":
+            return f"查看{target_region_name or '当前区域'}中的对象"
         if query_type == "object_visibility" and target_name:
             return f"看得到{target_name}吗"
         if query_type == "object_presence" and target_name:
@@ -1027,11 +1094,27 @@ def compose_language_concepts(
     object_concepts: list[dict[str, Any]],
     context_entities: list[dict[str, Any]] | None = None,
     learned_adapters: list[dict[str, Any]] | None = None,
+    semantic_regions: list[dict[str, Any]] | None = None,
     _build_event_frames: bool = True,
 ) -> dict[str, Any]:
-    normalized = normalize_language_text(utterance)
+    normalized, input_normalizations = _normalize_language_text_with_audit(
+        utterance
+    )
     definition = _definition_candidate(normalized, event_concepts)
     objects = _object_mentions(normalized, object_concepts)
+    region_mentions = [
+        {
+            "entity_ref": region.get("region_id"),
+            "value_ref": region.get("region_id"),
+            "entity_type": "semantic_region",
+            "display_name": region.get("label") or region.get("region_id"),
+            "matched_alias": alias,
+            "source": "semantic_region_registry_match",
+        }
+        for region in (semantic_regions or [])
+        for alias in [str(region.get("label") or "")]
+        if alias and alias in normalized
+    ]
     events = _infer_argument_order_events(
         normalized,
         _event_mentions(normalized, event_concepts, learned_adapters or []),
@@ -1051,9 +1134,39 @@ def compose_language_concepts(
         and ellipsis_candidates
     ):
         speech_act = "task_request"
-    query_type = _query_type(normalized, events, objects) if speech_act == "state_query" else None
+    query_type = (
+        _query_type(normalized, events, objects, region_mentions)
+        if speech_act == "state_query"
+        else None
+    )
+    if query_type in {"support_inventory", "region_inventory"}:
+        events = [
+            {
+                "operator": "observe_entity",
+                "concept_id": "factory_event_observe",
+                "matched_surface": normalized,
+                "canonical_surface": "观察",
+                "start": 0,
+                "end": len(normalized),
+                "source": "state_query_operator_inference",
+            }
+        ]
+        event_dependencies = []
+        unresolved = [
+            slot
+            for slot in unresolved
+            if slot != "pronoun_reference_not_unique"
+        ]
     context_entities = context_entities or []
     roles = _roles(events, objects, context_entities, normalized)
+    if query_type == "region_inventory":
+        roles["target_region"] = deepcopy(region_mentions[0]) if len(
+            region_mentions
+        ) == 1 else {
+            "reference": "current_executor_region",
+            "entity_type": "semantic_region",
+            "source": "deictic_current_region_query",
+        }
     if (
         discourse_roles.get("recipient")
         and not roles.get("recipient")
@@ -1094,7 +1207,7 @@ def compose_language_concepts(
         unresolved.append("query_relation_not_resolved")
     if speech_act == "task_request" and not events:
         unresolved.append("event_operator_not_resolved")
-    requires_object = any(item["operator"] in {
+    requires_object = query_type != "region_inventory" and any(item["operator"] in {
         "observe_entity", "grasp_object", "release_object", "place_object",
         "fill_container",
         "handover_object",
@@ -1153,10 +1266,12 @@ def compose_language_concepts(
         "schema_version": "1.0.0",
         "utterance": utterance,
         "normalized_utterance": normalized,
+        "input_normalizations": deepcopy(input_normalizations),
         "speech_act": speech_act,
         "query_type": query_type,
         "event_candidates": deepcopy(events),
         "entity_mentions": deepcopy(objects),
+        "semantic_region_mentions": deepcopy(region_mentions),
         "role_bindings": deepcopy(roles),
         "discourse_roles": discourse_roles,
         "reported_event_candidates": deepcopy(reported_events),
@@ -1230,6 +1345,7 @@ def compose_language_concepts(
                 object_concepts=object_concepts,
                 context_entities=context_entities,
                 learned_adapters=learned_adapters,
+                semantic_regions=semantic_regions,
                 _build_event_frames=False,
             )
             if frame.get("speech_act") != "task_request" or not frame.get("event_candidates"):
