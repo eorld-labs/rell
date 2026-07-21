@@ -16,6 +16,7 @@
     "world_revision": { "type": "integer", "minimum": 0 },
     "evidence_refs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
     "produces_predicate_refs": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "modifiers": { "type": "array", "items": { "type": "object" } },
     "arbitration_ref": { "type": ["string", "null"] },
     "verification_ref": { "type": ["string", "null"] },
     "invalidation_reason": { "type": "string" },

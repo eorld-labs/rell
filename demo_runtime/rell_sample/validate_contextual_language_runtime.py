@@ -7,6 +7,8 @@ from embodied_scene import (
     step_motion_command,
 )
 from evaluate_natural_language_variants import setup_human_held_cup
+from concept_core.concept_gap_dialogue import start_concept_gap_dialogue
+from concept_core.perceptual_grounding import load_object_concepts
 
 
 def require(condition: bool, message: str) -> None:
@@ -75,6 +77,91 @@ def validate_compound_runtime_paraphrases() -> None:
             == "hospitality_counter_a"
             and subtasks[1].get("explicit_theme_ref") == "glass_tall",
             f"compound runtime paraphrase lost event scope: {utterance}: {started}",
+        )
+
+
+def validate_compound_task_supersedes_stale_concept_gap() -> None:
+    session = start_session("home_humanoid", "hospitality_guest")
+    session_id = session["session_id"]
+    # Build the exact current relation from the reported case: the guest has
+    # the tall glass while the white mug remains a distinct later theme.
+    from evaluate_natural_language_variants import run_to_terminal
+
+    setup = run_to_terminal(
+        session_id,
+        begin_motion_command(session_id, "用高脚玻璃杯给我接一杯水"),
+    )
+    require(setup["completed"], str(setup))
+    live = SESSIONS[session_id]
+    stale = start_concept_gap_dialogue(
+        utterance="我看还有很大的空间呀",
+        runtime_objects=live["runtime_objects"],
+        object_concepts=load_object_concepts()["concepts"],
+        world_revision=live["world_revision"],
+    )
+    live["concept_gap_dialogue"] = stale["dialogue"]
+    result = begin_motion_command(
+        session_id,
+        "我喝完了，把我的杯子放到操作台B，然后用白色马克杯给我倒杯水",
+    )
+    view = immediate(result)
+    sequence = result.get("compound_command_sequence") or view.get(
+        "compound_command_sequence"
+    ) or {}
+    subtasks = sequence.get("subtasks") or []
+    require(
+        len(subtasks) == 2
+        and subtasks[0].get("explicit_theme_ref") == "glass_tall"
+        and subtasks[0].get("explicit_destination_ref")
+        == "hospitality_counter_b"
+        and subtasks[1].get("explicit_theme_ref") == "mug_white",
+        f"stale concept gap captured structured compound roles: {result}",
+    )
+    require(
+        view.get("status")
+        in {"requires_human_confirmation", "motion_started", "fact_established"}
+        and SESSIONS[session_id].get("concept_gap_dialogue") is None,
+        f"new structured task did not supersede stale concept gap: {result}",
+    )
+    require(
+        (SESSIONS[session_id].get("concept_gap_dialogue_history") or [])[-1].get(
+            "status"
+        )
+        == "superseded_by_new_structured_task",
+        "superseded concept gap was not archived",
+    )
+
+
+def validate_deictic_human_proximity_navigation() -> None:
+    from evaluate_natural_language_variants import run_to_terminal
+
+    variants = (
+        "好，你现在站在我这边来",
+        "你站到我身边来",
+        "请走到我旁边",
+        "靠近我这里",
+    )
+    for utterance in variants:
+        session = start_session("home_humanoid", "hospitality_guest")
+        started = begin_motion_command(session["session_id"], utterance)
+        require(
+            started.get("status") == "motion_started",
+            f"human-relative navigation did not start: {utterance}: {started}",
+        )
+        execution = run_to_terminal(session["session_id"], started)
+        terminal = execution["outcomes"][-1]
+        require(
+            execution["completed"]
+            and terminal.get("terminal_fact") == "executor_near_object"
+            and (terminal.get("terminal_fact_binding") or {}).get("entity_ref")
+            == "guest",
+            f"human-relative navigation lost speaker grounding: {utterance}: {execution}",
+        )
+        language = terminal.get("language_understanding") or {}
+        require(
+            not language.get("unresolved_slots")
+            and language.get("canonical_utterance") == "走到我这边",
+            f"human-relative navigation retained a semantic gap: {utterance}: {language}",
         )
 
 
@@ -292,6 +379,8 @@ def validate_classifier_delivery_and_support_query() -> None:
 def main() -> None:
     validate_historical_runtime_paraphrases()
     validate_compound_runtime_paraphrases()
+    validate_compound_task_supersedes_stale_concept_gap()
+    validate_deictic_human_proximity_navigation()
     validate_goal_schema_continuation_paraphrases()
     validate_outcome_correction_runtime()
     validate_runtime_dialogue_uses_planner_refs()

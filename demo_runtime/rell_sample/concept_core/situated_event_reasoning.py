@@ -80,6 +80,26 @@ def compile_situated_event_frame(
             "status": "human_reported_candidate_requires_physical_verification",
             "possible_derived_fact": "container_empty",
         })
+    possession_report = re.search(
+        r"(?:还|仍然|仍|依然)?(?:在|由)(?P<holder>我|你|机器人)(?:的)?手(?:里|上|中)(?:拿着|持有)?",
+        normalized,
+    )
+    if possession_report:
+        theme = roles.get("theme") or roles.get("target") or {}
+        holder_surface = possession_report.group("holder")
+        reported_state_candidates.append({
+            "predicate": "received_by" if holder_surface == "我" else "held_by",
+            "subject": (
+                theme.get("entity_ref")
+                or theme.get("concept_id")
+                or theme.get("matched_alias")
+            ),
+            "subject_role": "theme",
+            "object_role": "human_speaker" if holder_surface == "我" else "executor",
+            "reported_by": "human_speaker",
+            "status": "human_reported_candidate_requires_physical_verification",
+            "does_not_commit_physical_fact": True,
+        })
     frame_seed = f"{utterance}|{len(recent_episodes)}|{len(current_facts)}"
     return {
         "schema_version": "1.0.0",

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/schemas/rcir_modifier_contract.schema.json",
+  "title": "RCIR ModifierContract",
+  "type": "object",
+  "required": ["schema_version", "contract_kind", "contract_id", "modifiers", "event_modifiers", "conflicts", "inquiry_contract", "execution_constraints", "evidence_boundary"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "contract_kind": {"const": "ModifierContract"},
+    "contract_id": {"type": "string", "pattern": "^modifier_contract_[a-f0-9]{16}$"},
+    "modifiers": {"type": "array", "items": {"type": "object"}},
+    "event_modifiers": {"type": "array", "items": {"type": "object"}},
+    "discourse_modifiers": {"type": "array", "items": {"type": "object"}},
+    "conflicts": {"type": "array", "items": {"type": "object"}},
+    "inquiry_contract": {"type": ["object", "null"]},
+    "execution_constraints": {"type": "object"},
+    "evidence_boundary": {"type": "object"}
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/schemas/rcir_reference_resolution.schema.json",
+  "title": "RCIR ReferenceResolution",
+  "type": "object",
+  "required": ["schema_version", "resolution_kind", "resolution_id", "resolved_references", "unresolved", "inquiry_contracts", "salience_projection", "evidence_boundary"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "resolution_kind": {"const": "ReferenceResolution"},
+    "resolution_id": {"type": "string", "pattern": "^reference_resolution_[a-f0-9]{16}$"},
+    "resolved_references": {"type": "array", "items": {"type": "object"}},
+    "unresolved": {"type": "array", "items": {"type": "object"}},
+    "inquiry_contracts": {"type": "array", "items": {"type": "object"}},
+    "salience_projection": {"type": "object"},
+    "evidence_boundary": {"type": "object"}
+  },
+  "additionalProperties": false
+}

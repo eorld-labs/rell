@@ -4,10 +4,14 @@ import re
 from copy import deepcopy
 from typing import Any
 
+from .modifier_composer import compile_modifier_contract, modifiers_for_event
+from .reference_resolution import resolve_references, resolved_reference_mentions
+from .semantic_grounding import load_semantic_attribute_concepts
+
 
 EVENT_LEXICAL_PRIMITIVES: tuple[dict[str, Any], ...] = (
     {"operator": "observe_entity", "concept_id": "factory_event_observe", "heads": ("观察", "瞧", "看", "找"), "canonical": "观察"},
-    {"operator": "navigate_to", "concept_id": "factory_event_navigate", "heads": ("返回到", "回到", "返回", "前往", "靠近", "走", "去"), "canonical": "走到"},
+    {"operator": "navigate_to", "concept_id": "factory_event_navigate", "heads": ("返回到", "回到", "返回", "前往", "靠近", "站过来", "站到", "站在", "走", "去"), "canonical": "走到"},
     {"operator": "orient_executor", "concept_id": "factory_event_orient", "heads": ("转向", "面向", "朝向", "转"), "canonical": "转向"},
     {"operator": "grasp_object", "concept_id": "factory_event_grasp", "heads": ("捡", "拾", "抓", "取", "拿"), "canonical": "拿起"},
     {"operator": "release_object", "concept_id": "factory_event_release", "heads": ("释放", "撒手", "松开", "放开"), "canonical": "放开"},
@@ -572,6 +576,15 @@ def _discourse_roles(text: str) -> dict[str, dict[str, Any]]:
             "relation": "benefits_from_requested_outcome",
             "source": "deictic_service_role",
         }
+    if re.search(
+        r"(?:站|走|到|靠近).{0,8}(?:我这边|我这里|我身边|我旁边|我的旁边)",
+        text,
+    ):
+        roles["navigation_landmark"] = {
+            "reference": "human_speaker",
+            "relation": "near_landmark",
+            "source": "deictic_human_proximity_language",
+        }
     recipient_result_relation = bool(
         re.search(
             r"(?:送|递|交|拿|端|带)(?:回|过)?(?:来|到)?我(?:的)?手(?:里|上|中)",
@@ -1097,7 +1110,9 @@ def _roles(
         )
     )
     if source_possession_requested and len(human_held) == 1:
+        language_theme = deepcopy(roles.get("theme") or {})
         roles["theme"] = {
+            **language_theme,
             **deepcopy(human_held[0]),
             "binding_source": "explicit_human_possession_language_plus_verified_relation",
         }
@@ -1182,14 +1197,21 @@ def _unknown_surface(
     objects: list[dict[str, Any]],
     reported_events: list[dict[str, Any]],
     historical_event_constraints: list[dict[str, Any]] | None = None,
+    modifiers: list[dict[str, Any]] | None = None,
+    semantic_attributes: list[dict[str, Any]] | None = None,
 ) -> str | None:
     residual = text
     spans = [
-        (item["start"], item["end"])
+        (
+            item.get("start", (item.get("span") or [None, None])[0]),
+            item.get("end", (item.get("span") or [None, None])[1]),
+        )
         for item in [
             *events,
             *objects,
             *reported_events,
+            *(modifiers or []),
+            *(semantic_attributes or []),
             *(
                 {
                     "start": item.get("constraint_start"),
@@ -1198,7 +1220,9 @@ def _unknown_surface(
                 for item in (historical_event_constraints or [])
             ),
         ]
-        if isinstance(item.get("start"), int)
+        if isinstance(
+            item.get("start", (item.get("span") or [None, None])[0]), int
+        )
     ]
     for start, end in sorted(spans, reverse=True):
         residual = residual[:start] + (" " * (end - start)) + residual[end:]
@@ -1206,6 +1230,28 @@ def _unknown_surface(
         residual = residual.replace(word, "")
     residual = re.sub(r"[\s，。！？、,.!?；;：:]+", "", residual)
     return residual or None
+
+
+def _semantic_attribute_mentions(text: str) -> list[dict[str, Any]]:
+    """Expose registered attribute spans without grounding them as facts."""
+    candidates: list[dict[str, Any]] = []
+    for concept in load_semantic_attribute_concepts().get(
+        "attribute_concepts", []
+    ):
+        for value, aliases in concept.get("values", {}).items():
+            for alias in sorted(aliases, key=len, reverse=True):
+                for match in re.finditer(re.escape(alias), text):
+                    candidates.append(
+                        {
+                            "concept_id": concept.get("concept_id"),
+                            "value": value,
+                            "start": match.start(),
+                            "end": match.end(),
+                            "candidate_only": True,
+                            "runtime_fact_committed": False,
+                        }
+                    )
+    return candidates
 
 
 def compose_language_concepts(
@@ -1241,12 +1287,70 @@ def compose_language_concepts(
         _event_mentions(normalized, event_concepts, learned_adapters or []),
         objects,
     )
-    objects, unresolved = _resolve_pronouns(normalized, objects, context_entities or [])
+    reference_resolution = resolve_references(
+        normalized,
+        objects,
+        context_entities or [],
+        events,
+    )
+    structured_reference_mentions = resolved_reference_mentions(
+        reference_resolution, context_entities or []
+    )
+    for mention in structured_reference_mentions:
+        if not any(
+            item.get("start") == mention.get("start")
+            and item.get("end") == mention.get("end")
+            for item in objects
+        ):
+            objects.append(mention)
+    structured_reference_records = [
+        *reference_resolution.get("resolved_references", []),
+        *reference_resolution.get("unresolved", []),
+    ]
+    if structured_reference_records:
+        unresolved = []
+        unresolved_references = reference_resolution.get("unresolved", [])
+        if unresolved_references:
+            fallback_objects, fallback_unresolved = _resolve_pronouns(
+                normalized, objects, context_entities or []
+            )
+            appended = fallback_objects[len(objects) :]
+            if appended and not fallback_unresolved:
+                objects = fallback_objects
+                resolved_record = deepcopy(unresolved_references[0])
+                resolved_record.update(
+                    {
+                        "selected": None,
+                        "selected_concept_id": appended[0].get("concept_id"),
+                        "unique": True,
+                        "requires_confirmation": False,
+                        "binding_kind": "intra_turn_concept_coreference",
+                        "grounding_required": True,
+                    }
+                )
+                reference_resolution.setdefault(
+                    "resolved_references", []
+                ).append(resolved_record)
+                reference_resolution["unresolved"] = []
+                reference_resolution["inquiry_contracts"] = []
+            else:
+                unresolved = ["pronoun_reference_not_unique"]
+    else:
+        # Compatibility fallback for expressions outside the structured
+        # resolver. Never run both resolvers over the same span: duplicate
+        # theme mentions corrupt temporal relative-clause cardinality.
+        objects, unresolved = _resolve_pronouns(
+            normalized, objects, context_entities or []
+        )
     events, event_dependencies = _resolve_serial_event_dependencies(normalized, events, objects)
     events, historical_event_constraints = _extract_historical_event_constraints(
         normalized, events, objects
     )
     discourse_roles = _discourse_roles(normalized)
+    if discourse_roles.get("navigation_landmark"):
+        unresolved = [
+            slot for slot in unresolved if slot != "pronoun_reference_not_unique"
+        ]
     reported_events = _reported_events(normalized)
     ellipsis_candidates = _ellipsis_candidates(normalized)
     speech_act = _speech_act(normalized, events, definition)
@@ -1281,6 +1385,18 @@ def compose_language_concepts(
         ]
     context_entities = context_entities or []
     roles = _roles(events, objects, context_entities, normalized)
+    if (
+        discourse_roles.get("navigation_landmark")
+        and any(item.get("operator") == "navigate_to" for item in events)
+    ):
+        roles["destination"] = {
+            "matched_alias": "我这边",
+            "entity_type": "human_recipient",
+            "reference": "human_speaker",
+            "spatial_relation": "near_landmark",
+            "spatial_relation_basis": "explicit_deictic_human_proximity",
+            "source": "discourse_navigation_landmark",
+        }
     if query_type == "region_inventory":
         roles["target_region"] = deepcopy(region_mentions[0]) if len(
             region_mentions
@@ -1323,6 +1439,9 @@ def compose_language_concepts(
     if relative_direction:
         roles["direction"] = {"reference": "executor_body_frame", "value": relative_direction, "source": "body_relative_language"}
 
+    modifier_contract = compile_modifier_contract(normalized, events)
+    semantic_attribute_mentions = _semantic_attribute_mentions(normalized)
+
     if speech_act == "unknown":
         unresolved.append("event_or_query_concept_not_resolved")
     if speech_act == "state_query" and query_type is None:
@@ -1337,7 +1456,16 @@ def compose_language_concepts(
         "relocate_object",
         "apply_directional_force", "change_open_state", "change_device_activation", "remove_surface_contaminant",
     } for item in events) or (any(item["operator"] == "navigate_to" for item in events) and not relative_direction)
-    if requires_object and not objects and not (roles.get("theme") or roles.get("target")):
+    navigation_destination_grounded = bool(
+        any(item["operator"] == "navigate_to" for item in events)
+        and roles.get("destination")
+    )
+    if (
+        requires_object
+        and not objects
+        and not (roles.get("theme") or roles.get("target"))
+        and not navigation_destination_grounded
+    ):
         unresolved.append("required_object_role_not_grounded")
     if any(item["operator"] == "place_object" for item in events):
         if not roles.get("theme"):
@@ -1357,7 +1485,14 @@ def compose_language_concepts(
         objects,
         reported_events,
         historical_event_constraints,
+        modifier_contract.get("modifiers", []),
+        semantic_attribute_mentions,
     )
+    if (
+        discourse_roles.get("navigation_landmark")
+        and unknown_surface in {"这", "我这", "这边", "这里", "身边", "旁边"}
+    ):
+        unknown_surface = None
     confidence = 0.15
     if speech_act != "unknown":
         confidence += 0.18
@@ -1400,6 +1535,12 @@ def compose_language_concepts(
         "event_dependencies": deepcopy(event_dependencies),
         "historical_event_constraints": deepcopy(historical_event_constraints),
         "ellipsis_candidates": ellipsis_candidates,
+        "reference_resolution": deepcopy(reference_resolution),
+        "salience_projection": deepcopy(
+            reference_resolution.get("salience_projection")
+        ),
+        "modifier_contract": deepcopy(modifier_contract),
+        "semantic_attribute_mentions": deepcopy(semantic_attribute_mentions),
         "modifiers": {
             "negated": speech_act == "prohibition",
             "ability_or_possibility": any(marker in normalized for marker in ("能", "可以", "得见", "得到", "能不能", "可不可以")),
@@ -1486,4 +1627,16 @@ def compose_language_concepts(
             result["discourse_event_graph"] = _build_discourse_event_graph(
                 result["event_frames"]
             )
+    result["modifier_contract"] = compile_modifier_contract(
+        normalized,
+        result.get("event_candidates", []),
+        discourse_graph=result.get("discourse_event_graph"),
+    )
+    for index, event in enumerate(result.get("event_candidates", [])):
+        event["modifiers"] = modifiers_for_event(
+            result["modifier_contract"], index
+        )
+    result["canonical_frame"]["modifiers"] = deepcopy(
+        result["modifier_contract"]
+    )
     return result

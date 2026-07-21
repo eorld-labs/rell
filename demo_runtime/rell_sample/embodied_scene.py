@@ -23,6 +23,10 @@ from concept_core.runtime_cognitive_signals import (
     derive_runtime_cognitive_signal_candidates,
 )
 from concept_core.runtime_cognitive_inquiries import refresh_runtime_inquiries
+from concept_core.runtime_reasoning import (
+    evaluate_runtime_rules,
+    explanation_from_structured_state,
+)
 from concept_core.rcir_dialogue_realizer import realize_rcir_dialogue
 from concept_core.contextual_affordance import resolve_contextual_affordance_request
 from concept_core.context_projection import build_context_projection, compact_intent_capsule
@@ -331,6 +335,340 @@ def _authoritative_current_facts(
     ]
 
 
+def _requires_failure_resynchronization(result: dict[str, Any]) -> bool:
+    if result.get("runtime_diagnostic"):
+        return True
+    status = str(result.get("status") or "")
+    if any(token in status for token in ("clarification", "confirmation")):
+        return False
+    if status in {
+        "fact_established",
+        "motion_completed",
+        "motion_started",
+        "stage_ready",
+        "state_query_answered",
+        "observation_candidate_ready",
+        "temporary_effect_contract_compiled",
+    }:
+        return False
+    return bool(
+        result.get("reason")
+        or any(
+            token in status
+            for token in ("failed", "blocked", "unavailable", "awaiting_correction")
+        )
+    )
+
+
+def _failure_reason_text(reason: str) -> str:
+    return {
+        "no_object_currently_held": "机器人当前没有持有待放置对象",
+        "object_is_not_currently_held": "机器人当前没有持有目标对象",
+        "no_collision_free_object_relative_terminal_pose": "当前几何中没有通过碰撞检查的安全交互位置",
+        "stable_support_relation_not_established": "目标承载关系没有通过末态验真",
+        "container_fill_fact_not_established": "容器装液事实尚未验真",
+        "recipient_outside_safe_handover_workspace": "接收者不在当前安全交接范围内",
+    }.get(reason, reason or "当前执行前提没有成立")
+
+
+def _install_failure_recovery_contract(
+    session: dict[str, Any], result: dict[str, Any]
+) -> dict[str, Any]:
+    """Rebuild failure recovery from current facts without retaining old control paths."""
+    ledger = _refresh_authoritative_world_fact_ledger(
+        session, reason="failure_recovery_world_resynchronization"
+    )
+    objects = {
+        item.get("entity_id"): item
+        for item in session.get("runtime_objects", [])
+        if item.get("entity_id") and item.get("active") is not False
+    }
+    intent_view = result.get("long_horizon_intent") or {}
+    preserved_bindings = deepcopy(intent_view.get("role_bindings") or {})
+    if not preserved_bindings:
+        preserved_bindings = {
+            role: binding.get("entity_ref")
+            for role, binding in (
+                ((session.get("current_rcir") or {}).get("grounded_causal_graph") or {})
+                .get("role_bindings", {})
+                .items()
+            )
+            if binding.get("status") == "resolved" and binding.get("entity_ref")
+        }
+    held_by_executor = {
+        effector: ref
+        for effector, ref in _holding_by_effector(session).items()
+        if ref
+    }
+    held_by_human = [
+        {
+            "entity_ref": entity_ref,
+            "holder_ref": item.get("received_by"),
+        }
+        for entity_ref, item in objects.items()
+        if item.get("received_by")
+    ]
+    support_relations = [
+        {
+            "entity_ref": entity_ref,
+            "support_ref": item.get("support_ref"),
+        }
+        for entity_ref, item in objects.items()
+        if item.get("support_ref")
+    ]
+    reason = str(
+        (result.get("runtime_diagnostic") or {}).get("reason")
+        or result.get("reason")
+        or result.get("status")
+        or "unknown_failure"
+    )
+    invalidated_assumptions = []
+    if reason in {"no_object_currently_held", "object_is_not_currently_held"}:
+        invalidated_assumptions.append("object_in_gripper")
+    if "terminal_pose" in reason or "collision_free" in reason:
+        invalidated_assumptions.append("interaction_pose_feasible")
+    if not invalidated_assumptions:
+        invalidated_assumptions.append("failed_stage_preconditions")
+    for key in (
+        "pending_confirmation",
+        "role_clarification_dialogue",
+        "evidence_gap_dialogue",
+        "process_gap_dialogue",
+        "relation_hypothesis_dialogue",
+        "causal_graph_clarification",
+        "support_clearance_dialogue",
+        "compound_command_sequence",
+    ):
+        session[key] = None
+    session["dialogue_focus_entities"] = []
+    if session.get("current_rcir"):
+        _append_rcir_receipt(
+            session,
+            session["current_rcir"],
+            "released_after_failure_world_resynchronization",
+        )
+        session["current_rcir"] = None
+    seed = "|".join(
+        [
+            str(session.get("session_id")),
+            str(session.get("world_revision")),
+            reason,
+            str(len(session.get("failure_recovery_history", [])) + 1),
+        ]
+    )
+    contract = {
+        "schema_version": "1.0.0",
+        "contract_id": "failure_recovery_" + hashlib.sha1(seed.encode("utf-8")).hexdigest()[:16],
+        "status": "awaiting_recovery_or_replacement_task",
+        "failed_status": result.get("status"),
+        "failed_reason": reason,
+        "failed_stage": (result.get("runtime_diagnostic") or {}).get("stage"),
+        "world_revision": int(session.get("world_revision", 0)),
+        "fact_authority_ref": ledger.get("ledger_id"),
+        "preserved_role_bindings": preserved_bindings,
+        "current_verified_state": {
+            "held_by_executor": held_by_executor,
+            "held_by_human": held_by_human,
+            "support_relations": support_relations,
+        },
+        "invalidated_assumptions": sorted(set(invalidated_assumptions)),
+        "released_task_state": {
+            "old_motion_path_discarded": True,
+            "stale_dialogue_slots_discarded": True,
+            "stale_focus_discarded": True,
+        },
+        "resume_policy": "recompile_from_current_world_facts_and_new_structured_language",
+        "human_report_commits_physical_fact": False,
+        "control_gateway": "P018",
+        "verification_gateway": "P016",
+        "direct_execution_allowed": False,
+    }
+    session["failure_recovery_contract"] = contract
+    history = session.setdefault("failure_recovery_history", [])
+    history.append(deepcopy(contract))
+    if len(history) > 16:
+        del history[:-16]
+    diagnostic = deepcopy(result.get("runtime_diagnostic") or {})
+    if diagnostic:
+        session["last_runtime_diagnostic"] = diagnostic
+    entity_labels = {
+        ref: str((objects.get(ref) or {}).get("label") or ref)
+        for ref in objects
+    }
+    executor_text = (
+        "机器人当前持有" + "、".join(entity_labels.get(ref, ref) for ref in held_by_executor.values())
+        if held_by_executor
+        else "机器人当前双手为空"
+    )
+    human_text = "；".join(
+        f"{entity_labels.get(item['entity_ref'], item['entity_ref'])}由"
+        f"{entity_labels.get(item['holder_ref'], item['holder_ref'])}持有"
+        for item in held_by_human
+    )
+    result["failure_recovery_contract"] = deepcopy(contract)
+    result["world_state_resynchronized"] = True
+    result["prompt"] = (
+        f"当前执行已断开：{_failure_reason_text(reason)}。"
+        f"我已重新读取当前世界事实：{executor_text}"
+        f"{'；' + human_text if human_text else ''}。"
+        "旧路径、旧追问槽和旧焦点已释放。你可以直接给出完整的新请求；"
+        "如果我掌握的持有或位置状态不对，请说明对象和当前关系，我会先重新观察，口头说明不会直接写成物理事实。"
+    )
+    return contract
+
+
+def _retire_failure_recovery_contract(
+    session: dict[str, Any], *, reason: str
+) -> dict[str, Any] | None:
+    """Close recovery metadata before a new request enters normal compilation."""
+    contract = session.get("failure_recovery_contract")
+    if not contract:
+        return None
+    retired = deepcopy(contract)
+    retired["status"] = "retired"
+    retired["retirement_reason"] = reason
+    retired["retired_at_world_revision"] = int(session.get("world_revision", 0))
+    history = session.setdefault("failure_recovery_history", [])
+    for index in range(len(history) - 1, -1, -1):
+        if history[index].get("contract_id") == retired.get("contract_id"):
+            history[index] = deepcopy(retired)
+            break
+    else:
+        history.append(deepcopy(retired))
+    session["failure_recovery_contract"] = None
+    return retired
+
+
+def _continue_failure_recovery_state_report(
+    session: dict[str, Any], analysis: dict[str, Any]
+) -> dict[str, Any] | None:
+    """Consume structured correction evidence without reparsing surface language."""
+    contract = session.get("failure_recovery_contract")
+    if not contract:
+        return None
+    reports = [
+        item
+        for item in (
+            (analysis.get("situated_event_frame") or {}).get(
+                "reported_state_candidates", []
+            )
+        )
+        if item.get("predicate") in {"received_by", "held_by"}
+    ]
+    if not reports:
+        return None
+    report = deepcopy(reports[0])
+    role = (
+        (analysis.get("semantic_constraint_frame") or {})
+        .get("roles", {})
+        .get(report.get("subject_role") or "theme", {})
+    )
+    compatible_kinds = set(role.get("compatible_kinds") or [])
+    constraints = role.get("constraints") or []
+    candidates = []
+    for item in session.get("runtime_objects", []):
+        if item.get("active") is False:
+            continue
+        if compatible_kinds and item.get("kind") not in compatible_kinds:
+            continue
+        observed_attributes = observed_perceptual_attributes(item)
+        if any(
+            observed_attributes.get(constraint.get("observation_field"))
+            not in set(constraint.get("accepted_observed_values") or [])
+            for constraint in constraints
+            if constraint.get("observation_field")
+        ):
+            continue
+        candidates.append(item)
+    preserved_ref = (contract.get("preserved_role_bindings") or {}).get("theme")
+    if preserved_ref:
+        preserved = [item for item in candidates if item.get("entity_id") == preserved_ref]
+        if preserved:
+            candidates = preserved
+    if report.get("object_role") == "human_speaker":
+        speaker_ref = (session.get("interaction_role_bindings") or {}).get(
+            "human_speaker"
+        )
+        verified_human_refs = {
+            item.get("entity_ref")
+            for item in (
+                (contract.get("current_verified_state") or {}).get(
+                    "held_by_human", []
+                )
+            )
+            if item.get("holder_ref") == speaker_ref and item.get("entity_ref")
+        }
+        verified = [
+            item for item in candidates if item.get("entity_id") in verified_human_refs
+        ]
+        if len(verified) == 1:
+            candidates = verified
+    if len(candidates) != 1:
+        labels = [str(item.get("label") or item.get("entity_id")) for item in candidates]
+        return {
+            "status": "failure_recovery_report_grounding_required",
+            "prompt": (
+                "我已把这句话识别为当前持有关系的纠正线索，但还不能唯一绑定对象。"
+                + (f"当前候选是：{'、'.join(labels)}。请补充可观察特征。" if labels else "当前没有符合描述的可观察候选，请补充对象名称或让我重新观察。")
+            ),
+            "reported_state_candidate": report,
+            "runtime_fact_committed": False,
+            "failure_recovery_contract": deepcopy(contract),
+            "session": get_session(session["session_id"]),
+        }
+    entity_ref = candidates[0]["entity_id"]
+    object_role = report.get("object_role")
+    relation_object = (
+        (session.get("interaction_role_bindings") or {}).get("human_speaker")
+        if object_role == "human_speaker"
+        else next(iter(_holding_by_effector(session)), "executor")
+    )
+    report.update({
+        "subject": entity_ref,
+        "object": relation_object,
+        "world_revision": int(session.get("world_revision", 0)),
+        "runtime_fact_committed": False,
+    })
+    session.setdefault("human_reported_fact_candidates", []).append(deepcopy(report))
+    current_facts = _authoritative_current_facts(
+        session, reason="failure_recovery_state_report_comparison"
+    )
+    already_verified = any(
+        fact.get("predicate") == report.get("predicate")
+        and fact.get("subject") == entity_ref
+        and fact.get("object") == relation_object
+        for fact in current_facts
+    )
+    if already_verified:
+        return {
+            "status": "failure_recovery_state_report_already_verified",
+            "prompt": (
+                f"你说的状态与当前验真事实一致：{candidates[0].get('label', entity_ref)}仍由你持有。"
+                f"上次中断是因为{_failure_reason_text(str(contract.get('failed_reason') or ''))}，"
+                "不是杯子身份丢失。旧路径已经释放；请直接说明接下来要我做什么，我会从当前状态重新规划。"
+            ),
+            "reported_state_candidate": report,
+            "runtime_fact_committed": False,
+            "matched_verified_fact": True,
+            "failure_recovery_contract": deepcopy(contract),
+            "session": get_session(session["session_id"]),
+        }
+    return {
+        "status": "failure_recovery_observation_required",
+        "prompt": (
+            f"我已把“{candidates[0].get('label', entity_ref)}当前由指定主体持有”记录为待验真线索，"
+            "但它与当前权威事实不一致，因此没有直接改写世界状态。请允许我重新观察对象和手部关系；"
+            "验真后我会更新事实账本并重新规划。"
+        ),
+        "reported_state_candidate": report,
+        "runtime_fact_committed": False,
+        "matched_verified_fact": False,
+        "required_evidence": "qualified_multimodal_observation_or_p016_verification",
+        "failure_recovery_contract": deepcopy(contract),
+        "session": get_session(session["session_id"]),
+    }
+
+
 def _refresh_runtime_cognitive_signal_candidates(
     session: dict[str, Any], *, reason: str
 ) -> list[dict[str, Any]]:
@@ -540,8 +878,14 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator", scene_id
         "cognitive_signal_candidates": [],
         "cognitive_inquiry_working_set": [],
         "runtime_diagnostic_history": [],
+        "rule_evaluation_history": [],
+        "last_rule_evaluation": None,
+        "last_structured_explanation": None,
+        "failure_recovery_contract": None,
+        "failure_recovery_history": [],
         "retired_fact_authority_refs": [],
         "concept_gap_dialogue": None,
+        "concept_gap_dialogue_history": [],
         "open_world_observation": None,
         "confirmed_visual_bindings": [],
         "language_adapters": [],
@@ -755,6 +1099,7 @@ def _archive_and_release_task_context(
         "process_gap_dialogue",
         "causal_graph_clarification",
         "support_clearance_dialogue",
+        "failure_recovery_contract",
     ):
         session[key] = None
     return capsule
@@ -2712,6 +3057,7 @@ def _language_context_entities(session: dict[str, Any]) -> list[dict[str, Any]]:
                 "functional_affordances": deepcopy(concept.get("functional_affordances", [])),
                 "compatible_kinds": deepcopy(concept.get("compatible_kinds", [entity.get("kind")])),
                 "focus_source": "verified_holding_fact",
+                "observed_attributes": observed_perceptual_attributes(entity),
             }
     speaker_ref = (session.get("interaction_role_bindings") or {}).get(
         "human_speaker"
@@ -2744,6 +3090,7 @@ def _language_context_entities(session: dict[str, Any]) -> list[dict[str, Any]]:
                     concept.get("compatible_kinds", [entity.get("kind")])
                 ),
                 "focus_source": "verified_human_possession_fact",
+                "observed_attributes": observed_perceptual_attributes(entity),
                 "relation_object_ref": speaker_ref,
                 "world_revision": session.get("world_revision"),
             },
@@ -2764,6 +3111,7 @@ def _language_context_entities(session: dict[str, Any]) -> list[dict[str, Any]]:
                 "functional_affordances": deepcopy(concept.get("functional_affordances", [])),
                 "compatible_kinds": deepcopy(concept.get("compatible_kinds", [])),
                 "focus_source": "human_confirmed_visual_binding",
+                "observed_attributes": deepcopy(binding.get("observed_attributes", {})),
             })
     current_turn = int(session.get("interaction_turn", 0))
     for item in session.get("dialogue_focus_entities", []):
@@ -3163,6 +3511,18 @@ def _compose_session_language(
                     "basis": "current_verified_relation_after_goal_schema_projection",
                     "prior_goal_role_reused": False,
                 }
+    rule_evaluation = evaluate_runtime_rules(
+        analysis,
+        session.get("runtime_objects", []),
+        session.get("executor_profile", {}),
+        world_revision=int(session.get("world_revision", 0)),
+    )
+    analysis["rule_evaluation"] = rule_evaluation
+    session["last_rule_evaluation"] = deepcopy(rule_evaluation)
+    rule_history = session.setdefault("rule_evaluation_history", [])
+    rule_history.append(deepcopy(rule_evaluation))
+    if len(rule_history) > 16:
+        del rule_history[:-16]
     situated_frame = compile_situated_event_frame(
         utterance,
         analysis,
@@ -3202,6 +3562,12 @@ def _compose_session_language(
     )
     analysis["rcir_dialogue_projection"] = realize_rcir_dialogue(
         rcir, entity_labels=entity_labels
+    )
+    analysis["structured_explanation"] = explanation_from_structured_state(
+        analysis, rule_evaluation
+    )
+    session["last_structured_explanation"] = deepcopy(
+        analysis["structured_explanation"]
     )
     session["last_rcir_dialogue_projection"] = deepcopy(
         analysis["rcir_dialogue_projection"]
@@ -3281,6 +3647,13 @@ def _language_understanding_view(analysis: dict[str, Any]) -> dict[str, Any]:
         "role_bindings": deepcopy(analysis.get("role_bindings", {})),
         "input_normalizations": deepcopy(
             analysis.get("input_normalizations", [])
+        ),
+        "modifier_contract": deepcopy(analysis.get("modifier_contract")),
+        "reference_resolution": deepcopy(analysis.get("reference_resolution")),
+        "salience_projection": deepcopy(analysis.get("salience_projection")),
+        "rule_evaluation": deepcopy(analysis.get("rule_evaluation")),
+        "structured_explanation": deepcopy(
+            analysis.get("structured_explanation")
         ),
         "canonical_utterance": analysis.get("canonical_utterance"),
         "semantic_canonical_utterance": analysis.get("canonical_utterance"),
@@ -8827,7 +9200,11 @@ def execute_command(
         observation["language_understanding"] = language_view
         return observation
     active_gap_dialogue = session.get("concept_gap_dialogue") or {}
-    if active_gap_dialogue.get("status") == "collecting_minimum_causal_contract":
+    if (
+        active_gap_dialogue.get("status") == "collecting_minimum_causal_contract"
+        and not grounded_role_bindings
+        and not scoped_authorization
+    ):
         continued = continue_concept_gap_dialogue(
             active_gap_dialogue,
             answer=original_text,
@@ -8862,6 +9239,49 @@ def execute_command(
     relocation_preview = _build_observed_relocation_preview(session, text)
     if relocation_preview:
         return relocation_preview
+    grounded_navigation_destination = (
+        (
+            (language_analysis.get("grounded_intent_frame") or {})
+            .get("roles", {})
+            .get("destination", {})
+        ).get("binding")
+        or {}
+    )
+    navigation_destination_role = (
+        (language_analysis.get("role_bindings") or {}).get("destination") or {}
+    )
+    if (
+        any(
+            item.get("operator") == "navigate_to"
+            for item in language_analysis.get("event_candidates", [])
+        )
+        and grounded_navigation_destination.get("entity_ref")
+        and navigation_destination_role.get("reference") == "human_speaker"
+        and not (language_analysis.get("role_bindings") or {}).get("direction")
+    ):
+        result = _build_object_relative_motion(
+            session,
+            {
+                "status": "contextual_affordance_available",
+                "available": True,
+                "entity_ref": grounded_navigation_destination["entity_ref"],
+                "operator_candidate": "navigate_near",
+                "active_role": "destination",
+                "task_context": original_text,
+                "scoped_authorization_present": bool(scoped_authorization),
+                "grounding_basis": {
+                    "source": "grounded_intent_frame_destination_role",
+                    "spatial_relation": (
+                        navigation_destination_role.get("spatial_relation")
+                    ),
+                    "world_revision": session.get("world_revision"),
+                    "surface_text_reparsed": False,
+                },
+            },
+            decision_started_ns,
+        )
+        result["language_understanding"] = language_view
+        return result
     role_grounding_context = grounded_role_bindings or (scoped_authorization or {}).get("role_bindings") or {}
     task_perception = build_task_perception_result(
         _scene_for_session(session), session, text, grounded_role_bindings=role_grounding_context
@@ -9371,6 +9791,17 @@ def _finalize_motion_result(
     SESSIONS[session_id] = before
     frames = result.get("frames", [])
     if not frames:
+        if _requires_failure_resynchronization(result):
+            # Roll planning mutations back first, then reconstruct exclusively
+            # from the authoritative current-world ledger. Failed dialogue and
+            # control slots must not become a second state source.
+            _install_failure_recovery_contract(SESSIONS[session_id], result)
+            result["session"] = get_session(session_id)
+            return {
+                "status": result.get("status"),
+                "immediate_result": result,
+                "session": get_session(session_id),
+            }
         if pending_confirmation:
             SESSIONS[session_id]["pending_confirmation"] = pending_confirmation
         if result.get("task_perception_frame"):
@@ -9385,6 +9816,41 @@ def _finalize_motion_result(
             SESSIONS[session_id]["process_gap_dialogue"] = process_gap_dialogue
         result["session"] = get_session(session_id)
         return {"status": result.get("status"), "immediate_result": result, "session": get_session(session_id)}
+    modifier_contract = (language_understanding or {}).get("modifier_contract") or {}
+    modifier_constraints = modifier_contract.get("execution_constraints") or {}
+    duration_scale = max(
+        1.0, float(modifier_constraints.get("duration_scale_min") or 1.0)
+    )
+    if duration_scale > 1.0:
+        for frame in frames:
+            frame["duration_ms"] = max(
+                1,
+                int(
+                    math.ceil(
+                        float(frame.get("duration_ms") or 1) * duration_scale
+                    )
+                ),
+            )
+    if modifier_constraints.get("minimum_disturbance_requested"):
+        effective = result.setdefault("effective_execution_envelope", {}).setdefault(
+            "effective_constraints", {}
+        )
+        current_force = float(
+            effective.get("max_contact_force_n")
+            or before.get("executor_profile", {}).get("max_contact_force_n")
+            or 15.0
+        )
+        effective["max_contact_force_n"] = min(current_force, 15.0)
+    result["modifier_execution_contract"] = {
+        "modifier_contract_ref": modifier_contract.get("contract_id"),
+        "duration_scale_applied": duration_scale,
+        "minimum_disturbance_applied": bool(
+            modifier_constraints.get("minimum_disturbance_requested")
+        ),
+        "speed_or_force_request_never_relaxed_executor_or_policy_limit": True,
+        "control_gateway": "P018",
+        "verification_gateway": "P016",
+    }
     job_id = "motion_" + uuid4().hex[:12]
     job = {
         "job_id": job_id,
@@ -9593,6 +10059,38 @@ def begin_motion_command(
         )
         if graph_clarification:
             return graph_clarification
+        recovery_state_report = _continue_failure_recovery_state_report(
+            session, early_analysis
+        )
+        if recovery_state_report:
+            return {
+                "status": recovery_state_report.get("status"),
+                "immediate_result": recovery_state_report,
+                "session": recovery_state_report.get("session"),
+            }
+    if (
+        session.get("failure_recovery_contract")
+        and not internal_stage
+        and not scoped_authorization
+        and (early_analysis or {}).get("speech_act") == "task_request"
+        and any(
+            item.get("operator")
+            for item in (early_analysis or {}).get("event_candidates", [])
+        )
+    ):
+        retired_recovery = _retire_failure_recovery_contract(
+            session, reason="superseded_by_new_structured_task_request"
+        )
+        _debug_runtime(
+            "failure_recovery_contract_retired",
+            session,
+            contract_id=(retired_recovery or {}).get("contract_id"),
+            new_operators=[
+                item.get("operator")
+                for item in (early_analysis or {}).get("event_candidates", [])
+                if item.get("operator")
+            ],
+        )
     pending = session.get("pending_confirmation")
     confirmation_value = _context_confirmation_value(utterance)
     if pending and confirmation_value is not None and not scoped_authorization:
@@ -9754,6 +10252,103 @@ def begin_motion_command(
     language_analysis = _compose_session_language(
         session, text, grounded_role_bindings=grounded_role_bindings
     )
+    modifier_conflicts = (
+        (language_analysis.get("modifier_contract") or {}).get("conflicts", [])
+    )
+    if modifier_conflicts and not internal_stage and not scoped_authorization:
+        immediate = {
+            "status": "modifier_conflict_clarification_required",
+            "reason": "same_event_has_conflicting_modifier_values",
+            "prompt": "这条请求对同一动作给出了冲突的执行方式，请确认最终采用哪一个。",
+            "modifier_conflicts": deepcopy(modifier_conflicts),
+            "modifier_contract": deepcopy(language_analysis.get("modifier_contract")),
+            "runtime_fact_committed": False,
+            "direct_execution_allowed": False,
+            "session": get_session(session_id),
+        }
+        return {
+            "status": immediate["status"],
+            "immediate_result": immediate,
+            "session": immediate["session"],
+        }
+    rule_evaluation = language_analysis.get("rule_evaluation") or {}
+    if rule_evaluation.get("status") == "blocked":
+        explanation = language_analysis.get("structured_explanation") or {}
+        immediate = {
+            "status": "rule_blocked_execution",
+            "reason": "p018_rule_evaluation_blocked_candidate",
+            "prompt": explanation.get("text") or "当前规则禁止执行该候选动作。",
+            "rule_evaluation": deepcopy(rule_evaluation),
+            "structured_explanation": deepcopy(explanation),
+            "modifier_contract": deepcopy(language_analysis.get("modifier_contract")),
+            "runtime_fact_committed": False,
+            "direct_execution_allowed": False,
+            "control_gateway": "P018",
+            "verification_gateway": "P016",
+            "session": get_session(session_id),
+        }
+        return {
+            "status": immediate["status"],
+            "immediate_result": immediate,
+            "session": immediate["session"],
+        }
+    if (
+        not internal_stage
+        and not scoped_authorization
+        and not compound_dispatch
+        and (session.get("concept_gap_dialogue") or {}).get("status")
+        == "collecting_minimum_causal_contract"
+        and language_analysis.get("speech_act") == "task_request"
+        and (
+            len(language_analysis.get("event_frames", [])) >= 2
+            or bool(
+                (language_analysis.get("discourse_roles") or {}).get(
+                    "task_correction"
+                )
+            )
+        )
+    ):
+        superseded_gap = deepcopy(session["concept_gap_dialogue"])
+        superseded_gap["status"] = "superseded_by_new_structured_task"
+        superseded_gap["superseded_at_world_revision"] = int(
+            session.get("world_revision", 0)
+        )
+        superseded_gap["surface_text_reparsed_by_downstream"] = False
+        history = session.setdefault("concept_gap_dialogue_history", [])
+        history.append(superseded_gap)
+        if len(history) > 16:
+            del history[:-16]
+        session["concept_gap_dialogue"] = None
+        relation_gate_enabled = True
+        _debug_runtime(
+            "concept_gap_superseded_by_new_structured_task",
+            session,
+            dialogue_id=superseded_gap.get("dialogue_id"),
+            new_operators=[
+                item.get("operator")
+                for item in language_analysis.get("event_candidates", [])
+                if item.get("operator")
+            ],
+        )
+    if (
+        not internal_stage
+        and not scoped_authorization
+        and not compound_dispatch
+        and (session.get("concept_gap_dialogue") or {}).get("status")
+        == "collecting_minimum_causal_contract"
+    ):
+        continued_gap = execute_command(
+            session_id,
+            text,
+            scoped_authorization,
+            language_analysis,
+            grounded_role_bindings,
+        )
+        return {
+            "status": continued_gap.get("status"),
+            "immediate_result": continued_gap,
+            "session": get_session(session_id),
+        }
     if (
         not internal_stage
         and not scoped_authorization

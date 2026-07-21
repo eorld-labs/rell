@@ -134,6 +134,7 @@ def make_event(
     produces_predicate_refs: list[str] | None = None,
     arbitration_ref: str | None = None,
     verification_ref: str | None = None,
+    modifiers: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     seed = {
         "event_type": event_type,
@@ -141,6 +142,7 @@ def make_event(
         "world_revision": int(world_revision),
         "temporal_scope": temporal_scope,
         "evidence_refs": sorted(set(evidence_refs or [])),
+        "modifiers": deepcopy(modifiers or []),
     }
     return {
         "schema_version": PRIMITIVE_SCHEMA_VERSION,
@@ -156,6 +158,7 @@ def make_event(
         "produces_predicate_refs": sorted(set(produces_predicate_refs or [])),
         "arbitration_ref": arbitration_ref,
         "verification_ref": verification_ref,
+        "modifiers": deepcopy(modifiers or []),
     }
 
 

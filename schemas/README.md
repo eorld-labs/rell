@@ -23,6 +23,10 @@
 | `rcir_evidence_envelope.schema.json` | 定义证据来源、资格、世界版本、依赖和事实晋级权限。 |
 | `rcir_type_relations.json` | 定义七类基本类型间的允许关系、权限含义和禁止旁路。 |
 | `inquiry_contract.schema.json` | 定义认识目标、竞争假设、消解路线、关闭条件及 P018/P016 网关。 |
+| `rcir_modifier_contract.schema.json` | 定义事件级、全局级与语篇级修饰参数、冲突询问和只收紧不放宽的执行边界。 |
+| `rcir_reference_resolution.schema.json` | 定义指代候选、权威层级、时态来源、歧义询问及非事实提交边界。 |
+| `rcir_salience_projection.schema.json` | 定义从当前事实、任务角色和对话焦点派生且不可持久化为第二状态源的显著性投影。 |
+| `rcir_rule_evaluation.schema.json` | 定义经 P018 仲裁、经 P016 验真的规则结果及其非事实源边界。 |
 
 ## 兼容入口
 

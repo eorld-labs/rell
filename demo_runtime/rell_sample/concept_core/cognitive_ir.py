@@ -35,6 +35,89 @@ FORBIDDEN_DOWNSTREAM_TEXT_KEYS = {
     "question",
 }
 
+
+def _rcir_modifier_view(contract: dict[str, Any] | None) -> dict[str, Any]:
+    contract = contract or {}
+    return {
+        "contract_ref": contract.get("contract_id"),
+        "modifiers": [
+            {
+                key: deepcopy(item.get(key))
+                for key in (
+                    "modifier_id",
+                    "dimension",
+                    "value",
+                    "scope",
+                    "event_index",
+                    "basis",
+                    "runtime_fact_committed",
+                    "direct_execution_allowed",
+                )
+            }
+            for item in contract.get("modifiers", [])
+        ],
+        "conflicts": deepcopy(contract.get("conflicts", [])),
+        "inquiry_required": bool(contract.get("inquiry_contract")),
+        "execution_constraints": deepcopy(
+            contract.get("execution_constraints", {})
+        ),
+        "evidence_boundary": deepcopy(contract.get("evidence_boundary", {})),
+    }
+
+
+def _rcir_reference_view(resolution: dict[str, Any] | None) -> dict[str, Any]:
+    resolution = resolution or {}
+    salience = resolution.get("salience_projection") or {}
+    return {
+        "resolution_ref": resolution.get("resolution_id"),
+        "resolved_references": [
+            {
+                "reference_type": item.get("reference_type"),
+                "selected": item.get("selected"),
+                "selected_concept_id": item.get("selected_concept_id"),
+                "binding_kind": item.get("binding_kind"),
+                "grounding_required": item.get("grounding_required", False),
+                "unique": item.get("unique"),
+                "requires_confirmation": item.get("requires_confirmation"),
+                "candidate_refs": [
+                    candidate.get("entity_ref")
+                    for candidate in item.get("candidates", [])
+                ],
+                "runtime_fact_committed": item.get("runtime_fact_committed"),
+            }
+            for item in resolution.get("resolved_references", [])
+        ],
+        "unresolved_count": len(resolution.get("unresolved", [])),
+        "inquiry_contracts": [
+            {
+                "reason": item.get("reason"),
+                "candidate_entity_refs": deepcopy(
+                    item.get("candidate_entity_refs", [])
+                ),
+                "minimum_information_requested": item.get(
+                    "minimum_information_requested"
+                ),
+                "candidate_only": True,
+                "runtime_fact_committed": False,
+            }
+            for item in resolution.get("inquiry_contracts", [])
+        ],
+        "salience_projection": {
+            "ranked_entities": [
+                {
+                    "entity_ref": item.get("entity_ref"),
+                    "score": item.get("score"),
+                    "score_components": deepcopy(item.get("score_components", {})),
+                }
+                for item in salience.get("ranked_entities", [])
+            ],
+            "derived_only": True,
+            "persistent_state_source": False,
+            "runtime_fact_committed": False,
+        },
+        "evidence_boundary": deepcopy(resolution.get("evidence_boundary", {})),
+    }
+
 ARCHITECTURE_INVARIANTS = (
     "language_does_not_commit_physical_fact",
     "perception_candidate_is_not_runtime_fact",
@@ -374,6 +457,22 @@ def build_situated_event_graph(
             "event_origin": item.get("source"),
             "temporal_scope": "requested_current_or_future",
             "physical_fact_committed": False,
+            "modifiers": [
+                {
+                    key: deepcopy(modifier.get(key))
+                    for key in (
+                        "modifier_id",
+                        "dimension",
+                        "value",
+                        "scope",
+                        "event_index",
+                        "basis",
+                        "runtime_fact_committed",
+                        "direct_execution_allowed",
+                    )
+                }
+                for modifier in item.get("modifiers", [])
+            ],
         }
         for index, item in enumerate(language_analysis.get("event_candidates", []))
     ]
@@ -428,6 +527,9 @@ def build_situated_event_graph(
                 "incoming_discourse_relation"
             ),
             "discourse_polarity": frame.get("discourse_polarity", "asserted"),
+            "modifier_contract": _rcir_modifier_view(
+                frame.get("modifier_contract")
+            ),
         }
         for index, frame in enumerate(language_analysis.get("event_frames", []))
     ]
@@ -454,6 +556,15 @@ def build_situated_event_graph(
         ),
         "roles": roles,
         "discourse_roles": discourse_roles,
+        "modifier_contract": _rcir_modifier_view(
+            language_analysis.get("modifier_contract")
+        ),
+        "reference_resolution": _rcir_reference_view(
+            language_analysis.get("reference_resolution")
+        ),
+        "rule_evaluation": deepcopy(
+            language_analysis.get("rule_evaluation") or {}
+        ),
         "goal": {
             "goal_relation": goal_relation,
             "fact_candidates": goal_facts,

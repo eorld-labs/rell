@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/schemas/rcir_rule_evaluation.schema.json",
+  "title": "RCIR RuleEvaluation",
+  "type": "object",
+  "required": ["schema_version", "evaluation_kind", "evaluation_id", "world_revision", "status", "triggered_rules", "effective_constraints", "control_gateway", "verification_gateway", "direct_execution_allowed", "runtime_fact_committed", "rule_evaluation_is_not_fact_source"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "evaluation_kind": {"const": "RuleEvaluation"},
+    "evaluation_id": {"type": "string", "pattern": "^rule_evaluation_[a-f0-9]{16}$"},
+    "world_revision": {"type": "integer", "minimum": 0},
+    "status": {"enum": ["allowed", "allowed_with_constraints", "blocked", "inquiry_required"]},
+    "triggered_rules": {"type": "array", "items": {"type": "object"}},
+    "effective_constraints": {"type": "array", "items": {"type": "object"}},
+    "control_gateway": {"const": "P018"},
+    "verification_gateway": {"const": "P016"},
+    "direct_execution_allowed": {"const": false},
+    "runtime_fact_committed": {"const": false},
+    "rule_evaluation_is_not_fact_source": {"const": true}
+  },
+  "additionalProperties": false
+}

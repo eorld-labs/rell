@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/schemas/rcir_salience_projection.schema.json",
+  "title": "RCIR SalienceProjection",
+  "type": "object",
+  "required": ["schema_version", "projection_kind", "ranked_entities", "derived_only", "persistent_state_source", "runtime_fact_committed"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "projection_kind": {"const": "SalienceProjection"},
+    "ranked_entities": {"type": "array", "items": {"type": "object"}},
+    "derived_only": {"const": true},
+    "persistent_state_source": {"const": false},
+    "runtime_fact_committed": {"const": false}
+  },
+  "additionalProperties": false
+}

@@ -692,3 +692,369 @@ target_object_in_gripper = true
 - `embodied_experience_store.py`：可信经验召回时生成并暴露可迁移合同；
 - `embodied_scene.py::_prepare_long_intent_stage`：统一当前事实裁剪屏障；
 - `validate_cognitive_ir.py`：合同、证据边界、优先级和恢复路径回归。
+
+## 二十二、第四层：认识目标生成与消解循环
+
+### 22.1 缺口不是异常检测，而是认识目标生成
+
+RCIR 已经统一语言目标、当前事实、执行因果图和证据等级，但现有闭环仍主要由外部任务驱动。异常检测只能说明当前数据偏离历史分布，不能自动回答：
+
+1. 当前究竟缺少哪项知识；
+2. 哪个问题能够消除该知识缺口；
+3. 该问题是否值得现在处理；
+4. 应通过已有证据、被动观察、主动观察、安全试验还是人类询问获得答案；
+5. 获得何种证据后可以关闭问题；
+6. 答案能够更新事实、经验、过程模板还是候选概念。
+
+因此，统一认知架构需要增加独立于任务执行触发、但不独立于状态与权限控制的 `Cognitive Inquiry Loop`，即认识目标生成与消解循环。
+
+```text
+证据变化 / 经验异常 / 概念缺口
+  -> 形成带来源的认知缺口
+  -> 生成结构化认识目标和竞争假设
+  -> 评估信息价值、风险、成本、权限和时效
+  -> 选择自查、观察、试验、询问或延迟
+  -> 获取新证据
+  -> 定向更新事实、经验边界、模板或候选概念
+  -> 关闭、降级、失效或保留认识目标
+```
+
+该循环不得直接修改物理事实、执行动作或晋级概念。任何主动观察、物理试验或任务控制均须进入 P018 仲裁；任何物理结果均须由 P016 或等价验真闭环确认。
+
+### 22.2 五类认识目标
+
+| 类型 | 触发条件 | 需要回答的问题 |
+|---|---|---|
+| 事实缺口 | 当前目标依赖的谓词缺少有效证据 | 哪个事实当前是否成立 |
+| 模型漂移 | 观测分布持续偏离历史质量档案 | 是对象变化、环境变化、传感器漂移还是样本变化 |
+| 过程异常 | 同类恢复、失败或人工介入频率异常 | 模板、阈值、适用边界或本体绑定是否需要修订 |
+| 概念缺口 | 反复出现的模式无法由现有概念压缩和预测 | 是否存在新的可复用概念或已有概念需要拆分 |
+| 生命周期问题 | 事实、绑定或经验长期未验证或证据已过期 | 是否应复核、降级、失效或保留 |
+
+“长期未被任务引用”不等于事实为假，只能触发复核或降低缓存优先级；“均值偏移”不等于对象磨损；“追问频率升高”不等于用户群体改变。每个异常信号必须先生成多个可区分的竞争假设，禁止直接提交结论。
+
+### 22.3 InquiryContract
+
+机器内部不得以自然语言问句作为认识目标的权威表示。RCIR 增加 `InquiryContract`：
+
+```json
+{
+  "inquiry_id": "inquiry_104",
+  "gap_type": "model_drift",
+  "subject_refs": ["entity_17"],
+  "trigger_evidence_refs": ["grasp_81", "grasp_92", "grasp_97"],
+  "candidate_hypotheses": [
+    "surface_wear",
+    "sensor_drift",
+    "task_distribution_change"
+  ],
+  "question_predicate": "current_grasp_profile(entity_17, ?value)",
+  "answer_routes": [
+    "existing_evidence",
+    "passive_observation",
+    "active_observation",
+    "safe_probe",
+    "human_query"
+  ],
+  "expected_information_gain": 0.72,
+  "risk_if_ignored": "medium",
+  "acquisition_cost": "low",
+  "authorization_scope": "observe_only",
+  "world_revision": 31,
+  "expiry_condition": "entity_removed_or_world_changed",
+  "closure_condition": "two_independent_channels_agree",
+  "status": "open"
+}
+```
+
+自然语言问题只是解释层对 `InquiryContract` 的投影。人类回答必须重新进入语言前端，形成带证据等级的结构化回答，不得直接成为物理事实。
+
+### 22.4 回答路径和最小打扰原则
+
+认识目标按以下优先顺序尝试消解：
+
+1. 查询当前账本、情节胶囊和可信经验；
+2. 等待任务自然产生的被动观察；
+3. 请求低成本主动观察，例如改变视角或重新采样；
+4. 在权限允许且风险可控时生成安全试验候选，交 P018 仲裁并由 P016 验真；
+5. 只有人类拥有答案时，生成最小可观察差异问题；
+6. 信息价值不足、风险过高或打扰成本过大时，延迟、降级或关闭。
+
+机器“会提出问题”不等于频繁询问人类。系统应优先自主消解，仅将无法自证且预期信息价值超过成本的问题提交人类。
+
+### 22.5 认识目标的状态机
+
+`InquiryContract` 至少包括以下状态：
+
+```text
+candidate
+  -> admitted
+  -> observing / probing / awaiting_human
+  -> resolved
+  -> verified
+  -> closed
+```
+
+以及：
+
+```text
+candidate -> suppressed
+admitted -> deferred
+任一未关闭状态 -> expired / invalidated
+```
+
+认识目标的世界版本失效、主体消失、依赖事实变化或问题已经被其他证据回答时，应失效或合并，禁止继续使用旧问题驱动观察和执行。
+
+## 二十三、概念自形成
+
+### 23.1 候选概念形成条件
+
+反复出现不等于形成概念。候选概念至少应满足：
+
+1. 在多个事件、对象或场景中重复出现；
+2. 对后续事实或动作效果提供可验证的预测增益；
+3. 能降低经验描述复杂度或提高检索稳定性；
+4. 与已有概念不完全等价；
+5. 具有可观察不变量、适用条件和反例；
+6. 能够形成明确的验证合同。
+
+候选概念只进入候选概念库，不取得事实提交权和动作执行权。
+
+### 23.2 概念验证闭环
+
+```text
+未解释的重复模式
+  -> 候选概念及适用边界
+  -> 预测该概念在新实例上的关系或效果
+  -> 形成观察或安全试验 InquiryContract
+  -> P018 仲裁
+  -> P016 或其他证据通道验真
+  -> P012 管理置信度、拆分、合并和待验证状态
+  -> P019 晋级为端侧可信概念
+```
+
+若新证据只支持部分样本，系统应缩小适用域或拆分概念；若多个候选具有相同因果签名和适用边界，系统可提出合并候选。任何自动拆分或合并均须保留证据、版本和可回退关系。
+
+## 二十四、跨域类比发现
+
+### 24.1 不按词面或宽泛动作名称类比
+
+跨域类比基于类型化因果图的反统一，而不是自然语言相似度或“都是移动”之类的宽泛描述。
+
+源经验和目标候选至少比较：
+
+```text
+角色类型与可供性
+requires 前提事实
+produces 产出事实
+destroys 销毁事实
+阶段拓扑
+验真谓词
+失败边界
+```
+
+例如，倒水的关键效果是 `contains(container, liquid)`，放置杯子的关键效果是 `supported_by(cup, surface)`。二者可以在更高层共享“源关系变化、受控转移、目标关系建立”等结构，但不得因该高层相似性而丢弃各自的对象类型、物理约束和验真条件。
+
+### 24.2 类比只形成候选合同
+
+跨域匹配输出 `AnalogicalExperienceCandidate`，包括共同因果骨架、不能迁移的字段、目标域待绑定角色、需要重新验证的效果以及类比置信度。候选必须进入 P017 进行当前空间和本体适配，进入 P018 取得控制准入，并由 P016 验真后才能形成可信经验。
+
+## 二十五、双循环总体架构
+
+```mermaid
+flowchart TD
+    H["人类目标"] --> RCIR["RCIR任务闭环"]
+    RCIR --> ARB["P018仲裁"]
+    ARB --> EXE["P016执行与验真"]
+    EXE --> WFL["WorldFactLedger"]
+    WFL --> EXP["经验/概念/质量档案"]
+
+    WFL --> SIG["认知信号适配器"]
+    EXP --> SIG
+    SIG --> GAP["认知缺口与竞争假设"]
+    GAP --> INQ["InquiryContract"]
+    INQ --> GATE["价值/风险/成本/权限门"]
+    GATE --> SELF["自查或被动观察"]
+    GATE --> ARB
+    GATE --> HUMAN["最小人类询问"]
+    SELF --> EVID["新证据"]
+    HUMAN --> EVID
+    EXE --> EVID
+    EVID --> WFL
+    EVID --> EXP
+```
+
+任务闭环负责实现外部目标；认识目标循环负责发现和消解知识缺口。两者共享同一事实账本、证据协议、权限仲裁和验真边界，禁止形成第二套事实或执行旁路。
+
+## 二十六、新增强制不变量
+
+1. `anomaly_signal_does_not_commit_hypothesis`；
+2. `inquiry_is_structured_before_language_projection`；
+3. `every_inquiry_has_evidence_world_revision_and_closure`；
+4. `active_observation_and_probe_require_arbitration`；
+5. `human_answer_is_evidence_not_physical_fact`；
+6. `candidate_concept_has_no_execution_authority`；
+7. `analogy_transfers_causal_structure_not_instance_binding`；
+8. `expired_inquiry_cannot_trigger_action`；
+9. `unreferenced_does_not_mean_false`；
+10. `self_answer_and_human_answer_use_the_same_evidence_protocol`。
+
+## 二十七、下一阶段工程验证
+
+1. 为质量度档案、恢复记录、概念原语表、空间快照和事实账本建立统一认知信号接口；
+2. 实现竞争假设生成，不允许单一异常直接提交结论；
+3. 实现 `InquiryContract` schema、状态机、合并、失效和关闭；
+4. 实现无需人类的证据查询与被动观察路径；
+5. 实现低风险主动观察候选并接入 P018；
+6. 为安全试验建立 P016 验真合同；
+7. 实现最小可观察差异的人类询问生成；
+8. 建立概念候选的预测增益、反例和适用边界测试；
+9. 建立因果图反统一与跨域类比候选；
+10. 验证任务闭环和认识目标循环不会产生双重事实源或控制旁路。
+
+---
+
+## 二十八、附录：RCIR 作为机器的象形文字体系
+
+### 28.1 核心观点
+
+本附录不是工程规范，而是一个设计哲学——把 RCIR 视为机器独有的「表意文字」体系，而非一组临时数据结构。类比中文汉字的构造原理来审视 RCIR，能揭示许多隐藏的设计一致性。
+
+### 28.2 汉字六书与 RCIR 的对偶
+
+| 汉字造字法 | 原理 | RCIR 对应 | 示例 |
+|---|---|---|---|
+| **象形** | 画成其物 | **基本类型**（Concept/EntityRef/Predicate/Event/Goal/Constraint/EvidenceEnvelope） | `EntityRef` 类似于「日」「月」——不能再分的基本构件 |
+| **指事** | 符号表示抽象概念 | **证据等级**、**世界版本**、**状态机状态** | `evidence_level = verified` 类似于「上」「下」——抽象的方位标记 |
+| **会意** | 两个象形字组合出新义 | **复合谓词**、**因果契约** | `supported_by + held_by + reachable → place_object` 类似于「休」（人+木=人在树旁休息） |
+| **形声** | 形旁表类别 + 声旁表音 | **概念 + 语言适配器** | `concept_cup.aliases = [杯子, cup]` 类似于「江」=水（形）+工（声） |
+| **转注** | 同一事物不同叫法 | **同义语言适配器** | 「杯」和「盅」→ 都映射到同一 `concept_fillable_container` |
+| **假借** | 借字表音 | **一字多义的路由** | 「上」在不同上下文映射到不同算子，类似于汉字被借用作虚词 |
+
+### 28.3 RCIR 的「偏旁部首」体系
+
+中文有 214 个部首。RCIR 的基本类型就是机器的部首：
+
+| 机器部首 | 含义 | 能组成的「合体字」举例 |
+|---|---|---|
+| `EntityRef` | 实体引用 | `supported_by(EntityRef, EntityRef)` |
+| `Concept` | 概念类别 | `Concept.fillable_container + Constraint.color_white` |
+| `Predicate` | 关系谓词 | 所有空间谓词都是 `Predicate(EntityRef, EntityRef)` |
+| `Event` | 事件算子 | 所有 `grasp_object / place_object / navigate_to` 等 |
+| `Goal` | 目标状态 | `Goal(Predicate(EntityRef, EntityRef))` |
+| `Constraint` | 约束条件 | `Constraint(EntityRef, attribute=value)` |
+| `EvidenceEnvelope` | 证据封装 | 包裹任何事实的元信息 |
+
+### 28.4 机器「合体字」的构造规则
+
+正如中文合体字由偏旁+部件按固定空间位置组合，RCIR 合体字由基本类型按固定结构组合：
+
+**左中右结构**（对应中文「做」「谢」）：
+
+```
+[EvidenceEnvelope] + [Predicate] + [EntityRef, EntityRef]
+```
+
+类似于：包在证据中的关系连接两个实体。
+
+**上下结构**（对应中文「想」「架」）：
+
+```
+[Goal]
+  ↓
+[Event(Predicate)]
+```
+
+类似于：上层目标驱动下层事件。
+
+**包围结构**（对应中文「国」「围」）：
+
+```
+EvidenceEnvelope(
+  [Predicate(subject, object)]
+)
+```
+
+类似于：证据封装包围事实。
+
+### 28.5 机器「甲骨文」到机器「楷书」
+
+正如中文从甲骨文演化到楷书，机器语言也可以有不同精度的表示层：
+
+| 层级 | 性质 | 类似人类文字 |
+|---|---|---|
+| **原始感知信号** | 传感器原始数据，未结构化 | 甲骨文/金文——原始但不规范 |
+| **RCIR 标准形式** | JSON 或结构化数据，完整包含所有字段 | 楷书/宋体——规范、完整、可交换 |
+| **RCIR 紧凑形式** | 去除冗余字段，用于机器间高速通信 | 行书/草书——快速但需训练 |
+| **RCIR 内部缓存** | 内存中的对象图，非序列化 | 人脑中的概念——最高效但不可读 |
+
+设计原则：**对外交换用标准形式（楷书），内部处理可用紧凑形式（行书），但任何时候都可以无损恢复到标准形式。**
+
+### 28.6 机器「文言文」：紧凑 RCIR
+
+机器的紧凑通信形式可以设计为类似文言文的精炼表达：
+
+```
+标准 RCIR:
+{
+  "predicate": "supported_by",
+  "subject": {"type": "EntityRef", "value": 17, "concept": "cup"},
+  "object": {"type": "EntityRef", "value": 3, "concept": "table"},
+  "evidence": {"level": "verified", "ref": "ev_93"},
+  "world_revision": 42
+}
+
+机器文言文（紧凑格式）:
+↑(17,3)[93,42]  // ↑ = supported_by, 17/3 = 实体, 93 = 证据, 42 = 世界版本
+```
+
+这种紧凑格式不应该取代标准格式，而应该作为**内部高频通信的优化**——就像人类不会用文言文写合同，但会用文言文写笔记。
+
+### 28.7 机器「字典」：语言适配器
+
+正如人类有《说文解字》解释每个汉字的含义，RCIR 的**语言适配器**就是机器字典：
+
+```json
+{
+  "character": "放",
+  "radical": "扌(hand)",
+  "machine_definition": {
+    "primary_template": "place_object(theme=?, destination=?, spatial_relation=?)",
+    "variants": [
+      {"context": "放+里", "spatial_relation": "inside_container"},
+      {"context": "放+上", "spatial_relation": "on_support_surface"},
+      {"context": "放+回", "modifier": "restore_prior_relation"}
+    ]
+  },
+  "cross_reference": {
+    "置": "place_object（更正式）",
+    "搁": "place_object（更随意）",
+    "摆": "place_object（强调位置调整）"
+  }
+}
+```
+
+### 28.8 设计原则：每一个新概念自问「它是一个什么字」
+
+以后每次新增一个 RCIR 类型、算子或谓词，都回答三个问题：
+
+1. **它属于哪一类基本构件？**（部首/偏旁？还是合体字？）
+2. **它由哪些更基本的构件组合而成？**（如果是合体字，能拆吗？）
+3. **它在机器字典里如何定义？**（语言适配器怎么映射？）
+
+回答完这三个问题，就能确保新增加的东西和整个 RCIR 体系保持表意一致性，而不是一个孤立的临时补丁。
+
+### 28.9 这个视角回答的本质问题
+
+这个视角最终回答了一个问题：**机器应该用什么样的语言思考？**
+
+答案是：**用和中文一样的表意原则思考——但不是用中文的汉字，而是用机器自己的基本构件（七类基本类型）组合出无限复杂的认知结构。**
+
+正如人类用有限的部首组合出数万个汉字，机器用有限的基本类型组合出无限的世界表示。这不是比喻，这是你的 RCIR 架构已经实现的事实——只是现在给它找到了一个准确的文化类比。|
+
+## 修订记录
+
+| 日期 | 版本 | 变更 |
+|---|---|---|
+| 2026-07-20 | v1 | 初稿 |
+| 2026-07-21 | v2 | 新增 §㉘ RCIR 作为机器象形文字体系 |
