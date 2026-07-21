@@ -212,6 +212,94 @@ def main() -> None:
         f"online correction was not bound to its superseded context: {online_correction}",
     )
 
+    report_session = start_session("home_humanoid", "hospitality_guest")
+    report_live = SESSIONS[report_session["session_id"]]
+    report_analysis = _compose_session_language(
+        report_live, "我喝完了，再帮我接一杯水"
+    )
+    report_projection = next(
+        (
+            item
+            for item in report_analysis.get(
+                "communicative_dictionary_projections", []
+            )
+            if item.get("signal_kind") == "information_report"
+        ),
+        None,
+    )
+    require(
+        report_projection
+        and report_projection["speech_act_ref"] == "speech_act.inform"
+        and report_projection["typed_payload"]["reported_event_types"]
+        == ["consumption_completed"]
+        and report_projection["typed_payload"][
+            "qualified_for_physical_fact"
+        ]
+        is False,
+        f"human report did not enter the communication candidate path: {report_analysis}",
+    )
+
+    clarification_session = start_session(
+        "home_humanoid", "hospitality_guest"
+    )
+    clarification_live = SESSIONS[clarification_session["session_id"]]
+    clarification_live["role_clarification_dialogue"] = {
+        "status": "awaiting_role_value",
+        "source_utterance": "给我接杯水",
+        "role": "theme",
+        "concept_id": "concept_fillable_container",
+        "candidate_options": [
+            {"entity_ref": "mug_white", "label": "白色马克杯"},
+            {"entity_ref": "glass_tall", "label": "透明高脚玻璃杯"},
+        ],
+        "evidence_source": "current_world_container_candidates",
+        "world_revision": clarification_live["world_revision"],
+        "policy_revision": clarification_live["policy_revision"],
+    }
+    begin_motion_command(
+        clarification_session["session_id"], "白色马克杯"
+    )
+    clarification_projection = clarification_live.get(
+        "last_communicative_dictionary_projection"
+    ) or {}
+    require(
+        clarification_projection.get("signal_kind")
+        == "clarification_answer"
+        and clarification_projection.get("context_ref", "").startswith(
+            "dialogue_contract_"
+        )
+        and clarification_projection.get("typed_payload", {}).get(
+            "dialogue_kind"
+        )
+        == "role_clarification_dialogue"
+        and clarification_projection.get("requires_reentry_to_current_grounding")
+        is True,
+        f"role clarification answer bypassed the communication dictionary: {clarification_projection}",
+    )
+
+    query_session = start_session("home_humanoid", "hospitality_guest")
+    query_analysis = _compose_session_language(
+        SESSIONS[query_session["session_id"]], "桌子上有什么"
+    )
+    reverse = query_analysis["rcir_dialogue_projection"]
+    explanation = query_analysis["structured_explanation"]
+    require(
+        reverse["speech_act_ref"] == "speech_act.query_state"
+        and reverse["query_contract_ref"] == "query.support_inventory"
+        and reverse["response_act_ref"] == "speech_act.inform"
+        and reverse["generated_from_shared_dictionary_entries"] is True,
+        f"reverse dialogue did not preserve communication dictionary refs: {reverse}",
+    )
+    require(
+        {
+            "speech_act.query_state",
+            "query.support_inventory",
+            "speech_act.inform",
+        }.issubset(set(explanation["communication_entry_refs"]))
+        and explanation["generated_from_shared_dictionary_entries"] is True,
+        f"structured explanation lost reverse dictionary provenance: {explanation}",
+    )
+
     for ref in (
         "speech_act.query_state",
         "query.support_inventory",
@@ -231,6 +319,8 @@ def main() -> None:
             "typed_query_projection": len(query_types),
             "compositional_surface_bundle": "passed",
             "contextual_confirmation_and_correction": "passed",
+            "clarification_and_human_report_projection": "passed",
+            "reverse_dictionary_provenance": "passed",
             "fact_and_control_boundary": "passed",
         }
     )

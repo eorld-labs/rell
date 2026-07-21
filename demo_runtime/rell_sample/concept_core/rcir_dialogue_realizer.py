@@ -3,6 +3,8 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
+from .machine_dictionary import dictionary_index
+
 
 OPERATOR_PHRASES = {
     "observe_entity": "观察{theme}",
@@ -118,6 +120,29 @@ def realize_rcir_dialogue(
         situated.get("goal") or {}
     ).get("goal_relation")
     query_type = (situated.get("query") or {}).get("query_type")
+    dictionary = dictionary_index()
+    speech_act = situated.get("speech_act")
+    speech_act_ref = next(
+        (
+            ref
+            for ref, entry in dictionary.items()
+            if entry.get("entry_kind") == "speech_act"
+            and entry.get("semantic_value") == speech_act
+        ),
+        None,
+    )
+    query_contract_ref = next(
+        (
+            ref
+            for ref, entry in dictionary.items()
+            if entry.get("entry_kind") == "query_contract"
+            and entry.get("semantic_value") == query_type
+        ),
+        None,
+    )
+    response_act_ref = (
+        "speech_act.inform" if "speech_act.inform" in dictionary else None
+    )
     plan = _event_plan(bundle, roles, labels)
     unresolved_roles = [
         item.get("role")
@@ -153,12 +178,16 @@ def realize_rcir_dialogue(
         "fact_authority_ref": ledger.get("ledger_id"),
         "world_revision": bundle.get("world_revision"),
         "goal_relation": goal_relation,
+        "speech_act_ref": speech_act_ref,
         "query_type": query_type,
+        "query_contract_ref": query_contract_ref,
+        "response_act_ref": response_act_ref,
         "resolved_entity_refs": deepcopy(roles),
         "event_plan": plan,
         "unresolved_roles": unresolved_roles,
         "human_response": response,
         "generated_from_rcir_only": True,
+        "generated_from_shared_dictionary_entries": True,
         "surface_text_reparsed": False,
         "runtime_fact_committed": False,
         "direct_execution_allowed": False,

@@ -3331,6 +3331,73 @@ def _record_communicative_dictionary_projection(
         del history[:-64]
 
 
+def _active_dialogue_contract_descriptor(
+    session: dict[str, Any]
+) -> dict[str, Any] | None:
+    for key in (
+        "concept_gap_dialogue",
+        "role_clarification_dialogue",
+        "evidence_gap_dialogue",
+        "process_gap_dialogue",
+        "causal_graph_clarification",
+        "relational_reference_dialogue",
+    ):
+        dialogue = session.get(key)
+        if not isinstance(dialogue, dict) or not dialogue:
+            continue
+        explicit_ref = next(
+            (
+                dialogue.get(field)
+                for field in (
+                    "dialogue_id",
+                    "inquiry_id",
+                    "contract_id",
+                    "confirmation_id",
+                )
+                if dialogue.get(field)
+            ),
+            None,
+        )
+        safe_identity = {
+            field: deepcopy(dialogue.get(field))
+            for field in (
+                "status",
+                "phase",
+                "role",
+                "concept_id",
+                "template_id",
+                "intent_id",
+                "node_id",
+                "condition",
+                "target_concept_id",
+                "world_revision",
+                "policy_revision",
+            )
+            if dialogue.get(field) is not None
+        }
+        if not explicit_ref:
+            seed = json.dumps(
+                {"dialogue_kind": key, **safe_identity},
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            explicit_ref = (
+                "dialogue_contract_"
+                + hashlib.sha1(seed.encode("utf-8")).hexdigest()[:16]
+            )
+        pending_slot = dialogue.get("pending_slot") or (
+            (dialogue.get("resolution") or {}).get("next_gap") or {}
+        ).get("slot_id")
+        return {
+            "dialogue_kind": key,
+            "context_ref": str(explicit_ref),
+            "pending_slot": pending_slot,
+            "safe_identity": safe_identity,
+        }
+    return None
+
+
 def _compose_session_language(
     session: dict[str, Any],
     utterance: str,
@@ -3556,12 +3623,34 @@ def _compose_session_language(
             world_revision=int(session.get("world_revision", 0)),
         )
     )
+    communication_projections = []
+    reported_events = analysis.get("reported_event_candidates") or []
+    if reported_events:
+        communication_projections.append(
+            project_contextual_communication_signal(
+                "information_report",
+                context_ref=None,
+                world_revision=int(session.get("world_revision", 0)),
+                typed_payload={
+                    "reported_event_types": sorted(
+                        {
+                            str(item.get("event_type"))
+                            for item in reported_events
+                            if item.get("event_type")
+                        }
+                    ),
+                    "candidate_count": len(reported_events),
+                    "evidence_source": "human_report",
+                    "qualified_for_physical_fact": False,
+                },
+            )
+        )
     if (analysis.get("discourse_roles") or {}).get("task_correction"):
         correction_target_ref = (
             (session.get("current_rcir") or {}).get("bundle_id")
             or session.get("active_intent_id")
         )
-        analysis["communicative_dictionary_projection"] = (
+        communication_projections.append(
             project_contextual_communication_signal(
                 "correction",
                 context_ref=correction_target_ref,
@@ -3572,9 +3661,15 @@ def _compose_session_language(
                 },
             )
         )
-        _record_communicative_dictionary_projection(
-            session, analysis["communicative_dictionary_projection"]
+    if communication_projections:
+        analysis["communicative_dictionary_projections"] = deepcopy(
+            communication_projections
         )
+        analysis["communicative_dictionary_projection"] = deepcopy(
+            communication_projections[-1]
+        )
+        for projection in communication_projections:
+            _record_communicative_dictionary_projection(session, projection)
     analysis["machine_dictionary_equivalence"] = (
         build_dictionary_equivalence_receipt(
             analysis,
@@ -3742,6 +3837,9 @@ def _language_understanding_view(analysis: dict[str, Any]) -> dict[str, Any]:
         ),
         "communicative_dictionary_projection": deepcopy(
             analysis.get("communicative_dictionary_projection")
+        ),
+        "communicative_dictionary_projections": deepcopy(
+            analysis.get("communicative_dictionary_projections", [])
         ),
         "canonical_utterance": analysis.get("canonical_utterance"),
         "semantic_canonical_utterance": analysis.get("canonical_utterance"),
@@ -10121,6 +10219,40 @@ def begin_motion_command(
     )
     if not internal_stage and not scoped_authorization and relation_gate_enabled:
         early_analysis = _compose_session_language(deepcopy(session), text)
+        active_dialogue = _active_dialogue_contract_descriptor(session)
+        if (
+            active_dialogue
+            and early_analysis.get("speech_act") != "state_query"
+            and not (early_analysis.get("discourse_roles") or {}).get(
+                "task_correction"
+            )
+            and not early_analysis.get("reported_event_candidates")
+        ):
+            clarification_projection = (
+                project_contextual_communication_signal(
+                    "clarification_answer",
+                    context_ref=active_dialogue["context_ref"],
+                    world_revision=int(session.get("world_revision", 0)),
+                    typed_payload={
+                        "dialogue_kind": active_dialogue[
+                            "dialogue_kind"
+                        ],
+                        "pending_slot": active_dialogue.get(
+                            "pending_slot"
+                        ),
+                        "binding_status": "candidate_pending_dialogue_consumer",
+                        "structured_role_names": sorted(
+                            (early_analysis.get("role_bindings") or {}).keys()
+                        ),
+                    },
+                )
+            )
+            _record_communicative_dictionary_projection(
+                session, clarification_projection
+            )
+            early_analysis[
+                "communicative_dictionary_projection"
+            ] = deepcopy(clarification_projection)
         if _is_support_inventory_state_query(text, early_analysis):
             return _answer_support_inventory_state_query(session, text, early_analysis)
         if _is_region_inventory_state_query(early_analysis):

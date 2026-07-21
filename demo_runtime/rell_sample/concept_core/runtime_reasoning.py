@@ -110,6 +110,14 @@ def explanation_from_structured_state(
     else:
         text = understanding
         mode = "understood"
+    communication_entry_refs = [
+        projection.get("speech_act_ref"),
+        projection.get("query_contract_ref"),
+        projection.get("response_act_ref"),
+    ]
+    communication_entry_refs = [
+        ref for ref in communication_entry_refs if ref
+    ]
     return {
         "schema_version": "1.0.0",
         "explanation_kind": "StructuredExplanation",
@@ -118,7 +126,10 @@ def explanation_from_structured_state(
         "source_refs": [
             (language_analysis.get("rcir") or {}).get("bundle_id"),
             rule_evaluation.get("evaluation_id"),
+            *communication_entry_refs,
         ],
+        "communication_entry_refs": communication_entry_refs,
+        "generated_from_shared_dictionary_entries": True,
         "generated_from_rcir_only": True,
         "surface_text_reparsed": False,
         "runtime_fact_committed": False,
