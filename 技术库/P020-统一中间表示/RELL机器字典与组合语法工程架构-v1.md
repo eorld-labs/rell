@@ -269,6 +269,18 @@ direction_upward  requires: 垂直空间目标
 
 收据只用于迁移审计，`can_control_execution=false`、`can_commit_runtime_fact=false`、`surface_text_reparsed=false`。会话中最多保存64份收据，避免形成无界第二记忆源。
 
-首批工程证据共9案：8案正常语义等价，1案人为篡改目标关系并被正确判定为差异；6案满足当前晋级前提。其余两案分别因指代歧义和状态查询语义尚未字典化而被阻断。该`6/9`不是语言成功率：两案本来就是必须禁止晋级的负例，篡改案是差异检测对照。证据报告输出到`demo_runtime/output/rell_sample/dictionary_shadow_equivalence/shadow_equivalence_report.json`。
+首批工程证据共9案：8案正常语义等价，1案人为篡改目标关系并被正确判定为差异；7案满足当前晋级前提。另1个正常等价案因指代仍有歧义而按设计阻断，篡改案是差异检测对照。该`7/9`不是语言成功率，而是影子迁移门的准入分布。证据报告输出到`demo_runtime/output/rell_sample/dictionary_shadow_equivalence/shadow_equivalence_report.json`。
 
-该批证据同时暴露了下一项真实缺口：事件算子已17/17覆盖，但查询和交流行为仍没有正式机器字典条目。切换权威入口前，必须补齐状态查询、确认、纠正、告知、询问和教学等交流合同，并重新通过同一等价门。
+## 十四、交流字典层
+
+机器字典`1.1.0`新增三类正式条目：
+
+- `speech_act`：9类不可约言语行为原语；
+- `query_contract`：12类当前状态查询合同；
+- `communicative_contract`：确认、否决、纠正和澄清回答合同。
+
+查询合同只允许读取声明的权威来源，例如`WorldFactLedger`、当前任务图、合格观察证据或偏好记录。交流条目的`fact_commit_authority`必须为`none`；人类报告、确认和纠正只能改变交流或候选语义状态，不能直接建立物理事实。
+
+同一表面形式允许形成类型兼容的组合语义。例如“请”可以同时对应`request_action`与`politeness`，不应被错误处理为二选一歧义；“上”在承载面清单查询中则由`support_inventory`合同约束为`supported_by`，方向和体貌候选被排除。真正无法由类型、作用域和上下文消解的候选仍进入`InquiryContract`。
+
+当前在线路径已接入任务请求、状态查询、禁止、语言教学、确认、否决和显式纠正。确认必须绑定当前`pending_confirmation`，纠正必须绑定被替换的RCIR或活跃意图，并重新进入当前世界落地。下一阶段继续把各类澄清回答和人类信息报告统一接入该投影，并让反向解释引用同一交流条目ID。

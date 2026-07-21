@@ -5,7 +5,7 @@
   "type": "object",
   "required": ["schema_version", "dictionary_id", "architecture", "entries"],
   "properties": {
-    "schema_version": {"const": "1.0.0"},
+    "schema_version": {"const": "1.1.0"},
     "dictionary_id": {"type": "string", "minLength": 1},
     "architecture": {
       "type": "object",
@@ -20,7 +20,7 @@
         "required": ["entry_id", "entry_kind", "semantic_value", "irreducible", "components", "roles", "language_adapters", "fact_commit_authority"],
         "properties": {
           "entry_id": {"type": "string", "pattern": "^[a-z_]+\\.[a-z0-9_]+$"},
-          "entry_kind": {"enum": ["primitive_predicate", "primitive_operator", "modifier", "operator_contract", "process_template", "domain_pack_entry"]},
+          "entry_kind": {"enum": ["primitive_predicate", "primitive_operator", "modifier", "operator_contract", "process_template", "domain_pack_entry", "speech_act", "query_contract", "communicative_contract"]},
           "semantic_value": {"type": "string", "minLength": 1},
           "irreducible": {"type": "boolean"},
           "components": {"type": "array", "items": {"type": "string"}},
@@ -40,12 +40,27 @@
             },
             "additionalProperties": false
           },
+          "communication_contract": {
+            "type": "object",
+            "required": ["requires_context", "projects_dialogue_state", "verification"],
+            "properties": {
+              "requires_context": {"type": "array", "items": {"type": "string"}},
+              "projects_dialogue_state": {"type": "array", "items": {"type": "string"}},
+              "verification": {"type": "array", "items": {"type": "string"}},
+              "read_authority": {"type": "array", "items": {"type": "string"}}
+            },
+            "additionalProperties": false
+          },
           "fact_commit_authority": {"enum": ["none", "P016_via_WorldFactLedger_only"]}
         },
         "allOf": [
           {
             "if": {"properties": {"entry_kind": {"const": "modifier"}}},
             "then": {"required": ["modifier_dimension", "modifier_value", "default_scope"]}
+          },
+          {
+            "if": {"properties": {"entry_kind": {"enum": ["speech_act", "query_contract", "communicative_contract"]}}},
+            "then": {"required": ["communication_contract"]}
           }
         ],
         "additionalProperties": false

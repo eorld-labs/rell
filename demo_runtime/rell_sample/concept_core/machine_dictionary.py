@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 
-DICTIONARY_SCHEMA_VERSION = "1.0.0"
+DICTIONARY_SCHEMA_VERSION = "1.1.0"
 DATA_FILE = Path(__file__).resolve().parents[1] / "data" / "rell_machine_dictionary.json"
 
 ENTRY_KINDS = {
@@ -18,8 +18,16 @@ ENTRY_KINDS = {
     "operator_contract",
     "process_template",
     "domain_pack_entry",
+    "speech_act",
+    "query_contract",
+    "communicative_contract",
 }
-CORE_ENTRY_KINDS = {"primitive_predicate", "primitive_operator", "modifier"}
+CORE_ENTRY_KINDS = {
+    "primitive_predicate",
+    "primitive_operator",
+    "modifier",
+    "speech_act",
+}
 
 _MIGRATION_CLASSIFICATION = {
     "observe_entity": "primitive_operator",
@@ -79,6 +87,23 @@ def validate_machine_dictionary(payload: dict[str, Any]) -> None:
             contract = item.get("causal_contract") or {}
             if not all(key in contract for key in ("requires", "projects", "verification")):
                 raise ValueError(f"executable entry lacks causal contract: {item['entry_id']}")
+        if kind in {"speech_act", "query_contract", "communicative_contract"}:
+            contract = item.get("communication_contract") or {}
+            if not all(
+                key in contract
+                for key in (
+                    "requires_context",
+                    "projects_dialogue_state",
+                    "verification",
+                )
+            ):
+                raise ValueError(
+                    f"communication entry lacks contract: {item['entry_id']}"
+                )
+            if item.get("fact_commit_authority") != "none":
+                raise ValueError(
+                    f"communication entry gained fact authority: {item['entry_id']}"
+                )
         if item.get("fact_commit_authority") not in {"none", "P016_via_WorldFactLedger_only"}:
             raise ValueError(f"invalid fact authority: {item['entry_id']}")
         if kind == "modifier":

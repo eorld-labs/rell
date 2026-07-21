@@ -32,6 +32,7 @@
 | `rcir_interpretation_lattice.schema.json` | 定义权威语义图生成前的多解释候选格及歧义询问边界。 |
 | `rcir_scope_graph.schema.json` | 定义修饰、否定、量化及语篇关系对事件的显式作用域。 |
 | `machine_dictionary_equivalence_receipt.schema.json` | 定义机器字典影子编译与当前语言主链的逐字段等价收据及权威晋级阻断边界。 |
+| `communicative_dictionary_projection.schema.json` | 定义确认、否决、纠正、澄清回答和信息报告的结构化交流投影及无事实/控制权限边界。 |
 
 ## 兼容入口
 

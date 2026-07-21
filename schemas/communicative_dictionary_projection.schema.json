@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/worldmodels/schemas/communicative_dictionary_projection.schema.json",
+  "title": "RELL Communicative Dictionary Projection",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "projection_kind",
+    "mode",
+    "signal_kind",
+    "speech_act_ref",
+    "context_ref",
+    "typed_payload",
+    "world_revision",
+    "status",
+    "missing_semantics_or_context",
+    "can_control_execution",
+    "can_commit_runtime_fact",
+    "requires_reentry_to_current_grounding",
+    "surface_text_forwarded_downstream",
+    "runtime_fact_committed"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "projection_kind": {"const": "CommunicativeDictionaryProjection"},
+    "mode": {"const": "shadow_equivalence_migration"},
+    "signal_kind": {"enum": ["confirmation", "rejection", "correction", "clarification_answer", "information_report"]},
+    "speech_act_ref": {"type": ["string", "null"]},
+    "communicative_contract_ref": {"type": ["string", "null"]},
+    "context_ref": {"type": ["string", "null"]},
+    "typed_payload": {"type": "object"},
+    "world_revision": {"type": "integer", "minimum": 0},
+    "status": {"enum": ["admissible", "blocked"]},
+    "missing_semantics_or_context": {"type": "array", "items": {"type": "string"}},
+    "can_control_execution": {"const": false},
+    "can_commit_runtime_fact": {"const": false},
+    "requires_reentry_to_current_grounding": {"type": "boolean"},
+    "surface_text_forwarded_downstream": {"const": false},
+    "runtime_fact_committed": {"const": false}
+  },
+  "additionalProperties": false
+}

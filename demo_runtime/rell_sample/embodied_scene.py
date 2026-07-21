@@ -29,6 +29,7 @@ from concept_core.runtime_reasoning import (
 )
 from concept_core.dictionary_frontend import (
     project_analysis_to_machine_dictionary,
+    project_contextual_communication_signal,
 )
 from concept_core.dictionary_equivalence import (
     build_dictionary_equivalence_receipt,
@@ -899,6 +900,8 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator", scene_id
         "dialogue_focus_entities": [],
         "last_language_understanding": None,
         "machine_dictionary_equivalence_history": [],
+        "last_communicative_dictionary_projection": None,
+        "communicative_dictionary_projection_history": [],
         "current_observation_evidence": None,
         "observation_evidence_ledger": [],
         "grounded_intent_frame_history": [],
@@ -3316,6 +3319,18 @@ def _project_state_query_runtime_role(
     }
 
 
+def _record_communicative_dictionary_projection(
+    session: dict[str, Any], projection: dict[str, Any]
+) -> None:
+    session["last_communicative_dictionary_projection"] = deepcopy(projection)
+    history = session.setdefault(
+        "communicative_dictionary_projection_history", []
+    )
+    history.append(deepcopy(projection))
+    if len(history) > 64:
+        del history[:-64]
+
+
 def _compose_session_language(
     session: dict[str, Any],
     utterance: str,
@@ -3541,6 +3556,25 @@ def _compose_session_language(
             world_revision=int(session.get("world_revision", 0)),
         )
     )
+    if (analysis.get("discourse_roles") or {}).get("task_correction"):
+        correction_target_ref = (
+            (session.get("current_rcir") or {}).get("bundle_id")
+            or session.get("active_intent_id")
+        )
+        analysis["communicative_dictionary_projection"] = (
+            project_contextual_communication_signal(
+                "correction",
+                context_ref=correction_target_ref,
+                world_revision=int(session.get("world_revision", 0)),
+                typed_payload={
+                    "replacement_compiled_in_current_analysis": True,
+                    "must_release_superseded_graph": True,
+                },
+            )
+        )
+        _record_communicative_dictionary_projection(
+            session, analysis["communicative_dictionary_projection"]
+        )
     analysis["machine_dictionary_equivalence"] = (
         build_dictionary_equivalence_receipt(
             analysis,
@@ -3705,6 +3739,9 @@ def _language_understanding_view(analysis: dict[str, Any]) -> dict[str, Any]:
         ),
         "machine_dictionary_equivalence": deepcopy(
             analysis.get("machine_dictionary_equivalence")
+        ),
+        "communicative_dictionary_projection": deepcopy(
+            analysis.get("communicative_dictionary_projection")
         ),
         "canonical_utterance": analysis.get("canonical_utterance"),
         "semantic_canonical_utterance": analysis.get("canonical_utterance"),
@@ -10145,7 +10182,22 @@ def begin_motion_command(
     pending = session.get("pending_confirmation")
     confirmation_value = _context_confirmation_value(utterance)
     if pending and confirmation_value is not None and not scoped_authorization:
+        communication_projection = project_contextual_communication_signal(
+            "confirmation" if confirmation_value else "rejection",
+            context_ref=pending.get("confirmation_id"),
+            world_revision=int(session.get("world_revision", 0)),
+            typed_payload={
+                "confirmation_value": confirmation_value,
+                "pending_kind": pending.get("kind"),
+            },
+        )
+        _record_communicative_dictionary_projection(
+            session, communication_projection
+        )
         confirmed = confirm_pending_motion(session_id, pending["confirmation_id"], confirmation_value)
+        confirmed["communicative_dictionary_projection"] = deepcopy(
+            communication_projection
+        )
         if confirmed.get("status") == "observation_candidate_confirmed":
             return {"status": confirmed["status"], "immediate_result": confirmed, "session": confirmed.get("session")}
         return confirmed

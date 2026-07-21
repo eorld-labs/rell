@@ -104,7 +104,10 @@ from .composition_grammar import (
     build_scope_graph,
     make_referent_expression,
 )
-from .dictionary_frontend import project_analysis_to_machine_dictionary
+from .dictionary_frontend import (
+    project_analysis_to_machine_dictionary,
+    project_contextual_communication_signal,
+)
 from .dictionary_equivalence import build_dictionary_equivalence_receipt
 from .process_template_resolver import (
     PROCESS_TEMPLATES,
@@ -204,6 +207,7 @@ __all__ = [
     "build_scope_graph",
     "make_referent_expression",
     "project_analysis_to_machine_dictionary",
+    "project_contextual_communication_signal",
     "build_dictionary_equivalence_receipt",
     "invalidate_versioned_artifacts",
     "generate_competing_hypotheses",

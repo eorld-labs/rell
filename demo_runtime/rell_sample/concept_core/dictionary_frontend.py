@@ -16,8 +16,20 @@ from .machine_dictionary import (
 )
 
 
-def _candidate_id(operator_refs: list[str], role_referents: dict[str, Any]) -> str:
-    seed = repr((operator_refs, sorted(role_referents)))
+def _candidate_id(
+    operator_refs: list[str],
+    role_referents: dict[str, Any],
+    speech_act_ref: str | None,
+    query_contract_ref: str | None,
+) -> str:
+    seed = repr(
+        (
+            operator_refs,
+            sorted(role_referents),
+            speech_act_ref,
+            query_contract_ref,
+        )
+    )
     return "dictionary_candidate_" + hashlib.sha1(seed.encode("utf-8")).hexdigest()[:16]
 
 
@@ -56,6 +68,7 @@ def _role_referent(role: dict[str, Any], world_revision: int) -> dict[str, Any]:
 def _resolve_surface_groups_from_analysis(
     groups: list[dict[str, Any]], analysis: dict[str, Any]
 ) -> list[dict[str, Any]]:
+    entry_index = dictionary_index()
     roles = analysis.get("role_bindings") or {}
     modifiers = (analysis.get("modifier_contract") or {}).get("modifiers", [])
     spatial_values = {
@@ -64,25 +77,85 @@ def _resolve_surface_groups_from_analysis(
         if isinstance(role, dict)
     }
     modifier_values = {item.get("value") for item in modifiers}
+    modifier_pairs = {
+        (item.get("dimension"), item.get("value")) for item in modifiers
+    }
+    speech_act = analysis.get("speech_act") or (
+        analysis.get("canonical_frame") or {}
+    ).get("speech_act")
+    query_type = analysis.get("query_type") or (
+        analysis.get("canonical_frame") or {}
+    ).get("query_type")
+    correction_active = bool(
+        (analysis.get("discourse_roles") or {}).get("task_correction")
+    )
+    operators = set(
+        (analysis.get("canonical_frame") or {}).get("operators", [])
+    )
     resolved = []
     for group in groups:
         item = deepcopy(group)
+        item["selected_entry_ref"] = None
+        item["selected_entry_refs"] = []
+        item["status"] = "awaiting_typed_composition"
         candidates = set(item.get("candidate_entry_refs") or [])
-        selected = None
+        selected_refs: set[str] = set()
+        for ref in candidates:
+            entry = entry_index.get(ref) or {}
+            if (
+                entry.get("entry_kind") == "speech_act"
+                and entry.get("semantic_value") == speech_act
+            ):
+                selected_refs.add(ref)
+            if (
+                entry.get("entry_kind") == "query_contract"
+                and entry.get("semantic_value") == query_type
+            ):
+                selected_refs.add(ref)
+            if (
+                entry.get("entry_kind")
+                in {
+                    "primitive_operator",
+                    "operator_contract",
+                    "process_template",
+                    "domain_pack_entry",
+                }
+                and entry.get("semantic_value") in operators
+            ):
+                selected_refs.add(ref)
+            if entry.get("entry_kind") == "modifier" and (
+                entry.get("modifier_dimension"), entry.get("modifier_value")
+            ) in modifier_pairs:
+                selected_refs.add(ref)
+            if correction_active and ref in {
+                "speech_act.correct",
+                "communication.correct_semantics",
+            }:
+                selected_refs.add(ref)
         if "predicate.supported_by" in candidates and spatial_values.intersection(
             {"on_support_surface", "supported_by"}
         ):
-            selected = "predicate.supported_by"
+            selected_refs.add("predicate.supported_by")
+        elif "predicate.supported_by" in candidates and query_type == "support_inventory":
+            selected_refs.add("predicate.supported_by")
         elif "modifier.aspect_attainment" in candidates and "attainment" in modifier_values:
-            selected = "modifier.aspect_attainment"
+            selected_refs.add("modifier.aspect_attainment")
         elif "modifier.direction_upward" in candidates and "upward" in modifier_values:
-            selected = "modifier.direction_upward"
-        if selected:
+            selected_refs.add("modifier.direction_upward")
+        if selected_refs:
+            ordered_refs = sorted(selected_refs)
             item.update(
                 {
-                    "status": "resolved_from_composed_semantics",
-                    "selected_entry_ref": selected,
-                    "resolution_basis": "existing_structured_semantic_constraint",
+                    "status": (
+                        "resolved_compositional_bundle"
+                        if len(ordered_refs) > 1
+                        else "resolved_from_composed_semantics"
+                    ),
+                    "selected_entry_ref": (
+                        ordered_refs[0] if len(ordered_refs) == 1 else None
+                    ),
+                    "selected_entry_refs": ordered_refs,
+                    "resolution_basis": "existing_typed_composed_semantics",
                 }
             )
         resolved.append(item)
@@ -106,10 +179,22 @@ def project_analysis_to_machine_dictionary(
         analysis.get("canonical_frame") or {}
     ).get("query_type")
     semantic_coverage_gaps = []
-    if speech_act and speech_act != "task_request":
+    speech_act_matches = [
+        item
+        for item in semantic_index.get(str(speech_act), [])
+        if item.get("entry_kind") == "speech_act"
+    ]
+    query_matches = [
+        item
+        for item in semantic_index.get(str(query_type), [])
+        if item.get("entry_kind") == "query_contract"
+    ]
+    if speech_act and speech_act != "unknown" and len(speech_act_matches) != 1:
         semantic_coverage_gaps.append("speech_act_semantics_not_dictionary_grounded")
-    if query_type:
+    if query_type and len(query_matches) != 1:
         semantic_coverage_gaps.append("query_semantics_not_dictionary_grounded")
+    if speech_act == "unknown":
+        semantic_coverage_gaps.append("speech_act_not_resolved")
     if speech_act == "task_request" and not operators and not analysis.get("event_frames"):
         semantic_coverage_gaps.append("event_operator_not_dictionary_grounded")
     operator_refs, missing_operators = [], []
@@ -161,15 +246,34 @@ def project_analysis_to_machine_dictionary(
         item
         for item in surface_groups
         if len(set(item.get("candidate_entry_refs") or [])) > 1
-        and not item.get("selected_entry_ref")
+        and not (
+            item.get("selected_entry_ref")
+            or item.get("selected_entry_refs")
+        )
     ]
+    speech_act_ref = (
+        speech_act_matches[0]["entry_id"]
+        if len(speech_act_matches) == 1
+        else None
+    )
+    query_contract_ref = (
+        query_matches[0]["entry_id"] if len(query_matches) == 1 else None
+    )
     candidate = {
-        "candidate_id": _candidate_id(operator_refs, role_referents),
+        "candidate_id": _candidate_id(
+            operator_refs,
+            role_referents,
+            speech_act_ref,
+            query_contract_ref,
+        ),
         "operator_refs": operator_refs,
+        "speech_act_ref": speech_act_ref,
+        "query_contract_ref": query_contract_ref,
         "role_referents": role_referents,
         "scope_graph_ref": scope_graph["scope_graph_id"],
         "admissible": (
             not missing_operators
+            and not semantic_coverage_gaps
             and not unresolved_polysemy
             and scope_graph["scope_complete"]
         ),
@@ -200,7 +304,9 @@ def project_analysis_to_machine_dictionary(
         "operator_refs": operator_refs,
         "operator_semantics": operators,
         "speech_act": speech_act,
+        "speech_act_ref": speech_act_ref,
         "query_type": query_type,
+        "query_contract_ref": query_contract_ref,
         "semantic_coverage_gaps": semantic_coverage_gaps,
         "missing_operator_semantics": missing_operators,
         "goal_relation": (analysis.get("canonical_frame") or {}).get(
@@ -236,4 +342,63 @@ def project_analysis_to_machine_dictionary(
     }
 
 
-__all__ = ["project_analysis_to_machine_dictionary"]
+_CONTEXTUAL_COMMUNICATION_MAP = {
+    "confirmation": ("speech_act.confirm", "communication.confirm_pending"),
+    "rejection": ("speech_act.reject", "communication.reject_pending"),
+    "correction": ("speech_act.correct", "communication.correct_semantics"),
+    "clarification_answer": (
+        "speech_act.answer_clarification",
+        "communication.answer_inquiry",
+    ),
+    "information_report": ("speech_act.inform", None),
+}
+
+
+def project_contextual_communication_signal(
+    signal_kind: str,
+    *,
+    context_ref: str | None,
+    world_revision: int,
+    typed_payload: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    speech_act_ref, contract_ref = _CONTEXTUAL_COMMUNICATION_MAP.get(
+        signal_kind, (None, None)
+    )
+    index = dictionary_index()
+    missing = []
+    if not speech_act_ref or speech_act_ref not in index:
+        missing.append("speech_act_entry")
+    if contract_ref and contract_ref not in index:
+        missing.append("communicative_contract_entry")
+    if signal_kind in {
+        "confirmation",
+        "rejection",
+        "correction",
+        "clarification_answer",
+    } and not context_ref:
+        missing.append("dialogue_context_ref")
+    return {
+        "schema_version": "1.0.0",
+        "projection_kind": "CommunicativeDictionaryProjection",
+        "mode": "shadow_equivalence_migration",
+        "signal_kind": signal_kind,
+        "speech_act_ref": speech_act_ref,
+        "communicative_contract_ref": contract_ref,
+        "context_ref": context_ref,
+        "typed_payload": deepcopy(typed_payload or {}),
+        "world_revision": world_revision,
+        "status": "admissible" if not missing else "blocked",
+        "missing_semantics_or_context": missing,
+        "can_control_execution": False,
+        "can_commit_runtime_fact": False,
+        "requires_reentry_to_current_grounding": signal_kind
+        in {"correction", "clarification_answer"},
+        "surface_text_forwarded_downstream": False,
+        "runtime_fact_committed": False,
+    }
+
+
+__all__ = [
+    "project_analysis_to_machine_dictionary",
+    "project_contextual_communication_signal",
+]

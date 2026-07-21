@@ -121,10 +121,9 @@ def main() -> None:
     _, query_receipt = receipt(query_analysis)
     require(
         query_receipt["status"] == "equivalent"
-        and query_receipt["eligible_for_authority_promotion"] is False
-        and "query_semantics_not_dictionary_grounded"
-        in query_receipt["promotion_blockers"],
-        "field equality hid missing query/communicative dictionary coverage",
+        and query_receipt["eligible_for_authority_promotion"] is True
+        and query_receipt["promotion_blockers"] == [],
+        "grounded query contract was not promotion-ready",
     )
     record("state_query_coverage_gap", query_receipt)
 
@@ -205,7 +204,7 @@ def main() -> None:
             "event_frames_preserved": 2,
             "cross_turn_reference": "passed",
             "ambiguity_blocks_promotion": "passed",
-            "query_coverage_gap_blocks_promotion": "passed",
+            "query_contract_shadow_equivalence": "passed",
             "recovery_context_equivalence": "passed",
             "divergence_detection": "passed",
             "authority_boundary": "passed",

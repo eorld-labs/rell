@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "dictionary_id": "rell_machine_dictionary_core_v1",
   "architecture": {
     "glyph": "irreducible primitive predicate, operator, or modifier",
@@ -40,6 +40,149 @@
       "language_adapters": {"zh": [{"surface": "旁边", "canonical": true}, {"surface": "附近"}], "en": [{"surface": "near", "canonical": true}]},
       "verification_contract": ["reference_frame_valid", "distance_within_band"],
       "fact_commit_authority": "P016_via_WorldFactLedger_only"
+    },
+    {
+      "entry_id": "speech_act.request_action", "entry_kind": "speech_act", "semantic_value": "task_request",
+      "irreducible": true, "components": [], "roles": {"requested_outcome": "goal_or_event_ref"},
+      "language_adapters": {"zh": [{"surface": "请", "canonical": true}, {"surface": "帮我"}], "en": [{"surface": "request", "canonical": true}]},
+      "communication_contract": {"requires_context": ["request_interpretation_available"], "projects_dialogue_state": ["task_request_candidate"], "verification": ["requested_goal_and_roles_structurally_compiled"], "read_authority": ["current_dialogue_context"]},
+      "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "speech_act.query_state", "entry_kind": "speech_act", "semantic_value": "state_query",
+      "irreducible": true, "components": [], "roles": {"queried_relation": "predicate_or_state_ref"},
+      "language_adapters": {"zh": [{"surface": "什么", "canonical": true}, {"surface": "吗"}], "en": [{"surface": "query", "canonical": true}]},
+      "communication_contract": {"requires_context": ["query_scope_available"], "projects_dialogue_state": ["state_query_candidate"], "verification": ["answer_reads_authoritative_current_state"], "read_authority": ["WorldFactLedger", "qualified_observation_evidence"]},
+      "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "speech_act.prohibit_action", "entry_kind": "speech_act", "semantic_value": "prohibition",
+      "irreducible": true, "components": [], "roles": {"prohibited_event": "event_ref"},
+      "language_adapters": {"zh": [{"surface": "不要", "canonical": true}, {"surface": "别"}, {"surface": "禁止"}], "en": [{"surface": "prohibit", "canonical": true}]},
+      "communication_contract": {"requires_context": ["prohibited_scope_available"], "projects_dialogue_state": ["control_constraint_candidate"], "verification": ["P018_applies_prohibition_before_execution"], "read_authority": ["current_task_graph"]},
+      "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "speech_act.define_mapping", "entry_kind": "speech_act", "semantic_value": "language_teaching",
+      "irreducible": true, "components": [], "roles": {"surface": "language_adapter_candidate", "meaning": "semantic_entry_ref"},
+      "language_adapters": {"zh": [{"surface": "意思是", "canonical": true}, {"surface": "就是"}], "en": [{"surface": "define", "canonical": true}]},
+      "communication_contract": {"requires_context": ["surface_and_meaning_candidate_available"], "projects_dialogue_state": ["language_adapter_candidate"], "verification": ["human_confirmation_and_regression_required_before_promotion"], "read_authority": ["machine_dictionary"]},
+      "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "speech_act.confirm", "entry_kind": "speech_act", "semantic_value": "confirmation",
+      "irreducible": true, "components": [], "roles": {"target": "pending_dialogue_contract_ref"},
+      "language_adapters": {"zh": [{"surface": "对", "canonical": true}, {"surface": "是的"}, {"surface": "确认"}], "en": [{"surface": "confirm", "canonical": true}]},
+      "communication_contract": {"requires_context": ["pending_dialogue_contract"], "projects_dialogue_state": ["pending_contract_confirmed"], "verification": ["confirmation_scope_matches_pending_contract"], "read_authority": ["current_dialogue_context"]},
+      "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "speech_act.reject", "entry_kind": "speech_act", "semantic_value": "rejection",
+      "irreducible": true, "components": [], "roles": {"target": "pending_dialogue_contract_ref"},
+      "language_adapters": {"zh": [{"surface": "不对", "canonical": true}, {"surface": "不是"}, {"surface": "否"}], "en": [{"surface": "reject", "canonical": true}]},
+      "communication_contract": {"requires_context": ["pending_dialogue_contract"], "projects_dialogue_state": ["pending_contract_rejected"], "verification": ["rejection_scope_matches_pending_contract"], "read_authority": ["current_dialogue_context"]},
+      "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "speech_act.correct", "entry_kind": "speech_act", "semantic_value": "correction",
+      "irreducible": true, "components": [], "roles": {"target": "current_or_recent_semantic_graph_ref", "replacement": "semantic_constraint_or_goal_ref"},
+      "language_adapters": {"zh": [{"surface": "我的意思是", "canonical": true}, {"surface": "改成"}, {"surface": "而是"}], "en": [{"surface": "correct", "canonical": true}]},
+      "communication_contract": {"requires_context": ["correction_target_and_replacement_available"], "projects_dialogue_state": ["superseding_semantic_candidate"], "verification": ["new_graph_recompiled_against_current_world"], "read_authority": ["current_or_recent_semantic_graph", "WorldFactLedger"]},
+      "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "speech_act.inform", "entry_kind": "speech_act", "semantic_value": "information_report",
+      "irreducible": true, "components": [], "roles": {"reported_content": "event_or_predicate_candidate"},
+      "language_adapters": {"zh": [{"surface": "我看到", "canonical": true}, {"surface": "现在是"}], "en": [{"surface": "inform", "canonical": true}]},
+      "communication_contract": {"requires_context": ["reported_content_available"], "projects_dialogue_state": ["human_report_candidate"], "verification": ["EvidenceEnvelope_required_before_fact_promotion"], "read_authority": ["human_report"]},
+      "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "speech_act.answer_clarification", "entry_kind": "speech_act", "semantic_value": "clarification_answer",
+      "irreducible": true, "components": [], "roles": {"slot": "pending_inquiry_slot_ref", "value": "typed_constraint_or_referent"},
+      "language_adapters": {"zh": [{"surface": "白色的", "canonical": true}, {"surface": "操作台A"}], "en": [{"surface": "clarification answer", "canonical": true}]},
+      "communication_contract": {"requires_context": ["pending_inquiry_contract"], "projects_dialogue_state": ["inquiry_constraint_update"], "verification": ["updated_binding_reenters_grounding"], "read_authority": ["current_inquiry_contract"]},
+      "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "query.liquid_state", "entry_kind": "query_contract", "semantic_value": "liquid_state", "irreducible": false,
+      "components": ["speech_act.query_state"], "roles": {"theme": "liquid_container_referent"}, "language_adapters": {"zh": [{"surface": "有没有水", "canonical": true}, {"surface": "空的吗"}]},
+      "communication_contract": {"requires_context": ["theme_grounded"], "projects_dialogue_state": ["liquid_state_answer"], "verification": ["answer_cites_current_liquid_fact_or_qualified_observation"], "read_authority": ["WorldFactLedger", "qualified_observation_evidence"]}, "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "query.holding_state", "entry_kind": "query_contract", "semantic_value": "holding_state", "irreducible": false,
+      "components": ["speech_act.query_state"], "roles": {"holder": "agent_referent"}, "language_adapters": {"zh": [{"surface": "手里有什么", "canonical": true}, {"surface": "拿着什么"}]},
+      "communication_contract": {"requires_context": ["holder_grounded"], "projects_dialogue_state": ["holding_state_answer"], "verification": ["answer_cites_current_holding_fact"], "read_authority": ["WorldFactLedger"]}, "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "query.executor_location", "entry_kind": "query_contract", "semantic_value": "executor_location", "irreducible": false,
+      "components": ["speech_act.query_state"], "roles": {"executor": "embodied_agent"}, "language_adapters": {"zh": [{"surface": "你在哪", "canonical": true}, {"surface": "我现在在哪"}]},
+      "communication_contract": {"requires_context": ["executor_grounded"], "projects_dialogue_state": ["executor_location_answer"], "verification": ["answer_cites_current_executor_pose"], "read_authority": ["WorldFactLedger"]}, "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "query.preference_summary", "entry_kind": "query_contract", "semantic_value": "preference_summary", "irreducible": false,
+      "components": ["speech_act.query_state"], "roles": {"scope": "preference_context_ref"}, "language_adapters": {"zh": [{"surface": "偏好约束是什么", "canonical": true}]},
+      "communication_contract": {"requires_context": ["preference_context_available"], "projects_dialogue_state": ["preference_summary_answer"], "verification": ["answer_cites_active_preference_records"], "read_authority": ["active_preference_store"]}, "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "query.current_action", "entry_kind": "query_contract", "semantic_value": "current_action", "irreducible": false,
+      "components": ["speech_act.query_state"], "roles": {"executor": "embodied_agent"}, "language_adapters": {"zh": [{"surface": "你现在在做什么", "canonical": true}]},
+      "communication_contract": {"requires_context": ["runtime_context_available"], "projects_dialogue_state": ["current_action_answer"], "verification": ["answer_cites_active_task_stage"], "read_authority": ["current_task_graph"]}, "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "query.next_step", "entry_kind": "query_contract", "semantic_value": "next_step", "irreducible": false,
+      "components": ["speech_act.query_state"], "roles": {"task": "active_task_graph_ref"}, "language_adapters": {"zh": [{"surface": "下一步做什么", "canonical": true}]},
+      "communication_contract": {"requires_context": ["active_task_graph_available"], "projects_dialogue_state": ["next_step_answer"], "verification": ["answer_cites_current_ready_node"], "read_authority": ["current_task_graph", "WorldFactLedger"]}, "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "query.snapshot_summary", "entry_kind": "query_contract", "semantic_value": "snapshot_summary", "irreducible": false,
+      "components": ["speech_act.query_state"], "roles": {"scope": "current_world_revision"}, "language_adapters": {"zh": [{"surface": "当前状态", "canonical": true}, {"surface": "世界状态"}]},
+      "communication_contract": {"requires_context": ["current_world_revision_available"], "projects_dialogue_state": ["snapshot_summary_answer"], "verification": ["answer_cites_current_ledger_revision"], "read_authority": ["WorldFactLedger"]}, "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "query.object_location", "entry_kind": "query_contract", "semantic_value": "object_location", "irreducible": false,
+      "components": ["speech_act.query_state"], "roles": {"theme": "physical_referent"}, "language_adapters": {"zh": [{"surface": "在哪里", "canonical": true}, {"surface": "哪儿"}]},
+      "communication_contract": {"requires_context": ["theme_grounded"], "projects_dialogue_state": ["object_location_answer"], "verification": ["answer_cites_current_spatial_fact"], "read_authority": ["WorldFactLedger", "qualified_observation_evidence"]}, "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "query.object_visibility", "entry_kind": "query_contract", "semantic_value": "object_visibility", "irreducible": false,
+      "components": ["speech_act.query_state"], "roles": {"theme": "perceivable_referent"}, "language_adapters": {"zh": [{"surface": "看得到吗", "canonical": true}, {"surface": "能看见吗"}]},
+      "communication_contract": {"requires_context": ["theme_grounded", "observation_channel_available"], "projects_dialogue_state": ["object_visibility_answer"], "verification": ["answer_cites_current_observation_evidence"], "read_authority": ["qualified_observation_evidence"]}, "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "query.object_presence", "entry_kind": "query_contract", "semantic_value": "object_presence", "irreducible": false,
+      "components": ["speech_act.query_state"], "roles": {"theme": "concept_or_entity_selector"}, "language_adapters": {"zh": [{"surface": "有没有", "canonical": true}, {"surface": "在不在"}]},
+      "communication_contract": {"requires_context": ["query_scope_available"], "projects_dialogue_state": ["object_presence_answer"], "verification": ["bounded_observation_scope_and_revision_cited"], "read_authority": ["WorldFactLedger", "qualified_observation_evidence"]}, "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "query.support_inventory", "entry_kind": "query_contract", "semantic_value": "support_inventory", "irreducible": false,
+      "components": ["speech_act.query_state", "predicate.supported_by"], "roles": {"support": "support_capable_referent"}, "language_adapters": {"zh": [{"surface": "桌子上有什么", "canonical": true}, {"surface": "上面有哪些"}]},
+      "communication_contract": {"requires_context": ["support_grounded"], "projects_dialogue_state": ["support_inventory_answer"], "verification": ["answer_cites_current_supported_by_relations"], "read_authority": ["WorldFactLedger", "qualified_observation_evidence"]}, "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "query.region_inventory", "entry_kind": "query_contract", "semantic_value": "region_inventory", "irreducible": false,
+      "components": ["speech_act.query_state"], "roles": {"region": "semantic_region_ref"}, "language_adapters": {"zh": [{"surface": "房间里有什么", "canonical": true}, {"surface": "这里有什么"}]},
+      "communication_contract": {"requires_context": ["region_grounded"], "projects_dialogue_state": ["region_inventory_answer"], "verification": ["bounded_observation_scope_and_revision_cited"], "read_authority": ["WorldFactLedger", "qualified_observation_evidence"]}, "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "communication.confirm_pending", "entry_kind": "communicative_contract", "semantic_value": "confirm_pending_contract", "irreducible": false,
+      "components": ["speech_act.confirm"], "roles": {"target": "pending_dialogue_contract_ref"}, "language_adapters": {"zh": [{"surface": "对，就是这个", "canonical": true}]},
+      "communication_contract": {"requires_context": ["pending_dialogue_contract"], "projects_dialogue_state": ["pending_contract_confirmed"], "verification": ["confirmation_consumed_once_for_matching_scope"], "read_authority": ["current_dialogue_context"]}, "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "communication.reject_pending", "entry_kind": "communicative_contract", "semantic_value": "reject_pending_contract", "irreducible": false,
+      "components": ["speech_act.reject"], "roles": {"target": "pending_dialogue_contract_ref"}, "language_adapters": {"zh": [{"surface": "不对，不是这个", "canonical": true}]},
+      "communication_contract": {"requires_context": ["pending_dialogue_contract"], "projects_dialogue_state": ["pending_contract_rejected"], "verification": ["rejection_consumed_once_for_matching_scope"], "read_authority": ["current_dialogue_context"]}, "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "communication.correct_semantics", "entry_kind": "communicative_contract", "semantic_value": "correct_semantic_graph", "irreducible": false,
+      "components": ["speech_act.correct"], "roles": {"target": "semantic_graph_ref", "replacement": "typed_semantic_update"}, "language_adapters": {"zh": [{"surface": "我的意思是", "canonical": true}]},
+      "communication_contract": {"requires_context": ["correction_target_and_replacement_available"], "projects_dialogue_state": ["superseding_semantic_graph_candidate"], "verification": ["old_graph_released_and_new_graph_recompiled"], "read_authority": ["current_or_recent_semantic_graph", "WorldFactLedger"]}, "fact_commit_authority": "none"
+    },
+    {
+      "entry_id": "communication.answer_inquiry", "entry_kind": "communicative_contract", "semantic_value": "answer_inquiry_contract", "irreducible": false,
+      "components": ["speech_act.answer_clarification"], "roles": {"inquiry": "InquiryContract_ref", "value": "typed_constraint_or_referent"}, "language_adapters": {"zh": [{"surface": "白色马克杯", "canonical": true}]},
+      "communication_contract": {"requires_context": ["pending_inquiry_contract"], "projects_dialogue_state": ["inquiry_constraint_update"], "verification": ["updated_inquiry_reenters_grounding"], "read_authority": ["current_inquiry_contract"]}, "fact_commit_authority": "none"
     },
     {
       "entry_id": "operator.navigate_to",
