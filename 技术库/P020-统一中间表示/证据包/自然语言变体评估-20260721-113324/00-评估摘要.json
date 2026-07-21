@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0.0",
+  "collected_at": "2026-07-21T11:33:46.981607+08:00",
+  "case_count": 16,
+  "planning_success": {
+    "passed": 16,
+    "total": 16,
+    "rate_percent": 100.0
+  },
+  "historical_failure_retest": {
+    "historical_observed_success_rate_percent": 0.0,
+    "current_passed": 8,
+    "total": 8,
+    "current_rate_percent": 100.0,
+    "observed_improvement_percentage_points": 100.0,
+    "comparison_note": "历史基线来自此前交互日志中的失败结果，不是同一代码环境的A/B重跑。"
+  },
+  "unseen_paraphrases": {
+    "passed": 8,
+    "total": 8,
+    "rate_percent": 100.0
+  },
+  "end_to_end_sample": {
+    "passed": 4,
+    "attempted": 4,
+    "rate_percent": 100.0
+  },
+  "failed_cases": [],
+  "execution_failures": [],
+  "environment": {
+    "python": "3.12.8 (tags/v3.12.8:2dc476b, Dec  3 2024, 19:30:04) [MSC v.1942 64 bit (AMD64)]",
+    "platform": "Windows-10-10.0.19044-SP0",
+    "scene": "hospitality_guest",
+    "executor_profile": "home_humanoid"
+  }
+}

@@ -449,14 +449,29 @@ def invalidate_versioned_artifacts(
 class CognitiveAuthorityLedger:
     """The only fact authority used by task planning, inquiry, and explanation."""
 
-    def __init__(self, world_revision: int = 0) -> None:
+    def __init__(
+        self, world_revision: int = 0, *, authority_ref: str | None = None
+    ) -> None:
         self.world_revision = int(world_revision)
-        self.ledger_id = stable_id(
+        self.ledger_id = authority_ref or stable_id(
             "ledger", {"authority": "world_fact_ledger", "created": world_revision}
         )
         self.evidence: dict[str, dict[str, Any]] = {}
         self.predicates: dict[str, dict[str, Any]] = {}
         self.events: dict[str, dict[str, Any]] = {}
+
+    def snapshot(self) -> dict[str, Any]:
+        """Return indexes that extend, rather than replace, the bound fact ledger."""
+        return {
+            "fact_authority_ref": self.ledger_id,
+            "world_revision": self.world_revision,
+            "evidence": deepcopy(self.evidence),
+            "predicates": deepcopy(self.predicates),
+            "events": deepcopy(self.events),
+            "control_gateway": "P018",
+            "verification_gateway": "P016",
+            "direct_execution_allowed": False,
+        }
 
     def add_evidence(self, envelope: dict[str, Any]) -> str:
         validation = validate_primitive(envelope)

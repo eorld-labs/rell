@@ -45,8 +45,10 @@ from embodied_scene import begin_persisted_experience_replay as begin_embodied_p
 from embodied_scene import confirm_pending_motion as confirm_embodied_motion
 from embodied_scene import evaluate_learned_replay as evaluate_embodied_learned_replay
 from embodied_scene import finish_embodied_teaching as finish_embodied_teaching_session
+from embodied_scene import get_cognitive_inquiry_context
 from embodied_scene import get_session as get_embodied_session
 from embodied_scene import get_hospitality_task_graph
+from embodied_scene import record_cognitive_inquiry_result
 from embodied_scene import list_embodied_scenes, load_scene as load_embodied_scene
 from embodied_scene import set_stool as set_embodied_stool
 from embodied_scene import set_protection_policy as set_embodied_protection_policy
@@ -91,6 +93,10 @@ from real_robot_service import (
     reset_real_robot_emergency_stop,
     set_real_robot_session_mode,
     start_real_robot_session,
+)
+from cognitive_inquiry_service import (
+    get_cognitive_inquiry_catalog,
+    run_cognitive_inquiry,
 )
 
 
@@ -8410,6 +8416,9 @@ class RellSampleHandler(BaseHTTPRequestHandler):
         if path == "/concept-teaching/catalog":
             self._send_json(get_concept_teaching_catalog())
             return
+        if path == "/cognitive/inquiry/catalog":
+            self._send_json(get_cognitive_inquiry_catalog())
+            return
         if path.startswith("/concept-teaching/session/"):
             session_id = path.removeprefix("/concept-teaching/session/")
             result = get_concept_teaching_session(session_id)
@@ -8914,6 +8923,37 @@ class RellSampleHandler(BaseHTTPRequestHandler):
                 str(body.get("scene_id", "home_semantic_3d_a")),
             )
             self._send_json(result, status=400 if "error" in result else 200)
+            return
+        if path == "/cognitive/inquiry/run":
+            session_id = str(body.get("session_id", ""))
+            context = get_cognitive_inquiry_context(session_id)
+            if "error" in context:
+                self._send_json(context, status=404)
+                return
+            try:
+                result = run_cognitive_inquiry(
+                    context, str(body.get("scenario", "")), data_dir=DATA
+                )
+            except (AssertionError, PermissionError, ValueError) as error:
+                self._send_json(
+                    {
+                        "error": "cognitive_inquiry_contract_failed",
+                        "detail": str(error),
+                        "session_id": session_id,
+                    },
+                    status=400,
+                )
+                return
+            if "error" in result:
+                self._send_json(result, status=400)
+                return
+            receipt = record_cognitive_inquiry_result(session_id, result)
+            if "error" in receipt:
+                self._send_json(receipt, status=409)
+                return
+            result.pop("authority_extension", None)
+            result["session_binding_receipt"] = receipt
+            self._send_json(result)
             return
         if path == "/embodied/obstacle":
             result = set_embodied_stool(str(body.get("session_id", "")), str(body.get("mode", "ahead")))

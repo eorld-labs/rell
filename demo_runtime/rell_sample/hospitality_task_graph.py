@@ -48,6 +48,8 @@ def build_hospitality_task_graph(
             "speech_acts": ["task_request"],
             "operators_any": ["transport_object"],
             "goal_relations_any": ["object_at_target_region"],
+            "required_concepts_any": ["concept_portable_support_carrier"],
+            "minimum_event_frames": 0,
         },
         "roles": {
             "tea_vessel": mug.get("entity_id") if mug else None,

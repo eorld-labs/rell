@@ -7,7 +7,7 @@
     {
       "concept_id": "concept_support_surface",
       "display_name": "支撑操作面",
-      "aliases": ["桌子", "桌面", "操作台", "台面"],
+      "aliases": ["桌子", "桌面", "桌", "操作台", "台面"],
       "compatible_kinds": ["operation_surface"],
       "perceptual_invariants": ["stable_horizontal_support_surface", "body_supported_from_ground"],
       "variable_features": ["color", "material", "size"],

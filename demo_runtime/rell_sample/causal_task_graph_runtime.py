@@ -22,14 +22,29 @@ def causal_graph_activation_matches(
     required_operators = set(contract.get("operators_all") or [])
     alternative_operators = set(contract.get("operators_any") or [])
     alternative_goal_relations = set(contract.get("goal_relations_any") or [])
+    mentioned_concepts = {
+        item.get("concept_id")
+        for item in language_analysis.get("entity_mentions", [])
+        if item.get("concept_id")
+    }
+    required_concepts = set(contract.get("required_concepts_all") or [])
+    alternative_concepts = set(contract.get("required_concepts_any") or [])
+    minimum_event_frames = int(contract.get("minimum_event_frames") or 0)
+    alternative_event_signature_matches = bool(
+        (not alternative_operators and not alternative_goal_relations)
+        or operators.intersection(alternative_operators)
+        or goal_relation in alternative_goal_relations
+    )
     return bool(
         (not allowed_speech_acts or speech_act in allowed_speech_acts)
         and required_operators.issubset(operators)
-        and (not alternative_operators or bool(operators & alternative_operators))
+        and alternative_event_signature_matches
+        and required_concepts.issubset(mentioned_concepts)
         and (
-            not alternative_goal_relations
-            or goal_relation in alternative_goal_relations
+            not alternative_concepts
+            or bool(mentioned_concepts & alternative_concepts)
         )
+        and len(language_analysis.get("event_frames", [])) >= minimum_event_frames
     )
 
 

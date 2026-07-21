@@ -809,7 +809,13 @@ def verify_current_relation_precedes_category_ambiguity() -> dict:
     projected = (runtime_intent.get("source_language_frame") or {}).get("context_projection") or {}
     require(repeated.get("status") == "motion_started", f"verified holder relation fell back to category ambiguity: {repeated}")
     require(intent.get("role_bindings", {}).get("theme") == "mug_white", f"current human-held object was not bound as the new theme: {repeated}")
-    require(evidence.get("basis") == "current_verified_relation:held_by_human" and evidence.get("current_snapshot_revalidated") is True, f"relational binding did not expose current-world provenance: {evidence}")
+    require(
+        evidence.get("basis") == "current_verified_relation:received_by"
+        and evidence.get("current_snapshot_revalidated") is True
+        and evidence.get("rcir_bundle_id")
+        and evidence.get("rcir_authority_digest"),
+        f"relational binding did not expose the authoritative current-world predicate: {evidence}",
+    )
     require(projected.get("active_task_summary") is None, f"new task-creating input inherited the completed task summary: {projected}")
     require(any(item.get("predicate") == "received_by" and item.get("subject") == "mug_white" for item in projected.get("current_world_facts", [])), f"new input did not project the current holder relation: {projected}")
     outcomes = drain_service(repeated)

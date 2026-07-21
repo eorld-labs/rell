@@ -11,10 +11,10 @@ EVENT_LEXICAL_PRIMITIVES: tuple[dict[str, Any], ...] = (
     {"operator": "orient_executor", "concept_id": "factory_event_orient", "heads": ("转向", "面向", "朝向", "转"), "canonical": "转向"},
     {"operator": "grasp_object", "concept_id": "factory_event_grasp", "heads": ("捡", "拾", "抓", "取", "拿"), "canonical": "拿起"},
     {"operator": "release_object", "concept_id": "factory_event_release", "heads": ("释放", "撒手", "松开", "放开"), "canonical": "放开"},
-    {"operator": "fill_container", "concept_id": "factory_event_fill_container", "heads": ("接一杯水", "接杯水", "接水", "取水", "装水", "倒一杯水", "倒杯水"), "canonical": "接水"},
-    {"operator": "place_object", "concept_id": "factory_event_place", "heads": ("放回", "搁", "摆", "放"), "canonical": "放到"},
-    {"operator": "handover_object", "concept_id": "factory_event_handover", "heads": ("递给", "交给", "拿给", "送给", "递过去", "交过去"), "canonical": "递给"},
-    {"operator": "transport_object", "concept_id": "factory_event_transport", "heads": ("拿过来", "带过来", "端过来", "带到", "拿到", "送到", "端到", "带走", "拿来"), "canonical": "带到"},
+    {"operator": "fill_container", "concept_id": "factory_event_fill_container", "heads": ("接一杯水", "取一杯水", "接杯水", "取杯水", "接好水", "装满水", "盛点水", "盛水", "续满", "续水", "接水", "取水", "装水", "倒一杯水", "倒杯水"), "canonical": "接水"},
+    {"operator": "place_object", "concept_id": "factory_event_place", "heads": ("放回", "送回", "归还", "搁", "摆", "放"), "canonical": "放到"},
+    {"operator": "handover_object", "concept_id": "factory_event_handover", "heads": ("递回来", "交回来", "递给", "交给", "拿给", "送给", "递过去", "交过去", "递回", "交回"), "canonical": "递给"},
+    {"operator": "transport_object", "concept_id": "factory_event_transport", "heads": ("拿过来", "带过来", "送过来", "端过来", "带到", "拿到", "送到", "端到", "带走", "拿来", "送来", "端来"), "canonical": "带到"},
     {"operator": "relocate_object", "concept_id": "factory_event_relocate", "heads": ("移开", "移走", "挪开", "搬开", "搬走", "拿开", "清走"), "canonical": "移开"},
     {"operator": "apply_directional_force", "concept_id": "factory_event_push_pull", "heads": ("拖", "挪", "推", "拉"), "canonical": "推动"},
     {"operator": "change_open_state", "concept_id": "factory_event_open_close", "heads": ("打开", "关上", "关闭", "合上"), "canonical": "打开"},
@@ -47,9 +47,14 @@ def normalize_language_text(text: str) -> str:
 
 def _event_clause_surfaces(utterance: str) -> list[str]:
     """Split discourse boundaries without assigning cross-clause roles."""
+    prepared = re.sub(
+        r"((?:接好|装好|盛好|续满|填满|加满)(?:了)?(?:水|饮料))后(?=(?:把|将|搁|放|摆|端|拿|送|递|交))",
+        r"\1，",
+        utterance or "",
+    )
     surfaces = [
         item.strip()
-        for item in re.split(r"(?:[，,；;。！？!?]+|然后|接着|随后|再然后)", utterance or "")
+        for item in re.split(r"(?:[，,；;。！？!?]+|然后|接着|随后|再然后)", prepared)
         if item.strip()
     ]
     return surfaces if len(surfaces) > 1 else []
@@ -149,6 +154,8 @@ def _infer_argument_order_events(
     patterns = (
         r"(?:把)?(?:水|饮料)接(?:了|好|满)?",
         r"(?:杯子|容器)接(?:好|满)?(?:水|饮料)",
+        r"(?:取|打)(?:一)?杯水",
+        r"(?:杯子|容器)?(?:接好|装好|装满|盛好|盛|续满|续上)(?:点|些|一杯)?(?:常温|热|凉)?(?:水|饮料)",
     )
     inferred = list(events)
     for pattern in patterns:
@@ -240,13 +247,29 @@ def _discourse_roles(text: str) -> dict[str, dict[str, Any]]:
             "relation": "benefits_from_requested_outcome",
             "source": "deictic_service_role",
         }
-    if any(marker in text for marker in ("给我", "交给我", "递给我", "送给我", "拿给我")):
+    recipient_result_relation = bool(
+        re.search(
+            r"(?:送|递|交|拿|端|带)(?:回|过)?(?:来|到)?我(?:的)?手(?:里|上|中)",
+            text,
+        )
+    )
+    deictic_delivery = any(
+        marker in text
+        for marker in ("送过来", "递过来", "拿过来", "端过来", "送来", "递回来")
+    )
+    if any(marker in text for marker in ("给我", "交给我", "递给我", "送给我", "拿给我")) or recipient_result_relation or deictic_delivery:
         roles["recipient"] = {
             "reference": "human_speaker",
             "relation": "receives_requested_theme",
             "source": "deictic_service_role",
         }
-    if re.search(r"我(?:已经)?(?:喝|饮用)(?:完|光)", text):
+    possession_source = bool(
+        re.search(
+            r"(?:拿|取|从)我(?:的)?手(?:里|上|中)(?:的|这|那)?|我手(?:里|上|中)(?:的|这只|这个)",
+            text,
+        )
+    )
+    if re.search(r"我(?:已经)?(?:喝|饮用)(?:完|光|好)", text) or possession_source:
         roles["source_holder"] = {
             "reference": "human_speaker",
             "relation": "holds_reported_consumed_container_candidate",
@@ -258,6 +281,7 @@ def _discourse_roles(text: str) -> dict[str, dict[str, Any]]:
         for pattern in (
             r"(?:你|机器人)(?:继续|还|就)?(?:拿着|端着|托着|留着|保持拿着)",
             r"(?:拿着|端着|托着|留着)(?:就行|即可|不要给我)?$",
+            r"托盘.*(?:留在|留给|保持在)(?:你|机器人)(?:的)?手(?:里|上|中)",
         )
     ):
         roles["executor_retention"] = {
@@ -271,7 +295,10 @@ def _discourse_roles(text: str) -> dict[str, dict[str, Any]]:
 def _reported_events(text: str) -> list[dict[str, Any]]:
     """Represent human-reported state changes without committing physical facts."""
     candidates: list[dict[str, Any]] = []
-    for surface in ("喝完了", "喝完", "饮用完了", "饮用完"):
+    for surface in (
+        "喝完了", "喝光了", "喝好了", "饮用完了",
+        "喝完", "喝光", "喝好", "饮用完",
+    ):
         for match in re.finditer(re.escape(surface), text):
             candidates.append({
                 "event_type": "consumption_completed",
@@ -343,7 +370,15 @@ def _extract_historical_event_constraints(
     """Separate events inside temporal relative clauses from current commands."""
     retained: list[dict[str, Any]] = []
     constraints: list[dict[str, Any]] = []
-    temporal_markers = ("刚才", "刚刚", "之前", "先前", "上次")
+    temporal_markers = (
+        "刚才",
+        "刚刚",
+        "之前",
+        "先前",
+        "原先",
+        "原来",
+        "上次",
+    )
     for event in events:
         event_start = int(event.get("start", -1))
         event_end = int(event.get("end", -1))
@@ -369,6 +404,18 @@ def _extract_historical_event_constraints(
             and int(item.get("end", -1)) <= possessive_end
             and "graspable" in item.get("functional_affordances", [])
         ]
+        if not event_themes and any(
+            pronoun in text[event_end:possessive_end]
+            for pronoun in ("它", "这个", "那个")
+        ):
+            preceding_themes = [
+                item
+                for item in objects
+                if int(item.get("end", -1)) <= marker_start
+                and "graspable" in item.get("functional_affordances", [])
+            ]
+            if preceding_themes:
+                event_themes = [preceding_themes[-1]]
         heads = [
             item
             for item in objects
@@ -495,6 +542,11 @@ def _roles(
     movable = [item for item in objects if any(token in set(item.get("functional_affordances", [])) for token in ("graspable", "movable", "graspable_candidate"))]
     supports = [item for item in objects if any(token in set(item.get("functional_affordances", [])) for token in ("support_object", "receive_object"))]
     held = [item for item in context_entities if item.get("focus_source") == "verified_holding_fact"]
+    human_held = [
+        item
+        for item in context_entities
+        if item.get("focus_source") == "verified_human_possession_fact"
+    ]
     place_event = next((item for item in events if item["operator"] == "place_object"), None)
     handover_event = next((item for item in events if item["operator"] == "handover_object"), None)
     transport_event = next((item for item in events if item["operator"] == "transport_object"), None)
@@ -503,7 +555,14 @@ def _roles(
     if placing:
         surface = str(place_event.get("matched_surface") or "")
         has_destination_connector = any(marker in surface for marker in ("到", "在"))
-        restores_prior_relation = "回" in surface
+        restores_prior_relation = (
+            "回" in surface
+            or "归还" in surface
+            or any(
+                marker in text
+                for marker in ("原桌", "原台面", "原先", "原来", "原处")
+            )
+        )
         before = [item for item in objects if item.get("end", 0) <= place_event["start"]]
         after = [item for item in objects if item.get("start", 0) >= place_event["end"]]
         destination_candidate = after[-1] if after else None
@@ -633,7 +692,32 @@ def _roles(
                     "spatial_relation": "inside_semantic_region",
                     "source": "transport_result_complement",
                 }
+    source_possession_requested = bool(
+        re.search(
+            r"(?:拿|取|从)我(?:的)?手(?:里|上|中)|我手(?:里|上|中)(?:的|这只|这个)",
+            text,
+        )
+    )
+    if source_possession_requested and len(human_held) == 1:
+        roles["theme"] = {
+            **deepcopy(human_held[0]),
+            "binding_source": "explicit_human_possession_language_plus_verified_relation",
+        }
     return roles
+
+
+def _restores_prior_relation(text: str, events: list[dict[str, Any]]) -> bool:
+    return bool(
+        any(
+            item.get("operator") == "place_object"
+            and any(
+                marker in str(item.get("matched_surface") or "")
+                for marker in ("回", "归还")
+            )
+            for item in events
+        )
+        or any(marker in text for marker in ("原先", "原来", "原处", "原桌", "原台面"))
+    )
 
 
 def _canonical_utterance(speech_act: str, query_type: str | None, events: list[dict[str, Any]], roles: dict[str, Any]) -> str | None:
@@ -786,7 +870,7 @@ def compose_language_concepts(
         "relocate_object",
         "apply_directional_force", "change_open_state", "change_device_activation", "remove_surface_contaminant",
     } for item in events) or (any(item["operator"] == "navigate_to" for item in events) and not relative_direction)
-    if requires_object and not objects:
+    if requires_object and not objects and not (roles.get("theme") or roles.get("target")):
         unresolved.append("required_object_role_not_grounded")
     if any(item["operator"] == "place_object" for item in events):
         if not roles.get("theme"):
@@ -853,10 +937,7 @@ def compose_language_concepts(
             "completed_or_resultative": any(marker in normalized for marker in ("到了", "看见", "看到", "完成", "已经")),
             "current_scope": not any(marker in normalized for marker in ("昨天", "以前", "曾经")),
             "body_relative_direction": relative_direction,
-            "restore_prior_relation": any(
-                item.get("operator") == "place_object" and "回" in str(item.get("matched_surface") or "")
-                for item in events
-            ),
+            "restore_prior_relation": _restores_prior_relation(normalized, events),
         },
         "canonical_utterance": canonical,
         "canonical_frame": {
@@ -882,10 +963,7 @@ def compose_language_concepts(
             "world_scope": "current_world_revision",
             "destination_binding_policy": (
                 "most_recent_verified_support_relation"
-                if any(
-                    item.get("operator") == "place_object" and "回" in str(item.get("matched_surface") or "")
-                    for item in events
-                )
+                if _restores_prior_relation(normalized, events)
                 else "current_spatial_relation"
             ),
         },

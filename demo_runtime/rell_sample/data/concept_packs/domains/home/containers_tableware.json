@@ -7,7 +7,7 @@
     {
       "concept_id": "concept_fillable_container",
       "display_name": "可盛装容器",
-      "aliases": ["杯子", "水杯", "杯"],
+      "aliases": ["杯子", "水杯", "杯", "马克"],
       "compatible_kinds": ["graspable_container"],
       "perceptual_invariants": ["open_top", "bounded_inner_volume", "graspable_body"],
       "variable_features": ["color", "size", "handle_presence"],

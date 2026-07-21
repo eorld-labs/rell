@@ -298,16 +298,21 @@ def _question_predicate(
     )
 
 
-def run_quality_profile_drift_loop() -> dict[str, Any]:
-    authority = CognitiveAuthorityLedger(world_revision=31)
-    subject_ref = "entity_quality_target"
+def run_quality_profile_drift_loop(
+    *,
+    authority: CognitiveAuthorityLedger | None = None,
+    inquiry_scope_ref: str | None = None,
+) -> dict[str, Any]:
+    authority = authority or CognitiveAuthorityLedger(world_revision=31)
+    revision = authority.world_revision
+    subject_ref = inquiry_scope_ref or "entity_quality_target"
     profile_ref = "quality_profile_grasp_v4"
-    question = _question_predicate("current_grasp_profile", subject_ref, 31)
+    question = _question_predicate("current_grasp_profile", subject_ref, revision)
     trigger = adapt_cognitive_signal(
         "quality_profile_drift",
         subject_refs=[subject_ref],
         question_predicate_ref=question["predicate_id"],
-        world_revision=31,
+        world_revision=revision,
         depends_on_refs=[profile_ref],
         measurements={"baseline_mean": 0.72, "recent_mean": 0.51, "tolerance": 0.08},
         strength=420,
@@ -326,7 +331,7 @@ def run_quality_profile_drift_loop() -> dict[str, Any]:
         question_predicate_ref=question["predicate_id"],
         answer_routes=["existing_evidence", "active_observation", "human_query"],
         authorization_scope="observe_only",
-        world_revision=31,
+        world_revision=revision,
         depends_on_refs=[subject_ref, profile_ref, trigger_ref],
         closure_condition="two_independent_modalities_identify_one_hypothesis",
         fact_authority_ref=authority.ledger_id,
@@ -346,29 +351,30 @@ def run_quality_profile_drift_loop() -> dict[str, Any]:
             {"role": "subject", "value_type": "EntityRef", "value": subject_ref},
             {"role": "state", "value_type": "literal", "value": "surface_condition_changed"},
         ],
-        world_revision=31,
+        world_revision=revision,
         modality="perception_candidate",
         status="candidate",
         depends_on_refs=[subject_ref, profile_ref],
     )
+    observation_payload = {
+        "vision": "surface_texture_changed",
+        "touch": "friction_drop_confirmed",
+        "sensor_self_check": "nominal",
+    }
     result_evidence = make_evidence_envelope(
         "multimodal_observation",
         epistemic_status="corroborated",
-        world_revision=31,
+        world_revision=revision,
         supports_refs=[result_predicate["predicate_id"]],
         strength=830,
         independent_channels=2,
         depends_on_refs=[subject_ref, profile_ref],
-        payload={
-            "vision": "surface_texture_changed",
-            "touch": "friction_drop_confirmed",
-            "sensor_self_check": "nominal",
-        },
+        payload=observation_payload,
     )
     event = make_event(
         "active_quality_observation_completed",
         participant_refs={"subject": subject_ref},
-        world_revision=31,
+        world_revision=revision,
         temporal_scope="verified_transition",
         status="observed",
         evidence_refs=[],
@@ -385,27 +391,41 @@ def run_quality_profile_drift_loop() -> dict[str, Any]:
     )
     return {
         "loop_type": "quality_profile_drift",
-        "trigger": {"baseline_mean": 0.72, "recent_mean": 0.51},
+        "trigger": {
+            "baseline_mean": 0.72,
+            "recent_mean": 0.51,
+            "tolerance": 0.08,
+        },
+        "observation_receipt": {
+            **observation_payload,
+            "independent_channels": 2,
+            "evidence_ref": result_evidence["envelope_id"],
+        },
         "hypothesis_count": len(inquiry["candidate_hypotheses"]),
         "action": authorization,
         "closure": closed,
         "transition_log": deepcopy(runtime.transition_log),
         "planning_view": authority.planning_view(closed["predicate_ref"]),
         "explanation_view": authority.explanation_view(closed["event_ref"]),
+        "authority_snapshot": authority.snapshot(),
     }
 
 
 def run_recovery_boundary_probe_loop(
-    *, p016_result: dict[str, Any] | None = None
+    *,
+    p016_result: dict[str, Any] | None = None,
+    authority: CognitiveAuthorityLedger | None = None,
+    inquiry_scope_ref: str | None = None,
 ) -> dict[str, Any]:
-    authority = CognitiveAuthorityLedger(world_revision=44)
-    template_ref = "process_template_fill_container"
-    question = _question_predicate("template_applicability", template_ref, 44)
+    authority = authority or CognitiveAuthorityLedger(world_revision=44)
+    revision = authority.world_revision
+    template_ref = inquiry_scope_ref or "process_template_fill_container"
+    question = _question_predicate("template_applicability", template_ref, revision)
     trigger = adapt_cognitive_signal(
         "recovery_pattern",
         subject_refs=[template_ref],
         question_predicate_ref=question["predicate_id"],
-        world_revision=44,
+        world_revision=revision,
         depends_on_refs=["recovery_cluster_12"],
         measurements={"same_recovery": "no_source_flow", "count": 5, "window": 8},
         strength=610,
@@ -424,7 +444,7 @@ def run_recovery_boundary_probe_loop(
         question_predicate_ref=question["predicate_id"],
         answer_routes=["existing_evidence", "safe_probe", "human_query"],
         authorization_scope="safe_probe",
-        world_revision=44,
+        world_revision=revision,
         depends_on_refs=[template_ref, trigger_ref, "recovery_cluster_12"],
         closure_condition="p016_dual_channel_probe_verifies_source_flow_boundary",
         fact_authority_ref=authority.ledger_id,
@@ -482,7 +502,7 @@ def run_recovery_boundary_probe_loop(
             {"role": "template", "value_type": "literal", "value": template_ref},
             {"role": "required_condition", "value_type": "literal", "value": "stable_source_flow"},
         ],
-        world_revision=44,
+        world_revision=revision,
         modality="template_boundary",
         status="candidate",
         depends_on_refs=[template_ref, "source_flow_profile"],
@@ -490,7 +510,7 @@ def run_recovery_boundary_probe_loop(
     verification = make_evidence_envelope(
         "safe_probe_result",
         epistemic_status="physically_verified",
-        world_revision=44,
+        world_revision=revision,
         supports_refs=[boundary_predicate["predicate_id"]],
         strength=940,
         independent_channels=2,
@@ -502,7 +522,7 @@ def run_recovery_boundary_probe_loop(
     event = make_event(
         "safe_template_boundary_probe_completed",
         participant_refs={"template": template_ref},
-        world_revision=44,
+        world_revision=revision,
         temporal_scope="verified_transition",
         status="observed",
         produces_predicate_refs=[boundary_predicate["predicate_id"]],
@@ -518,7 +538,7 @@ def run_recovery_boundary_probe_loop(
     )
     return {
         "loop_type": "recovery_boundary_probe",
-        "recovery_cluster": {"type": "no_source_flow", "count": 5},
+        "recovery_cluster": {"type": "no_source_flow", "count": 5, "window": 8},
         "p016_runtime_receipt": probe_payload,
         "hypothesis_count": len(inquiry["candidate_hypotheses"]),
         "action": authorization,
@@ -526,13 +546,21 @@ def run_recovery_boundary_probe_loop(
         "transition_log": deepcopy(runtime.transition_log),
         "planning_view": authority.planning_view(closed["predicate_ref"]),
         "explanation_view": authority.explanation_view(closed["event_ref"]),
+        "authority_snapshot": authority.snapshot(),
     }
 
 
-def run_concept_validation_loop(*, prediction_confirmed: bool) -> dict[str, Any]:
-    authority = CognitiveAuthorityLedger(world_revision=58 if prediction_confirmed else 59)
+def run_concept_validation_loop(
+    *,
+    prediction_confirmed: bool,
+    authority: CognitiveAuthorityLedger | None = None,
+    inquiry_scope_ref: str | None = None,
+) -> dict[str, Any]:
+    authority = authority or CognitiveAuthorityLedger(
+        world_revision=58 if prediction_confirmed else 59
+    )
     revision = authority.world_revision
-    pattern_ref = "pattern_compliant_support_after_release"
+    pattern_ref = inquiry_scope_ref or "pattern_compliant_support_after_release"
     question = _question_predicate("pattern_predicts_stable_support", pattern_ref, revision)
     pattern_evidence_refs = []
     for index in range(3):
@@ -597,6 +625,7 @@ def run_concept_validation_loop(*, prediction_confirmed: bool) -> dict[str, Any]
         status="candidate",
         depends_on_refs=["unseen_instance_04", candidate["concept_id"]],
     )
+    probe_payload = {"support_stable": prediction_confirmed, "new_instance": True}
     verification = make_evidence_envelope(
         "safe_probe_result",
         epistemic_status="physically_verified",
@@ -607,7 +636,7 @@ def run_concept_validation_loop(*, prediction_confirmed: bool) -> dict[str, Any]
         physical_verification=True,
         verifier="P016",
         depends_on_refs=["unseen_instance_04", candidate["concept_id"]],
-        payload={"support_stable": prediction_confirmed, "new_instance": True},
+        payload=probe_payload,
     )
     event = make_event(
         "candidate_concept_new_instance_probe_completed",
@@ -647,6 +676,11 @@ def run_concept_validation_loop(*, prediction_confirmed: bool) -> dict[str, Any]
     return {
         "loop_type": "candidate_concept_validation",
         "pattern_episode_count": 3,
+        "new_instance_probe_receipt": {
+            **probe_payload,
+            "independent_channels": 2,
+            "evidence_ref": verification["envelope_id"],
+        },
         "candidate": candidate,
         "action": authorization,
         "closure": closed,
@@ -654,6 +688,7 @@ def run_concept_validation_loop(*, prediction_confirmed: bool) -> dict[str, Any]
         "transition_log": deepcopy(runtime.transition_log),
         "planning_view": authority.planning_view(closed["predicate_ref"]),
         "explanation_view": authority.explanation_view(closed["event_ref"]),
+        "authority_snapshot": authority.snapshot(),
     }
 
 

@@ -305,6 +305,20 @@ def normalize_perception_gap(
         semantic_binding = (process_resolution.get("bindings") or {}).get(slot.slot_id)
         if not semantic_binding and not slot.required:
             continue
+        binding_evidence = str((semantic_binding or {}).get("evidence") or "")
+        binding_world_revision = (semantic_binding or {}).get(
+            "observation_world_revision"
+        )
+        current_world_revision = process_resolution.get("world_revision")
+        if (
+            semantic_binding
+            and binding_evidence.startswith("current_verified_relation:")
+            and binding_world_revision == current_world_revision
+        ):
+            # A bounded observation may add candidates, but it cannot demote a
+            # role already selected by a version-matched, physically verified
+            # relation. Otherwise perception becomes a second fact source.
+            continue
         candidates = [
             {
                 "value_ref": item.get("entity_ref"),
@@ -744,11 +758,12 @@ def _entity_value(
         if binding.get("entity_ref") == item.get("entity_id")
         and binding.get("world_revision") == world_revision
     ]
-    if explicit:
+    if verified_relation:
+        evidence_kind = f"current_verified_relation:{verified_relation}"
+        evidence_strength = 650 if explicit else 450
+    elif explicit:
         evidence_kind = (semantic_binding or {}).get("binding_basis") or "semantic_constraints_grounded_in_current_observation"
         evidence_strength = int((semantic_binding or {}).get("evidence_strength") or 500)
-    elif verified_relation:
-        evidence_kind, evidence_strength = f"current_verified_relation:{verified_relation}", 450
     elif current_confirmations:
         strongest_confirmation = max(
             current_confirmations,

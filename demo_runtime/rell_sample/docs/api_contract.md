@@ -727,6 +727,23 @@ Session state never stores absolute poses, joint angles, fixed durations, or tra
 python .\demo_runtime\rell_sample\validate_p017_minimal_loop.py
 ```
 
+## GET /cognitive/inquiry/catalog
+
+返回可运行的认识目标闭环以及共同权限边界。所有条目固定声明 `fact_authority=session_world_fact_ledger`、`control_gateway=P018`、`verification_gateway=P016` 和 `direct_execution_allowed=false`。
+
+## POST /cognitive/inquiry/run
+
+请求：
+
+```json
+{
+  "session_id": "embodied_xxx",
+  "scenario": "quality_profile_drift"
+}
+```
+
+`scenario` 可为 `quality_profile_drift`、`recovery_boundary_probe`、`concept_promote` 或 `concept_reject`。响应返回竞争假设、闭环结论、P018/P016 收据、Event/Predicate/Evidence 引用以及规划/解释同源读取结果。该接口没有执行器直连权限，也不把认识候选提交为具身运行时物理事实。
+
 ## 调试接口
 
 `GET /process/status/{task_id}` 为调试接口，不作为对外承诺接口。

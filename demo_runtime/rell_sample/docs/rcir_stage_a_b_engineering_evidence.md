@@ -129,3 +129,28 @@ direct_execution_allowed = false
 ## 五、当前边界
 
 本阶段证明共同类型、证据权限和认识目标闭环已经可执行，不表示所有旧模块已经迁移完毕。旧 API、视觉概念库和部分任务结构仍有自己的兼容字段；后续迁移标准是这些模块逐步只交换七类原语引用，并继续由同一事实账本、P018 和 P016 约束。
+
+## 六、具身服务接入
+
+阶段 B 已接入具身会话和 `/embodied` 页面。每次运行前，服务按当前 `runtime_objects`、本体状态和 `world_revision` 重建会话的 `WorldFactLedger`，再将其 `ledger_id` 注入 `CognitiveAuthorityLedger`。认识闭环不创建自己的事实权威。
+
+服务入口：
+
+- `GET /cognitive/inquiry/catalog`：列出质量漂移、恢复边界、概念晋级和概念否决四个闭环；
+- `POST /cognitive/inquiry/run`：在指定具身会话的当前世界版本上运行闭环。
+
+响应同时返回：
+
+- 竞争假设、选择结果和 Inquiry 状态迁移；
+- P018 仲裁收据与 P016 验真引用；
+- 同一个 `Event`、`Predicate`、`EvidenceEnvelope` 引用；
+- 规划读取面与反向解释读取面的同源断言；
+- `direct_execution_allowed=false` 和 `runtime_fact_committed_by_inquiry=false`。
+
+认识结果作为同一账本的诊断扩展及会话审计历史保存，不成为第二事实源，也不直接改变具身运行时物理事实。恢复边界闭环通过真实 `run_simulated_runtime_sample(..., "simulated_success")` 获得 P016 双通道验真结果，而不是使用静态成功样本。
+
+服务级回归：
+
+```powershell
+python .\demo_runtime\rell_sample\validate_cognitive_inquiry_api.py
+```

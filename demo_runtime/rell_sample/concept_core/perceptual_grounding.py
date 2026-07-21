@@ -11,15 +11,15 @@ from concept_core.visual_concept_packs import load_visual_concept_packs, match_v
 
 
 COLOR_ALIASES = {
-    "white": ["白色", "白的"],
-    "black": ["黑色", "黑的"],
+    "white": ["白色", "白的", "白"],
+    "black": ["黑色", "黑的", "黑"],
     "light_blue": ["浅蓝色", "浅蓝"],
-    "blue": ["蓝色", "蓝的"],
-    "red": ["红色", "红的"],
-    "green": ["绿色", "绿的"],
-    "yellow": ["黄色", "黄的"],
-    "gray": ["灰色", "灰的"],
-    "brown": ["棕色", "褐色", "棕的"],
+    "blue": ["蓝色", "蓝的", "蓝"],
+    "red": ["红色", "红的", "红"],
+    "green": ["绿色", "绿的", "绿"],
+    "yellow": ["黄色", "黄的", "黄"],
+    "gray": ["灰色", "灰的", "灰"],
+    "brown": ["棕色", "褐色", "棕的", "棕", "褐"],
 }
 
 COLOR_NAMES = {

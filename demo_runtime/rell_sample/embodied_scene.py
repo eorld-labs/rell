@@ -14,7 +14,11 @@ from uuid import uuid4
 
 from concept_core.factory_event_units import FACTORY_EVENT_CONCEPT_UNITS, build_factory_inability_diagnosis, find_factory_event_concepts_by_text
 from concept_core.concept_gap_dialogue import continue_concept_gap_dialogue, start_concept_gap_dialogue
-from concept_core.cognitive_ir import compact_rcir_receipt, compile_rcir_bundle
+from concept_core.cognitive_ir import (
+    build_world_fact_ledger,
+    compact_rcir_receipt,
+    compile_rcir_bundle,
+)
 from concept_core.contextual_affordance import resolve_contextual_affordance_request
 from concept_core.context_projection import build_context_projection, compact_intent_capsule
 from concept_core.functional_object_reasoning import build_functional_object_catalog, build_functional_profile, evaluate_role_compatibility
@@ -351,7 +355,12 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator", scene_id
         "interaction_turn": 0,
         "last_context_projection": None,
         "current_rcir": None,
+        "world_fact_ledger": build_world_fact_ledger(
+            facts_from_runtime_state(scene["objects"], state, 0),
+            world_revision=0,
+        ),
         "rcir_receipts": [],
+        "cognitive_inquiry_history": [],
         "concept_gap_dialogue": None,
         "open_world_observation": None,
         "confirmed_visual_bindings": [],
@@ -601,7 +610,18 @@ def _create_transfer_intent(
 ) -> dict[str, Any] | None:
     normalized = re.sub(r"[，。！？、,.!?\s]+", "", utterance)
     transfer_tokens = ("放到", "放在", "摆到", "摆在", "搁到", "搁在", "移到", "搬到", "挪到")
-    restore_requested = any(token in normalized for token in ("放回", "放回去", "放回原处", "还回去"))
+    semantic_restore = bool(
+        ((language_analysis or {}).get("modifiers") or {}).get(
+            "restore_prior_relation"
+        )
+        or ((language_analysis or {}).get("canonical_frame") or {}).get(
+            "destination_binding_policy"
+        )
+        == "most_recent_verified_support_relation"
+    )
+    restore_requested = semantic_restore or any(
+        token in normalized for token in ("放回", "放回去", "放回原处", "还回去")
+    )
     if not restore_requested and not any(token in normalized for token in transfer_tokens):
         return None
     concepts = load_object_concepts()["concepts"]
@@ -921,6 +941,11 @@ def _water_delivery_goal_semantics(
     """Compose a service goal from effects and roles, independent of word order."""
     normalized = re.sub(r"[，。！？、,.!?\s]+", "", utterance)
     analysis = language_analysis or {}
+    operators = {
+        item.get("operator")
+        for item in analysis.get("event_candidates", [])
+        if item.get("operator")
+    }
     discourse_roles = analysis.get("discourse_roles") or {}
     beneficiary_requested = (
         (discourse_roles.get("beneficiary") or {}).get("reference")
@@ -953,7 +978,7 @@ def _water_delivery_goal_semantics(
         ),
         None,
     )
-    water_effect_requested = any(token in normalized for token in ("接水", "取水", "倒水", "装水", "一杯水")) or bool(
+    water_effect_requested = "fill_container" in operators or any(token in normalized for token in ("接水", "取水", "倒水", "装水", "盛水", "续水", "续满", "一杯水")) or bool(
         re.search(r"(?:接|取|倒|装)(?:一)?杯水", normalized)
     )
     if omitted_content and recent_water_goal:
@@ -971,6 +996,8 @@ def _water_delivery_goal_semantics(
     )
     transfer_relation_requested = (
         any(token in normalized for token in ("给", "交给", "递给", "送给", "拿给"))
+        or "handover_object" in operators
+        or ("transport_object" in operators and deictic_recipient_requested)
         or beneficiary_requested
         or bool(recent_water_goal and omitted_content)
         or repeated_service_after_consumption
@@ -2229,6 +2256,111 @@ def get_session(session_id: str) -> dict[str, Any]:
     return deepcopy(session)
 
 
+def get_cognitive_inquiry_context(session_id: str) -> dict[str, Any]:
+    """Expose the live session ledger without granting inquiry execution rights."""
+    session = SESSIONS.get(session_id)
+    if not session:
+        return {"error": "embodied_session_not_found", "session_id": session_id}
+    facts = facts_from_runtime_state(
+        session.get("runtime_objects", []),
+        session.get("state", {}),
+        int(session.get("world_revision", 0)),
+    )
+    ledger = build_world_fact_ledger(
+        facts, world_revision=int(session.get("world_revision", 0))
+    )
+    session["world_fact_ledger"] = deepcopy(ledger)
+    current_rcir = session.get("current_rcir") or {}
+    if current_rcir:
+        current_rcir["world_fact_ledger"] = deepcopy(ledger)
+    return {
+        "session_id": session_id,
+        "scene_id": session.get("scene_id"),
+        "world_revision": int(session.get("world_revision", 0)),
+        "world_fact_ledger": deepcopy(ledger),
+        "history_count": len(session.get("cognitive_inquiry_history", [])),
+        "control_gateway": "P018",
+        "verification_gateway": "P016",
+        "direct_execution_allowed": False,
+    }
+
+
+def record_cognitive_inquiry_result(
+    session_id: str, result: dict[str, Any]
+) -> dict[str, Any]:
+    """Attach inquiry evidence and receipts to the session's sole fact ledger."""
+    session = SESSIONS.get(session_id)
+    if not session:
+        return {"error": "embodied_session_not_found", "session_id": session_id}
+    ledger = session.get("world_fact_ledger") or {}
+    authority_ref = result.get("fact_authority_ref")
+    if not authority_ref or authority_ref != ledger.get("ledger_id"):
+        return {
+            "error": "cognitive_inquiry_fact_authority_mismatch",
+            "expected_fact_authority_ref": ledger.get("ledger_id"),
+            "received_fact_authority_ref": authority_ref,
+        }
+    if (
+        result.get("control_gateway") != "P018"
+        or result.get("verification_gateway") != "P016"
+        or result.get("direct_execution_allowed") is not False
+    ):
+        return {"error": "cognitive_inquiry_control_or_verification_bypass"}
+    extension = deepcopy(result.get("authority_extension") or {})
+    ledger["cognitive_evidence"] = list((extension.get("evidence") or {}).values())
+    ledger["cognitive_predicates"] = list(
+        (extension.get("predicates") or {}).values()
+    )
+    ledger["cognitive_events"] = list((extension.get("events") or {}).values())
+    ledger["active_inquiry_ref"] = result.get("inquiry_id")
+    ledger["cognitive_extension_is_secondary_fact_source"] = False
+    current_rcir = session.get("current_rcir") or {}
+    if (
+        (current_rcir.get("world_fact_ledger") or {}).get("ledger_id")
+        == ledger.get("ledger_id")
+    ):
+        current_rcir["world_fact_ledger"] = deepcopy(ledger)
+    history = session.setdefault("cognitive_inquiry_history", [])
+    history.append(
+        {
+            key: deepcopy(result.get(key))
+            for key in (
+                "schema_version",
+                "scenario",
+                "world_revision",
+                "fact_authority_ref",
+                "inquiry_id",
+                "inquiry_status",
+                "signal_evidence_refs",
+                "diagnostic_summary",
+                "observation_or_probe_receipt",
+                "competing_hypotheses",
+                "selected_hypothesis",
+                "transition_log",
+                "p018_arbitration",
+                "p016_verification_ref",
+                "event_ref",
+                "predicate_ref",
+                "evidence_ref",
+                "concept_decision",
+                "concept_candidate",
+                "shared_readback",
+                "direct_execution_allowed",
+                "runtime_fact_committed_by_inquiry",
+            )
+        }
+    )
+    if len(history) > 16:
+        del history[:-16]
+    return {
+        "session_id": session_id,
+        "recorded": True,
+        "history_count": len(history),
+        "fact_authority_ref": ledger.get("ledger_id"),
+        "inquiry_id": result.get("inquiry_id"),
+    }
+
+
 def get_hospitality_task_graph(session_id: str) -> dict[str, Any]:
     """Return the live hospitality graph and its minimum unresolved conditions."""
     session = SESSIONS.get(session_id)
@@ -2339,6 +2471,41 @@ def _language_context_entities(session: dict[str, Any]) -> list[dict[str, Any]]:
                 "compatible_kinds": deepcopy(concept.get("compatible_kinds", [entity.get("kind")])),
                 "focus_source": "verified_holding_fact",
             }
+    speaker_ref = (session.get("interaction_role_bindings") or {}).get(
+        "human_speaker"
+    )
+    for entity in session.get("runtime_objects", []):
+        if (
+            not speaker_ref
+            or entity.get("active") is False
+            or entity.get("received_by") != speaker_ref
+        ):
+            continue
+        matching = [
+            item
+            for item in concepts
+            if entity.get("kind") in item.get("compatible_kinds", [])
+        ]
+        concept = matching[0] if len(matching) == 1 else {}
+        focused.setdefault(
+            entity["entity_id"],
+            {
+                "entity_ref": entity["entity_id"],
+                "label": entity.get("label"),
+                "concept_id": concept.get("concept_id"),
+                "display_name": concept.get("display_name")
+                or entity.get("label"),
+                "functional_affordances": deepcopy(
+                    concept.get("functional_affordances", [])
+                ),
+                "compatible_kinds": deepcopy(
+                    concept.get("compatible_kinds", [entity.get("kind")])
+                ),
+                "focus_source": "verified_human_possession_fact",
+                "relation_object_ref": speaker_ref,
+                "world_revision": session.get("world_revision"),
+            },
+        )
     for binding in session.get("confirmed_visual_bindings", []):
         if binding.get("world_revision") != session["world_revision"]:
             continue
@@ -2633,6 +2800,7 @@ def _compose_session_language(
             session, previous_rcir, "superseded_by_new_authoritative_turn"
         )
     session["current_rcir"] = deepcopy(rcir)
+    session["world_fact_ledger"] = deepcopy(rcir["world_fact_ledger"])
     analysis["rcir"] = rcir
     grounded_history = session.setdefault("grounded_intent_frame_history", [])
     grounded_history.append(deepcopy(grounded_frame))
@@ -3123,6 +3291,8 @@ def _compound_sequence_view(sequence: dict[str, Any] | None) -> dict[str, Any] |
                 "operators": deepcopy(item.get("operators", [])),
                 "goal_relation": item.get("goal_relation"),
                 "explicit_theme_ref": item.get("explicit_theme_ref"),
+                "explicit_destination_ref": item.get("explicit_destination_ref"),
+                "explicit_recipient_ref": item.get("explicit_recipient_ref"),
                 "payload_ref": item.get("payload_ref"),
                 "carrier_ref": item.get("carrier_ref"),
                 "delivery_mode": item.get("delivery_mode"),
@@ -3199,9 +3369,19 @@ def _dispatch_compound_subtask(session: dict[str, Any]) -> dict[str, Any] | None
                     "session": get_session(session["session_id"]),
                 }
         else:
+            grounded_roles = {
+                role: entity_ref
+                for role, entity_ref in {
+                    "theme": subtask.get("explicit_theme_ref"),
+                    "destination": subtask.get("explicit_destination_ref"),
+                    "recipient": subtask.get("explicit_recipient_ref"),
+                }.items()
+                if entity_ref
+            }
             started = begin_motion_command(
                 session["session_id"],
                 subtask["utterance"],
+                grounded_role_bindings=grounded_roles,
                 compound_dispatch=True,
             )
     finally:
@@ -3306,8 +3486,14 @@ def _compile_compound_subtasks(
         frame = frames[index]
         operators = set((frame.get("canonical_frame") or {}).get("operators", []))
         next_frame = frames[index + 1] if index + 1 < len(frames) else None
+        following_frame = frames[index + 2] if index + 2 < len(frames) else None
         next_operators = set(
             ((next_frame or {}).get("canonical_frame") or {}).get("operators", [])
+        )
+        following_operators = set(
+            ((following_frame or {}).get("canonical_frame") or {}).get(
+                "operators", []
+            )
         )
         payload_binding = _contextual_compound_payload_binding(
             session, frame, analysis
@@ -3338,6 +3524,9 @@ def _compile_compound_subtasks(
         ]
         delivery_requested = bool(
             {"transport_object", "handover_object"}.intersection(next_operators)
+            or {"transport_object", "handover_object"}.intersection(
+                following_operators
+            )
             or next_recipient_requested
         )
         next_theme_ref = _event_frame_bound_ref(next_frame or {})
@@ -3398,7 +3587,24 @@ def _compile_compound_subtasks(
                 "status": "pending",
                 "intent_id": None,
             })
-            index += 2
+            following_is_delivery_tail = bool(
+                following_frame
+                and following_operators
+                and following_operators.issubset(
+                    {"handover_object", "transport_object"}
+                )
+                and (
+                    ((following_frame.get("role_bindings") or {}).get("recipient"))
+                    or (
+                        (following_frame.get("discourse_roles") or {}).get(
+                            "recipient"
+                        )
+                        or {}
+                    ).get("reference")
+                    == "human_speaker"
+                )
+            )
+            index += 3 if following_is_delivery_tail else 2
             continue
         subtask_index = len(subtasks)
         subtasks.append({
@@ -3408,6 +3614,8 @@ def _compile_compound_subtasks(
             "operators": deepcopy((frame.get("canonical_frame") or {}).get("operators", [])),
             "goal_relation": (frame.get("canonical_frame") or {}).get("goal_relation"),
             "explicit_theme_ref": _event_frame_bound_ref(frame),
+            "explicit_destination_ref": _event_frame_bound_ref(frame, "destination"),
+            "explicit_recipient_ref": _event_frame_bound_ref(frame, "recipient"),
             "depends_on": [subtasks[-1]["subtask_id"]] if subtasks else [],
             "status": "pending",
             "intent_id": None,
@@ -3803,20 +4011,31 @@ def _historical_support_reference_candidate(
     session: dict[str, Any], utterance: str, analysis: dict[str, Any]
 ) -> dict[str, Any] | None:
     """Resolve only the candidate referent; human confirmation supplies semantics, not physical truth."""
-    normalized = re.sub(r"[，。！？、,.!?\s]+", "", utterance)
-    if not any(marker in normalized for marker in ("刚才", "之前", "先前", "上次")):
+    historical_destination_constraints = [
+        item
+        for item in analysis.get("historical_event_constraints", [])
+        if item.get("head_role") == "destination"
+        and item.get("temporal_scope") == "recent_verified_runtime_past"
+    ]
+    event_constraints = [
+        item
+        for item in historical_destination_constraints
+        if item.get("operator") == "grasp_object"
+        and item.get("relation") == "source_support_of_verified_event"
+    ]
+    restore_requested = bool(
+        (analysis.get("modifiers") or {}).get("restore_prior_relation")
+        or (analysis.get("canonical_frame") or {}).get(
+            "destination_binding_policy"
+        )
+        == "most_recent_verified_support_relation"
+    )
+    if not restore_requested and not historical_destination_constraints:
         return None
     if not any(item.get("operator") == "place_object" for item in analysis.get("event_candidates", [])):
         return None
     theme = analysis.get("role_bindings", {}).get("theme") or {}
     theme_concept_id = theme.get("concept_id")
-    event_constraints = [
-        item
-        for item in analysis.get("historical_event_constraints", [])
-        if item.get("operator") == "grasp_object"
-        and item.get("relation") == "source_support_of_verified_event"
-        and item.get("head_role") == "destination"
-    ]
     if len(event_constraints) == 1:
         constraint = event_constraints[0]
         historical_theme = constraint.get("theme") or {}
