@@ -66,6 +66,12 @@ def build_semantic_constraint_frame(
             "relation_surface": role.get("relation_surface"),
             "relation_span_start": role.get("relation_span_start"),
             "relation_span_end": role.get("relation_span_end"),
+            "quantity_constraint": deepcopy(
+                role.get("quantity_constraint")
+            ),
+            "quantity": role.get("quantity"),
+            "classifier": role.get("classifier"),
+            "selection_quantifier": role.get("selection_quantifier"),
             "constraints": [],
         }
 

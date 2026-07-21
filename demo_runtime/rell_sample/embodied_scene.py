@@ -615,6 +615,9 @@ def _long_intent_view(intent: dict[str, Any]) -> dict[str, Any]:
         "goal_fact": intent["goal_fact"],
         "delivery_mode": intent.get("delivery_mode"),
         "role_bindings": deepcopy(intent["role_bindings"]),
+        "role_binding_evidence": deepcopy(
+            intent.get("role_binding_evidence", {})
+        ),
         "source_language_frame": deepcopy(intent.get("source_language_frame")),
         "lifecycle": intent["lifecycle"],
         "verified_facts": list(intent["verified_facts"]),
@@ -1004,6 +1007,10 @@ def _create_object_handover_intent(
             "theme": theme["entity_id"],
             "recipient": recipient["entity_id"],
             **({"source_holder": source_holder_ref} if source_holder_ref else {}),
+        },
+        "role_binding_evidence": {
+            "theme": deepcopy(bindings.get("theme") or {}),
+            "recipient": deepcopy(bindings.get("recipient") or {}),
         },
         "goal_contract": {
             "requires": ["theme_object_grounded", "recipient_grounded", "recipient_ready"],
@@ -2816,6 +2823,26 @@ def _project_resolved_process_roles(
     for role in projected.values():
         if not any(item.get("entity_ref") == role.get("entity_ref") for item in analysis.get("entity_mentions", [])):
             analysis.setdefault("entity_mentions", []).append(deepcopy(role))
+    resolved_slot_names = {
+        "theme": {
+            "required_object_role_not_grounded",
+            "held_theme_not_grounded",
+            "handover_theme_not_grounded",
+        },
+        "target": {"required_object_role_not_grounded"},
+        "destination": {"placement_destination_not_grounded"},
+        "recipient": {"handover_recipient_not_grounded"},
+    }
+    closed_slots = {
+        slot
+        for role_name in projected
+        for slot in resolved_slot_names.get(role_name, set())
+    }
+    analysis["unresolved_slots"] = [
+        slot
+        for slot in analysis.get("unresolved_slots", [])
+        if slot not in closed_slots
+    ]
     historical_relation_policy = (
         analysis.get("canonical_frame", {}).get("destination_binding_policy")
         == "most_recent_verified_support_relation"
@@ -2833,6 +2860,18 @@ def _project_resolved_process_roles(
     ):
         analysis["canonical_utterance"] = resolution["canonical_utterance"]
         analysis["decision"] = "route_canonical_semantics"
+        if analysis.get("unknown_surface"):
+            analysis["resolved_surface_evidence"] = {
+                "surface": analysis["unknown_surface"],
+                "basis": "structured_process_roles_grounded_in_current_world",
+                "surface_reparsed_downstream": False,
+            }
+            analysis["unknown_surface"] = None
+        if not analysis.get("unresolved_slots"):
+            analysis["confidence"] = max(
+                float(analysis.get("confidence") or 0.0), 0.92
+            )
+            analysis["confidence_band"] = "high"
 
 
 def _structured_role_binding(
@@ -2883,6 +2922,45 @@ def _structured_role_binding(
     }
 
 
+def _project_state_query_runtime_role(
+    session: dict[str, Any], utterance: str, analysis: dict[str, Any]
+) -> None:
+    """Ground an explicitly named query referent before RCIR compilation."""
+    if analysis.get("query_type") != "support_inventory":
+        return
+    normalized = normalize_language_text(utterance)
+    matches = [
+        item
+        for item in session.get("runtime_objects", [])
+        if item.get("active") is not False
+        and item.get("kind") == "operation_surface"
+        and normalize_language_text(str(item.get("label") or "")) in normalized
+    ]
+    if len(matches) != 1:
+        return
+    binding = _structured_role_binding(
+        session, "destination", matches[0]["entity_id"]
+    )
+    if not binding:
+        return
+    analysis.setdefault("role_bindings", {})["destination"] = deepcopy(
+        binding
+    )
+    analysis.setdefault("canonical_frame", {}).setdefault("roles", {})[
+        "destination"
+    ] = deepcopy(binding)
+    analysis["canonical_utterance"] = (
+        f"查看{binding['label']}上的当前对象"
+    )
+    analysis["query_runtime_role_grounding"] = {
+        "role": "destination",
+        "entity_ref": binding["entity_ref"],
+        "world_revision": session.get("world_revision"),
+        "basis": "explicit_current_name_reference",
+        "physical_fact_committed": False,
+    }
+
+
 def _compose_session_language(
     session: dict[str, Any],
     utterance: str,
@@ -2922,6 +3000,7 @@ def _compose_session_language(
     if structured_bindings:
         analysis["structured_role_bindings"] = deepcopy(structured_bindings)
         analysis["structured_binding_reparsed_as_surface_text"] = False
+    _project_state_query_runtime_role(session, utterance, analysis)
     semantic_frame = build_semantic_constraint_frame(utterance, analysis)
     observation_evidence = _current_observation_evidence(
         session,
@@ -5720,6 +5799,8 @@ def _is_support_inventory_state_query(text: str, analysis: dict[str, Any]) -> bo
     )
     if not support_role:
         return False
+    if analysis.get("query_type") == "support_inventory":
+        return True
     normalized = re.sub(r"[\s，。！？、,.!?]+", "", text)
     return re.search(r"(?:上|上面)(?:都|还)?(?:有|放着|摆着)(?:什么|哪些|啥)", normalized) is not None
 
@@ -5740,7 +5821,13 @@ def _answer_support_inventory_state_query(
 ) -> dict[str, Any]:
     """Read current supported-by facts; episodic memory may select a support but cannot supply its contents."""
     analysis = deepcopy(analysis)
-    support_surface = (_support_role_from_analysis(analysis) or {}).get("matched_alias") or "承载面"
+    support_role_view = _support_role_from_analysis(analysis) or {}
+    support_surface = (
+        support_role_view.get("matched_alias")
+        or support_role_view.get("surface")
+        or support_role_view.get("label")
+        or "承载面"
+    )
     analysis["query_type"] = "support_inventory"
     analysis["canonical_utterance"] = f"查看{support_surface}上的当前对象"
     analysis["unresolved_slots"] = [
@@ -5791,14 +5878,20 @@ def _answer_support_inventory_state_query(
             }
         supports = [support]
     else:
-        compatible_kinds = set(support_role.get("compatible_kinds") or [])
-        supports = [
-            item for item in runtime_objects
-            if not compatible_kinds or item.get("kind") in compatible_kinds
-        ]
-        explicitly_named = [item for item in supports if str(item.get("label") or "") in text]
-        if explicitly_named:
-            supports = explicitly_named
+        explicit_support_ref = support_role.get(
+            "entity_ref"
+        ) or support_role.get("explicit_entity_ref")
+        if explicit_support_ref in runtime_index:
+            supports = [runtime_index[explicit_support_ref]]
+        else:
+            compatible_kinds = set(support_role.get("compatible_kinds") or [])
+            supports = [
+                item for item in runtime_objects
+                if not compatible_kinds or item.get("kind") in compatible_kinds
+            ]
+            explicitly_named = [item for item in supports if str(item.get("label") or "") in text]
+            if explicitly_named:
+                supports = explicitly_named
 
     current_facts = facts_from_runtime_state(
         session.get("runtime_objects", []), session.get("state", {}), session.get("world_revision", 0)

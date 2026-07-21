@@ -196,6 +196,43 @@ def resolve_process_request(
                         },
                     )]
         usable = _non_dominated_evidence(values)
+        semantic_role = next(
+            (
+                (language_analysis.get("role_bindings") or {}).get(name)
+                for name in slot.role_names
+                if (language_analysis.get("role_bindings") or {}).get(name)
+            ),
+            {},
+        ) or {}
+        if (
+            len(usable) > 1
+            and semantic_role.get("selection_quantifier") == "existential"
+            and semantic_role.get("quantity") == 1
+        ):
+            object_index = {
+                item.get("entity_id"): item for item in runtime_objects
+            }
+            executor_position = runtime_state.get("executor_position") or [0, 0]
+
+            def selection_cost(candidate: dict[str, Any]) -> tuple[float, str]:
+                entity = object_index.get(candidate.get("value_ref")) or {}
+                position = entity.get("position") or [float("inf"), float("inf")]
+                distance_squared = sum(
+                    (float(left) - float(right)) ** 2
+                    for left, right in zip(position[:2], executor_position[:2])
+                )
+                return distance_squared, str(candidate.get("value_ref"))
+
+            selected_value = deepcopy(min(usable, key=selection_cost))
+            selected_value.update(
+                {
+                    "selection_policy": "existential_quantity_minimum_current_cost",
+                    "selection_quantifier": "existential",
+                    "requested_quantity": 1,
+                    "human_specific_instance_required": False,
+                }
+            )
+            usable = [selected_value]
         conditionally_required = _conditionally_required(slot, bindings)
         if not slot.required and not conditionally_required and not any(item.get("explicit") for item in usable) and not override:
             slot_results.append(_slot_result(slot, "optional_unbound", []))

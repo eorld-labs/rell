@@ -16,6 +16,20 @@
       "expected_relations": ["inside_navigation_space"],
       "load_policy": "domain_resident",
       "direct_execution_allowed": false
+    },
+    {
+      "concept_id": "concept_readable_sheet_item",
+      "display_name": "纸质读物",
+      "aliases": ["报纸", "报刊"],
+      "classifiers": ["份", "张"],
+      "compatible_kinds": ["discardable_object"],
+      "perceptual_invariants": ["thin_sheet_body", "printed_readable_surface"],
+      "variable_features": ["edition", "age", "fold_state", "page_count"],
+      "functional_affordances": ["graspable", "movable", "readable"],
+      "physical_properties": ["portable", "flexible_sheet"],
+      "expected_relations": ["on_top_of_support", "held_by_executor", "received_by_human"],
+      "load_policy": "domain_resident",
+      "direct_execution_allowed": false
     }
   ]
 }

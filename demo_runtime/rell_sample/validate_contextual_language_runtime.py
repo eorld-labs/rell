@@ -229,6 +229,66 @@ def validate_compound_transition_language_ownership() -> None:
     )
 
 
+def validate_classifier_delivery_and_support_query() -> None:
+    for utterance, existential in (
+        ("把旧报纸一拿给我", False),
+        ("给我一份报纸", True),
+    ):
+        session = start_session("home_humanoid", "hospitality_guest")
+        started = begin_motion_command(session["session_id"], utterance)
+        active = intent(started)
+        evidence = (active.get("role_binding_evidence") or {}).get(
+            "theme", {}
+        )
+        outcomes = []
+        current = started
+        while current:
+            outcome = _finish_job(current)
+            outcomes.append(outcome)
+            current = outcome.get("next_stage_started")
+        require(
+            [item.get("terminal_fact") for item in outcomes]
+            == ["target_object_in_gripper", "object_received_by_recipient"]
+            and active.get("goal_fact") == "object_received_by_recipient"
+            and (active.get("role_bindings") or {}).get("theme")
+            == "newspaper_a"
+            and all(
+                not (item.get("language_understanding") or {}).get(
+                    "unresolved_slots"
+                )
+                for item in outcomes
+            )
+            and not SESSIONS[session["session_id"]].get(
+                "concept_gap_dialogue"
+            )
+            and (
+                not existential
+                or evidence.get("selection_policy")
+                == "existential_quantity_minimum_current_cost"
+            ),
+            str({"started": started, "outcomes": outcomes}),
+        )
+
+    query_session = start_session("home_humanoid", "hospitality_guest")
+    answered = begin_motion_command(
+        query_session["session_id"], "操作台B有什么"
+    )
+    groups = answered.get("inventory_groups") or []
+    language = answered.get("language_understanding") or {}
+    require(
+        answered.get("status") == "support_inventory_state_answered"
+        and len(groups) == 1
+        and groups[0].get("support_entity_ref") == "hospitality_counter_b"
+        and groups[0].get("entity_refs")
+        == ["newspaper_a", "newspaper_b"]
+        and language.get("canonical_utterance")
+        == "查看操作台B上的当前对象"
+        and "目标承载面上当前有哪些对象"
+        in str(language.get("human_understanding_response")),
+        str(answered),
+    )
+
+
 def main() -> None:
     validate_historical_runtime_paraphrases()
     validate_compound_runtime_paraphrases()
@@ -237,10 +297,12 @@ def main() -> None:
     validate_runtime_dialogue_uses_planner_refs()
     validate_region_inventory_query_runtime()
     validate_compound_transition_language_ownership()
+    validate_classifier_delivery_and_support_query()
     print(
         "Contextual language runtime validation passed: historical reference, "
         "compound scope, goal-schema continuation, outcome correction, "
-        "region inventory, and transition-language ownership."
+        "region/support inventory, classifier delivery, and "
+        "transition-language ownership."
     )
 
 

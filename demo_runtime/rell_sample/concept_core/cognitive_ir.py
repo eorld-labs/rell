@@ -248,6 +248,9 @@ def _role_view(role_name: str, role: dict[str, Any]) -> dict[str, Any]:
         ),
         "relation_predicate": role.get("relation_predicate"),
         "relation_target_role": role.get("relation_target_role"),
+        "quantity": role.get("quantity"),
+        "classifier": role.get("classifier"),
+        "selection_quantifier": role.get("selection_quantifier"),
         "constraints": [
             _constraint_view(item) for item in role.get("constraints", [])
         ],

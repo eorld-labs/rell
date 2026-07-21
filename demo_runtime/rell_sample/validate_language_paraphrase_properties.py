@@ -183,6 +183,33 @@ def validate_inventory_query_equivalence() -> int:
     return len(region_variants) + 1
 
 
+def validate_classifier_result_construction() -> int:
+    variants = (
+        "给我一份报纸",
+        "拿一张报刊给我",
+        "把一份报纸递给我",
+        "请给我一张报刊",
+    )
+    for text in variants:
+        analysis = compose(text)
+        theme = (analysis.get("role_bindings") or {}).get("theme") or {}
+        operators = (analysis.get("canonical_frame") or {}).get(
+            "operators", []
+        )
+        require(
+            analysis.get("speech_act") == "task_request"
+            and "handover_object" in operators
+            and (analysis.get("canonical_frame") or {}).get("goal_relation")
+            == "object_received_by_recipient"
+            and theme.get("concept_id") == "concept_readable_sheet_item"
+            and theme.get("quantity") == 1
+            and theme.get("selection_quantifier") == "existential"
+            and not analysis.get("unresolved_slots"),
+            f"classifier/result construction failed: {text}: {analysis}",
+        )
+    return len(variants)
+
+
 def main() -> None:
     counts = {
         "historical_cross_product": validate_historical_cross_product(),
@@ -190,6 +217,7 @@ def main() -> None:
         "pronoun_cardinality": validate_pronoun_cardinality(),
         "correction_equivalence": validate_correction_equivalence(),
         "inventory_query_equivalence": validate_inventory_query_equivalence(),
+        "classifier_result_construction": validate_classifier_result_construction(),
     }
     print(f"Language paraphrase property validation passed: {counts}")
 

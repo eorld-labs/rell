@@ -276,15 +276,70 @@ def _object_mentions(text: str, object_concepts: list[dict[str, Any]]) -> list[d
             if not alias:
                 continue
             for match in re.finditer(re.escape(alias), text):
+                mention_start = match.start()
+                quantity_constraint = None
+                classifiers = [
+                    str(item)
+                    for item in concept.get("classifiers", [])
+                    if item
+                ]
+                if classifiers:
+                    prefix = text[:match.start()]
+                    quantifier = re.search(
+                        rf"(?P<number>[一二两三四五六七八九十\d]+)"
+                        rf"(?P<classifier>{'|'.join(map(re.escape, classifiers))})$",
+                        prefix,
+                    )
+                    if quantifier:
+                        number_surface = quantifier.group("number")
+                        number_values = {
+                            "一": 1,
+                            "二": 2,
+                            "两": 2,
+                            "三": 3,
+                            "四": 4,
+                            "五": 5,
+                            "六": 6,
+                            "七": 7,
+                            "八": 8,
+                            "九": 9,
+                            "十": 10,
+                        }
+                        quantity = (
+                            int(number_surface)
+                            if number_surface.isdigit()
+                            else number_values.get(number_surface)
+                        )
+                        if quantity is not None:
+                            mention_start = quantifier.start()
+                            quantity_constraint = {
+                                "quantity": quantity,
+                                "classifier": quantifier.group("classifier"),
+                                "surface": quantifier.group(0) + alias,
+                                "selection_quantifier": "existential",
+                                "human_specific_instance_required": False,
+                            }
                 candidates.append({
                     "concept_id": concept.get("concept_id"),
                     "display_name": concept.get("display_name"),
                     "matched_alias": alias,
-                    "start": match.start(),
+                    "start": mention_start,
                     "end": match.end(),
                     "compatible_kinds": deepcopy(concept.get("compatible_kinds", [])),
                     "functional_affordances": deepcopy(concept.get("functional_affordances", [])),
                     "source": "object_concept_language_adapter",
+                    **(
+                        {
+                            "quantity_constraint": quantity_constraint,
+                            "quantity": quantity_constraint["quantity"],
+                            "classifier": quantity_constraint["classifier"],
+                            "selection_quantifier": quantity_constraint[
+                                "selection_quantifier"
+                            ],
+                        }
+                        if quantity_constraint
+                        else {}
+                    ),
                 })
     return _longest_non_overlapping_mentions(text, candidates)
 
@@ -344,7 +399,9 @@ def _event_mentions(
 
 
 def _infer_argument_order_events(
-    text: str, events: list[dict[str, Any]]
+    text: str,
+    events: list[dict[str, Any]],
+    objects: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """Infer known events from argument-predicate order, independent of word order."""
     patterns = (
@@ -369,8 +426,24 @@ def _infer_argument_order_events(
                 "source": "argument_predicate_composition",
             })
             break
-    if not inferred:
-        handover = re.search(r"(?:把|将).+?(?:给我|交到我手(?:里|上|中))", text)
+    inferred_operators = {
+        item.get("operator") for item in inferred if item.get("operator")
+    }
+    if (
+        "handover_object" not in inferred_operators
+        and (
+            not inferred_operators
+            or inferred_operators.issubset({"grasp_object", "navigate_to"})
+        )
+    ):
+        result_head = (
+            r"(?:拿|取)"
+            if inferred_operators
+            else r"(?:把|将|拿|取)"
+        )
+        handover = re.search(
+            result_head + r".+?(?:给我|交到我手(?:里|上|中))", text
+        )
         if handover:
             inferred.append(
                 {
@@ -383,6 +456,20 @@ def _infer_argument_order_events(
                     "source": "argument_result_relation_composition",
                 }
             )
+    if not inferred and objects and re.match(
+        r"^(?:请|麻烦)?给(?:我|人类|家人|主人|用户|接收人)", text
+    ):
+        inferred.append(
+            {
+                "concept_id": "factory_event_handover",
+                "operator": "handover_object",
+                "matched_surface": "给",
+                "canonical_surface": "递给",
+                "start": 0,
+                "end": len(text),
+                "source": "recipient_result_construction",
+            }
+        )
     return sorted(inferred, key=lambda item: (item.get("start", 0), item.get("end", 0)))
 
 
@@ -439,7 +526,15 @@ def _query_type(
 ) -> str | None:
     operators = {item["operator"] for item in events}
     inventory_tail = r"(?:都|还)?(?:有|放着|摆着)(?:什么|哪些|啥)"
-    if objects and re.search(rf"(?:上|上面){inventory_tail}", text):
+    support_mentioned = any(
+        {"support_object", "receive_object"}.intersection(
+            item.get("functional_affordances", [])
+        )
+        for item in objects
+    )
+    if support_mentioned and re.search(
+        rf"(?:上|上面)?{inventory_tail}$", text
+    ):
         return "support_inventory"
     if re.search(
         rf"(?:房间|屋里|屋内|这里|当前空间|这个空间|周围)(?:里|内)?{inventory_tail}",
@@ -1118,6 +1213,7 @@ def compose_language_concepts(
     events = _infer_argument_order_events(
         normalized,
         _event_mentions(normalized, event_concepts, learned_adapters or []),
+        objects,
     )
     objects, unresolved = _resolve_pronouns(normalized, objects, context_entities or [])
     events, event_dependencies = _resolve_serial_event_dependencies(normalized, events, objects)
