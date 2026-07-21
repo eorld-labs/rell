@@ -94,10 +94,24 @@ def project_analysis_to_machine_dictionary(
     analysis: dict[str, Any],
     *,
     world_revision: int,
+    _include_event_frames: bool = True,
 ) -> dict[str, Any]:
     dictionary = load_machine_dictionary()
     semantic_index = _semantic_index(dictionary)
     operators = list((analysis.get("canonical_frame") or {}).get("operators", []))
+    speech_act = analysis.get("speech_act") or (
+        analysis.get("canonical_frame") or {}
+    ).get("speech_act")
+    query_type = analysis.get("query_type") or (
+        analysis.get("canonical_frame") or {}
+    ).get("query_type")
+    semantic_coverage_gaps = []
+    if speech_act and speech_act != "task_request":
+        semantic_coverage_gaps.append("speech_act_semantics_not_dictionary_grounded")
+    if query_type:
+        semantic_coverage_gaps.append("query_semantics_not_dictionary_grounded")
+    if speech_act == "task_request" and not operators and not analysis.get("event_frames"):
+        semantic_coverage_gaps.append("event_operator_not_dictionary_grounded")
     operator_refs, missing_operators = [], []
     for operator in operators:
         matches = [
@@ -167,23 +181,55 @@ def project_analysis_to_machine_dictionary(
         candidate_graphs=[candidate] if candidate["admissible"] else [],
         world_revision=world_revision,
     )
+    event_frame_projections = []
+    if _include_event_frames:
+        event_frame_projections = [
+            project_analysis_to_machine_dictionary(
+                str(frame.get("normalized_utterance") or frame.get("utterance") or ""),
+                frame,
+                world_revision=world_revision,
+                _include_event_frames=False,
+            )
+            for frame in analysis.get("event_frames", [])
+        ]
     return {
         "schema_version": "1.0.0",
         "projection_kind": "MachineDictionaryProjection",
         "mode": "shadow_equivalence_migration",
         "dictionary_ref": dictionary.get("dictionary_id"),
         "operator_refs": operator_refs,
+        "operator_semantics": operators,
+        "speech_act": speech_act,
+        "query_type": query_type,
+        "semantic_coverage_gaps": semantic_coverage_gaps,
         "missing_operator_semantics": missing_operators,
+        "goal_relation": (analysis.get("canonical_frame") or {}).get(
+            "goal_relation"
+        ),
+        "unresolved_variables": list(analysis.get("unresolved_slots") or []),
         "role_referents": role_referents,
         "reference_referents": deepcopy(
             (analysis.get("reference_resolution") or {}).get(
                 "referent_expressions", []
             )
         ),
+        "recovery_context_projection": deepcopy(
+            analysis.get("recovery_context_projection")
+        ),
         "scope_graph": scope_graph,
         "surface_candidate_groups": surface_groups,
         "unresolved_polysemy_count": len(unresolved_polysemy),
         "interpretation_lattice": lattice,
+        "event_frame_projections": event_frame_projections,
+        "all_event_frames_admissible": all(
+            (item.get("interpretation_lattice") or {}).get("status") == "resolved"
+            and not item.get("unresolved_variables")
+            and all(
+                not reference.get("requires_confirmation")
+                for reference in item.get("reference_referents", [])
+            )
+            for item in event_frame_projections
+        ),
         "can_control_execution": False,
         "downstream_surface_reparse_allowed": False,
         "runtime_fact_committed": False,

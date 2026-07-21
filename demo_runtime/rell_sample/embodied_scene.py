@@ -30,6 +30,9 @@ from concept_core.runtime_reasoning import (
 from concept_core.dictionary_frontend import (
     project_analysis_to_machine_dictionary,
 )
+from concept_core.dictionary_equivalence import (
+    build_dictionary_equivalence_receipt,
+)
 from concept_core.rcir_dialogue_realizer import realize_rcir_dialogue
 from concept_core.contextual_affordance import resolve_contextual_affordance_request
 from concept_core.context_projection import build_context_projection, compact_intent_capsule
@@ -895,6 +898,7 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator", scene_id
         "language_interpretation_history": [],
         "dialogue_focus_entities": [],
         "last_language_understanding": None,
+        "machine_dictionary_equivalence_history": [],
         "current_observation_evidence": None,
         "observation_evidence_ledger": [],
         "grounded_intent_frame_history": [],
@@ -3514,6 +3518,22 @@ def _compose_session_language(
                     "basis": "current_verified_relation_after_goal_schema_projection",
                     "prior_goal_role_reused": False,
                 }
+    recovery_contract = session.get("failure_recovery_contract") or {}
+    analysis["recovery_context_projection"] = {
+        "status": (
+            "active"
+            if recovery_contract.get("status")
+            == "awaiting_recovery_or_replacement_task"
+            else "inactive"
+        ),
+        "contract_ref": recovery_contract.get("contract_id"),
+        "active_intent_ref": session.get("active_intent_id"),
+        "world_revision": int(session.get("world_revision", 0)),
+        "fact_source": "WorldFactLedger",
+        "raw_failure_text_included": False,
+        "candidate_only": True,
+        "runtime_fact_committed": False,
+    }
     analysis["machine_dictionary_projection"] = (
         project_analysis_to_machine_dictionary(
             str(analysis.get("normalized_utterance") or ""),
@@ -3521,6 +3541,21 @@ def _compose_session_language(
             world_revision=int(session.get("world_revision", 0)),
         )
     )
+    analysis["machine_dictionary_equivalence"] = (
+        build_dictionary_equivalence_receipt(
+            analysis,
+            analysis["machine_dictionary_projection"],
+            world_revision=int(session.get("world_revision", 0)),
+        )
+    )
+    equivalence_history = session.setdefault(
+        "machine_dictionary_equivalence_history", []
+    )
+    equivalence_history.append(
+        deepcopy(analysis["machine_dictionary_equivalence"])
+    )
+    if len(equivalence_history) > 64:
+        del equivalence_history[:-64]
     rule_evaluation = evaluate_runtime_rules(
         analysis,
         session.get("runtime_objects", []),
@@ -3667,6 +3702,9 @@ def _language_understanding_view(analysis: dict[str, Any]) -> dict[str, Any]:
         ),
         "machine_dictionary_projection": deepcopy(
             analysis.get("machine_dictionary_projection")
+        ),
+        "machine_dictionary_equivalence": deepcopy(
+            analysis.get("machine_dictionary_equivalence")
         ),
         "canonical_utterance": analysis.get("canonical_utterance"),
         "semantic_canonical_utterance": analysis.get("canonical_utterance"),

@@ -586,6 +586,7 @@ def main() -> None:
     run_python("validate_language_modifier_reference_architecture.py")
     run_python("validate_machine_dictionary_architecture.py")
     run_python("validate_dictionary_coverage_and_equivalence.py")
+    run_python("validate_dictionary_shadow_equivalence.py")
     run_python("validate_discourse_event_graph.py")
     run_python("validate_language_paraphrase_properties.py")
     run_python("validate_contextual_language_runtime.py")
