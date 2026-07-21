@@ -109,6 +109,11 @@ from .dictionary_frontend import (
     project_contextual_communication_signal,
 )
 from .dictionary_equivalence import build_dictionary_equivalence_receipt
+from .dictionary_authority import (
+    assert_dictionary_authority_boundary,
+    build_dictionary_authority_admission,
+    invalidate_dictionary_authority_admission,
+)
 from .process_template_resolver import (
     PROCESS_TEMPLATES,
     ProcessTemplate,
@@ -209,6 +214,9 @@ __all__ = [
     "project_analysis_to_machine_dictionary",
     "project_contextual_communication_signal",
     "build_dictionary_equivalence_receipt",
+    "assert_dictionary_authority_boundary",
+    "build_dictionary_authority_admission",
+    "invalidate_dictionary_authority_admission",
     "invalidate_versioned_artifacts",
     "generate_competing_hypotheses",
     "normalize_language_text",

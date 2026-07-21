@@ -110,6 +110,14 @@ def main() -> None:
     live = get_session(ambiguous_session["session_id"])
     apple = next(item for item in live["runtime_objects"] if item["entity_id"] == "apple_a")
     require(apple.get("received_by") == "human_a", f"confirmed unknown expression did not resume and verify the original goal: {outcomes}: {apple}")
+    structured_resume = confirmed.get("structured_dialogue_resume", {})
+    require(
+        structured_resume.get("surface_text_reparsed") is False
+        and structured_resume.get("generated_surface_text_used") is False
+        and structured_resume.get("confirmed_template_id") == "handover_object"
+        and confirmed.get("surface_text_reparsed_for_template_confirmation") is False,
+        f"template confirmation re-entered through generated surface text: {confirmed}",
+    )
     learned = confirmed.get("process_template_mapping_learned", {})
     require(learned.get("surface_form") == "捎给" and learned.get("modifies_concept_kernel") is False, f"template confirmation did not create a scoped language adapter: {confirmed}")
 

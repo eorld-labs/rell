@@ -652,6 +652,26 @@ def _reported_events(text: str) -> list[dict[str, Any]]:
                 "evidence_source": "human_report",
                 "physical_state_change_committed": False,
             })
+    possession_patterns = (
+        r"(?:还|仍然|依然)?在我(?:的)?手(?:上|里|中)",
+        r"我(?:还|仍然|依然)?(?:拿着|握着|持有)",
+    )
+    for pattern in possession_patterns:
+        for match in re.finditer(pattern, text):
+            candidates.append(
+                {
+                    "event_type": "possession_state_report",
+                    "operator": "report_possession_state",
+                    "matched_surface": match.group(0),
+                    "start": match.start(),
+                    "end": match.end(),
+                    "candidate_postcondition": "received_by",
+                    "subject_role": "theme",
+                    "object_role": "human_speaker",
+                    "evidence_source": "human_report",
+                    "physical_state_change_committed": False,
+                }
+            )
     return _longest_non_overlapping_mentions(text, candidates)
 
 
@@ -1361,6 +1381,8 @@ def compose_language_concepts(
     reported_events = _reported_events(normalized)
     ellipsis_candidates = _ellipsis_candidates(normalized)
     speech_act = _speech_act(normalized, events, definition)
+    if speech_act == "unknown" and reported_events:
+        speech_act = "information_report"
     if (
         speech_act == "unknown"
         and discourse_roles.get("beneficiary")

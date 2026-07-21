@@ -16,6 +16,15 @@ def _stable_id(value: Any) -> str:
     return "dictionary_equivalence_" + hashlib.sha1(payload.encode("utf-8")).hexdigest()[:16]
 
 
+def _projection_digest(projection: dict[str, Any]) -> str:
+    unsigned = deepcopy(projection)
+    unsigned.pop("projection_id", None)
+    payload = json.dumps(
+        unsigned, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 def _role_signature(role: dict[str, Any]) -> dict[str, Any]:
     entity_ref = role.get("entity_ref") or role.get("value_ref")
     if entity_ref:
@@ -130,6 +139,9 @@ def build_dictionary_equivalence_receipt(
             "event_index": (
                 event_ref_index.get(item.get("target_event_ref"))
                 if item.get("scope") != "global"
+                and not str(item.get("target_event_ref") or "").startswith(
+                    "dictionary_reported_event_"
+                )
                 else None
             ),
         }
@@ -213,6 +225,8 @@ def build_dictionary_equivalence_receipt(
         "receipt_kind": "MachineDictionaryEquivalenceReceipt",
         "mode": "shadow_equivalence_migration",
         "world_revision": world_revision,
+        "projection_ref": projection.get("projection_id"),
+        "projection_digest": _projection_digest(projection),
         "projection_lattice_ref": (projection.get("interpretation_lattice") or {}).get("lattice_id"),
         "field_results": fields,
         "status": "equivalent" if not divergent else "divergent",

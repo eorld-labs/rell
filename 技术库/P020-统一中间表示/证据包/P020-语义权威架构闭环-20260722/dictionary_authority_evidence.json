@@ -1,0 +1,75 @@
+{
+  "schema_version": "1.0.0",
+  "evidence_kind": "DictionaryAuthorityArchitectureEvidence",
+  "normal_cases": [
+    {
+      "case_id": "direct_place",
+      "admission_id": "dictionary_admission_e7bd501a67c151cd",
+      "admission_status": "admitted",
+      "semantic_source": "machine_dictionary",
+      "fallback_reasons": [],
+      "speech_act": "task_request",
+      "operators": [
+        "place_object"
+      ],
+      "reported_event_types": [],
+      "runtime_fact_committed": false
+    },
+    {
+      "case_id": "compound_sequence",
+      "admission_id": "dictionary_admission_eacc273b46ab359f",
+      "admission_status": "admitted",
+      "semantic_source": "machine_dictionary",
+      "fallback_reasons": [],
+      "speech_act": "task_request",
+      "operators": [
+        "place_object",
+        "fill_container"
+      ],
+      "reported_event_types": [],
+      "runtime_fact_committed": false
+    },
+    {
+      "case_id": "state_query",
+      "admission_id": "dictionary_admission_559966165c015c84",
+      "admission_status": "admitted",
+      "semantic_source": "machine_dictionary",
+      "fallback_reasons": [],
+      "speech_act": "state_query",
+      "operators": [
+        "observe_entity"
+      ],
+      "reported_event_types": [],
+      "runtime_fact_committed": false
+    },
+    {
+      "case_id": "human_information_report",
+      "admission_id": "dictionary_admission_c859355f1abf5182",
+      "admission_status": "admitted",
+      "semantic_source": "machine_dictionary",
+      "fallback_reasons": [],
+      "speech_act": "information_report",
+      "operators": [],
+      "reported_event_types": [
+        "consumption_completed"
+      ],
+      "runtime_fact_committed": false
+    }
+  ],
+  "fault_injection": {
+    "tampered_receipt_rejected": true,
+    "ambiguous_lattice_rejected": true,
+    "post_receipt_projection_tamper_rejected": true,
+    "recovery_pruning_bypass_rejected": true,
+    "world_revision_mismatch_rejected": true,
+    "runtime_world_change_retired_current_rcir": true,
+    "semantic_authority_cannot_control_execution": true
+  },
+  "boundaries": {
+    "fact_authority": "WorldFactLedger",
+    "control_gateway": "P018",
+    "verification_gateway": "P016",
+    "surface_text_below_rcir": false,
+    "simultaneous_dictionary_and_fallback_authority": false
+  }
+}

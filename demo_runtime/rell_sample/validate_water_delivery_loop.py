@@ -751,6 +751,13 @@ def verify_contrastive_evidence_gap_dialogue() -> dict:
     require(resumed_result.get("status") == "requires_human_confirmation", f"confirmed substitute did not resume causal planning: {resumed}")
     resolution = resumed.get("process_gap_resolution", {})
     require(resolution.get("human_confirmed_substitution") and resolution.get("value_ref") == "cup_b", f"human confirmation did not fill only the missing slot binding: {resumed}")
+    require(
+        resolution.get("surface_text_rewritten") is False
+        and resolution.get("execution_utterance_used_for_semantic_compilation") is False
+        and resolution.get("binding_authority")
+        == "structured_entity_refs_at_current_world_revision",
+        f"constraint substitution resumed by rewriting and reparsing language: {resumed}",
+    )
     intent = resumed.get("long_horizon_intent", {})
     require(intent.get("role_bindings", {}).get("theme") == "cup_b" and intent.get("role_bindings", {}).get("destination") == "dining_table_b", f"resumed task changed its object or destination goal: {resumed}")
     return {
@@ -1065,9 +1072,10 @@ def verify_structured_role_answer_does_not_rewrite_source_text() -> dict:
         resolved.get("status") == "motion_started"
         and resolution.get("role") == "destination"
         and resolution.get("entity_ref") == "mug_white"
-        and resolution.get("resolved_utterance") == source
+        and resolution.get("resolved_utterance") is None
         and resolution.get("binding_mode") == "structured_role_binding"
-        and resolution.get("surface_text_rewritten") is False,
+        and resolution.get("surface_text_rewritten") is False
+        and resolution.get("surface_text_reparsed") is False,
         f"role answer was reparsed through textual substitution: {resolved}",
     )
     outcome = drain(resolved)

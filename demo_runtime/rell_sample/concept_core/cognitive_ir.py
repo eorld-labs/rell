@@ -7,6 +7,10 @@ from typing import Any
 
 from .rcir_contracts import build_grounding_clarification_contract
 from .rcir_primitives import make_evidence_envelope
+from .dictionary_authority import (
+    assert_dictionary_authority_boundary,
+    build_dictionary_authority_admission,
+)
 from .relation_hypothesis import (
     assert_relation_hypothesis_boundary,
     generate_relation_hypothesis_workset,
@@ -133,6 +137,10 @@ ARCHITECTURE_INVARIANTS = (
     "p016_writes_fact_only_through_world_fact_ledger",
     "relation_generator_reads_only_current_ledger_projection",
     "relation_candidates_are_ephemeral_task_memory",
+    "dictionary_semantic_authority_is_not_execution_authority",
+    "dictionary_and_legacy_adapter_never_share_authority",
+    "semantic_authority_is_world_version_bound",
+    "rcir_consumes_only_admitted_semantic_input",
 )
 
 
@@ -405,9 +413,20 @@ def build_situated_event_graph(
     *,
     world_revision: int,
     interaction_turn: int,
+    semantic_authority_admission: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Compile one authoritative turn graph without retaining surface text."""
-    semantic_frame = language_analysis.get("semantic_constraint_frame") or {}
+    admission = semantic_authority_admission or build_dictionary_authority_admission(
+        language_analysis,
+        language_analysis.get("machine_dictionary_projection"),
+        language_analysis.get("machine_dictionary_equivalence"),
+        world_revision=world_revision,
+    )
+    assert_dictionary_authority_boundary(admission)
+    semantic_analysis = admission.get("semantic_input") or {}
+    if semantic_analysis.get("world_revision") != world_revision:
+        raise AssertionError("stale_semantic_authority_admission")
+    semantic_frame = semantic_analysis.get("semantic_constraint_frame") or {}
     roles = {
         role_name: _role_view(role_name, role)
         for role_name, role in (semantic_frame.get("roles") or {}).items()
@@ -422,7 +441,7 @@ def build_situated_event_graph(
                 role.get("physical_state_change_committed", False)
             ),
         }
-        for role_name, role in (language_analysis.get("discourse_roles") or {}).items()
+        for role_name, role in (semantic_analysis.get("discourse_roles") or {}).items()
         if isinstance(role, dict)
     }
     if "recipient" not in roles and discourse_roles.get("recipient"):
@@ -440,7 +459,7 @@ def build_situated_event_graph(
             "constraints": [],
         }
     operators = list(
-        (language_analysis.get("canonical_frame") or {}).get("operators", [])
+        (semantic_analysis.get("canonical_frame") or {}).get("operators", [])
     )
     events = [
         {
@@ -454,7 +473,8 @@ def build_situated_event_graph(
             ),
             "operator": item.get("operator"),
             "concept_id": item.get("concept_id"),
-            "event_origin": item.get("source"),
+            "event_origin": item.get("event_origin") or item.get("source"),
+            "dictionary_operator_ref": item.get("operator_ref"),
             "temporal_scope": "requested_current_or_future",
             "physical_fact_committed": False,
             "modifiers": [
@@ -462,6 +482,7 @@ def build_situated_event_graph(
                     key: deepcopy(modifier.get(key))
                     for key in (
                         "modifier_id",
+                        "dictionary_entry_ref",
                         "dimension",
                         "value",
                         "scope",
@@ -474,7 +495,7 @@ def build_situated_event_graph(
                 for modifier in item.get("modifiers", [])
             ],
         }
-        for index, item in enumerate(language_analysis.get("event_candidates", []))
+        for index, item in enumerate(semantic_analysis.get("event_candidates", []))
     ]
     reported_events = [
         {
@@ -489,11 +510,13 @@ def build_situated_event_graph(
             "event_type": item.get("event_type"),
             "operator": item.get("operator"),
             "candidate_postcondition": item.get("candidate_postcondition"),
+            "subject_role": item.get("subject_role"),
+            "object_role": item.get("object_role"),
             "evidence_class": "human_report",
             "physical_fact_committed": False,
         }
         for index, item in enumerate(
-            language_analysis.get("reported_event_candidates", [])
+            semantic_analysis.get("reported_event_candidates", [])
         )
     ]
     historical_constraints = [
@@ -505,17 +528,17 @@ def build_situated_event_graph(
             "actor_reference": item.get("actor_reference"),
             "physical_fact_committed": False,
         }
-        for item in language_analysis.get("historical_event_constraints", [])
+        for item in semantic_analysis.get("historical_event_constraints", [])
     ]
     goal_relation, goal_facts = _goal_facts(
-        (language_analysis.get("canonical_frame") or {}).get("goal_relation"),
+        (semantic_analysis.get("canonical_frame") or {}).get("goal_relation"),
         operators,
         roles,
         discourse_roles,
     )
     event_scopes = [
         {
-            "scope_id": frame.get("frame_id") or f"scope_{index}",
+            "scope_id": frame.get("frame_ref") or frame.get("frame_id") or f"scope_{index}",
             "sequence_index": index,
             "operators": deepcopy(
                 (frame.get("canonical_frame") or {}).get("operators", [])
@@ -531,7 +554,7 @@ def build_situated_event_graph(
                 frame.get("modifier_contract")
             ),
         }
-        for index, frame in enumerate(language_analysis.get("event_frames", []))
+        for index, frame in enumerate(semantic_analysis.get("event_frames", []))
     ]
     source_ref = "sha256:" + hashlib.sha256(utterance.encode("utf-8")).hexdigest()
     graph = {
@@ -544,26 +567,29 @@ def build_situated_event_graph(
             "character_count": len(utterance),
             "raw_text_included": False,
         },
-        "speech_act": language_analysis.get("speech_act"),
+        "speech_act": semantic_analysis.get("speech_act"),
+        "communication_contracts": deepcopy(
+            semantic_analysis.get("communication_contracts") or {}
+        ),
         "events": events,
         "reported_events": reported_events,
         "historical_event_constraints": historical_constraints,
         "event_scopes": event_scopes,
         "discourse_edges": deepcopy(
-            (language_analysis.get("discourse_event_graph") or {}).get(
+            (semantic_analysis.get("discourse_event_graph") or {}).get(
                 "edges", []
             )
         ),
         "roles": roles,
         "discourse_roles": discourse_roles,
         "modifier_contract": _rcir_modifier_view(
-            language_analysis.get("modifier_contract")
+            semantic_analysis.get("modifier_contract")
         ),
         "reference_resolution": _rcir_reference_view(
-            language_analysis.get("reference_resolution")
+            semantic_analysis.get("reference_resolution")
         ),
         "rule_evaluation": deepcopy(
-            language_analysis.get("rule_evaluation") or {}
+            semantic_analysis.get("rule_evaluation") or {}
         ),
         "goal": {
             "goal_relation": goal_relation,
@@ -571,15 +597,27 @@ def build_situated_event_graph(
             "candidate_only": True,
         },
         "query": {
-            "query_type": language_analysis.get("query_type"),
+            "query_type": semantic_analysis.get("query_type"),
             "candidate_only": True,
             "physical_fact_committed": False,
         },
         "unresolved_variables": deepcopy(
-            language_analysis.get("unresolved_slots", [])
+            semantic_analysis.get("unresolved_slots", [])
         ),
         "authority": {
             "authoritative_for_turn": True,
+            "semantic_source_kind": admission.get("authoritative_semantic_source"),
+            "admission_ref": admission.get("admission_id"),
+            "dictionary_ref": admission.get("dictionary_ref"),
+            "projection_ref": admission.get("projection_ref"),
+            "projection_digest": admission.get("projection_digest"),
+            "lattice_ref": admission.get("lattice_ref"),
+            "equivalence_receipt_ref": admission.get("equivalence_receipt_ref"),
+            "fallback_used": admission.get("fallback_used", False),
+            "fallback_reasons": deepcopy(admission.get("fallback_reasons", [])),
+            "world_revision": world_revision,
+            "single_semantic_input_consumed": True,
+            "legacy_semantic_fields_read_below_admission": False,
             "downstream_surface_reparse_allowed": False,
             "language_commits_physical_facts": False,
         },
@@ -873,6 +911,15 @@ def compile_rcir_bundle(
     interaction_turn: int,
     interaction_role_bindings: dict[str, Any],
 ) -> dict[str, Any]:
+    admission = language_analysis.get("dictionary_authority_admission")
+    if not admission or admission.get("world_revision") != world_revision:
+        admission = build_dictionary_authority_admission(
+            language_analysis,
+            language_analysis.get("machine_dictionary_projection"),
+            language_analysis.get("machine_dictionary_equivalence"),
+            world_revision=world_revision,
+        )
+    assert_dictionary_authority_boundary(admission)
     ledger = build_world_fact_ledger(
         current_facts,
         world_revision=world_revision,
@@ -882,10 +929,27 @@ def compile_rcir_bundle(
         language_analysis,
         world_revision=world_revision,
         interaction_turn=interaction_turn,
+        semantic_authority_admission=admission,
     )
+    semantic_input = admission.get("semantic_input") or {}
+    grounding_analysis = {
+        "context_projection": deepcopy(
+            language_analysis.get("context_projection") or {}
+        ),
+        "grounded_intent_frame": deepcopy(
+            language_analysis.get("grounded_intent_frame") or {}
+        ),
+        "process_template_resolution": deepcopy(
+            language_analysis.get("process_template_resolution") or {}
+        ),
+        "semantic_constraint_frame": deepcopy(
+            semantic_input.get("semantic_constraint_frame") or {}
+        ),
+        "discourse_roles": deepcopy(semantic_input.get("discourse_roles") or {}),
+    }
     grounded = build_grounded_causal_graph(
         situated,
-        language_analysis,
+        grounding_analysis,
         ledger,
         interaction_role_bindings=interaction_role_bindings,
     )
@@ -939,6 +1003,28 @@ def compile_rcir_bundle(
         ),
         "world_revision": world_revision,
         "interaction_turn": interaction_turn,
+        "semantic_authority": {
+            key: deepcopy(admission.get(key))
+            for key in (
+                "admission_id",
+                "admission_status",
+                "authoritative_semantic_source",
+                "fallback_used",
+                "fallback_reasons",
+                "dictionary_ref",
+                "projection_ref",
+                "projection_digest",
+                "lattice_ref",
+                "equivalence_receipt_ref",
+                "world_revision",
+                "legacy_parser_role",
+                "downstream_legacy_semantic_fields_allowed",
+                "downstream_surface_reparse_allowed",
+                "can_control_execution",
+                "can_commit_runtime_fact",
+                "runtime_fact_committed",
+            )
+        },
         "situated_event_graph": situated,
         "world_fact_ledger": ledger,
         "grounded_causal_graph": grounded,
@@ -962,6 +1048,10 @@ def compile_rcir_bundle(
             "current_world_ledger_is_authoritative": True,
             "every_binding_has_evidence_and_world_revision": True,
             "current_fact_pruning_required_before_execution": True,
+            "dictionary_semantic_authority_is_not_execution_authority": True,
+            "dictionary_and_legacy_adapter_never_share_authority": True,
+            "semantic_authority_is_world_version_bound": True,
+            "rcir_consumes_only_admitted_semantic_input": True,
         },
     }
     assert_rcir_architecture_invariants(
@@ -1020,6 +1110,24 @@ def assert_rcir_architecture_invariants(
 ) -> None:
     assert_no_surface_text_below_rcir_boundary(bundle)
     situated = bundle.get("situated_event_graph") or {}
+    semantic_authority = bundle.get("semantic_authority") or {}
+    situated_authority = situated.get("authority") or {}
+    if semantic_authority.get("can_control_execution") is not False:
+        raise AssertionError("semantic_authority_bypassed_p018")
+    if semantic_authority.get("can_commit_runtime_fact") is not False:
+        raise AssertionError("semantic_authority_bypassed_world_fact_ledger")
+    if semantic_authority.get("world_revision") != bundle.get("world_revision"):
+        raise AssertionError("semantic_authority_world_revision_mismatch")
+    if semantic_authority.get("fallback_used") and semantic_authority.get(
+        "authoritative_semantic_source"
+    ) == "machine_dictionary":
+        raise AssertionError("dictionary_and_fallback_both_authoritative")
+    if situated_authority.get("admission_ref") != semantic_authority.get(
+        "admission_id"
+    ):
+        raise AssertionError("situated_graph_did_not_consume_bundle_admission")
+    if situated_authority.get("legacy_semantic_fields_read_below_admission") is not False:
+        raise AssertionError("legacy_semantic_field_control_bypass")
     event_records = [
         *situated.get("events", []),
         *situated.get("reported_events", []),
@@ -1064,6 +1172,8 @@ def validate_rcir_bundle(bundle: dict[str, Any]) -> dict[str, Any]:
     ):
         if (bundle.get(key) or {}).get("world_revision") != revision:
             errors.append(f"world_revision_mismatch:{key}")
+    if (bundle.get("semantic_authority") or {}).get("world_revision") != revision:
+        errors.append("world_revision_mismatch:semantic_authority")
     violations = _forbidden_key_paths(bundle)
     if violations:
         errors.append("surface_text_leaked:" + "|".join(violations))

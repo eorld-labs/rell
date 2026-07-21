@@ -126,6 +126,128 @@ def compile_situated_event_frame(
     }
 
 
+def project_situated_event_frame_from_rcir(
+    bundle: dict[str, Any],
+    *,
+    current_facts: list[dict[str, Any]],
+    recent_episodes: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Project the legacy runtime view from RCIR without reparsing language."""
+    situated = bundle.get("situated_event_graph") or {}
+    grounded = bundle.get("grounded_causal_graph") or {}
+    semantic_roles = deepcopy(situated.get("roles") or {})
+    for role, binding in (grounded.get("role_bindings") or {}).items():
+        if binding.get("status") != "resolved":
+            continue
+        semantic_roles.setdefault(role, {"role": role})["entity_ref"] = binding.get(
+            "entity_ref"
+        )
+        semantic_roles[role]["world_revision"] = binding.get("world_revision")
+        semantic_roles[role]["binding_evidence_ref"] = (
+            binding.get("evidence") or {}
+        ).get("evidence_ref")
+
+    historical = situated.get("historical_event_constraints") or []
+    temporal_scopes = {
+        item.get("temporal_scope") for item in historical if item.get("temporal_scope")
+    }
+    temporal_modifier_values = {
+        item.get("value")
+        for item in (
+            (situated.get("modifier_contract") or {}).get("modifiers") or []
+        )
+        if item.get("dimension") == "temporal" and item.get("value")
+    }
+    if (
+        "recent_verified_runtime_past" in temporal_scopes
+        or "immediate_past" in temporal_modifier_values
+    ):
+        temporal_scope = "most_recent_verified_past"
+    elif temporal_scopes or temporal_modifier_values.intersection(
+        {"past", "verified_past", "prior"}
+    ):
+        temporal_scope = "verified_past"
+    elif any(
+        scope.get("incoming_discourse_relation")
+        in {"sequence", "ordered_after", "then"}
+        for scope in situated.get("event_scopes", [])
+    ):
+        temporal_scope = "ordered_future_stage"
+    else:
+        temporal_scope = "current"
+
+    reported_state_candidates = [
+        {
+            "predicate": item.get("candidate_postcondition"),
+            "reported_event_type": item.get("event_type"),
+            "operator": item.get("operator"),
+            "possible_derived_fact": (
+                "container_empty"
+                if item.get("event_type") == "consumption_completed"
+                else item.get("candidate_postcondition")
+            ),
+            "reported_by": "human_speaker",
+            "subject_role": item.get("subject_role"),
+            "object_role": item.get("object_role"),
+            "status": "human_reported_candidate_requires_physical_verification",
+            "evidence_class": item.get("evidence_class"),
+            "does_not_commit_physical_fact": True,
+        }
+        for item in situated.get("reported_events", [])
+    ]
+    reference_queries = [
+        {
+            "operator": item.get("operator"),
+            "head_role": item.get("head_role"),
+            "relation": item.get("relation"),
+            "temporal_scope": item.get("temporal_scope"),
+            "query_over": "verified_episodic_facts",
+        }
+        for item in historical
+    ]
+    expected = deepcopy(grounded.get("goal_facts") or [])
+    frame = {
+        "schema_version": "1.0.0",
+        "frame_id": "event_frame_rcir_"
+        + hashlib.sha1(str(situated.get("graph_id")).encode("utf-8")).hexdigest()[:12],
+        "source_rcir_bundle_ref": bundle.get("bundle_id"),
+        "source_situated_graph_ref": situated.get("graph_id"),
+        "semantic_authority_ref": (
+            bundle.get("semantic_authority") or {}
+        ).get("admission_id"),
+        "speech_act": situated.get("speech_act"),
+        "operators": [
+            item.get("operator")
+            for item in situated.get("events", [])
+            if item.get("operator")
+        ],
+        "semantic_roles": semantic_roles,
+        "spatial_constraints": _spatial_constraints(semantic_roles),
+        "temporal_scope": temporal_scope,
+        "reference_queries": reference_queries,
+        "reported_state_candidates": reported_state_candidates,
+        "current_fact_snapshot": deepcopy(current_facts),
+        "recent_episode_refs": [
+            item.get("episode_id") for item in recent_episodes[-8:]
+        ],
+        "expected_goal_facts": expected,
+        "known_slots": sorted(semantic_roles),
+        "unresolved_slots": deepcopy(situated.get("unresolved_variables") or []),
+        "interpretation_status": (
+            "partial" if situated.get("unresolved_variables") else "composed_candidate"
+        ),
+        "generated_from_rcir_only": True,
+        "surface_text_reparsed": False,
+        "runtime_fact_committed": False,
+        "evidence_boundary": {
+            "language_creates_goal_candidates": True,
+            "language_does_not_commit_physical_facts": True,
+            "execution_requires_current_grounding_and_verification": True,
+        },
+    }
+    return frame
+
+
 def create_hierarchical_intent_graph(
     graph_id: str,
     *,

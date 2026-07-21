@@ -1,53 +1,26 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.org/worldmodels/rcir_bundle.schema.json",
+  "$id": "https://example.org/worldmodels/schemas/rcir_bundle.schema.json",
   "title": "RELL Cognitive IR Bundle",
-  "description": "同一交互轮次的权威情境事件图、世界事实账本和已落地因果图。",
+  "description": "Authoritative situated event graph, world fact ledger, and grounded causal graph for one interaction turn.",
   "type": "object",
   "required": [
-    "schema_version",
-    "ir_kind",
-    "bundle_id",
-    "authority_digest",
-    "world_revision",
-    "interaction_turn",
-    "situated_event_graph",
-    "world_fact_ledger",
-    "grounded_causal_graph",
+    "schema_version", "ir_kind", "bundle_id", "authority_digest",
+    "world_revision", "interaction_turn", "semantic_authority",
+    "situated_event_graph", "world_fact_ledger", "grounded_causal_graph",
     "architecture_invariants"
   ],
   "properties": {
-    "schema_version": {
-      "const": "1.0.0"
-    },
-    "ir_kind": {
-      "const": "rell_cognitive_ir_bundle"
-    },
-    "bundle_id": {
-      "type": "string",
-      "pattern": "^rcir_[a-f0-9]{16}$"
-    },
-    "authority_digest": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
-    },
-    "world_revision": {
-      "type": "integer",
-      "minimum": 0
-    },
-    "interaction_turn": {
-      "type": "integer",
-      "minimum": 0
-    },
-    "situated_event_graph": {
-      "$ref": "#/$defs/situatedEventGraph"
-    },
-    "world_fact_ledger": {
-      "$ref": "#/$defs/worldFactLedger"
-    },
-    "grounded_causal_graph": {
-      "$ref": "#/$defs/groundedCausalGraph"
-    },
+    "schema_version": {"const": "1.0.0"},
+    "ir_kind": {"const": "rell_cognitive_ir_bundle"},
+    "bundle_id": {"type": "string", "pattern": "^rcir_[a-f0-9]{16}$"},
+    "authority_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "world_revision": {"type": "integer", "minimum": 0},
+    "interaction_turn": {"type": "integer", "minimum": 0},
+    "semantic_authority": {"$ref": "#/$defs/semanticAuthority"},
+    "situated_event_graph": {"$ref": "#/$defs/situatedEventGraph"},
+    "world_fact_ledger": {"$ref": "#/$defs/worldFactLedger"},
+    "grounded_causal_graph": {"$ref": "#/$defs/groundedCausalGraph"},
     "architecture_invariants": {
       "type": "object",
       "required": [
@@ -62,72 +35,125 @@
         "versioned_dependency_invalidation_required",
         "shared_event_predicate_evidence_readback",
         "no_secondary_fact_or_control_source",
+        "ambiguous_relation_never_silently_becomes_unique",
+        "relation_generator_is_not_fact_authority",
+        "p016_writes_fact_only_through_world_fact_ledger",
+        "relation_generator_reads_only_current_ledger_projection",
+        "relation_candidates_are_ephemeral_task_memory",
         "current_world_ledger_is_authoritative",
         "every_binding_has_evidence_and_world_revision",
-        "current_fact_pruning_required_before_execution"
+        "current_fact_pruning_required_before_execution",
+        "dictionary_semantic_authority_is_not_execution_authority",
+        "dictionary_and_legacy_adapter_never_share_authority",
+        "semantic_authority_is_world_version_bound",
+        "rcir_consumes_only_admitted_semantic_input"
       ],
       "properties": {
-        "one_turn_one_authoritative_semantic_graph": { "const": true },
-        "downstream_surface_reparse_allowed": { "const": false },
-        "language_does_not_commit_physical_fact": { "const": true },
-        "perception_candidate_is_not_runtime_fact": { "const": true },
-        "downstream_does_not_reparse_surface_text": { "const": true },
-        "current_verified_relation_precedes_history_and_category": { "const": true },
-        "every_recovery_reenters_current_fact_pruning": { "const": true },
-        "qualified_evidence_required_for_execution_fact": { "const": true },
-        "versioned_dependency_invalidation_required": { "const": true },
-        "shared_event_predicate_evidence_readback": { "const": true },
-        "no_secondary_fact_or_control_source": { "const": true },
-        "current_world_ledger_is_authoritative": { "const": true },
-        "every_binding_has_evidence_and_world_revision": { "const": true },
-        "current_fact_pruning_required_before_execution": { "const": true }
+        "one_turn_one_authoritative_semantic_graph": {"const": true},
+        "downstream_surface_reparse_allowed": {"const": false},
+        "language_does_not_commit_physical_fact": {"const": true},
+        "perception_candidate_is_not_runtime_fact": {"const": true},
+        "downstream_does_not_reparse_surface_text": {"const": true},
+        "current_verified_relation_precedes_history_and_category": {"const": true},
+        "every_recovery_reenters_current_fact_pruning": {"const": true},
+        "qualified_evidence_required_for_execution_fact": {"const": true},
+        "versioned_dependency_invalidation_required": {"const": true},
+        "shared_event_predicate_evidence_readback": {"const": true},
+        "no_secondary_fact_or_control_source": {"const": true},
+        "ambiguous_relation_never_silently_becomes_unique": {"const": true},
+        "relation_generator_is_not_fact_authority": {"const": true},
+        "p016_writes_fact_only_through_world_fact_ledger": {"const": true},
+        "relation_generator_reads_only_current_ledger_projection": {"const": true},
+        "relation_candidates_are_ephemeral_task_memory": {"const": true},
+        "current_world_ledger_is_authoritative": {"const": true},
+        "every_binding_has_evidence_and_world_revision": {"const": true},
+        "current_fact_pruning_required_before_execution": {"const": true},
+        "dictionary_semantic_authority_is_not_execution_authority": {"const": true},
+        "dictionary_and_legacy_adapter_never_share_authority": {"const": true},
+        "semantic_authority_is_world_version_bound": {"const": true},
+        "rcir_consumes_only_admitted_semantic_input": {"const": true}
       },
       "additionalProperties": false
     }
   },
   "$defs": {
-    "situatedEventGraph": {
+    "semanticAuthority": {
       "type": "object",
       "required": [
-        "schema_version",
-        "ir_kind",
-        "graph_id",
-        "world_revision",
-        "source_language",
-        "events",
-        "roles",
-        "goal",
-        "authority"
+        "admission_id", "admission_status", "authoritative_semantic_source",
+        "fallback_used", "fallback_reasons", "world_revision",
+        "downstream_legacy_semantic_fields_allowed",
+        "downstream_surface_reparse_allowed", "can_control_execution",
+        "can_commit_runtime_fact", "runtime_fact_committed"
       ],
       "properties": {
-        "schema_version": { "const": "1.0.0" },
-        "ir_kind": { "const": "situated_event_graph" },
-        "graph_id": { "type": "string" },
-        "world_revision": { "type": "integer", "minimum": 0 },
+        "admission_id": {"type": "string"},
+        "admission_status": {"enum": ["admitted", "fallback"]},
+        "authoritative_semantic_source": {"enum": ["machine_dictionary", "legacy_structured_compatibility_adapter"]},
+        "fallback_used": {"type": "boolean"},
+        "fallback_reasons": {"type": "array", "items": {"type": "string"}},
+        "dictionary_ref": {"type": ["string", "null"]},
+        "projection_ref": {"type": ["string", "null"]},
+        "projection_digest": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"},
+        "lattice_ref": {"type": ["string", "null"]},
+        "equivalence_receipt_ref": {"type": ["string", "null"]},
+        "world_revision": {"type": "integer", "minimum": 0},
+        "legacy_parser_role": {"type": "string"},
+        "downstream_legacy_semantic_fields_allowed": {"const": false},
+        "downstream_surface_reparse_allowed": {"const": false},
+        "can_control_execution": {"const": false},
+        "can_commit_runtime_fact": {"const": false},
+        "runtime_fact_committed": {"const": false}
+      },
+      "additionalProperties": false
+    },
+    "situatedEventGraph": {
+      "type": "object",
+      "required": ["schema_version", "ir_kind", "graph_id", "world_revision", "source_language", "events", "roles", "goal", "authority"],
+      "properties": {
+        "schema_version": {"const": "1.0.0"},
+        "ir_kind": {"const": "situated_event_graph"},
+        "graph_id": {"type": "string"},
+        "world_revision": {"type": "integer", "minimum": 0},
         "source_language": {
           "type": "object",
           "required": ["utterance_ref", "character_count", "raw_text_included"],
           "properties": {
-            "utterance_ref": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
-            "character_count": { "type": "integer", "minimum": 0 },
-            "raw_text_included": { "const": false }
+            "utterance_ref": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+            "character_count": {"type": "integer", "minimum": 0},
+            "raw_text_included": {"const": false}
           },
           "additionalProperties": false
         },
-        "events": { "type": "array", "items": { "type": "object" } },
-        "roles": { "type": "object" },
-        "goal": { "type": "object" },
+        "events": {"type": "array", "items": {"type": "object"}},
+        "roles": {"type": "object"},
+        "goal": {"type": "object"},
         "authority": {
           "type": "object",
           "required": [
-            "authoritative_for_turn",
+            "authoritative_for_turn", "semantic_source_kind", "admission_ref",
+            "fallback_used", "fallback_reasons", "world_revision",
+            "single_semantic_input_consumed",
+            "legacy_semantic_fields_read_below_admission",
             "downstream_surface_reparse_allowed",
             "language_commits_physical_facts"
           ],
           "properties": {
-            "authoritative_for_turn": { "const": true },
-            "downstream_surface_reparse_allowed": { "const": false },
-            "language_commits_physical_facts": { "const": false }
+            "authoritative_for_turn": {"const": true},
+            "semantic_source_kind": {"enum": ["machine_dictionary", "legacy_structured_compatibility_adapter"]},
+            "admission_ref": {"type": "string"},
+            "dictionary_ref": {"type": ["string", "null"]},
+            "projection_ref": {"type": ["string", "null"]},
+            "projection_digest": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"},
+            "lattice_ref": {"type": ["string", "null"]},
+            "equivalence_receipt_ref": {"type": ["string", "null"]},
+            "fallback_used": {"type": "boolean"},
+            "fallback_reasons": {"type": "array", "items": {"type": "string"}},
+            "world_revision": {"type": "integer", "minimum": 0},
+            "single_semantic_input_consumed": {"const": true},
+            "legacy_semantic_fields_read_below_admission": {"const": false},
+            "downstream_surface_reparse_allowed": {"const": false},
+            "language_commits_physical_facts": {"const": false}
           },
           "additionalProperties": false
         }
@@ -136,64 +162,43 @@
     },
     "worldFactLedger": {
       "type": "object",
-      "required": [
-        "schema_version",
-        "ir_kind",
-        "ledger_id",
-        "world_revision",
-        "facts",
-        "evidence",
-        "authoritative_current_fact_ids"
-      ],
+      "required": ["schema_version", "ir_kind", "ledger_id", "world_revision", "facts", "evidence", "authoritative_current_fact_ids"],
       "properties": {
-        "schema_version": { "const": "1.0.0" },
-        "ir_kind": { "const": "world_fact_ledger" },
-        "ledger_id": { "type": "string" },
-        "world_revision": { "type": "integer", "minimum": 0 },
-        "facts": { "type": "array", "items": { "type": "object" } },
-        "evidence": { "type": "array", "items": { "type": "object" } },
-        "authoritative_current_fact_ids": {
-          "type": "array",
-          "items": { "type": "string" }
-        }
+        "schema_version": {"const": "1.0.0"},
+        "ir_kind": {"const": "world_fact_ledger"},
+        "ledger_id": {"type": "string"},
+        "world_revision": {"type": "integer", "minimum": 0},
+        "facts": {"type": "array", "items": {"type": "object"}},
+        "evidence": {"type": "array", "items": {"type": "object"}},
+        "authoritative_current_fact_ids": {"type": "array", "items": {"type": "string"}}
       },
       "additionalProperties": true
     },
     "groundedCausalGraph": {
       "type": "object",
       "required": [
-        "schema_version",
-        "ir_kind",
-        "graph_id",
-        "world_revision",
-        "situated_graph_ref",
-        "world_ledger_ref",
-        "goal_facts",
-        "role_bindings",
-        "nodes",
-        "fact_authority_ref",
-        "control_gateway",
-        "verification_gateway",
-        "current_fact_pruning_required",
-        "direct_execution_allowed",
-        "runtime_fact_committed"
+        "schema_version", "ir_kind", "graph_id", "world_revision",
+        "situated_graph_ref", "world_ledger_ref", "goal_facts",
+        "role_bindings", "nodes", "fact_authority_ref", "control_gateway",
+        "verification_gateway", "current_fact_pruning_required",
+        "direct_execution_allowed", "runtime_fact_committed"
       ],
       "properties": {
-        "schema_version": { "const": "1.0.0" },
-        "ir_kind": { "const": "grounded_causal_graph" },
-        "graph_id": { "type": "string" },
-        "world_revision": { "type": "integer", "minimum": 0 },
-        "situated_graph_ref": { "type": "string" },
-        "world_ledger_ref": { "type": "string" },
-        "goal_facts": { "type": "array", "items": { "type": "object" } },
-        "role_bindings": { "type": "object" },
-        "nodes": { "type": "array", "items": { "type": "object" } },
-        "fact_authority_ref": { "type": "string" },
-        "control_gateway": { "const": "P018" },
-        "verification_gateway": { "const": "P016" },
-        "current_fact_pruning_required": { "const": true },
-        "direct_execution_allowed": { "const": false },
-        "runtime_fact_committed": { "const": false }
+        "schema_version": {"const": "1.0.0"},
+        "ir_kind": {"const": "grounded_causal_graph"},
+        "graph_id": {"type": "string"},
+        "world_revision": {"type": "integer", "minimum": 0},
+        "situated_graph_ref": {"type": "string"},
+        "world_ledger_ref": {"type": "string"},
+        "goal_facts": {"type": "array", "items": {"type": "object"}},
+        "role_bindings": {"type": "object"},
+        "nodes": {"type": "array", "items": {"type": "object"}},
+        "fact_authority_ref": {"type": "string"},
+        "control_gateway": {"const": "P018"},
+        "verification_gateway": {"const": "P016"},
+        "current_fact_pruning_required": {"const": true},
+        "direct_execution_allowed": {"const": false},
+        "runtime_fact_committed": {"const": false}
       },
       "additionalProperties": true
     }

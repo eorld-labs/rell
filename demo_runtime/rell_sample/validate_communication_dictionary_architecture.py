@@ -243,8 +243,12 @@ def main() -> None:
         "home_humanoid", "hospitality_guest"
     )
     clarification_live = SESSIONS[clarification_session["session_id"]]
+    clarification_source_analysis = _compose_session_language(
+        clarification_live, "\u7ed9\u6211\u63a5\u676f\u6c34"
+    )
     clarification_live["role_clarification_dialogue"] = {
         "status": "awaiting_role_value",
+        "source_language_analysis": clarification_source_analysis,
         "source_utterance": "给我接杯水",
         "role": "theme",
         "concept_id": "concept_fillable_container",

@@ -122,24 +122,19 @@ def realize_rcir_dialogue(
     query_type = (situated.get("query") or {}).get("query_type")
     dictionary = dictionary_index()
     speech_act = situated.get("speech_act")
-    speech_act_ref = next(
-        (
-            ref
-            for ref, entry in dictionary.items()
-            if entry.get("entry_kind") == "speech_act"
-            and entry.get("semantic_value") == speech_act
-        ),
-        None,
-    )
-    query_contract_ref = next(
-        (
-            ref
-            for ref, entry in dictionary.items()
-            if entry.get("entry_kind") == "query_contract"
-            and entry.get("semantic_value") == query_type
-        ),
-        None,
-    )
+    communication_contracts = situated.get("communication_contracts") or {}
+    speech_act_ref = communication_contracts.get("speech_act_ref")
+    query_contract_ref = communication_contracts.get("query_contract_ref")
+    if speech_act_ref and (
+        (dictionary.get(speech_act_ref) or {}).get("semantic_value")
+        != speech_act
+    ):
+        raise AssertionError("reverse_dialogue_speech_act_ref_mismatch")
+    if query_contract_ref and (
+        (dictionary.get(query_contract_ref) or {}).get("semantic_value")
+        != query_type
+    ):
+        raise AssertionError("reverse_dialogue_query_contract_ref_mismatch")
     response_act_ref = (
         "speech_act.inform" if "speech_act.inform" in dictionary else None
     )
@@ -177,6 +172,12 @@ def realize_rcir_dialogue(
         "grounded_graph_ref": grounded.get("graph_id"),
         "fact_authority_ref": ledger.get("ledger_id"),
         "world_revision": bundle.get("world_revision"),
+        "semantic_authority_ref": (
+            bundle.get("semantic_authority") or {}
+        ).get("admission_id"),
+        "semantic_source_kind": (
+            bundle.get("semantic_authority") or {}
+        ).get("authoritative_semantic_source"),
         "goal_relation": goal_relation,
         "speech_act_ref": speech_act_ref,
         "query_type": query_type,
@@ -188,6 +189,7 @@ def realize_rcir_dialogue(
         "human_response": response,
         "generated_from_rcir_only": True,
         "generated_from_shared_dictionary_entries": True,
+        "dictionary_refs_reused_without_reinterpretation": True,
         "surface_text_reparsed": False,
         "runtime_fact_committed": False,
         "direct_execution_allowed": False,

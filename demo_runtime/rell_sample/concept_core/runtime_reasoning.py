@@ -129,7 +129,13 @@ def explanation_from_structured_state(
             *communication_entry_refs,
         ],
         "communication_entry_refs": communication_entry_refs,
+        "semantic_authority_ref": projection.get("semantic_authority_ref"),
+        "semantic_source_kind": projection.get("semantic_source_kind"),
         "generated_from_shared_dictionary_entries": True,
+        "dictionary_refs_reused_without_reinterpretation": projection.get(
+            "dictionary_refs_reused_without_reinterpretation"
+        )
+        is True,
         "generated_from_rcir_only": True,
         "surface_text_reparsed": False,
         "runtime_fact_committed": False,

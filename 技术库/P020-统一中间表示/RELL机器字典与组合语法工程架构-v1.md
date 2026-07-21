@@ -286,3 +286,47 @@ direction_upward  requires: 垂直空间目标
 当前在线路径已接入任务请求、状态查询、禁止、语言教学、确认、否决、显式纠正、各类澄清回答和人类信息报告。确认必须绑定当前`pending_confirmation`，纠正必须绑定被替换的RCIR或活跃意图，并重新进入当前世界落地。澄清回答绑定活跃对话合同的稳定引用，是否真正消费仍由对应合同解析器决定；新的完整任务可以继续按原有优先级取代旧询问。人类信息报告只形成`information_report`候选，其`qualified_for_physical_fact=false`。
 
 反向对话和结构化解释现同时输出`speech_act_ref`、`query_contract_ref`和`response_act_ref`，引用与正向编译相同的机器字典条目。反向生成仍只读取RCIR、规则评估和证据引用，不重读原始命令。至此，交流字典已经形成“人类语言→机器交流合同→RCIR/当前事实读取→共享字典引用→人类语言”的首个双向闭环。
+
+## 十五、2026-07-22受控语义权威切换
+
+机器字典现已从影子比较进入`controlled_authority_trial`。这里提升的是“生成`SituatedEventGraph`的语义权威”，不是执行权、事实提交权或物理验真权。
+
+每一轮输入必须依次形成：
+
+```text
+旧语言前端兼容适配
+  -> MachineDictionaryProjection
+  -> InterpretationLattice
+  -> MachineDictionaryEquivalenceReceipt
+  -> DictionaryAuthorityAdmission
+  -> 单一 semantic_input
+  -> SituatedEventGraph
+  -> GroundedCausalGraph
+  -> P018控制仲裁
+  -> P016执行验真
+  -> WorldFactLedger
+```
+
+`DictionaryAuthorityAdmission`检查以下条件：
+
+- 解释格已经唯一收敛，歧义未被静默消除；
+- 算子、角色、修饰、作用域、目标、指代、语篇和事件帧的等价票据通过；
+- 投影、解释格、票据、角色落地和过程绑定均属于当前世界版本；
+- 恢复路径已经声明重新进入当前事实裁剪；
+- 完整投影的`projection_id`和SHA-256摘要与票据一致；
+- 字典层仍为`can_control_execution=false`、`can_commit_runtime_fact=false`。
+
+任一条件失败时，只允许生成带原因的`legacy_structured_compatibility_adapter`回退输入。字典投影与兼容回退在同一轮中不得同时成为权威。回退保证旧能力可运行，但其使用情况必须可统计、可定位并可逐步归零。
+
+本轮同时关闭了四条历史旁路：
+
+1. `SituatedEventGraph`不再直接读取旧分析字段，只读取准入后的`semantic_input`；
+2. 运行规则评估读取同一准入语义和当前实体绑定，不再读取第二份算子/修饰词解释；
+3. 旧`SituatedEventFrame`改为从RCIR投影，时间范围、人类报告和历史事件约束不再重读原文；
+4. 复合任务子节点携带字典事件帧、`EntityRef`和证据引用，阶段切换时不再重新造句并进入语言解析器。
+
+人类报告现覆盖完成事件和持续占有状态。`我喝完了`、`杯子还在我手上`等表达先形成`information_report`及候选关系；恢复门只能用它们发起当前事实核对，不能直接写入物理事实。
+
+世界版本变化时，当前语义准入和RCIR立即局部失效，旧图进入紧凑收据；下一轮必须重新投影、重新落地和重新签发准入合同。反向对话复用RCIR中已有的交流字典引用，并校验引用与类型一致，不重新根据语义值搜索另一条解释路径。
+
+本阶段的架构完结判据是：语义主链只有一个准入入口，事实主链只有`WorldFactLedger`，控制和验真仍分别只经P018与P016，恢复、复合语篇、查询、澄清和反向解释不存在第二语义源。词汇覆盖、领域包和认识目标仍可持续扩展，但扩展必须进入本合同，不得新增旁路。

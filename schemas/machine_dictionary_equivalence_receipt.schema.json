@@ -9,6 +9,8 @@
     "receipt_id",
     "mode",
     "world_revision",
+    "projection_ref",
+    "projection_digest",
     "field_results",
     "status",
     "divergent_fields",
@@ -25,6 +27,8 @@
     "receipt_id": {"type": "string", "pattern": "^dictionary_equivalence_[a-f0-9]{16}$"},
     "mode": {"const": "shadow_equivalence_migration"},
     "world_revision": {"type": "integer", "minimum": 0},
+    "projection_ref": {"type": "string", "pattern": "^dictionary_projection_[a-f0-9]{16}$"},
+    "projection_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
     "projection_lattice_ref": {"type": ["string", "null"]},
     "field_results": {
       "type": "object",

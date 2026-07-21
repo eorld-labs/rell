@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from copy import deepcopy
 from typing import Any
 
@@ -38,6 +39,174 @@ def _semantic_index(dictionary: dict[str, Any]) -> dict[str, list[dict[str, Any]
     for entry in dictionary.get("entries", []):
         result.setdefault(str(entry.get("semantic_value")), []).append(entry)
     return result
+
+
+def _dictionary_modifier_ref(
+    modifier: dict[str, Any], semantic_index: dict[str, list[dict[str, Any]]]
+) -> str | None:
+    declared_ref = modifier.get("dictionary_entry_ref")
+    if declared_ref and any(
+        item.get("entry_id") == declared_ref
+        for entries in semantic_index.values()
+        for item in entries
+    ):
+        return str(declared_ref)
+    matches = [
+        item
+        for item in semantic_index.get(str(modifier.get("value")), [])
+        if item.get("entry_kind") == "modifier"
+        and item.get("modifier_dimension") == modifier.get("dimension")
+    ]
+    return matches[0].get("entry_id") if len(matches) == 1 else None
+
+
+def _semantic_role_projection(role: dict[str, Any]) -> dict[str, Any]:
+    result = {
+        key: deepcopy(role.get(key))
+        for key in (
+            "role",
+            "concept_id",
+            "entity_ref",
+            "value_ref",
+            "entity_type",
+            "reference",
+            "compatible_kinds",
+            "functional_affordances",
+            "relation_predicate",
+            "relation_target_role",
+            "spatial_relation",
+            "spatial_relation_basis",
+            "quantity",
+            "classifier",
+            "selection_quantifier",
+            "constraints",
+        )
+        if role.get(key) is not None
+    }
+    return result
+
+
+def _semantic_event_projection(
+    event: dict[str, Any],
+    *,
+    index: int,
+    operator_refs: list[str],
+    semantic_index: dict[str, list[dict[str, Any]]],
+) -> dict[str, Any]:
+    operator = event.get("operator")
+    operator_ref = next(
+        (
+            ref
+            for ref in operator_refs
+            if any(
+                entry.get("entry_id") == ref
+                and entry.get("semantic_value") == operator
+                for entry in semantic_index.get(str(operator), [])
+            )
+        ),
+        None,
+    )
+    return {
+        "event_ref": f"dictionary_event_{index}",
+        "operator": operator,
+        "operator_ref": operator_ref,
+        "concept_id": event.get("concept_id"),
+        "event_origin": event.get("source"),
+        "modifiers": [
+            {
+                "dictionary_entry_ref": _dictionary_modifier_ref(
+                    modifier, semantic_index
+                ),
+                **{
+                    key: deepcopy(modifier.get(key))
+                    for key in (
+                        "dimension",
+                        "value",
+                        "scope",
+                        "event_index",
+                        "basis",
+                    )
+                },
+                "candidate_only": True,
+                "runtime_fact_committed": False,
+                "direct_execution_allowed": False,
+            }
+            for modifier in event.get("modifiers", [])
+        ],
+        "candidate_only": True,
+        "runtime_fact_committed": False,
+    }
+
+
+def _grounding_projection(frame: dict[str, Any]) -> dict[str, Any]:
+    grounding = frame.get("grounded_intent_frame") or {}
+    return {
+        "world_revision": grounding.get("world_revision"),
+        "roles": {
+            role: {
+                "status": item.get("status"),
+                "world_revision": item.get("world_revision"),
+                "observation_evidence_set_id": item.get(
+                    "observation_evidence_set_id"
+                ),
+                "binding": {
+                    key: deepcopy((item.get("binding") or {}).get(key))
+                    for key in (
+                        "entity_ref",
+                        "binding_basis",
+                        "evidence_strength",
+                    )
+                    if (item.get("binding") or {}).get(key) is not None
+                },
+                "candidate_bindings": [
+                    {
+                        key: deepcopy(candidate.get(key))
+                        for key in (
+                            "entity_ref",
+                            "binding_basis",
+                            "evidence_strength",
+                        )
+                        if candidate.get(key) is not None
+                    }
+                    for candidate in item.get("candidate_bindings", [])
+                ],
+            }
+            for role, item in (grounding.get("roles") or {}).items()
+            if isinstance(item, dict)
+        },
+        "candidate_only": True,
+        "runtime_fact_committed": False,
+    }
+
+
+def _process_resolution_projection(frame: dict[str, Any]) -> dict[str, Any]:
+    resolution = frame.get("process_template_resolution") or {}
+    return {
+        "status": resolution.get("status"),
+        "template_id": resolution.get("template_id"),
+        "goal_fact": resolution.get("goal_fact"),
+        "bindings": {
+            role: {
+                key: deepcopy(binding.get(key))
+                for key in (
+                    "value_ref",
+                    "value_type",
+                    "explicit",
+                    "evidence",
+                    "evidence_strength",
+                    "evidence_sources",
+                    "matched_semantic_constraints",
+                    "observation_world_revision",
+                )
+                if binding.get(key) is not None
+            }
+            for role, binding in (resolution.get("bindings") or {}).items()
+            if isinstance(binding, dict)
+        },
+        "candidate_only": True,
+        "runtime_fact_committed": False,
+        "direct_execution_allowed": False,
+    }
 
 
 def _role_referent(role: dict[str, Any], world_revision: int) -> dict[str, Any]:
@@ -216,21 +385,49 @@ def project_analysis_to_machine_dictionary(
         if isinstance(role, dict)
     }
     event_refs = [f"dictionary_event_{index}" for index in range(len(operators))]
+    if not event_refs and analysis.get("reported_event_candidates"):
+        event_refs = [
+            f"dictionary_reported_event_{index}"
+            for index, _ in enumerate(
+                analysis.get("reported_event_candidates", [])
+            )
+        ]
     attachments = []
     for modifier in (analysis.get("modifier_contract") or {}).get("modifiers", []):
         event_index = modifier.get("event_index")
         scope = modifier.get("scope", "event")
+        target_event_ref = (
+            event_refs[event_index]
+            if isinstance(event_index, int) and 0 <= event_index < len(event_refs)
+            else None
+        )
+        if (
+            target_event_ref is None
+            and not operators
+            and scope == "event"
+            and len(analysis.get("reported_event_candidates", [])) == 1
+        ):
+            modifier_span = modifier.get("span") or []
+            reported = analysis.get("reported_event_candidates", [])[0]
+            reported_span = [reported.get("start"), reported.get("end")]
+            if (
+                len(modifier_span) == 2
+                and all(isinstance(value, int) for value in modifier_span)
+                and all(isinstance(value, int) for value in reported_span)
+                and modifier_span[0] < reported_span[1]
+                and reported_span[0] < modifier_span[1]
+            ):
+                target_event_ref = event_refs[0]
         attachments.append(
             {
-                "modifier_ref": modifier.get("modifier_id"),
+                "modifier_ref": _dictionary_modifier_ref(
+                    modifier, semantic_index
+                )
+                or modifier.get("modifier_id"),
                 "dimension": modifier.get("dimension"),
                 "value": modifier.get("value"),
                 "scope": scope,
-                "target_event_ref": (
-                    event_refs[event_index]
-                    if isinstance(event_index, int) and 0 <= event_index < len(event_refs)
-                    else None
-                ),
+                "target_event_ref": target_event_ref,
                 "candidate_only": True,
             }
         )
@@ -296,10 +493,207 @@ def project_analysis_to_machine_dictionary(
             )
             for frame in analysis.get("event_frames", [])
         ]
-    return {
+    semantic_roles = {
+        name: _semantic_role_projection(role)
+        for name, role in (
+            (analysis.get("semantic_constraint_frame") or {}).get("roles") or {}
+        ).items()
+        if isinstance(role, dict)
+    }
+    semantic_events = [
+        _semantic_event_projection(
+            event,
+            index=index,
+            operator_refs=operator_refs,
+            semantic_index=semantic_index,
+        )
+        for index, event in enumerate(analysis.get("event_candidates", []))
+    ]
+    semantic_payload = {
+        "speech_act": speech_act,
+        "query_type": query_type,
+        "communication_contracts": {
+            "speech_act_ref": speech_act_ref,
+            "query_contract_ref": query_contract_ref,
+        },
+        "canonical_frame": {
+            "operators": list(operators),
+            "goal_relation": (analysis.get("canonical_frame") or {}).get(
+                "goal_relation"
+            ),
+            "destination_binding_policy": (
+                analysis.get("canonical_frame") or {}
+            ).get("destination_binding_policy"),
+            "speech_act": speech_act,
+            "query_type": query_type,
+        },
+        "role_bindings": {
+            name: _semantic_role_projection(role)
+            for name, role in (analysis.get("role_bindings") or {}).items()
+            if isinstance(role, dict)
+        },
+        "semantic_constraint_frame": {
+            "schema_version": (
+                analysis.get("semantic_constraint_frame") or {}
+            ).get("schema_version", "1.0.0"),
+            "roles": semantic_roles,
+            "attribute_predicates": deepcopy(
+                (analysis.get("semantic_constraint_frame") or {}).get(
+                    "attribute_predicates", []
+                )
+            ),
+            "unresolved_surfaces": deepcopy(
+                (analysis.get("semantic_constraint_frame") or {}).get(
+                    "unresolved_surfaces", []
+                )
+            ),
+            "evidence_boundary": deepcopy(
+                (analysis.get("semantic_constraint_frame") or {}).get(
+                    "evidence_boundary", {}
+                )
+            ),
+        },
+        "grounded_intent_frame": _grounding_projection(analysis),
+        "process_template_resolution": _process_resolution_projection(analysis),
+        "discourse_roles": {
+            name: {
+                key: deepcopy(role.get(key))
+                for key in (
+                    "reference",
+                    "relation",
+                    "physical_state_change_committed",
+                    "subject_role",
+                    "object_role",
+                    "executor_retention",
+                    "task_correction",
+                )
+                if role.get(key) is not None
+            }
+            for name, role in (analysis.get("discourse_roles") or {}).items()
+            if isinstance(role, dict)
+        },
+        "event_candidates": semantic_events,
+        "reported_event_candidates": [
+            {
+                key: deepcopy(item.get(key))
+                for key in (
+                    "event_type",
+                    "operator",
+                    "candidate_postcondition",
+                    "evidence_source",
+                    "physical_state_change_committed",
+                )
+                if item.get(key) is not None
+            }
+            for item in analysis.get("reported_event_candidates", [])
+        ],
+        "historical_event_constraints": [
+            {
+                key: deepcopy(item.get(key))
+                for key in (
+                    "operator",
+                    "temporal_scope",
+                    "relation",
+                    "head_role",
+                    "actor_reference",
+                    "theme",
+                )
+                if item.get(key) is not None
+            }
+            for item in analysis.get("historical_event_constraints", [])
+        ],
+        "event_frames": [
+            {
+                **deepcopy(item.get("semantic_payload") or {}),
+                "frame_ref": str(
+                    (analysis.get("event_frames", [])[index] or {}).get(
+                        "frame_id"
+                    )
+                    or f"dictionary_frame_{index}"
+                ),
+                "incoming_discourse_relation": (
+                    analysis.get("event_frames", [])[index] or {}
+                ).get("incoming_discourse_relation"),
+                "discourse_polarity": (
+                    analysis.get("event_frames", [])[index] or {}
+                ).get("discourse_polarity", "asserted"),
+            }
+            for index, item in enumerate(event_frame_projections)
+        ],
+        "discourse_event_graph": {
+            "edges": deepcopy(scope_graph.get("discourse_edges") or [])
+        },
+        "modifier_contract": {
+            "contract_id": (analysis.get("modifier_contract") or {}).get(
+                "contract_id"
+            ),
+            "modifiers": [
+                {
+                    "dictionary_entry_ref": _dictionary_modifier_ref(
+                        modifier, semantic_index
+                    ),
+                    **{
+                        key: deepcopy(modifier.get(key))
+                        for key in (
+                            "dimension",
+                            "value",
+                            "scope",
+                            "event_index",
+                            "basis",
+                            "runtime_fact_committed",
+                            "direct_execution_allowed",
+                        )
+                    },
+                }
+                for modifier in (
+                    analysis.get("modifier_contract") or {}
+                ).get("modifiers", [])
+            ],
+            "conflicts": deepcopy(
+                (analysis.get("modifier_contract") or {}).get("conflicts", [])
+            ),
+            "inquiry_contract": deepcopy(
+                (analysis.get("modifier_contract") or {}).get(
+                    "inquiry_contract"
+                )
+            ),
+            "execution_constraints": deepcopy(
+                (analysis.get("modifier_contract") or {}).get(
+                    "execution_constraints", {}
+                )
+            ),
+            "evidence_boundary": deepcopy(
+                (analysis.get("modifier_contract") or {}).get(
+                    "evidence_boundary", {}
+                )
+            ),
+        },
+        "reference_resolution": {
+            key: deepcopy(
+                (analysis.get("reference_resolution") or {}).get(key)
+            )
+            for key in (
+                "resolution_id",
+                "resolved_references",
+                "unresolved",
+                "inquiry_contracts",
+                "salience_projection",
+                "evidence_boundary",
+            )
+        },
+        "rule_evaluation": deepcopy(analysis.get("rule_evaluation") or {}),
+        "unresolved_slots": list(analysis.get("unresolved_slots") or []),
+        "recovery_context_projection": deepcopy(
+            analysis.get("recovery_context_projection")
+        ),
+        "candidate_only": True,
+        "runtime_fact_committed": False,
+    }
+    result = {
         "schema_version": "1.0.0",
         "projection_kind": "MachineDictionaryProjection",
         "mode": "shadow_equivalence_migration",
+        "world_revision": world_revision,
         "dictionary_ref": dictionary.get("dictionary_id"),
         "operator_refs": operator_refs,
         "operator_semantics": operators,
@@ -327,6 +721,7 @@ def project_analysis_to_machine_dictionary(
         "unresolved_polysemy_count": len(unresolved_polysemy),
         "interpretation_lattice": lattice,
         "event_frame_projections": event_frame_projections,
+        "semantic_payload": semantic_payload,
         "all_event_frames_admissible": all(
             (item.get("interpretation_lattice") or {}).get("status") == "resolved"
             and not item.get("unresolved_variables")
@@ -340,6 +735,13 @@ def project_analysis_to_machine_dictionary(
         "downstream_surface_reparse_allowed": False,
         "runtime_fact_committed": False,
     }
+    projection_payload = json.dumps(
+        result, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )
+    result["projection_id"] = "dictionary_projection_" + hashlib.sha1(
+        projection_payload.encode("utf-8")
+    ).hexdigest()[:16]
+    return result
 
 
 _CONTEXTUAL_COMMUNICATION_MAP = {

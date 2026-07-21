@@ -34,6 +34,10 @@ from concept_core.dictionary_frontend import (
 from concept_core.dictionary_equivalence import (
     build_dictionary_equivalence_receipt,
 )
+from concept_core.dictionary_authority import (
+    build_dictionary_authority_admission,
+    invalidate_dictionary_authority_admission,
+)
 from concept_core.rcir_dialogue_realizer import realize_rcir_dialogue
 from concept_core.contextual_affordance import resolve_contextual_affordance_request
 from concept_core.context_projection import build_context_projection, compact_intent_capsule
@@ -50,9 +54,9 @@ from concept_core.semantic_grounding import (
     ground_semantic_role,
 )
 from concept_core.situated_event_reasoning import (
-    compile_situated_event_frame,
     create_hierarchical_intent_graph,
     facts_from_runtime_state,
+    project_situated_event_frame_from_rcir,
     record_verified_fact as record_intent_verified_fact,
 )
 from concept_core.task_horizon import classify_execution_horizon
@@ -807,6 +811,34 @@ def _append_rcir_receipt(
         del receipts[:-16]
 
 
+def _invalidate_stale_semantic_authority(session: dict[str, Any]) -> None:
+    current_revision = int(session.get("world_revision", 0))
+    understanding = session.get("last_language_understanding") or {}
+    admission = understanding.get("dictionary_authority_admission") or {}
+    if admission and admission.get("world_revision") != current_revision:
+        invalidated = invalidate_dictionary_authority_admission(
+            admission, current_world_revision=current_revision
+        )
+        session["last_invalidated_dictionary_authority_admission"] = invalidated
+        history = session.setdefault(
+            "dictionary_authority_invalidation_history", []
+        )
+        if not history or history[-1].get("admission_id") != invalidated.get(
+            "admission_id"
+        ):
+            history.append(deepcopy(invalidated))
+        if len(history) > 64:
+            del history[:-64]
+    current_rcir = session.get("current_rcir") or {}
+    if current_rcir and current_rcir.get("world_revision") != current_revision:
+        _append_rcir_receipt(
+            session,
+            current_rcir,
+            "semantic_authority_invalidated_by_world_revision_change",
+        )
+        session["current_rcir"] = None
+
+
 def _held_effector(session: dict[str, Any], object_ref: str) -> str | None:
     return next((channel for channel, ref in _holding_by_effector(session).items() if ref == object_ref), None)
 
@@ -900,6 +932,9 @@ def start_session(executor_profile_id: str = "home_mobile_manipulator", scene_id
         "dialogue_focus_entities": [],
         "last_language_understanding": None,
         "machine_dictionary_equivalence_history": [],
+        "dictionary_authority_admission_history": [],
+        "dictionary_authority_invalidation_history": [],
+        "last_invalidated_dictionary_authority_admission": None,
         "last_communicative_dictionary_projection": None,
         "communicative_dictionary_projection_history": [],
         "current_observation_evidence": None,
@@ -1146,6 +1181,11 @@ def _create_transfer_intent(
 ) -> dict[str, Any] | None:
     normalized = re.sub(r"[，。！？、,.!?\s]+", "", utterance)
     transfer_tokens = ("放到", "放在", "摆到", "摆在", "搁到", "搁在", "移到", "搬到", "挪到")
+    semantic_place_request = "place_object" in set(
+        ((language_analysis or {}).get("canonical_frame") or {}).get(
+            "operators", []
+        )
+    )
     semantic_restore = bool(
         ((language_analysis or {}).get("modifiers") or {}).get(
             "restore_prior_relation"
@@ -1158,7 +1198,11 @@ def _create_transfer_intent(
     restore_requested = semantic_restore or any(
         token in normalized for token in ("放回", "放回去", "放回原处", "还回去")
     )
-    if not restore_requested and not any(token in normalized for token in transfer_tokens):
+    if (
+        not semantic_place_request
+        and not restore_requested
+        and not any(token in normalized for token in transfer_tokens)
+    ):
         return None
     concepts = load_object_concepts()["concepts"]
     process_resolution = (language_analysis or {}).get("process_template_resolution") or {}
@@ -1481,6 +1525,9 @@ def _water_delivery_goal_semantics(
     """Compose a service goal from effects and roles, independent of word order."""
     normalized = re.sub(r"[，。！？、,.!?\s]+", "", utterance)
     analysis = language_analysis or {}
+    canonical_goal = (analysis.get("canonical_frame") or {}).get(
+        "goal_relation"
+    )
     operators = {
         item.get("operator")
         for item in analysis.get("event_candidates", [])
@@ -1521,6 +1568,12 @@ def _water_delivery_goal_semantics(
     water_effect_requested = "fill_container" in operators or any(token in normalized for token in ("接水", "取水", "倒水", "装水", "盛水", "续水", "续满", "一杯水")) or bool(
         re.search(r"(?:接|取|倒|装)(?:一)?杯水", normalized)
     )
+    if canonical_goal in {
+        "container_filled",
+        "human_received_filled_container",
+        "filled_container_supported_at_destination",
+    }:
+        water_effect_requested = True
     if omitted_content and recent_water_goal:
         water_effect_requested = True
     repeated_service_after_consumption = bool(
@@ -1542,6 +1595,8 @@ def _water_delivery_goal_semantics(
         or bool(recent_water_goal and omitted_content)
         or repeated_service_after_consumption
     )
+    if canonical_goal == "human_received_filled_container":
+        transfer_relation_requested = True
     recipients = [
         item for item in session["runtime_objects"]
         if item.get("active") is not False and item.get("kind") == "human_recipient"
@@ -1562,6 +1617,10 @@ def _water_delivery_goal_semantics(
         or repeated_service_after_consumption
     )
     placement_relation_requested = any(token in normalized for token in ("放到", "放在", "摆到", "摆在", "搁到", "搁在"))
+    if canonical_goal == "human_received_filled_container":
+        recipient_role_requested = True
+    if canonical_goal == "filled_container_supported_at_destination":
+        placement_relation_requested = True
     support_concepts = [
         concept for concept in load_object_concepts()["concepts"]
         if "support_object" in concept.get("functional_affordances", [])
@@ -2847,6 +2906,7 @@ def get_session(session_id: str) -> dict[str, Any]:
     session = SESSIONS.get(session_id)
     if not session:
         return {"error": "embodied_session_not_found", "session_id": session_id}
+    _invalidate_stale_semantic_authority(session)
     _refresh_authoritative_world_fact_ledger(
         session, reason="public_session_snapshot_requested"
     )
@@ -3403,6 +3463,7 @@ def _compose_session_language(
     utterance: str,
     grounded_role_bindings: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    _invalidate_stale_semantic_authority(session)
     analysis = compose_language_concepts(
         utterance,
         event_concepts=FACTORY_EVENT_CONCEPT_UNITS,
@@ -3677,6 +3738,56 @@ def _compose_session_language(
             world_revision=int(session.get("world_revision", 0)),
         )
     )
+    analysis["dictionary_authority_admission"] = (
+        build_dictionary_authority_admission(
+            analysis,
+            analysis["machine_dictionary_projection"],
+            analysis["machine_dictionary_equivalence"],
+            world_revision=int(session.get("world_revision", 0)),
+        )
+    )
+    rule_semantic_input = deepcopy(
+        analysis["dictionary_authority_admission"]["semantic_input"]
+    )
+    rule_semantic_input["role_bindings"] = deepcopy(
+        analysis.get("role_bindings") or {}
+    )
+    rule_evaluation = evaluate_runtime_rules(
+        rule_semantic_input,
+        session.get("runtime_objects", []),
+        session.get("executor_profile", {}),
+        world_revision=int(session.get("world_revision", 0)),
+    )
+    rule_evaluation["semantic_source_kind"] = analysis[
+        "dictionary_authority_admission"
+    ]["authoritative_semantic_source"]
+    rule_evaluation["dictionary_ref"] = analysis[
+        "dictionary_authority_admission"
+    ].get("dictionary_ref")
+    rule_evaluation["legacy_semantic_fields_read"] = False
+    analysis["rule_evaluation"] = rule_evaluation
+    analysis["machine_dictionary_projection"] = (
+        project_analysis_to_machine_dictionary(
+            str(analysis.get("normalized_utterance") or ""),
+            analysis,
+            world_revision=int(session.get("world_revision", 0)),
+        )
+    )
+    analysis["machine_dictionary_equivalence"] = (
+        build_dictionary_equivalence_receipt(
+            analysis,
+            analysis["machine_dictionary_projection"],
+            world_revision=int(session.get("world_revision", 0)),
+        )
+    )
+    analysis["dictionary_authority_admission"] = (
+        build_dictionary_authority_admission(
+            analysis,
+            analysis["machine_dictionary_projection"],
+            analysis["machine_dictionary_equivalence"],
+            world_revision=int(session.get("world_revision", 0)),
+        )
+    )
     equivalence_history = session.setdefault(
         "machine_dictionary_equivalence_history", []
     )
@@ -3685,25 +3796,23 @@ def _compose_session_language(
     )
     if len(equivalence_history) > 64:
         del equivalence_history[:-64]
-    rule_evaluation = evaluate_runtime_rules(
-        analysis,
-        session.get("runtime_objects", []),
-        session.get("executor_profile", {}),
-        world_revision=int(session.get("world_revision", 0)),
+    admission_history = session.setdefault(
+        "dictionary_authority_admission_history", []
     )
-    analysis["rule_evaluation"] = rule_evaluation
+    admission_history.append(
+        {
+            key: deepcopy(analysis["dictionary_authority_admission"].get(key))
+            for key in analysis["dictionary_authority_admission"]
+            if key != "semantic_input"
+        }
+    )
+    if len(admission_history) > 64:
+        del admission_history[:-64]
     session["last_rule_evaluation"] = deepcopy(rule_evaluation)
     rule_history = session.setdefault("rule_evaluation_history", [])
     rule_history.append(deepcopy(rule_evaluation))
     if len(rule_history) > 16:
         del rule_history[:-16]
-    situated_frame = compile_situated_event_frame(
-        utterance,
-        analysis,
-        current_facts=context_projection["current_world_facts"],
-        recent_episodes=context_projection["recent_episode_capsules"],
-    )
-    analysis["situated_event_frame"] = situated_frame
     rcir = compile_rcir_bundle(
         utterance,
         analysis,
@@ -3720,6 +3829,12 @@ def _compose_session_language(
     session["current_rcir"] = deepcopy(rcir)
     session["world_fact_ledger"] = deepcopy(rcir["world_fact_ledger"])
     analysis["rcir"] = rcir
+    situated_frame = project_situated_event_frame_from_rcir(
+        rcir,
+        current_facts=context_projection["current_world_facts"],
+        recent_episodes=context_projection["recent_episode_capsules"],
+    )
+    analysis["situated_event_frame"] = situated_frame
     entity_labels = {
         str(item.get("entity_id")): str(item.get("label") or item.get("entity_id"))
         for item in session.get("runtime_objects", [])
@@ -3761,6 +3876,7 @@ def _compose_session_language(
             "world_revision": session["world_revision"],
             "runtime_fact_committed": False,
         })
+    _apply_authoritative_semantic_runtime_view(analysis)
     session["last_language_understanding"] = _language_understanding_view(analysis)
     grounded_focus = [
         result.get("binding")
@@ -3809,6 +3925,150 @@ def _compose_session_language(
     return analysis
 
 
+def _apply_authoritative_semantic_runtime_view(
+    analysis: dict[str, Any]
+) -> None:
+    admission = analysis.get("dictionary_authority_admission") or {}
+    semantic_input = admission.get("semantic_input") or {}
+    if not semantic_input:
+        raise AssertionError("runtime_semantic_input_missing")
+    semantic_fields = (
+        "speech_act",
+        "query_type",
+        "canonical_frame",
+        "role_bindings",
+        "semantic_constraint_frame",
+        "discourse_roles",
+        "event_candidates",
+        "reported_event_candidates",
+        "historical_event_constraints",
+        "event_frames",
+        "discourse_event_graph",
+        "modifier_contract",
+        "reference_resolution",
+        "rule_evaluation",
+        "unresolved_slots",
+        "recovery_context_projection",
+    )
+    for field in semantic_fields:
+        if field in semantic_input:
+            analysis[field] = deepcopy(semantic_input[field])
+    authoritative_bindings = (
+        ((analysis.get("rcir") or {}).get("grounded_causal_graph") or {}).get(
+            "role_bindings"
+        )
+        or {}
+    )
+    for role, binding in authoritative_bindings.items():
+        if binding.get("status") != "resolved" or not binding.get("entity_ref"):
+            continue
+        role_view = analysis.setdefault("role_bindings", {}).setdefault(
+            role, {"role": role}
+        )
+        role_view["entity_ref"] = binding["entity_ref"]
+        role_view["value_ref"] = binding["entity_ref"]
+        role_view["world_revision"] = binding.get("world_revision")
+        binding_evidence = deepcopy(binding.get("evidence") or {})
+        # Keep the legacy read-only label as a projection of the RCIR basis;
+        # it is not a second evidence source.
+        if binding_evidence.get("basis") and not binding_evidence.get("evidence"):
+            binding_evidence["evidence"] = binding_evidence["basis"]
+        role_view["binding_evidence"] = binding_evidence
+    _reconcile_process_resolution_with_rcir(analysis, authoritative_bindings)
+    analysis["runtime_semantic_source"] = admission.get(
+        "authoritative_semantic_source"
+    )
+    analysis["runtime_semantic_authority_ref"] = admission.get("admission_id")
+    analysis["legacy_semantic_fields_read_below_admission"] = False
+    analysis["surface_text_reparsed_below_admission"] = False
+
+
+def _reconcile_process_resolution_with_rcir(
+    analysis: dict[str, Any],
+    authoritative_bindings: dict[str, Any],
+) -> None:
+    resolution = analysis.get("process_template_resolution")
+    if not isinstance(resolution, dict) or not resolution.get("template_id"):
+        return
+    resolved_refs = {
+        role: binding.get("entity_ref")
+        for role, binding in authoritative_bindings.items()
+        if binding.get("status") == "resolved" and binding.get("entity_ref")
+    }
+    if not resolved_refs:
+        return
+    process_bindings = resolution.setdefault("bindings", {})
+    for slot in resolution.get("slot_results", []):
+        role = slot.get("slot_id")
+        entity_ref = resolved_refs.get(role)
+        if not entity_ref:
+            continue
+        candidate = next(
+            (
+                item
+                for item in slot.get("candidates", [])
+                if item.get("value_ref") == entity_ref
+            ),
+            None,
+        ) or {
+            "value_ref": entity_ref,
+            "explicit": True,
+            "evidence": "authoritative_rcir_role_binding",
+            "evidence_strength": int(
+                (authoritative_bindings[role].get("evidence") or {}).get(
+                    "strength", 0
+                )
+            ),
+            "observation_world_revision": analysis.get(
+                "runtime_semantic_world_revision",
+                (analysis.get("rcir") or {}).get("world_revision"),
+            ),
+        }
+        slot["status"] = "bound"
+        slot["bound_value"] = deepcopy(candidate)
+        process_bindings[role] = deepcopy(candidate)
+    open_slots = [
+        item
+        for item in resolution.get("slot_results", [])
+        if item.get("status") != "bound"
+    ]
+    if not open_slots:
+        if resolution.get("status") == "unsafe_switch":
+            resolution["surface_text_reparsed_for_reconciliation"] = False
+            return
+        mapping_confirmation_pending = bool(
+            resolution.get("status") == "template_confirmation_required"
+            or (resolution.get("template_candidate") or {}).get(
+                "requires_human_confirmation"
+            )
+        )
+        if mapping_confirmation_pending:
+            resolution["status"] = "template_confirmation_required"
+            resolution["next_gap"] = {
+                "kind": "template_mapping",
+                "template_id": resolution.get("template_id"),
+                "novel_surface": (
+                    resolution.get("template_candidate") or {}
+                ).get("novel_surface"),
+            }
+            resolution["surface_text_reparsed_for_reconciliation"] = False
+            return
+        resolution["next_gap"] = None
+        resolution["question"] = None
+        producible = any(
+            item.get("status") == "producible_subgoal"
+            for item in resolution.get("precondition_results", [])
+        )
+        resolution["status"] = "subgoals_required" if producible else "ready"
+        resolution["binding_authority_ref"] = (
+            analysis.get("runtime_semantic_authority_ref")
+            or ((analysis.get("rcir") or {}).get("semantic_authority") or {}).get(
+                "admission_id"
+            )
+        )
+        resolution["surface_text_reparsed_for_reconciliation"] = False
+
+
 def _language_understanding_view(analysis: dict[str, Any]) -> dict[str, Any]:
     return {
         "speech_act": analysis.get("speech_act"),
@@ -3834,6 +4094,9 @@ def _language_understanding_view(analysis: dict[str, Any]) -> dict[str, Any]:
         ),
         "machine_dictionary_equivalence": deepcopy(
             analysis.get("machine_dictionary_equivalence")
+        ),
+        "dictionary_authority_admission": deepcopy(
+            analysis.get("dictionary_authority_admission")
         ),
         "communicative_dictionary_projection": deepcopy(
             analysis.get("communicative_dictionary_projection")
@@ -4360,21 +4623,7 @@ def _dispatch_compound_subtask(session: dict[str, Any]) -> dict[str, Any] | None
                     "session": get_session(session["session_id"]),
                 }
         else:
-            grounded_roles = {
-                role: entity_ref
-                for role, entity_ref in {
-                    "theme": subtask.get("explicit_theme_ref"),
-                    "destination": subtask.get("explicit_destination_ref"),
-                    "recipient": subtask.get("explicit_recipient_ref"),
-                }.items()
-                if entity_ref
-            }
-            started = begin_motion_command(
-                session["session_id"],
-                subtask["utterance"],
-                grounded_role_bindings=grounded_roles,
-                compound_dispatch=True,
-            )
+            started = _dispatch_structured_compound_subtask(session, subtask)
     finally:
         session = SESSIONS.get(session["session_id"], session)
         live_sequence = session.get("compound_command_sequence") or sequence
@@ -4411,6 +4660,122 @@ def _dispatch_compound_subtask(session: dict[str, Any]) -> dict[str, Any] | None
         operators=subtask.get("operators", []),
         explicit_theme_ref=subtask.get("explicit_theme_ref"),
     )
+    return started
+
+
+def _dispatch_structured_compound_subtask(
+    session: dict[str, Any], subtask: dict[str, Any]
+) -> dict[str, Any]:
+    frame = deepcopy(subtask.get("semantic_frame") or {})
+    if not frame:
+        return {
+            "status": "compound_semantic_frame_missing",
+            "runtime_fact_committed": False,
+            "session": get_session(session["session_id"]),
+        }
+    if not isinstance(frame.get("process_template_resolution"), dict):
+        frame["process_template_resolution"] = {}
+    bindings = frame["process_template_resolution"].setdefault("bindings", {})
+    explicit_roles = {
+        "theme": subtask.get("explicit_theme_ref"),
+        "destination": subtask.get("explicit_destination_ref"),
+        "recipient": subtask.get("explicit_recipient_ref"),
+    }
+    for role, entity_ref in explicit_roles.items():
+        if not entity_ref:
+            continue
+        bindings[role] = {
+            "value_ref": entity_ref,
+            "explicit": True,
+            "evidence": "parent_rcir_scoped_role_binding",
+            "evidence_strength": 700,
+            "observation_world_revision": session.get("world_revision"),
+        }
+        frame.setdefault("role_bindings", {}).setdefault(role, {})[
+            "entity_ref"
+        ] = entity_ref
+    operators = set((frame.get("canonical_frame") or {}).get("operators", []))
+    if len(operators) == 1:
+        frame["process_template_resolution"].setdefault(
+            "template_id", next(iter(operators))
+        )
+        frame["process_template_resolution"].setdefault("status", "ready")
+    binding_overrides = {
+        role: entity_ref
+        for role, entity_ref in explicit_roles.items()
+        if entity_ref
+    }
+    current_resolution = resolve_process_request(
+        "",
+        frame,
+        runtime_objects=session.get("runtime_objects", []),
+        runtime_state=session.get("state", {}),
+        semantic_regions=_scene_for_session(session).get("semantic_regions", []),
+        executor_profile=session.get("executor_profile", {}),
+        world_revision=int(session.get("world_revision", 0)),
+        binding_overrides=binding_overrides,
+        evidence_bindings=_process_slot_evidence_bindings(session, frame),
+    )
+    if current_resolution:
+        frame["process_template_resolution"] = current_resolution
+        if current_resolution.get("status") in {
+            "clarification_required",
+            "unsafe_switch",
+            "template_confirmation_required",
+        }:
+            result = _start_process_gap_dialogue(
+                session,
+                source_utterance=f"semantic_subtask:{subtask.get('subtask_id')}",
+                language_analysis=frame,
+                resolution=current_resolution,
+            )
+            result["semantic_authority_ref"] = subtask.get(
+                "semantic_authority_ref"
+            )
+            result["surface_text_reparsed"] = False
+            result["session"] = get_session(session["session_id"])
+            return result
+    rule_evaluation = evaluate_runtime_rules(
+        frame,
+        session.get("runtime_objects", []),
+        session.get("executor_profile", {}),
+        world_revision=int(session.get("world_revision", 0)),
+    )
+    if rule_evaluation.get("status") == "blocked":
+        return {
+            "status": "rule_blocked_execution",
+            "reason": "structured_compound_subtask_blocked_by_p018",
+            "rule_evaluation": rule_evaluation,
+            "runtime_fact_committed": False,
+            "session": get_session(session["session_id"]),
+        }
+    source_ref = f"semantic_subtask:{subtask.get('subtask_id')}"
+    intent = None
+    if "place_object" in operators:
+        intent = _create_transfer_intent(session, source_ref, frame)
+    elif "fill_container" in operators:
+        intent = _create_water_delivery_intent(session, source_ref, frame)
+        if intent is None:
+            intent = _create_water_placement_intent(session, source_ref, frame)
+    elif "handover_object" in operators:
+        intent = _create_object_handover_intent(session, source_ref, frame)
+    elif "transport_object" in operators:
+        intent = _create_transport_intent(session, source_ref, frame)
+    if intent is None:
+        return {
+            "status": "compound_structured_intent_not_compilable",
+            "operators": sorted(operators),
+            "semantic_authority_ref": subtask.get("semantic_authority_ref"),
+            "runtime_fact_committed": False,
+            "session": get_session(session["session_id"]),
+        }
+    intent["source_semantic_frame_ref"] = subtask.get("source_frame_ref")
+    intent["source_semantic_authority_ref"] = subtask.get(
+        "semantic_authority_ref"
+    )
+    intent["surface_text_reparsed_for_subtask"] = False
+    started = _prepare_long_intent_stage(session, intent)
+    started["session"] = get_session(session["session_id"])
     return started
 
 
@@ -4577,7 +4942,7 @@ def _compile_compound_subtasks(
             subtasks.append({
                 "subtask_id": f"{sequence_id}:{subtask_index}",
                 "subtask_kind": "payload_carrier_delivery",
-                "utterance": analysis.get("utterance")
+                "utterance": f"semantic_subtask:{sequence_id}:{subtask_index}"
                 or f"{frame['utterance']}，{next_frame['utterance']}",
                 "operators": ["fill_container", "place_object", "transport_object", "handover_object"],
                 "goal_relation": (
@@ -4616,15 +4981,45 @@ def _compile_compound_subtasks(
             index += 3 if following_is_delivery_tail else 2
             continue
         subtask_index = len(subtasks)
+        explicit_theme_ref = _event_frame_bound_ref(frame)
+        explicit_destination_ref = _event_frame_bound_ref(frame, "destination")
+        historical_binding_evidence = None
+        if not explicit_destination_ref and explicit_theme_ref:
+            historical_source_requested = any(
+                item.get("operator") == "grasp_object"
+                and item.get("relation") == "source_support_of_verified_event"
+                and item.get("head_role") == "destination"
+                for item in frame.get("historical_event_constraints", [])
+            )
+            if historical_source_requested:
+                episode = _query_recent_support_episode(
+                    session, explicit_theme_ref
+                )
+                explicit_destination_ref = (episode or {}).get(
+                    "destination_ref"
+                )
+                if explicit_destination_ref:
+                    historical_binding_evidence = {
+                        "basis": "verified_event_source_support_role",
+                        "episode_ref": (episode or {}).get("episode_id"),
+                        "world_revision": session.get("world_revision"),
+                        "current_world_revalidation_required": True,
+                        "physical_fact_committed": False,
+                    }
         subtasks.append({
             "subtask_id": f"{sequence_id}:{subtask_index}",
             "subtask_kind": "ordinary_event",
-            "utterance": frame["utterance"],
+            "source_frame_ref": frame.get("frame_ref"),
+            "semantic_frame": deepcopy(frame),
+            "semantic_authority_ref": analysis.get(
+                "runtime_semantic_authority_ref"
+            ),
             "operators": deepcopy((frame.get("canonical_frame") or {}).get("operators", [])),
             "goal_relation": (frame.get("canonical_frame") or {}).get("goal_relation"),
-            "explicit_theme_ref": _event_frame_bound_ref(frame),
-            "explicit_destination_ref": _event_frame_bound_ref(frame, "destination"),
+            "explicit_theme_ref": explicit_theme_ref,
+            "explicit_destination_ref": explicit_destination_ref,
             "explicit_recipient_ref": _event_frame_bound_ref(frame, "recipient"),
+            "historical_binding_evidence": historical_binding_evidence,
             "depends_on": [subtasks[-1]["subtask_id"]] if subtasks else [],
             "status": "pending",
             "intent_id": None,
@@ -5086,13 +5481,7 @@ def _historical_support_reference_candidate(
             ),
             None,
         )
-        theme_name = (
-            theme.get("matched_alias")
-            or theme.get("label")
-            or theme.get("display_name")
-        )
-        if not theme_name:
-            return None
+        theme_name = reference.get("label") or reference.get("entity_id")
         candidate_analysis = deepcopy(analysis)
         candidate_analysis["canonical_utterance"] = (
             f"把{theme_name}放到{destination['label']}" if destination else None
@@ -5129,6 +5518,29 @@ def _historical_support_reference_candidate(
         and "graspable" in item.get("functional_affordances", [])
     ]
     if len(reference_mentions) != 1:
+        # Historical relational clauses may carry the referenced object only
+        # in the typed event constraint, not as a second lexical mention.
+        # Recover that role from the current snapshot; never infer a physical
+        # fact from the category alone.
+        constraint_theme = next(
+            (
+                item.get("theme")
+                for item in historical_destination_constraints
+                if item.get("theme")
+            ),
+            None,
+        )
+        if constraint_theme:
+            reference_mentions = [
+                {
+                    "concept_id": None,
+                    "compatible_kinds": constraint_theme.get("compatible_kinds", []),
+                    "functional_affordances": ["graspable"],
+                    "matched_alias": constraint_theme.get("label")
+                    or constraint_theme.get("matched_alias"),
+                }
+            ]
+    if len(reference_mentions) != 1:
         return None
     reference_concept = reference_mentions[0]
     reference_entities = [
@@ -5151,7 +5563,19 @@ def _historical_support_reference_candidate(
         (item for item in session["runtime_objects"] if item.get("entity_id") == destination_ref),
         None,
     )
-    theme_name = theme.get("matched_alias") or theme.get("label") or theme.get("display_name")
+    theme_name = (
+        theme.get("matched_alias")
+        or theme.get("label")
+        or theme.get("display_name")
+        or next(
+            (
+                item.get("matched_alias") or item.get("display_name")
+                for item in analysis.get("entity_mentions", [])
+                if item.get("concept_id") == theme_concept_id
+            ),
+            None,
+        )
+    )
     if not theme_name:
         return None
     if destination and destination.get("kind") != "operation_surface":
@@ -5251,6 +5675,7 @@ def _start_role_clarification(
     session: dict[str, Any],
     *,
     source_utterance: str,
+    source_language_analysis: dict[str, Any],
     role: str,
     concept_id: str | None,
     options: list[dict[str, Any]],
@@ -5259,6 +5684,7 @@ def _start_role_clarification(
     dialogue = {
         "status": "awaiting_role_value",
         "source_utterance": source_utterance,
+        "source_language_analysis": deepcopy(source_language_analysis),
         "role": role,
         "concept_id": concept_id,
         "candidate_options": deepcopy(options),
@@ -5270,16 +5696,299 @@ def _start_role_clarification(
     return dialogue
 
 
+def _resume_structured_dialogue_analysis(
+    session: dict[str, Any],
+    source_analysis: dict[str, Any],
+    *,
+    source_ref: str,
+    structured_role_refs: dict[str, str | None] | None = None,
+    confirmed_template_id: str | None = None,
+) -> dict[str, Any]:
+    """Resume an admitted meaning without sending generated text to the parser."""
+    analysis = deepcopy(source_analysis)
+    if not analysis:
+        raise AssertionError("structured_dialogue_resume_requires_source_analysis")
+    _invalidate_stale_semantic_authority(session)
+    role_refs = {
+        role: entity_ref
+        for role, entity_ref in (structured_role_refs or {}).items()
+        if entity_ref
+    }
+    for role, entity_ref in role_refs.items():
+        binding = _structured_role_binding(session, role, str(entity_ref))
+        if not binding:
+            raise AssertionError("structured_dialogue_resume_entity_not_current")
+        analysis.setdefault("role_bindings", {})[role] = deepcopy(binding)
+        analysis.setdefault("canonical_frame", {}).setdefault("roles", {})[
+            role
+        ] = deepcopy(binding)
+    if confirmed_template_id:
+        template_contracts = {
+            "grasp_object": ("factory_event_grasp", "object_in_gripper"),
+            "place_object": (
+                "factory_event_place",
+                "object_supported_at_destination",
+            ),
+            "handover_object": (
+                "factory_event_handover",
+                "object_received_by_recipient",
+            ),
+            "transport_object": (
+                "factory_event_transport",
+                "object_at_target_region",
+            ),
+        }
+        concept_id, goal_relation = template_contracts[confirmed_template_id]
+        analysis["speech_act"] = "task_request"
+        canonical_frame = analysis.setdefault("canonical_frame", {})
+        canonical_frame["speech_act"] = "task_request"
+        canonical_frame["operators"] = [confirmed_template_id]
+        canonical_frame["goal_relation"] = goal_relation
+        analysis["event_candidates"] = [{
+            "operator": confirmed_template_id,
+            "concept_id": concept_id,
+            "event_origin": "human_confirmed_process_template",
+            "candidate_only": True,
+            "runtime_fact_committed": False,
+        }]
+        analysis["unresolved_slots"] = [
+            item
+            for item in analysis.get("unresolved_slots", [])
+            if item
+            not in {
+                "event_or_query_concept_not_resolved",
+                "event_operator_not_resolved",
+            }
+        ]
+    existing_resolution = deepcopy(analysis.get("process_template_resolution") or {})
+    if confirmed_template_id:
+        existing_resolution["template_id"] = confirmed_template_id
+        if existing_resolution.get("template_candidate"):
+            existing_resolution["template_candidate"][
+                "requires_human_confirmation"
+            ] = False
+            existing_resolution["template_candidate"][
+                "human_confirmation_status"
+            ] = "confirmed"
+    process_bindings = existing_resolution.setdefault("bindings", {})
+    for role, entity_ref in role_refs.items():
+        process_bindings[role] = {
+            "value_ref": entity_ref,
+            "explicit": True,
+            "evidence": "human_confirmed_structured_dialogue_binding",
+            "evidence_strength": 700,
+            "observation_world_revision": session.get("world_revision"),
+        }
+    if existing_resolution.get("template_id"):
+        existing_resolution["status"] = "subgoals_required"
+        existing_resolution["next_gap"] = None
+        existing_resolution["candidate_only"] = True
+        existing_resolution["runtime_fact_committed"] = False
+        existing_resolution["direct_execution_allowed"] = False
+    analysis["process_template_resolution"] = existing_resolution
+    analysis["structured_dialogue_resume"] = {
+        "source_ref": source_ref,
+        "world_revision": session.get("world_revision"),
+        "surface_text_reparsed": False,
+        "generated_surface_text_used": False,
+        "role_refs": deepcopy(role_refs),
+        "confirmed_template_id": confirmed_template_id,
+    }
+    projection_source = f"structured_semantic_resume:{source_ref}"
+    analysis["machine_dictionary_projection"] = (
+        project_analysis_to_machine_dictionary(
+            projection_source,
+            analysis,
+            world_revision=int(session.get("world_revision", 0)),
+        )
+    )
+    analysis["machine_dictionary_equivalence"] = (
+        build_dictionary_equivalence_receipt(
+            analysis,
+            analysis["machine_dictionary_projection"],
+            world_revision=int(session.get("world_revision", 0)),
+        )
+    )
+    analysis["dictionary_authority_admission"] = (
+        build_dictionary_authority_admission(
+            analysis,
+            analysis["machine_dictionary_projection"],
+            analysis["machine_dictionary_equivalence"],
+            world_revision=int(session.get("world_revision", 0)),
+        )
+    )
+    rule_input = deepcopy(
+        analysis["dictionary_authority_admission"]["semantic_input"]
+    )
+    rule_input["role_bindings"] = deepcopy(analysis.get("role_bindings") or {})
+    rule_evaluation = evaluate_runtime_rules(
+        rule_input,
+        session.get("runtime_objects", []),
+        session.get("executor_profile", {}),
+        world_revision=int(session.get("world_revision", 0)),
+    )
+    rule_evaluation.update({
+        "semantic_source_kind": analysis["dictionary_authority_admission"][
+            "authoritative_semantic_source"
+        ],
+        "dictionary_ref": analysis["dictionary_authority_admission"].get(
+            "dictionary_ref"
+        ),
+        "legacy_semantic_fields_read": False,
+    })
+    analysis["rule_evaluation"] = rule_evaluation
+    analysis["machine_dictionary_projection"] = (
+        project_analysis_to_machine_dictionary(
+            projection_source,
+            analysis,
+            world_revision=int(session.get("world_revision", 0)),
+        )
+    )
+    analysis["machine_dictionary_equivalence"] = (
+        build_dictionary_equivalence_receipt(
+            analysis,
+            analysis["machine_dictionary_projection"],
+            world_revision=int(session.get("world_revision", 0)),
+        )
+    )
+    analysis["dictionary_authority_admission"] = (
+        build_dictionary_authority_admission(
+            analysis,
+            analysis["machine_dictionary_projection"],
+            analysis["machine_dictionary_equivalence"],
+            world_revision=int(session.get("world_revision", 0)),
+        )
+    )
+    current_facts = _authoritative_current_facts(
+        session, reason="structured_dialogue_resume_current_fact_pruning"
+    )
+    rcir = compile_rcir_bundle(
+        projection_source,
+        analysis,
+        current_facts=current_facts,
+        world_revision=int(session.get("world_revision", 0)),
+        interaction_turn=int(session.get("interaction_turn", 0)),
+        interaction_role_bindings=session.get("interaction_role_bindings", {}),
+    )
+    previous_rcir = session.get("current_rcir")
+    if previous_rcir and previous_rcir.get("bundle_id") != rcir.get("bundle_id"):
+        _append_rcir_receipt(
+            session, previous_rcir, "superseded_by_structured_dialogue_resume"
+        )
+    session["current_rcir"] = deepcopy(rcir)
+    session["world_fact_ledger"] = deepcopy(rcir["world_fact_ledger"])
+    analysis["rcir"] = rcir
+    _apply_authoritative_semantic_runtime_view(analysis)
+    operators = set((analysis.get("canonical_frame") or {}).get("operators", []))
+    intent = None
+    if rule_evaluation.get("status") != "blocked":
+        if "place_object" in operators:
+            intent = _create_transfer_intent(session, projection_source, analysis)
+        elif "handover_object" in operators:
+            intent = _create_object_handover_intent(
+                session, projection_source, analysis
+            )
+        elif "transport_object" in operators:
+            intent = _create_transport_intent(session, projection_source, analysis)
+        elif "fill_container" in operators:
+            intent = _create_water_delivery_intent(
+                session, projection_source, analysis
+            ) or _create_water_placement_intent(
+                session, projection_source, analysis
+            )
+    if intent:
+        result = _prepare_long_intent_stage(session, intent)
+        intent["source_semantic_authority_ref"] = (
+            analysis.get("runtime_semantic_authority_ref")
+            or ((analysis.get("rcir") or {}).get("semantic_authority") or {}).get(
+                "admission_id"
+            )
+        )
+        intent["dialogue_binding_reparsed_as_surface_text"] = False
+        result["session"] = get_session(session["session_id"])
+    elif "grasp_object" in operators and role_refs.get("theme"):
+        before_motion = deepcopy(session)
+        result = _build_object_relative_motion(
+            session,
+            {
+                "status": "contextual_affordance_available",
+                "available": True,
+                "entity_ref": role_refs["theme"],
+                "operator_candidate": "grasp_object",
+                "active_role": "theme",
+                "task_context": projection_source,
+                "scoped_authorization_present": False,
+                "grounding_basis": {
+                    "source": "admitted_structured_dialogue_resume",
+                    "world_revision": session.get("world_revision"),
+                    "surface_text_reparsed": False,
+                },
+            },
+            perf_counter_ns(),
+        )
+        result = _finalize_motion_result(
+            session["session_id"],
+            projection_source,
+            before_motion,
+            result,
+            None,
+        )
+    elif "navigate_to" in operators and (
+        role_refs.get("destination") or role_refs.get("target")
+    ):
+        destination_ref = role_refs.get("destination") or role_refs.get("target")
+        before_motion = deepcopy(session)
+        result = _build_object_relative_motion(
+            session,
+            {
+                "status": "contextual_affordance_available",
+                "available": True,
+                "entity_ref": destination_ref,
+                "operator_candidate": "navigate_near",
+                "active_role": "destination",
+                "task_context": projection_source,
+                "scoped_authorization_present": False,
+                "grounding_basis": {
+                    "source": "admitted_structured_dialogue_resume",
+                    "world_revision": session.get("world_revision"),
+                    "surface_text_reparsed": False,
+                },
+            },
+            perf_counter_ns(),
+        )
+        result = _finalize_motion_result(
+            session["session_id"],
+            projection_source,
+            before_motion,
+            result,
+            None,
+        )
+    else:
+        result = {
+            "status": "structured_semantic_resume_not_orchestratable",
+            "reason": "admitted_semantics_have_no_supported_intent_contract",
+            "language_understanding": _language_understanding_view(analysis),
+            "runtime_fact_committed": False,
+            "session": get_session(session["session_id"]),
+        }
+    result["structured_dialogue_resume"] = deepcopy(
+        analysis["structured_dialogue_resume"]
+    )
+    return result
+
+
 def _start_evidence_gap_clarification(
     session: dict[str, Any],
     *,
     source_utterance: str,
+    source_language_analysis: dict[str, Any],
     task_perception: dict[str, Any],
 ) -> dict[str, Any]:
     grounding = task_perception.get("concept_grounding", {})
     dialogue = {
         "status": "awaiting_evidence_gap_resolution",
         "source_utterance": source_utterance,
+        "source_language_analysis": deepcopy(source_language_analysis),
         "goal": deepcopy(task_perception.get("causal_preview", {})),
         "target_concept_id": task_perception.get("task_perception_frame", {}).get("target_concept_id"),
         "requested_constraints": deepcopy(task_perception.get("task_perception_frame", {}).get("target_constraints", {})),
@@ -5357,24 +6066,35 @@ def _continue_evidence_gap_clarification(session: dict[str, Any], utterance: str
             },
             "session": get_session(session["session_id"]),
         }
-    resolved_utterance = dialogue["source_utterance"]
-    for mention in dialogue.get("constraint_mentions", []):
-        observed_value = selected.get("observed_attributes", {}).get(mention.get("attribute"))
-        surface = mention.get("surface")
-        if not observed_value or not surface:
-            continue
-        replacement = COLOR_NAMES.get(observed_value, str(observed_value)) if mention.get("attribute") == "color" else str(observed_value)
-        resolved_utterance = resolved_utterance.replace(surface, replacement, 1)
+    source_analysis = deepcopy(dialogue.get("source_language_analysis") or {})
+    entity_ref = selected.get("entity_ref")
+    target_role = "theme" if "theme" in source_analysis.get("role_bindings", {}) else "target"
+    source_analysis.setdefault("human_confirmed_constraint_substitutions", []).append({
+        "role": target_role,
+        "entity_ref": entity_ref,
+        "requested_constraints": deepcopy(dialogue.get("requested_constraints")),
+        "accepted_observed_attributes": deepcopy(selected.get("observed_attributes", {})),
+        "world_revision": session.get("world_revision"),
+        "physical_fact_committed": False,
+    })
     session["evidence_gap_dialogue"] = None
-    resumed = begin_motion_command(session["session_id"], resolved_utterance)
+    resumed = _resume_structured_dialogue_analysis(
+        session,
+        source_analysis,
+        source_ref="evidence_gap_resolution",
+        structured_role_refs={target_role: entity_ref},
+    )
     resolution = {
         "status": "evidence_gap_resolved",
         "source_utterance": dialogue["source_utterance"],
-        "resolved_utterance": resolved_utterance,
+        "resolved_utterance": None,
         "requested_constraints": deepcopy(dialogue.get("requested_constraints")),
         "accepted_observed_attributes": deepcopy(selected.get("observed_attributes", {})),
         "entity_ref": selected.get("entity_ref"),
         "human_confirmed_substitution": True,
+        "surface_text_rewritten": False,
+        "surface_text_reparsed": False,
+        "semantic_resume_mode": "admitted_structured_analysis",
         "physical_fact_committed": False,
     }
     resumed["evidence_gap_resolution"] = deepcopy(resolution)
@@ -5535,8 +6255,19 @@ def _continue_process_gap_dialogue(session: dict[str, Any], utterance: str) -> d
         session["process_gap_dialogue"] = None
         if not canonical:
             return None
-        resumed = begin_motion_command(session["session_id"], canonical)
+        resumed = _resume_structured_dialogue_analysis(
+            session,
+            deepcopy(dialogue.get("source_language_analysis") or {}),
+            source_ref="process_template_confirmation",
+            structured_role_refs={
+                role: binding.get("value_ref")
+                for role, binding in (resolution.get("bindings") or {}).items()
+                if isinstance(binding, dict) and binding.get("value_ref")
+            },
+            confirmed_template_id=dialogue.get("template_id"),
+        )
         resumed["process_template_mapping_learned"] = deepcopy(learned_adapter)
+        resumed["surface_text_reparsed_for_template_confirmation"] = False
         if resumed.get("immediate_result"):
             resumed["immediate_result"]["process_template_mapping_learned"] = deepcopy(learned_adapter)
             resumed["immediate_result"]["prompt"] = (
@@ -5605,6 +6336,17 @@ def _continue_process_gap_dialogue(session: dict[str, Any], utterance: str) -> d
     if not updated:
         session["process_gap_dialogue"] = None
         return None
+    source_analysis["process_template_resolution"] = updated
+    source_rcir_bindings = (
+        ((source_analysis.get("rcir") or {}).get("grounded_causal_graph") or {}).get(
+            "role_bindings"
+        )
+        or {}
+    )
+    _reconcile_process_resolution_with_rcir(
+        source_analysis, source_rcir_bindings
+    )
+    updated = source_analysis["process_template_resolution"]
     dialogue["resolution"] = deepcopy(updated)
     if updated.get("status") in {"clarification_required", "unsafe_switch"}:
         dialogue["phase"] = "awaiting_slot_value"
@@ -5657,15 +6399,51 @@ def _continue_process_gap_dialogue(session: dict[str, Any], utterance: str) -> d
     # authorized an observed constraint substitute. Ordinary slot answers
     # resume the original request with version-bound EntityRef roles so an
     # entity display label cannot become a fresh lexical constraint.
-    resumed = (
-        begin_motion_command(
-            session["session_id"],
-            execution_utterance,
-            grounded_role_bindings=structured_role_refs,
-        )
-        if canonical
-        else None
+    for role, entity_ref in structured_role_refs.items():
+        source_analysis.setdefault("role_bindings", {}).setdefault(role, {})[
+            "entity_ref"
+        ] = entity_ref
+    source_analysis["process_template_resolution"] = deepcopy(updated)
+    rule_evaluation = evaluate_runtime_rules(
+        source_analysis,
+        session.get("runtime_objects", []),
+        session.get("executor_profile", {}),
+        world_revision=int(session.get("world_revision", 0)),
     )
+    operators = set(
+        (source_analysis.get("canonical_frame") or {}).get("operators", [])
+    )
+    source_ref = "dialogue_resolution:" + str(
+        dialogue.get("dialogue_id")
+        or (source_analysis.get("rcir") or {}).get("bundle_id")
+        or "process_gap"
+    )
+    intent = None
+    if rule_evaluation.get("status") != "blocked":
+        if "place_object" in operators:
+            intent = _create_transfer_intent(session, source_ref, source_analysis)
+        elif "handover_object" in operators:
+            intent = _create_object_handover_intent(
+                session, source_ref, source_analysis
+            )
+        elif "transport_object" in operators:
+            intent = _create_transport_intent(session, source_ref, source_analysis)
+        elif "fill_container" in operators:
+            intent = _create_water_delivery_intent(
+                session, source_ref, source_analysis
+            ) or _create_water_placement_intent(
+                session, source_ref, source_analysis
+            )
+    resumed = _prepare_long_intent_stage(session, intent) if intent else None
+    if resumed is not None:
+        intent["source_semantic_authority_ref"] = (
+            source_analysis.get("runtime_semantic_authority_ref")
+            or ((source_analysis.get("rcir") or {}).get("semantic_authority") or {}).get(
+                "admission_id"
+            )
+        )
+        intent["dialogue_binding_reparsed_as_surface_text"] = False
+        resumed["session"] = get_session(session["session_id"])
     if resumed is not None:
         gap_resolution = {
             "slot_id": gap.get("slot_id"),
@@ -5673,12 +6451,10 @@ def _continue_process_gap_dialogue(session: dict[str, Any], utterance: str) -> d
             "structured_role_refs": deepcopy(structured_role_refs),
             "canonical_utterance_for_explanation": canonical,
             "execution_utterance": execution_utterance,
-            "surface_text_rewritten": constraint_substitution_authorized,
-            "surface_rewrite_reason": (
-                "human_authorized_observed_constraint_substitution"
-                if constraint_substitution_authorized
-                else None
-            ),
+            "surface_text_rewritten": False,
+            "surface_rewrite_reason": None,
+            "execution_utterance_used_for_semantic_compilation": False,
+            "structured_constraint_substitution": constraint_substitution_authorized,
             "display_label_reparsed_as_constraint": False,
             "binding_authority": "structured_entity_refs_at_current_world_revision",
             "world_revision": session.get("world_revision"),
@@ -5779,55 +6555,26 @@ def _resume_role_clarification_choice(
     evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     label = choice.get("label") or choice.get("label_hint")
-    resolved_utterance = dialogue["source_utterance"]
     if dialogue.get("role") == "theme" and dialogue.get("evidence_source") == "current_world_container_candidates":
         session["pending_water_container_ref"] = choice.get("entity_ref")
     session["role_clarification_dialogue"] = None
-    if dialogue.get("role") == "theme" and dialogue.get("evidence_source") == "current_world_container_candidates":
-        # The human-selected entity is a structured binding. Resume the
-        # already understood service goal without reparsing it as a new task.
-        intent = _create_water_delivery_intent(session, dialogue["source_utterance"])
-        if intent:
-            resumed = _prepare_long_intent_stage(session, intent)
-            resumed["session"] = get_session(session["session_id"])
-        else:
-            # Some clients keep an active service intent while presenting the
-            # slot answer. Rebind that intent directly; otherwise the answer
-            # would fall through to fresh lexical parsing and reopen ambiguity.
-            active = (session.get("long_horizon_intents") or {}).get(session.get("active_intent_id"))
-            entity_ref = choice.get("entity_ref")
-            if (
-                active
-                and active.get("goal_fact") == "human_received_filled_container"
-                and entity_ref
-                and any(item.get("entity_id") == entity_ref for item in session.get("runtime_objects", []))
-            ):
-                active.setdefault("role_bindings", {})["theme"] = entity_ref
-                active.setdefault("task_level_authorization", {}).setdefault("role_bindings", {})["theme"] = entity_ref
-                session.pop("pending_water_container_ref", None)
-                resumed = _prepare_long_intent_stage(session, active)
-                resumed["session"] = get_session(session["session_id"])
-            else:
-                resumed = begin_motion_command(
-                    session["session_id"],
-                    resolved_utterance,
-                    grounded_role_bindings={dialogue["role"]: choice.get("entity_ref")},
-                )
-    else:
-        resumed = begin_motion_command(
-            session["session_id"],
-            resolved_utterance,
-            grounded_role_bindings={dialogue["role"]: choice.get("entity_ref")},
-        )
+    resumed = _resume_structured_dialogue_analysis(
+        session,
+        deepcopy(dialogue.get("source_language_analysis") or {}),
+        source_ref="role_clarification_resolution",
+        structured_role_refs={dialogue["role"]: choice.get("entity_ref")},
+    )
     resolution = {
         "status": "role_clarification_resolved",
         "role": dialogue["role"],
         "entity_ref": choice.get("entity_ref"),
         "label": label,
         "source_utterance": dialogue["source_utterance"],
-        "resolved_utterance": resolved_utterance,
+        "resolved_utterance": None,
         "binding_mode": "structured_role_binding",
         "surface_text_rewritten": False,
+        "surface_text_reparsed": False,
+        "semantic_resume_mode": "admitted_structured_analysis",
         "evidence": deepcopy(evidence),
         "physical_fact_committed": False,
     }
@@ -6381,8 +7128,21 @@ def _answer_support_inventory_state_query(
     """Read current supported-by facts; episodic memory may select a support but cannot supply its contents."""
     analysis = deepcopy(analysis)
     support_role_view = _support_role_from_analysis(analysis) or {}
+    support_runtime_entity = next(
+        (
+            item
+            for item in session.get("runtime_objects", [])
+            if item.get("entity_id")
+            == (
+                support_role_view.get("entity_ref")
+                or support_role_view.get("value_ref")
+            )
+        ),
+        None,
+    )
     support_surface = (
-        support_role_view.get("matched_alias")
+        (support_runtime_entity or {}).get("label")
+        or support_role_view.get("matched_alias")
         or support_role_view.get("surface")
         or support_role_view.get("label")
         or "承载面"
@@ -9554,6 +10314,7 @@ def execute_command(
             _start_evidence_gap_clarification(
                 session,
                 source_utterance=original_text,
+                source_language_analysis=language_analysis,
                 task_perception=task_perception,
             )
         if ambiguity_reason in {"multiple_target_candidates", "multiple_support_candidates"} and not scoped_authorization:
@@ -9563,6 +10324,7 @@ def execute_command(
             _start_role_clarification(
                 session,
                 source_utterance=original_text,
+                source_language_analysis=language_analysis,
                 role=role,
                 concept_id=task_perception.get("task_perception_frame", {}).get(concept_key),
                 options=task_perception.get("concept_grounding", {}).get(option_key, []),
@@ -9601,6 +10363,7 @@ def execute_command(
             _start_role_clarification(
                 session,
                 source_utterance=original_text,
+                source_language_analysis=language_analysis,
                 role="destination" if contextual_affordance.get("operator_candidate") == "navigate_near" else contextual_affordance.get("active_role", "target"),
                 concept_id=candidate_concept_id,
                 options=contextual_affordance.get("candidate_options", []),
@@ -10757,6 +11520,7 @@ def begin_motion_command(
             _start_role_clarification(
                 session,
                 source_utterance=text,
+                source_language_analysis=language_analysis,
                 role="theme",
                 concept_id=(container_concept or {}).get("concept_id"),
                 options=options,
