@@ -96,6 +96,23 @@ def _matches(view: dict[str, Any], expected: dict[str, Any], analysis: dict[str,
     return not failures, failures
 
 
+def _category(case: dict[str, Any]) -> str:
+    case_id = case["id"]
+    if "historical" in case_id or "return" in case_id:
+        return "指代和历史省略"
+    if "compound" in case_id or "connector" in case_id:
+        return "复合任务与语篇"
+    if "surface" in case_id or "tray" in case_id or "support" in case_id:
+        return "空间关系"
+    if "reported" in case_id:
+        return "报告与事实区分"
+    if "ambiguous" in case_id or "unknown_process" in case_id:
+        return "询问与澄清"
+    if "unknown_concept" in case_id:
+        return "新概念与未知动词"
+    return "角色落地"
+
+
 def _expand_cases(cases: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Expand only paraphrase families already covered by independent regressions."""
     expanded = list(cases)
@@ -154,7 +171,23 @@ def run() -> dict[str, Any]:
             result = begin_motion_command(session_id, case["utterance"])
             view = _result_view(result)
             matched, failures = _matches(view, case["expected"])
-        results.append({"id": case["id"], "layer": case["layer"], "passed": matched, "failures": failures, "observed": view})
+        inquiry_statuses = {"role_clarification_required", "contextual_affordance_disambiguation_required", "process_slot_clarification_required"}
+        results.append({
+            "id": case["id"],
+            "category": _category(case),
+            "layer": case["layer"],
+            "passed": matched,
+            "failures": failures,
+            "observed": view,
+            "diagnostics": {
+                "semantic_parse_correct": matched if case["layer"] == "semantic" else None,
+                "role_grounding_correct": matched if case["layer"] == "semantic" and any(key in case["expected"] for key in ("theme_entity_ref", "destination_entity_ref", "spatial_relation")) else None,
+                "inquiry_correct": matched if view.get("status") in inquiry_statuses else None,
+                "planning_success": view.get("status") == "motion_started" if case["layer"] == "interaction" else None,
+                "physical_verification_passed": view.get("runtime_fact_committed") if view.get("runtime_fact_committed") else None,
+                "safe_rejection": matched if case["expected"].get("not_motion_started") else None,
+            },
+        })
     totals = {"cases": len(results), "passed": sum(item["passed"] for item in results)}
     applicable = {
         "semantic_parse": [item for item in results if item["layer"] == "semantic"],
@@ -170,7 +203,15 @@ def run() -> dict[str, Any]:
             "pass_rate": (sum(item["passed"] for item in items) / len(items)) if items else None,
             "status": "measured" if items else "not_applicable_in_current_fixture",
         }
-    report = {"schema_version": "1.1.0", "benchmark_id": "p020_natural_language_benchmark_v1", "totals": totals, "pass_rate": totals["passed"] / totals["cases"] if totals["cases"] else 0.0, "layered_statistics": layered_statistics, "results": results}
+    category_statistics = {}
+    for category in sorted({item["category"] for item in results}):
+        items = [item for item in results if item["category"] == category]
+        category_statistics[category] = {
+            "cases": len(items),
+            "passed": sum(item["passed"] for item in items),
+            "pass_rate": sum(item["passed"] for item in items) / len(items),
+        }
+    report = {"schema_version": "1.2.0", "benchmark_id": "p020_natural_language_benchmark_v1", "totals": totals, "pass_rate": totals["passed"] / totals["cases"] if totals["cases"] else 0.0, "layered_statistics": layered_statistics, "category_statistics": category_statistics, "results": results}
     OUTPUT.mkdir(parents=True, exist_ok=True)
     (OUTPUT / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     return report

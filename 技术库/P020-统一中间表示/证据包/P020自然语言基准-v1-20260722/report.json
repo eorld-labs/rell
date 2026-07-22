@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.1.0",
+  "schema_version": "1.2.0",
   "benchmark_id": "p020_natural_language_benchmark_v1",
   "totals": {
     "cases": 101,
@@ -32,9 +32,47 @@
       "status": "not_applicable_in_current_fixture"
     }
   },
+  "category_statistics": {
+    "复合任务与语篇": {
+      "cases": 13,
+      "passed": 13,
+      "pass_rate": 1.0
+    },
+    "报告与事实区分": {
+      "cases": 1,
+      "passed": 1,
+      "pass_rate": 1.0
+    },
+    "指代和历史省略": {
+      "cases": 77,
+      "passed": 77,
+      "pass_rate": 1.0
+    },
+    "新概念与未知动词": {
+      "cases": 1,
+      "passed": 1,
+      "pass_rate": 1.0
+    },
+    "空间关系": {
+      "cases": 4,
+      "passed": 4,
+      "pass_rate": 1.0
+    },
+    "角色落地": {
+      "cases": 2,
+      "passed": 2,
+      "pass_rate": 1.0
+    },
+    "询问与澄清": {
+      "cases": 3,
+      "passed": 3,
+      "pass_rate": 1.0
+    }
+  },
   "results": [
     {
       "id": "place_explicit_roles",
+      "category": "角色落地",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -50,10 +88,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "compound_then",
+      "category": "复合任务与语篇",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -70,10 +117,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "reported_consumption",
+      "category": "报告与事实区分",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -89,10 +145,19 @@
         "reported_event_types": [
           "consumption_completed"
         ]
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "historical_return",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -109,10 +174,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "implicit_support_relation",
+      "category": "空间关系",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -128,10 +202,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "ambiguous_container",
+      "category": "询问与澄清",
       "layer": "interaction",
       "passed": true,
       "failures": [],
@@ -145,10 +228,19 @@
         "pending_role": "theme",
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": null,
+        "role_grounding_correct": null,
+        "inquiry_correct": true,
+        "planning_success": false,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "ambiguous_navigation",
+      "category": "询问与澄清",
       "layer": "interaction",
       "passed": true,
       "failures": [],
@@ -164,10 +256,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": null,
+        "role_grounding_correct": null,
+        "inquiry_correct": true,
+        "planning_success": false,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "unknown_process_template",
+      "category": "询问与澄清",
       "layer": "interaction",
       "passed": true,
       "failures": [],
@@ -181,10 +282,19 @@
         "pending_role": null,
         "template_id": "handover_object",
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": null,
+        "role_grounding_correct": null,
+        "inquiry_correct": true,
+        "planning_success": false,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "explicit_container_precedence",
+      "category": "角色落地",
       "layer": "interaction",
       "passed": true,
       "failures": [],
@@ -200,10 +310,19 @@
         "pending_role": null,
         "template_id": "grasp_object",
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": null,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": true,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "unknown_concept_safe_boundary",
+      "category": "新概念与未知动词",
       "layer": "interaction",
       "passed": true,
       "failures": [],
@@ -217,10 +336,19 @@
         "pending_role": null,
         "template_id": "place_object",
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": null,
+        "role_grounding_correct": null,
+        "inquiry_correct": true,
+        "planning_success": false,
+        "physical_verification_passed": null,
+        "safe_rejection": true
       }
     },
     {
       "id": "compound_connective_then_variant",
+      "category": "复合任务与语篇",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -237,10 +365,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "compound_connective_next",
+      "category": "复合任务与语篇",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -257,10 +394,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "compound_connective_afterwards",
+      "category": "复合任务与语篇",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -278,10 +424,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "compound_connective_re_then",
+      "category": "复合任务与语篇",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -298,10 +453,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "historical_return_just_now",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -317,10 +481,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "historical_return_before",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -336,10 +509,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "historical_return_previous_time",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -356,10 +538,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "surface_synonym_desktop",
+      "category": "空间关系",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -375,10 +566,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "surface_synonym_tabletop",
+      "category": "空间关系",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -394,10 +594,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "tray_inside_relation",
+      "category": "空间关系",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -413,10 +622,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "return_to_recent_pickup_surface",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -432,10 +650,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_connector_01",
+      "category": "复合任务与语篇",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -452,10 +679,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_connector_02",
+      "category": "复合任务与语篇",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -472,10 +708,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_connector_03",
+      "category": "复合任务与语篇",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -492,10 +737,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_connector_04",
+      "category": "复合任务与语篇",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -512,10 +766,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_connector_05",
+      "category": "复合任务与语篇",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -532,10 +795,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_connector_06",
+      "category": "复合任务与语篇",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -552,10 +824,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_connector_07",
+      "category": "复合任务与语篇",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -572,10 +853,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_connector_08",
+      "category": "复合任务与语篇",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -592,10 +882,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_01",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -611,10 +910,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_02",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -630,10 +938,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_03",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -649,10 +966,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_04",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -668,10 +994,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_05",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -687,10 +1022,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_06",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -706,10 +1050,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_07",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -725,10 +1078,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_08",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -744,10 +1106,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_09",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -763,10 +1134,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_10",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -782,10 +1162,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_11",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -801,10 +1190,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_12",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -820,10 +1218,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_13",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -839,10 +1246,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_14",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -858,10 +1274,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_15",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -877,10 +1302,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_16",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -896,10 +1330,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_17",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -915,10 +1358,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_18",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -934,10 +1386,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_19",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -953,10 +1414,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_20",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -972,10 +1442,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_21",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -991,10 +1470,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_22",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1010,10 +1498,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_23",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1029,10 +1526,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_24",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1048,10 +1554,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_25",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1067,10 +1582,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_26",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1086,10 +1610,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_27",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1105,10 +1638,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_28",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1124,10 +1666,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_29",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1143,10 +1694,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_30",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1162,10 +1722,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_31",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1181,10 +1750,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_32",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1200,10 +1778,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_33",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1219,10 +1806,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_34",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1238,10 +1834,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_35",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1257,10 +1862,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_36",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1276,10 +1890,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_37",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1295,10 +1918,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_38",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1314,10 +1946,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_39",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1333,10 +1974,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_40",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1352,10 +2002,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_41",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1371,10 +2030,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_42",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1390,10 +2058,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_43",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1409,10 +2086,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_44",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1428,10 +2114,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_45",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1447,10 +2142,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_46",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1466,10 +2170,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_47",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1485,10 +2198,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_48",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1504,10 +2226,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_49",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1523,10 +2254,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_50",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1542,10 +2282,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_51",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1561,10 +2310,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_52",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1580,10 +2338,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_53",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1599,10 +2366,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_54",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1618,10 +2394,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_55",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1637,10 +2422,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_56",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1656,10 +2450,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_57",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1675,10 +2478,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_58",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1694,10 +2506,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_59",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1713,10 +2534,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_60",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1732,10 +2562,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_61",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1751,10 +2590,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_62",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1770,10 +2618,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_63",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1789,10 +2646,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_64",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1808,10 +2674,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_65",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1827,10 +2702,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_66",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1846,10 +2730,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_67",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1865,10 +2758,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_68",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1884,10 +2786,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_69",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1903,10 +2814,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_70",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1922,10 +2842,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_71",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1941,10 +2870,19 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     },
     {
       "id": "generated_historical_72",
+      "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
       "failures": [],
@@ -1960,6 +2898,14 @@
         "pending_role": null,
         "template_id": null,
         "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     }
   ]

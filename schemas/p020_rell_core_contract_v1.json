@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.0.0",
+  "contract_id": "p020_rell_core_contract_v1",
+  "basic_types": [
+    "EntityRef",
+    "Predicate",
+    "Event",
+    "EvidenceEnvelope",
+    "WorldFact",
+    "Goal",
+    "Constraint"
+  ],
+  "authority": {
+    "semantic_admission": "DictionaryAuthorityAdmission",
+    "fact_ledger": "WorldFactLedger",
+    "control_gateway": "P018",
+    "verification_gateway": "P016"
+  },
+  "invariants": [
+    "language_does_not_commit_physical_fact",
+    "perception_candidate_is_not_runtime_fact",
+    "downstream_does_not_reparse_surface_text",
+    "current_verified_relation_precedes_history_and_category",
+    "every_recovery_reenters_current_fact_pruning",
+    "ambiguous_binding_never_silently_becomes_unique",
+    "dictionary_authority_cannot_control_execution",
+    "p016_is_only_runtime_fact_write_gateway",
+    "p018_is_only_control_gateway"
+  ],
+  "extension_policy": {
+    "allowed": ["schema_extension", "contract_version_bump", "new_adapter_with_evidence"],
+    "forbidden": ["downstream_surface_text_branch", "second_fact_source", "control_bypass", "silent_ambiguity_resolution"]
+  }
+}
