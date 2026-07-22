@@ -1067,7 +1067,8 @@ def _roles(
                     for markers, relation in (
                         (("上面", "上边", "上"), "on_support_surface"),
                         (("里面", "内部", "里"), "inside_container"),
-                        (("旁边", "附近", "旁"), "near_landmark"),
+                        (("附近",), "near_landmark"),
+                        (("旁边", "侧边"), "beside"),
                         (("我身边", "我旁边", "靠近我"), "near_human"),
                         (("身边", "侧边"), "beside"),
                         (("前面", "前方"), "in_front_of"),
@@ -1100,8 +1101,26 @@ def _roles(
             if item.get("start", -1) >= navigation.get("end", 0)
             and (not following or item.get("end", -1) <= following.get("start", 0))
         ]
-        if explicit_navigation_objects:
+        if len(explicit_navigation_objects) >= 2 and any(marker in text for marker in ("之间", "中间")):
+            first, second = explicit_navigation_objects[-2:]
+            roles["between_reference_a"] = deepcopy(first)
+            roles["between_reference_b"] = deepcopy(second)
+            roles["destination"] = {
+                "entity_type": "derived_spatial_region",
+                "reference_roles": ["between_reference_a", "between_reference_b"],
+                "spatial_relation": "between",
+                "spatial_relation_basis": "explicit_spatial_marker",
+                "source": "two_reference_spatial_relation",
+            }
+        elif explicit_navigation_objects:
             roles["destination"] = deepcopy(explicit_navigation_objects[-1])
+            navigation_scope = text[int(navigation.get("end", 0)):]
+            if any(marker in navigation_scope for marker in ("旁边", "侧边")):
+                roles["destination"]["spatial_relation"] = "beside"
+                roles["destination"]["spatial_relation_basis"] = "explicit_spatial_marker"
+            elif "附近" in navigation_scope:
+                roles["destination"]["spatial_relation"] = "near_landmark"
+                roles["destination"]["spatial_relation_basis"] = "explicit_spatial_marker"
         elif len(events) == 1:
             roles["destination"] = deepcopy(objects[-1])
     if handover_event:
@@ -1128,7 +1147,10 @@ def _roles(
             if alias and suffix.startswith(("上", "上面", "上边")):
                 destination["spatial_relation"] = "on_support_surface"
                 destination["spatial_relation_basis"] = "explicit_spatial_marker"
-            elif alias and suffix.startswith(("旁", "旁边", "附近")):
+            elif alias and suffix.startswith(("旁", "旁边", "侧边")):
+                destination["spatial_relation"] = "beside"
+                destination["spatial_relation_basis"] = "explicit_spatial_marker"
+            elif alias and suffix.startswith(("附近",)):
                 destination["spatial_relation"] = "near_landmark"
                 destination["spatial_relation_basis"] = "explicit_spatial_marker"
             elif alias and suffix.startswith(("里", "里面", "内部")):
