@@ -400,4 +400,8 @@ def _meta_learn(self, inquiry: Inquiry, result: InquiryResult):
 - `concept_core/epistemic_flywheel.py`；
 - `validate_rell_epistemic_flywheel_stage_a.py`。
 
-下一阶段按原路线实施 L2：从 L1 增量统计事件签名、跨实例一致性、稳定效果、变量特征和异常幅度，再由 L4 决定是否启动认识目标。
+阶段 B 的增量统计骨架也已落地：`PatternDiscoveryEngine` 直接重放或增量消费 L1 事件，根据事件类型和参与角色形成模式签名，输出出现频率、跨实例数量、一致性、稳定特征、变量特征、稳定效果、平均强度和强度趋势。L2 的输出保持 `candidate_only`，不解释因果，也不提交事实。
+
+阶段 B 校验入口：`validate_rell_epistemic_flywheel_stage_b.py`。
+
+下一阶段按原路线实施 L4 调度器：使用模式强度、概念空间距离和预期信息增益决定是否启动认识目标，并把单次 `CognitiveInquiryRuntime` 组装成可重复 tick 的闭环。

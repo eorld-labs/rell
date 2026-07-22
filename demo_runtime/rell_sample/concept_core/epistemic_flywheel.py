@@ -146,3 +146,76 @@ class ConceptSpace:
         if maximum < threshold:
             return None
         return {"status": "candidate_only", "operation": "split", "concept_ref": concept_ref, "maximum_instance_distance": maximum, "direct_dictionary_write_allowed": False}
+
+
+class PatternDiscoveryEngine:
+    """Incremental statistics over immutable history entries; it never explains causes."""
+
+    def __init__(self) -> None:
+        self._episodes: dict[str, list[dict[str, Any]]] = {}
+
+    @staticmethod
+    def _signature(entry: dict[str, Any]) -> str | None:
+        payload = entry.get("payload") or {}
+        event_type = payload.get("event_type")
+        if not event_type:
+            return None
+        roles = sorted((payload.get("participant_refs") or {}).keys())
+        return f"{event_type}|roles={','.join(roles)}"
+
+    def ingest(self, entry: dict[str, Any]) -> None:
+        signature = self._signature(entry)
+        if signature is None:
+            return
+        payload = entry["payload"]
+        measurements = payload.get("measurements") or {}
+        episode = {
+            "source_ref": entry["source_ref"],
+            "world_revision": entry["world_revision"],
+            "instance_refs": sorted(set((payload.get("participant_refs") or {}).values())),
+            "features": sorted(set(measurements.get("features") or [])),
+            "effects": sorted(set(measurements.get("effects") or [])),
+            "strength": float(measurements.get("strength") or 0.0),
+        }
+        self._episodes.setdefault(signature, []).append(episode)
+
+    def ingest_ledger(self, ledger: EventHistoryLedger, from_revision: int = 0) -> None:
+        for entry in ledger.replay(from_revision):
+            self.ingest(entry)
+
+    def query_active_patterns(self, min_strength: float = 0.0, min_episodes: int = 2) -> list[dict[str, Any]]:
+        patterns = []
+        for signature, episodes in sorted(self._episodes.items()):
+            if len(episodes) < min_episodes:
+                continue
+            feature_sets = [set(item["features"]) for item in episodes]
+            effect_sets = [set(item["effects"]) for item in episodes]
+            stable_features = set.intersection(*feature_sets) if feature_sets else set()
+            all_features = set.union(*feature_sets) if feature_sets else set()
+            stable_effects = set.intersection(*effect_sets) if effect_sets else set()
+            exact_profiles: dict[tuple[str, ...], int] = {}
+            for item in episodes:
+                profile = tuple(item["features"] + [f"effect:{value}" for value in item["effects"]])
+                exact_profiles[profile] = exact_profiles.get(profile, 0) + 1
+            consistency = max(exact_profiles.values()) / len(episodes)
+            strengths = [item["strength"] for item in episodes]
+            mean_strength = sum(strengths) / len(strengths)
+            if mean_strength < min_strength:
+                continue
+            delta = strengths[-1] - strengths[0]
+            trend = "rising" if delta > 0.05 else "decaying" if delta < -0.05 else "stable"
+            patterns.append({
+                "pattern_signature": signature,
+                "observed_episodes": len(episodes),
+                "cross_instance_count": len({ref for item in episodes for ref in item["instance_refs"]}),
+                "cross_instance_consistency": consistency,
+                "stable_features": sorted(stable_features),
+                "stable_effects": sorted(stable_effects),
+                "variable_features": sorted(all_features - stable_features),
+                "measurements": {"strength_samples": strengths},
+                "mean_strength": mean_strength,
+                "strength_trend": trend,
+                "candidate_only": True,
+                "runtime_fact_committed": False,
+            })
+        return patterns
