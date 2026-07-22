@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
 from pathlib import Path
@@ -153,6 +154,7 @@ class PatternDiscoveryEngine:
 
     def __init__(self) -> None:
         self._episodes: dict[str, list[dict[str, Any]]] = {}
+        self._seen_entry_digests: set[str] = set()
 
     @staticmethod
     def _signature(entry: dict[str, Any]) -> str | None:
@@ -164,9 +166,14 @@ class PatternDiscoveryEngine:
         return f"{event_type}|roles={','.join(roles)}"
 
     def ingest(self, entry: dict[str, Any]) -> None:
+        entry_digest = str(entry.get("entry_digest") or "")
+        if entry_digest and entry_digest in self._seen_entry_digests:
+            return
         signature = self._signature(entry)
         if signature is None:
             return
+        if entry_digest:
+            self._seen_entry_digests.add(entry_digest)
         payload = entry["payload"]
         measurements = payload.get("measurements") or {}
         episode = {
@@ -219,3 +226,125 @@ class PatternDiscoveryEngine:
                 "runtime_fact_committed": False,
             })
         return patterns
+
+
+@dataclass
+class EpistemicMetaParams:
+    min_pattern_strength: float = 0.55
+    min_investigation_score: float = 0.55
+    min_verification_channels: int = 2
+    hypothesis_generation_bias: float = 0.0
+
+    def clamp(self) -> None:
+        self.min_pattern_strength = min(0.95, max(0.2, self.min_pattern_strength))
+        self.min_investigation_score = min(0.95, max(0.2, self.min_investigation_score))
+        self.min_verification_channels = min(4, max(2, self.min_verification_channels))
+        self.hypothesis_generation_bias = min(0.5, max(-0.5, self.hypothesis_generation_bias))
+
+
+class EpistemicLoopEngine:
+    """Bounded L4 scheduler. A tick proposes work; only P018/P016 may execute and verify it."""
+
+    def __init__(self, ledger: EventHistoryLedger, discovery: PatternDiscoveryEngine, space: ConceptSpace) -> None:
+        self.ledger = ledger
+        self.discovery = discovery
+        self.space = space
+        self.meta_params = EpistemicMetaParams()
+        self.active_inquiries: dict[str, dict[str, Any]] = {}
+        self.closed_inquiries: dict[str, dict[str, Any]] = {}
+        self.pending_dictionary_admission: dict[str, dict[str, Any]] = {}
+
+    @staticmethod
+    def _pattern_features(pattern: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "perceptual_invariants": pattern.get("stable_features") or [],
+            "functional_affordances": [],
+            "effects": pattern.get("stable_effects") or [],
+            "applicability_constraints": [],
+        }
+
+    def _assessment(self, pattern: dict[str, Any]) -> dict[str, Any]:
+        nearest = self.space.nearest_neighbors(self._pattern_features(pattern), top_k=1)
+        nearest_ref, novelty = nearest[0] if nearest else (None, 1.0)
+        consistency = float(pattern.get("cross_instance_consistency") or 0.0)
+        strength = float(pattern.get("mean_strength") or 0.0)
+        information_gain = consistency * novelty
+        probe_cost = 0.1
+        score = 0.4 * strength + 0.3 * novelty + 0.3 * consistency - probe_cost + self.meta_params.hypothesis_generation_bias
+        return {
+            "nearest_concept_ref": nearest_ref,
+            "concept_distance": novelty,
+            "expected_information_gain": information_gain,
+            "probe_cost": probe_cost,
+            "investigation_score": score,
+            "should_investigate": score >= self.meta_params.min_investigation_score,
+        }
+
+    def tick(self, probe_outcomes: dict[str, bool] | None = None) -> dict[str, Any]:
+        from .cognitive_inquiry import run_concept_validation_loop
+
+        self.discovery.ingest_ledger(self.ledger)
+        probe_outcomes = probe_outcomes or {}
+        patterns = self.discovery.query_active_patterns(min_strength=self.meta_params.min_pattern_strength)
+        launched = []
+        resolved = []
+        monitored = []
+        for pattern in patterns:
+            signature = pattern["pattern_signature"]
+            if signature in self.closed_inquiries:
+                continue
+            assessment = self._assessment(pattern)
+            if not assessment["should_investigate"]:
+                monitored.append({"pattern_signature": signature, **assessment})
+                continue
+            inquiry = self.active_inquiries.setdefault(signature, {
+                "pattern_signature": signature,
+                "status": "awaiting_p018_authorized_probe",
+                "assessment": assessment,
+                "pattern": deepcopy(pattern),
+                "direct_execution_allowed": False,
+            })
+            if signature not in probe_outcomes:
+                launched.append(deepcopy(inquiry))
+                continue
+            loop = run_concept_validation_loop(prediction_confirmed=bool(probe_outcomes[signature]))
+            if loop["action"]["arbitration_receipt"]["decision"] != "authorized":
+                raise AssertionError("epistemic_probe_bypassed_p018")
+            if loop["decision"]["basis"] != "new_instance_p016_verification":
+                raise AssertionError("epistemic_probe_bypassed_p016")
+            decision = loop["decision"]["decision"]
+            closed = {**inquiry, "status": "closed", "decision": decision, "loop": loop}
+            self.closed_inquiries[signature] = closed
+            self.active_inquiries.pop(signature, None)
+            if decision == "promoted":
+                self.pending_dictionary_admission[signature] = deepcopy(loop["candidate"])
+                self.meta_params.min_investigation_score *= 0.95
+            else:
+                self.meta_params.hypothesis_generation_bias += 0.01
+            self.meta_params.clamp()
+            resolved.append({"pattern_signature": signature, "decision": decision})
+        return {
+            "status": "tick_completed",
+            "active_pattern_count": len(patterns),
+            "launched": launched,
+            "resolved": resolved,
+            "monitored": monitored,
+            "pending_dictionary_admission": sorted(self.pending_dictionary_admission),
+            "meta_params": deepcopy(self.meta_params.__dict__),
+            "fact_authority": "WorldFactLedger",
+            "control_gateway": "P018",
+            "verification_gateway": "P016",
+            "direct_execution_allowed": False,
+        }
+
+    def admit_promoted_concept(self, pattern_signature: str, *, admission_ref: str) -> str:
+        candidate = self.pending_dictionary_admission.pop(pattern_signature)
+        causal = candidate.get("minimal_causal_contract") or {}
+        concept = {
+            "concept_id": candidate["concept_id"],
+            "perceptual_invariants": causal.get("observable_features") or candidate.get("perceptual_invariants") or [],
+            "functional_affordances": causal.get("functional_affordances") or candidate.get("functional_affordances") or [],
+            "effects": causal.get("effects") or [],
+            "applicability_constraints": (candidate.get("applicability_contract") or {}).get("scope") or [],
+        }
+        return self.space.add_concept(concept, admission_ref=admission_ref)

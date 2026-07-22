@@ -404,4 +404,10 @@ def _meta_learn(self, inquiry: Inquiry, result: InquiryResult):
 
 阶段 B 校验入口：`validate_rell_epistemic_flywheel_stage_b.py`。
 
-下一阶段按原路线实施 L4 调度器：使用模式强度、概念空间距离和预期信息增益决定是否启动认识目标，并把单次 `CognitiveInquiryRuntime` 组装成可重复 tick 的闭环。
+阶段 C 的最小 L4 调度器已落地：`EpistemicLoopEngine.tick()` 使用模式强度、概念空间距离、跨实例一致性、预期信息增益和探针成本计算调查分数。达到阈值的模式进入 `awaiting_p018_authorized_probe`；没有探针结果时不会执行。
+
+探针通过 P018 和 P016 后，晋级概念先进入 `pending_dictionary_admission`，不会直接改变概念空间。只有调用 `admit_promoted_concept(..., admission_ref=...)` 并提供字典准入引用后，概念才加入 L3。每次晋级或否决会更新元参数，所有参数都有上下界。
+
+阶段 C 校验入口：`validate_rell_epistemic_flywheel_stage_c.py`。
+
+下一阶段进入 D：使用运行时执行闭环产生的真实 Event/Predicate/EvidenceEnvelope 驱动 L1-L4，验证概念加入后下一轮最近邻匹配确实改善，并建立飞轮收益指标。
