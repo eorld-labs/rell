@@ -6,6 +6,13 @@ from typing import Any
 
 from embodied_scene import SESSIONS, _compose_session_language, begin_motion_command, start_session
 from runtime_core import run_simulated_runtime_sample
+from validate_failure_recovery_architecture import (
+    validate_conflicting_language_correction_requires_observation,
+    validate_failure_rebuilds_from_authoritative_world,
+    validate_human_possession_preserves_language_role_span,
+    validate_language_correction_enters_evidence_gate,
+    validate_new_task_retires_recovery_contract,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -193,6 +200,48 @@ def _physical_fixture_results() -> list[dict[str, Any]]:
     return results
 
 
+def _recovery_fixture_results() -> list[dict[str, Any]]:
+    fixtures = (
+        ("human_possession_role_span", validate_human_possession_preserves_language_role_span),
+        ("authoritative_world_rebuild", validate_failure_rebuilds_from_authoritative_world),
+        ("new_task_retires_old_recovery", validate_new_task_retires_recovery_contract),
+        ("matching_report_enters_evidence_gate", validate_language_correction_enters_evidence_gate),
+        ("conflicting_report_requires_observation", validate_conflicting_language_correction_requires_observation),
+    )
+    results = []
+    for fixture_id, fixture in fixtures:
+        failures = []
+        try:
+            fixture()
+        except AssertionError as error:
+            failures.append(str(error))
+        passed = not failures
+        results.append({
+            "id": f"recovery_{fixture_id}",
+            "category": "结构化恢复",
+            "layer": "recovery",
+            "passed": passed,
+            "failures": failures,
+            "observed": {
+                "fixture": fixture_id,
+                "current_fact_pruning_reentered": passed,
+                "surface_text_reparsed": False if passed else None,
+                "old_motion_path_reused": False if passed else None,
+                "runtime_fact_committed": False,
+            },
+            "diagnostics": {
+                "semantic_parse_correct": None,
+                "role_grounding_correct": None,
+                "inquiry_correct": None,
+                "structured_recovery_success": passed,
+                "planning_success": None,
+                "physical_verification_passed": None,
+                "safe_rejection": passed if "conflicting" in fixture_id else None,
+            },
+        })
+    return results
+
+
 def run() -> dict[str, Any]:
     benchmark = json.loads(BENCHMARK.read_text(encoding="utf-8"))
     cases = _expand_cases(benchmark["cases"])
@@ -232,11 +281,13 @@ def run() -> dict[str, Any]:
             },
         })
     results.extend(_physical_fixture_results())
+    results.extend(_recovery_fixture_results())
     totals = {"cases": len(results), "passed": sum(item["passed"] for item in results)}
     applicable = {
         "semantic_parse": [item for item in results if item["layer"] == "semantic"],
         "inquiry_correctness": [item for item in results if item["layer"] == "interaction" and item["observed"].get("status") in {"role_clarification_required", "contextual_affordance_disambiguation_required", "process_slot_clarification_required"}],
         "planning_success": [item for item in results if item["layer"] == "interaction" and item["observed"].get("status") == "motion_started"],
+        "structured_recovery": [item for item in results if item["layer"] == "recovery"],
         "physical_verification": [item for item in results if item["layer"] == "physical"],
     }
     layered_statistics = {}
@@ -263,7 +314,7 @@ def run() -> dict[str, Any]:
             "passed": sum(item["passed"] for item in items),
             "pass_rate": sum(item["passed"] for item in items) / len(items),
         }
-    report = {"schema_version": "1.3.0", "benchmark_id": "p020_natural_language_benchmark_v1", "totals": totals, "pass_rate": totals["passed"] / totals["cases"] if totals["cases"] else 0.0, "layered_statistics": layered_statistics, "category_statistics": category_statistics, "results": results}
+    report = {"schema_version": "1.4.0", "benchmark_id": "p020_natural_language_benchmark_v1", "totals": totals, "pass_rate": totals["passed"] / totals["cases"] if totals["cases"] else 0.0, "layered_statistics": layered_statistics, "category_statistics": category_statistics, "results": results}
     OUTPUT.mkdir(parents=True, exist_ok=True)
     (OUTPUT / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     return report

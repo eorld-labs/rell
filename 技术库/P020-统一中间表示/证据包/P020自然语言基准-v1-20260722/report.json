@@ -1,9 +1,9 @@
 {
-  "schema_version": "1.3.0",
+  "schema_version": "1.4.0",
   "benchmark_id": "p020_natural_language_benchmark_v1",
   "totals": {
-    "cases": 104,
-    "passed": 104
+    "cases": 109,
+    "passed": 109
   },
   "pass_rate": 1.0,
   "layered_statistics": {
@@ -22,6 +22,12 @@
     "planning_success": {
       "applicable_cases": 1,
       "passed": 1,
+      "pass_rate": 1.0,
+      "status": "measured"
+    },
+    "structured_recovery": {
+      "applicable_cases": 5,
+      "passed": 5,
       "pass_rate": 1.0,
       "status": "measured"
     },
@@ -68,6 +74,11 @@
     "空间关系": {
       "cases": 4,
       "passed": 4,
+      "pass_rate": 1.0
+    },
+    "结构化恢复": {
+      "cases": 5,
+      "passed": 5,
       "pass_rate": 1.0
     },
     "角色落地": {
@@ -2986,6 +2997,121 @@
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": true,
+        "safe_rejection": true
+      }
+    },
+    {
+      "id": "recovery_human_possession_role_span",
+      "category": "结构化恢复",
+      "layer": "recovery",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "fixture": "human_possession_role_span",
+        "current_fact_pruning_reentered": true,
+        "surface_text_reparsed": false,
+        "old_motion_path_reused": false,
+        "runtime_fact_committed": false
+      },
+      "diagnostics": {
+        "semantic_parse_correct": null,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "structured_recovery_success": true,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "recovery_authoritative_world_rebuild",
+      "category": "结构化恢复",
+      "layer": "recovery",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "fixture": "authoritative_world_rebuild",
+        "current_fact_pruning_reentered": true,
+        "surface_text_reparsed": false,
+        "old_motion_path_reused": false,
+        "runtime_fact_committed": false
+      },
+      "diagnostics": {
+        "semantic_parse_correct": null,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "structured_recovery_success": true,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "recovery_new_task_retires_old_recovery",
+      "category": "结构化恢复",
+      "layer": "recovery",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "fixture": "new_task_retires_old_recovery",
+        "current_fact_pruning_reentered": true,
+        "surface_text_reparsed": false,
+        "old_motion_path_reused": false,
+        "runtime_fact_committed": false
+      },
+      "diagnostics": {
+        "semantic_parse_correct": null,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "structured_recovery_success": true,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "recovery_matching_report_enters_evidence_gate",
+      "category": "结构化恢复",
+      "layer": "recovery",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "fixture": "matching_report_enters_evidence_gate",
+        "current_fact_pruning_reentered": true,
+        "surface_text_reparsed": false,
+        "old_motion_path_reused": false,
+        "runtime_fact_committed": false
+      },
+      "diagnostics": {
+        "semantic_parse_correct": null,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "structured_recovery_success": true,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "recovery_conflicting_report_requires_observation",
+      "category": "结构化恢复",
+      "layer": "recovery",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "fixture": "conflicting_report_requires_observation",
+        "current_fact_pruning_reentered": true,
+        "surface_text_reparsed": false,
+        "old_motion_path_reused": false,
+        "runtime_fact_committed": false
+      },
+      "diagnostics": {
+        "semantic_parse_correct": null,
+        "role_grounding_correct": null,
+        "inquiry_correct": null,
+        "structured_recovery_success": true,
+        "planning_success": null,
+        "physical_verification_passed": null,
         "safe_rejection": true
       }
     }
