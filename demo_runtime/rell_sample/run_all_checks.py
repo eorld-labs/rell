@@ -594,6 +594,7 @@ def main() -> None:
     run_python("validate_rell_between_beside_language.py")
     run_python("validate_rell_relation_duality.py")
     run_python("validate_rell_concept_self_generation.py")
+    run_python("validate_rell_social_relation_grounding.py")
     run_python("validate_communication_dictionary_architecture.py")
     run_python("validate_discourse_event_graph.py")
     run_python("validate_language_paraphrase_properties.py")

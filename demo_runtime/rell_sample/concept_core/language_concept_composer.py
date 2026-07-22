@@ -625,9 +625,24 @@ def _discourse_roles(text: str) -> dict[str, dict[str, Any]]:
     if re.search(r"我(?:已经)?(?:喝|饮用)(?:完|光|好)", text) or possession_source:
         roles["source_holder"] = {
             "reference": "human_speaker",
-            "relation": "holds_reported_consumed_container_candidate",
+            "relation": "held_by",
             "source": "deictic_reported_event_role",
             "physical_state_change_committed": False,
+        }
+    if re.search(r"我的(?:白色)?(?:马克杯|高脚杯|杯子|杯|苹果|报纸|托盘)", text):
+        roles["ownership_claim"] = {
+            "reference": "human_speaker",
+            "relation": "owned_by",
+            "source": "explicit_possessive_language",
+            "social_fact_committed": False,
+        }
+    if re.search(r"我.{0,8}(?:够得到|拿得到|能拿到|可以拿到)", text):
+        roles["accessibility_claim"] = {
+            "reference": "human_speaker",
+            "relation": "accessible_to",
+            "source": "reported_accessibility_language",
+            "physical_fact_committed": False,
+            "permission_fact_committed": False,
         }
     if any(
         re.search(pattern, text)
