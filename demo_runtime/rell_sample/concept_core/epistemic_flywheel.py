@@ -271,13 +271,15 @@ class EpistemicLoopEngine:
         information_gain = consistency * novelty
         probe_cost = 0.1
         score = 0.4 * strength + 0.3 * novelty + 0.3 * consistency - probe_cost + self.meta_params.hypothesis_generation_bias
+        already_explained = nearest_ref is not None and novelty <= 0.15
         return {
             "nearest_concept_ref": nearest_ref,
             "concept_distance": novelty,
             "expected_information_gain": information_gain,
             "probe_cost": probe_cost,
             "investigation_score": score,
-            "should_investigate": score >= self.meta_params.min_investigation_score,
+            "already_explained_by_concept": already_explained,
+            "should_investigate": not already_explained and score >= self.meta_params.min_investigation_score,
         }
 
     def tick(self, probe_outcomes: dict[str, bool] | None = None) -> dict[str, Any]:
@@ -317,7 +319,10 @@ class EpistemicLoopEngine:
             self.closed_inquiries[signature] = closed
             self.active_inquiries.pop(signature, None)
             if decision == "promoted":
-                self.pending_dictionary_admission[signature] = deepcopy(loop["candidate"])
+                self.pending_dictionary_admission[signature] = {
+                    "candidate": deepcopy(loop["candidate"]),
+                    "pattern_features": self._pattern_features(pattern),
+                }
                 self.meta_params.min_investigation_score *= 0.95
             else:
                 self.meta_params.hypothesis_generation_bias += 0.01
@@ -338,13 +343,15 @@ class EpistemicLoopEngine:
         }
 
     def admit_promoted_concept(self, pattern_signature: str, *, admission_ref: str) -> str:
-        candidate = self.pending_dictionary_admission.pop(pattern_signature)
+        pending = self.pending_dictionary_admission.pop(pattern_signature)
+        candidate = pending["candidate"]
         causal = candidate.get("minimal_causal_contract") or {}
+        pattern_features = pending.get("pattern_features") or {}
         concept = {
             "concept_id": candidate["concept_id"],
-            "perceptual_invariants": causal.get("observable_features") or candidate.get("perceptual_invariants") or [],
-            "functional_affordances": causal.get("functional_affordances") or candidate.get("functional_affordances") or [],
-            "effects": causal.get("effects") or [],
-            "applicability_constraints": (candidate.get("applicability_contract") or {}).get("scope") or [],
+            "perceptual_invariants": pattern_features.get("perceptual_invariants", causal.get("observable_features") or candidate.get("perceptual_invariants") or []),
+            "functional_affordances": pattern_features.get("functional_affordances", causal.get("functional_affordances") or candidate.get("functional_affordances") or []),
+            "effects": pattern_features.get("effects", causal.get("effects") or []),
+            "applicability_constraints": pattern_features.get("applicability_constraints", (candidate.get("applicability_contract") or {}).get("scope") or []),
         }
         return self.space.add_concept(concept, admission_ref=admission_ref)

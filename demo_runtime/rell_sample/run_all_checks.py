@@ -598,6 +598,7 @@ def main() -> None:
     run_python("validate_rell_epistemic_flywheel_stage_a.py")
     run_python("validate_rell_epistemic_flywheel_stage_b.py")
     run_python("validate_rell_epistemic_flywheel_stage_c.py")
+    run_python("validate_rell_epistemic_flywheel_stage_d.py")
     run_python("validate_communication_dictionary_architecture.py")
     run_python("validate_discourse_event_graph.py")
     run_python("validate_language_paraphrase_properties.py")
