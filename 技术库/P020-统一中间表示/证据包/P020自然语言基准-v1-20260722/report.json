@@ -1,0 +1,197 @@
+{
+  "schema_version": "1.0.0",
+  "benchmark_id": "p020_natural_language_benchmark_v1",
+  "totals": {
+    "cases": 10,
+    "passed": 10
+  },
+  "pass_rate": 1.0,
+  "results": [
+    {
+      "id": "place_explicit_roles",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": "mug_white",
+        "destination_entity_ref": "hospitality_counter_a",
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "compound_then",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object",
+          "fill_container"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": "glass_tall",
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "reported_consumption",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [],
+        "speech_act": "information_report",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": [
+          "consumption_completed"
+        ]
+      }
+    },
+    {
+      "id": "historical_return",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "navigate_to",
+          "grasp_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "implicit_support_relation",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": "mug_white",
+        "destination_entity_ref": "hospitality_counter_b",
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "ambiguous_container",
+      "layer": "interaction",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": "role_clarification_required",
+        "operators": [],
+        "speech_act": null,
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": "theme",
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "ambiguous_navigation",
+      "layer": "interaction",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": "contextual_affordance_disambiguation_required",
+        "operators": [
+          "navigate_to"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "unknown_process_template",
+      "layer": "interaction",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": "process_slot_clarification_required",
+        "operators": [],
+        "speech_act": null,
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": "handover_object",
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "explicit_container_precedence",
+      "layer": "interaction",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": "motion_started",
+        "operators": [
+          "grasp_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": "mug_white",
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": "grasp_object",
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "unknown_concept_safe_boundary",
+      "layer": "interaction",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": "process_slot_clarification_required",
+        "operators": [],
+        "speech_act": null,
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": "place_object",
+        "reported_event_types": []
+      }
+    }
+  ]
+}

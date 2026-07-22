@@ -1,0 +1,67 @@
+{
+  "schema_version": "1.0.0",
+  "benchmark_id": "p020_natural_language_benchmark_v1",
+  "description": "RELL/P020 natural-language understanding and interaction benchmark",
+  "cases": [
+    {
+      "id": "place_explicit_roles",
+      "layer": "semantic",
+      "utterance": "\u628a\u767d\u8272\u9a6c\u514b\u676f\u653e\u5230\u64cd\u4f5c\u53f0A",
+      "expected": {"operators": ["place_object"], "theme_entity_ref": "mug_white", "destination_entity_ref": "hospitality_counter_a"}
+    },
+    {
+      "id": "compound_then",
+      "layer": "semantic",
+      "utterance": "\u628a\u767d\u8272\u9a6c\u514b\u676f\u653e\u5230\u64cd\u4f5c\u53f0A\uff0c\u7136\u540e\u7528\u900f\u660e\u9ad8\u811a\u73bb\u7483\u676f\u63a5\u4e00\u676f\u6c34",
+      "expected": {"operators": ["place_object", "fill_container"], "event_frame_count": 2}
+    },
+    {
+      "id": "reported_consumption",
+      "layer": "semantic",
+      "utterance": "\u6211\u559d\u5b8c\u4e86",
+      "expected": {"speech_act": "information_report", "reported_event_type": "consumption_completed", "runtime_fact_committed": false}
+    },
+    {
+      "id": "historical_return",
+      "layer": "semantic",
+      "utterance": "\u56de\u5230\u521a\u624d\u53d6\u676f\u5b50\u7684\u5730\u65b9",
+      "expected": {"operators_include": "navigate_to", "temporal_scope": "most_recent_verified_past"}
+    },
+    {
+      "id": "implicit_support_relation",
+      "layer": "semantic",
+      "utterance": "\u628a\u767d\u8272\u9a6c\u514b\u676f\u653e\u5230\u64cd\u4f5c\u53f0B",
+      "expected": {"operators": ["place_object"], "spatial_relation": "supported_by"}
+    },
+    {
+      "id": "ambiguous_container",
+      "layer": "interaction",
+      "utterance": "\u7ed9\u6211\u63a5\u4e00\u676f\u6c34",
+      "expected": {"status": "role_clarification_required", "pending_role": "theme"}
+    },
+    {
+      "id": "ambiguous_navigation",
+      "layer": "interaction",
+      "utterance": "\u8d70\u5230\u676f\u5b50\u65c1\u8fb9",
+      "expected": {"status": "contextual_affordance_disambiguation_required"}
+    },
+    {
+      "id": "unknown_process_template",
+      "layer": "interaction",
+      "utterance": "\u628a\u82f9\u679c\u634e\u7ed9\u5ba2\u4eba",
+      "expected": {"status": "process_slot_clarification_required", "template_id": "handover_object"}
+    },
+    {
+      "id": "explicit_container_precedence",
+      "layer": "interaction",
+      "utterance": "\u7528\u767d\u8272\u9a6c\u514b\u676f\u7ed9\u6211\u63a5\u6c34",
+      "expected": {"status": "motion_started", "theme_entity_ref": "mug_white"}
+    },
+    {
+      "id": "unknown_concept_safe_boundary",
+      "layer": "interaction",
+      "utterance": "\u628a\u6728\u8d28\u5bb9\u5668\u653e\u597d",
+      "expected": {"not_motion_started": true, "runtime_fact_committed": false}
+    }
+  ]
+}

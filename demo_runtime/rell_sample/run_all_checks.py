@@ -591,6 +591,7 @@ def main() -> None:
     run_python("validate_communication_dictionary_architecture.py")
     run_python("validate_discourse_event_graph.py")
     run_python("validate_language_paraphrase_properties.py")
+    run_python("benchmark_p020_natural_language.py")
     run_python("validate_contextual_language_runtime.py")
     run_python("validate_failure_recovery_architecture.py")
     run_python("validate_semantic_grounding_architecture.py")
