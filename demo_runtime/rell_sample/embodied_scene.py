@@ -10046,6 +10046,112 @@ def _build_structured_relative_spatial_motion(
     direction = roles.get("direction") or {}
     destination = roles.get("destination") or {}
     relation = direction.get("spatial_relation") or destination.get("spatial_relation")
+    def build_target_motion(
+        target_position: list[float],
+        *,
+        terminal_fact: str,
+        terminal_binding: dict[str, Any],
+        verification: dict[str, Any],
+        process_contract: str,
+    ) -> dict[str, Any]:
+        start = list(session["state"]["executor_position"])
+        envelope = build_effective_execution_envelope(session["executor_profile"], session.get("protection_policy_overlay"))
+        planning_radius = envelope["effective_constraints"]["body_radius_m"] + envelope["effective_constraints"]["minimum_avoidance_distance_m"]
+        plan = _plan_verified_motion(session, start, target_position, planning_radius)
+        if plan.get("outcome") != "verified":
+            return {
+                "status": "contextual_spatial_motion_blocked",
+                "reason": "no_verified_route_to_relative_spatial_region",
+                "frames": [],
+                "route_evidence": deepcopy(plan),
+                "relative_spatial_execution_contract": {
+                    "relation": relation,
+                    "process_contract": process_contract,
+                    "control_gateway": "P018",
+                    "verification_gateway": "P016",
+                    "world_revision": session["world_revision"],
+                },
+                "session": get_session(session["session_id"]),
+            }
+        frames: list[dict[str, Any]] = []
+        segment_start = start
+        current_yaw = float(session["state"].get("executor_yaw_deg") or 0.0)
+        for waypoint in plan["waypoints"]:
+            segment_yaw = math.degrees(math.atan2(waypoint[1] - segment_start[1], waypoint[0] - segment_start[0]))
+            if math.dist(segment_start, waypoint) > 0.001 and abs(segment_yaw - current_yaw) > 0.1:
+                frames.extend(_rotation_frames(segment_start, current_yaw, segment_yaw))
+            count = max(3, int(math.dist(segment_start, waypoint) / 0.05) + 1)
+            frames.extend(_with_yaw(_interpolate(segment_start, waypoint, count)[1:], segment_yaw))
+            segment_start = waypoint
+            current_yaw = segment_yaw
+        _apply_speed_timing(frames, session["executor_profile"]["max_linear_speed_mps"])
+        return {
+            "status": "fact_established",
+            "reason": "structured_relative_region_physically_verified",
+            "frames": frames,
+            "terminal_fact": terminal_fact,
+            "terminal_fact_binding": terminal_binding,
+            "terminal_verification": verification,
+            "relative_spatial_execution_contract": {
+                "relation": relation,
+                "process_contract": process_contract,
+                "control_gateway": "P018",
+                "verification_gateway": "P016",
+                "world_revision": session["world_revision"],
+            },
+            "effective_execution_envelope": envelope,
+            "session": get_session(session["session_id"]),
+        }
+    if relation in {"in_front_of", "behind"} and destination.get("reference") == "human_speaker":
+        reference = next((item for item in session.get("runtime_objects", []) if item.get("kind") == "human_recipient" and item.get("active") is not False), None)
+        if not reference:
+            return None
+        executor_position = list(session["state"]["executor_position"])
+        reference_position = list(reference["position"])
+        vector = [executor_position[0] - reference_position[0], executor_position[1] - reference_position[1]]
+        length = max(math.hypot(vector[0], vector[1]), 0.001)
+        heading = [vector[0] / length, vector[1] / length]
+        envelope = build_effective_execution_envelope(session["executor_profile"], session.get("protection_policy_overlay"))
+        offset = max(float(reference["size"][0]), float(reference["size"][1])) / 2 + envelope["effective_constraints"]["body_radius_m"] + envelope["effective_constraints"]["minimum_avoidance_distance_m"] + 0.08
+        sign = 1.0 if relation == "in_front_of" else -1.0
+        target = [reference_position[0] + sign * heading[0] * offset, reference_position[1] + sign * heading[1] * offset]
+        return build_target_motion(
+            target,
+            terminal_fact="executor_in_front_of_reference" if relation == "in_front_of" else "executor_behind_reference",
+            terminal_binding={"entity_ref": reference["entity_id"], "relation": relation},
+            verification={
+                "kind": "human_relative_region",
+                "entity_ref": reference["entity_id"],
+                "relation": relation,
+                "reference_heading": heading,
+                "target_position": target,
+                "maximum_position_error_m": 0.08,
+            },
+            process_contract="navigate_to_front_region" if relation == "in_front_of" else "navigate_to_rear_region",
+        )
+    if relation == "between":
+        first_role = roles.get("between_reference_a") or {}
+        second_role = roles.get("between_reference_b") or {}
+        first_ref = first_role.get("entity_ref") or first_role.get("value_ref")
+        second_ref = second_role.get("entity_ref") or second_role.get("value_ref")
+        first = next((item for item in session.get("runtime_objects", []) if item.get("entity_id") == first_ref), None)
+        second = next((item for item in session.get("runtime_objects", []) if item.get("entity_id") == second_ref), None)
+        if not first or not second:
+            return None
+        target = [(float(first["position"][0]) + float(second["position"][0])) / 2, (float(first["position"][1]) + float(second["position"][1])) / 2]
+        return build_target_motion(
+            target,
+            terminal_fact="executor_between_references",
+            terminal_binding={"entity_refs": [first_ref, second_ref], "relation": "between"},
+            verification={
+                "kind": "between_reference_region",
+                "entity_ref": first_ref,
+                "reference_entity_refs": [first_ref, second_ref],
+                "target_position": target,
+                "maximum_position_error_m": 0.08,
+            },
+            process_contract="navigate_to_between_region",
+        )
     if relation == "facing" and direction.get("reference") == "human_speaker":
         reference = next(
             (item for item in session.get("runtime_objects", []) if item.get("kind") == "human_recipient" and item.get("active") is not False),
@@ -12352,6 +12458,21 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
                 "target_yaw_deg": target_yaw,
                 "actual_yaw_deg": actual_yaw,
                 "orientation_error_deg": round(orientation_error, 4),
+                "relation_verified": relation_verified,
+                "world_revision": session["world_revision"],
+                "verifier": "P016",
+            }
+        elif terminal_verification.get("kind") in {"human_relative_region", "between_reference_region"}:
+            target_position = list(terminal_verification["target_position"])
+            actual_position = list(session["state"]["executor_position"])
+            position_error = math.dist(actual_position, target_position)
+            relation_verified = position_error <= float(terminal_verification["maximum_position_error_m"])
+            result["terminal_verification_evidence"] = {
+                "entity_ref": terminal_verification["entity_ref"],
+                "reference_entity_refs": deepcopy(terminal_verification.get("reference_entity_refs") or [terminal_verification["entity_ref"]]),
+                "target_position": target_position,
+                "actual_position": actual_position,
+                "position_error_m": round(position_error, 4),
                 "relation_verified": relation_verified,
                 "world_revision": session["world_revision"],
                 "verifier": "P016",

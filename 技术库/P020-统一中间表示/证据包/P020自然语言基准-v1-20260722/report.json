@@ -2,8 +2,8 @@
   "schema_version": "1.7.0",
   "benchmark_id": "p020_natural_language_benchmark_v1",
   "totals": {
-    "cases": 275,
-    "passed": 275
+    "cases": 279,
+    "passed": 279
   },
   "pass_rate": 1.0,
   "layered_statistics": {
@@ -38,26 +38,26 @@
       "status": "measured"
     },
     "runtime_planning_decision": {
-      "applicable_cases": 6,
-      "passed": 6,
+      "applicable_cases": 9,
+      "passed": 9,
       "pass_rate": 1.0,
       "status": "measured"
     },
     "runtime_motion_started": {
-      "applicable_cases": 4,
-      "passed": 4,
+      "applicable_cases": 5,
+      "passed": 5,
       "pass_rate": 1.0,
       "status": "measured"
     },
     "runtime_execution_completion": {
-      "applicable_cases": 4,
-      "passed": 4,
+      "applicable_cases": 5,
+      "passed": 5,
       "pass_rate": 1.0,
       "status": "measured"
     },
     "terminal_fact_verification": {
-      "applicable_cases": 4,
-      "passed": 4,
+      "applicable_cases": 5,
+      "passed": 5,
       "pass_rate": 1.0,
       "status": "measured"
     },
@@ -80,8 +80,8 @@
       "status": "measured"
     },
     "safe_rejection": {
-      "applicable_cases": 4,
-      "passed": 4,
+      "applicable_cases": 6,
+      "passed": 6,
       "pass_rate": 1.0,
       "status": "measured"
     },
@@ -145,13 +145,13 @@
       "pass_rate": 1.0
     },
     "运行时执行闭环": {
-      "cases": 4,
-      "passed": 4,
+      "cases": 5,
+      "passed": 5,
       "pass_rate": 1.0
     },
     "运行时规划决策": {
-      "cases": 6,
-      "passed": 6,
+      "cases": 9,
+      "passed": 9,
       "pass_rate": 1.0
     }
   },
@@ -7955,6 +7955,93 @@
       }
     },
     {
+      "id": "runtime_planning_front_region_blocked_by_current_clearance",
+      "category": "运行时规划决策",
+      "layer": "runtime_planning",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": "contextual_spatial_motion_blocked",
+        "expected_status": "contextual_spatial_motion_blocked",
+        "expected_statuses": [
+          "contextual_spatial_motion_blocked"
+        ],
+        "motion_started": false,
+        "safe_block": true,
+        "runtime_fact_committed": false
+      },
+      "diagnostics": {
+        "semantic_parse_correct": null,
+        "role_grounding_correct": null,
+        "historical_context_correct": null,
+        "inquiry_correct": null,
+        "structured_recovery_success": null,
+        "planning_contract_compiled": null,
+        "runtime_planning_decision_correct": true,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": true
+      }
+    },
+    {
+      "id": "runtime_planning_rear_region_blocked_by_current_clearance",
+      "category": "运行时规划决策",
+      "layer": "runtime_planning",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": "contextual_spatial_motion_blocked",
+        "expected_status": "contextual_spatial_motion_blocked",
+        "expected_statuses": [
+          "contextual_spatial_motion_blocked"
+        ],
+        "motion_started": false,
+        "safe_block": true,
+        "runtime_fact_committed": false
+      },
+      "diagnostics": {
+        "semantic_parse_correct": null,
+        "role_grounding_correct": null,
+        "historical_context_correct": null,
+        "inquiry_correct": null,
+        "structured_recovery_success": null,
+        "planning_contract_compiled": null,
+        "runtime_planning_decision_correct": true,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": true
+      }
+    },
+    {
+      "id": "runtime_planning_between_executor_contract",
+      "category": "运行时规划决策",
+      "layer": "runtime_planning",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": "motion_started",
+        "expected_status": "motion_started",
+        "expected_statuses": [
+          "motion_started"
+        ],
+        "motion_started": true,
+        "safe_block": false,
+        "runtime_fact_committed": false
+      },
+      "diagnostics": {
+        "semantic_parse_correct": null,
+        "role_grounding_correct": null,
+        "historical_context_correct": null,
+        "inquiry_correct": null,
+        "structured_recovery_success": null,
+        "planning_contract_compiled": null,
+        "runtime_planning_decision_correct": true,
+        "planning_success": true,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
       "id": "runtime_execution_water_service_complete",
       "category": "运行时执行闭环",
       "layer": "runtime_execution",
@@ -8067,6 +8154,38 @@
         ],
         "expected_terminal_facts": [
           "executor_facing_reference"
+        ],
+        "all_terminal_facts_verified": true,
+        "execution_completed": true,
+        "runtime_fact_committed": true
+      },
+      "diagnostics": {
+        "semantic_parse_correct": null,
+        "role_grounding_correct": null,
+        "historical_context_correct": null,
+        "inquiry_correct": null,
+        "structured_recovery_success": null,
+        "planning_contract_compiled": null,
+        "runtime_planning_decision_correct": null,
+        "planning_success": true,
+        "execution_completion": true,
+        "physical_verification_passed": true,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "runtime_execution_between_navigation_complete",
+      "category": "运行时执行闭环",
+      "layer": "runtime_execution",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "initial_status": "motion_started",
+        "terminal_facts": [
+          "executor_between_references"
+        ],
+        "expected_terminal_facts": [
+          "executor_between_references"
         ],
         "all_terminal_facts_verified": true,
         "execution_completed": true,

@@ -53,3 +53,7 @@
 - “面向我”依据当前人体位置计算动态目标朝向，P016 验真 `executor_facing_reference` 和最终角度误差。
 
 两种能力都从结构化角色进入执行层，不在执行层重读自然语言。
+
+`between` 也已形成运行时闭环：“站到操作台A和操作台B之间”使用两个稳定 `EntityRef` 计算派生中间区域，完成扫掠体积规划并由 P016 验真 `executor_between_references`。
+
+`in_front_of` 和 `behind` 已进入相同执行合同，但当前场景的人体前后目标区路径被固定家具阻断，因此返回 `contextual_spatial_motion_blocked`、空帧和完整路线证据。该结果代表物理条件不满足，不代表语义或规划合同缺失。

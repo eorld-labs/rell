@@ -308,6 +308,9 @@ def _runtime_planning_fixture_results() -> list[dict[str, Any]]:
         ("grasp_requires_confirmation", "拿起白色马克杯", ("requires_human_confirmation", "process_grounding_clarification_required")),
         ("beside_executor_contract", "走到操作台A旁边", "motion_started"),
         ("facing_executor_contract", "面向我", "motion_started"),
+        ("front_region_blocked_by_current_clearance", "站到我前面", "contextual_spatial_motion_blocked"),
+        ("rear_region_blocked_by_current_clearance", "站到我后面", "contextual_spatial_motion_blocked"),
+        ("between_executor_contract", "站到操作台A和操作台B之间", "motion_started"),
     )
     results = []
     for fixture_id, utterance, expected_status in fixtures:
@@ -328,7 +331,7 @@ def _runtime_planning_fixture_results() -> list[dict[str, Any]]:
                 "expected_status": expected_statuses[0] if len(expected_statuses) == 1 else None,
                 "expected_statuses": list(expected_statuses),
                 "motion_started": status == "motion_started",
-                "safe_block": status in {"factory_concept_recognized_execution_gap", "concept_gap_clarification_required"},
+                "safe_block": status in {"factory_concept_recognized_execution_gap", "concept_gap_clarification_required", "contextual_spatial_motion_blocked"},
                 "runtime_fact_committed": bool(result.get("runtime_fact_committed") or immediate.get("runtime_fact_committed")),
             },
             "diagnostics": {
@@ -341,7 +344,7 @@ def _runtime_planning_fixture_results() -> list[dict[str, Any]]:
                 "runtime_planning_decision_correct": passed,
                 "planning_success": passed if expected_statuses == ("motion_started",) else None,
                 "physical_verification_passed": None,
-                "safe_rejection": passed if set(expected_statuses).intersection({"factory_concept_recognized_execution_gap", "concept_gap_clarification_required"}) else None,
+                "safe_rejection": passed if set(expected_statuses).intersection({"factory_concept_recognized_execution_gap", "concept_gap_clarification_required", "contextual_spatial_motion_blocked"}) else None,
             },
         })
     return results
@@ -368,6 +371,11 @@ def _runtime_execution_fixture_results() -> list[dict[str, Any]]:
             "facing_orientation_complete",
             "面向我",
             ["executor_facing_reference"],
+        ),
+        (
+            "between_navigation_complete",
+            "站到操作台A和操作台B之间",
+            ["executor_between_references"],
         ),
     )
     results = []
