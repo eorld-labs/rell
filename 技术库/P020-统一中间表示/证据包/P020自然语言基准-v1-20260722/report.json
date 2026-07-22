@@ -1,9 +1,9 @@
 {
-  "schema_version": "1.5.0",
+  "schema_version": "1.6.0",
   "benchmark_id": "p020_natural_language_benchmark_v1",
   "totals": {
-    "cases": 265,
-    "passed": 265
+    "cases": 271,
+    "passed": 271
   },
   "pass_rate": 1.0,
   "layered_statistics": {
@@ -37,6 +37,18 @@
       "pass_rate": 1.0,
       "status": "measured"
     },
+    "runtime_planning_decision": {
+      "applicable_cases": 6,
+      "passed": 6,
+      "pass_rate": 1.0,
+      "status": "measured"
+    },
+    "runtime_motion_started": {
+      "applicable_cases": 2,
+      "passed": 2,
+      "pass_rate": 1.0,
+      "status": "measured"
+    },
     "planning_success": {
       "applicable_cases": 1,
       "passed": 1,
@@ -56,8 +68,8 @@
       "status": "measured"
     },
     "safe_rejection": {
-      "applicable_cases": 4,
-      "passed": 4,
+      "applicable_cases": 6,
+      "passed": 6,
       "pass_rate": 1.0,
       "status": "measured"
     },
@@ -118,6 +130,11 @@
     "询问与澄清": {
       "cases": 3,
       "passed": 3,
+      "pass_rate": 1.0
+    },
+    "运行时规划决策": {
+      "cases": 6,
+      "passed": 6,
       "pass_rate": 1.0
     }
   },
@@ -7743,6 +7760,181 @@
         "planning_success": null,
         "physical_verification_passed": null,
         "safe_rejection": null
+      }
+    },
+    {
+      "id": "runtime_planning_refill_explicit_mug",
+      "category": "运行时规划决策",
+      "layer": "runtime_planning",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": "motion_started",
+        "expected_status": "motion_started",
+        "expected_statuses": [
+          "motion_started"
+        ],
+        "motion_started": true,
+        "safe_block": false,
+        "runtime_fact_committed": false
+      },
+      "diagnostics": {
+        "semantic_parse_correct": null,
+        "role_grounding_correct": null,
+        "historical_context_correct": null,
+        "inquiry_correct": null,
+        "structured_recovery_success": null,
+        "planning_contract_compiled": null,
+        "runtime_planning_decision_correct": true,
+        "planning_success": true,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "runtime_planning_navigate_near_human",
+      "category": "运行时规划决策",
+      "layer": "runtime_planning",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": "motion_started",
+        "expected_status": "motion_started",
+        "expected_statuses": [
+          "motion_started"
+        ],
+        "motion_started": true,
+        "safe_block": false,
+        "runtime_fact_committed": false
+      },
+      "diagnostics": {
+        "semantic_parse_correct": null,
+        "role_grounding_correct": null,
+        "historical_context_correct": null,
+        "inquiry_correct": null,
+        "structured_recovery_success": null,
+        "planning_contract_compiled": null,
+        "runtime_planning_decision_correct": true,
+        "planning_success": true,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "runtime_planning_place_requires_confirmation",
+      "category": "运行时规划决策",
+      "layer": "runtime_planning",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": "requires_human_confirmation",
+        "expected_status": "requires_human_confirmation",
+        "expected_statuses": [
+          "requires_human_confirmation"
+        ],
+        "motion_started": false,
+        "safe_block": false,
+        "runtime_fact_committed": false
+      },
+      "diagnostics": {
+        "semantic_parse_correct": null,
+        "role_grounding_correct": null,
+        "historical_context_correct": null,
+        "inquiry_correct": null,
+        "structured_recovery_success": null,
+        "planning_contract_compiled": null,
+        "runtime_planning_decision_correct": true,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "runtime_planning_grasp_requires_confirmation",
+      "category": "运行时规划决策",
+      "layer": "runtime_planning",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": "process_grounding_clarification_required",
+        "expected_status": null,
+        "expected_statuses": [
+          "requires_human_confirmation",
+          "process_grounding_clarification_required"
+        ],
+        "motion_started": false,
+        "safe_block": false,
+        "runtime_fact_committed": false
+      },
+      "diagnostics": {
+        "semantic_parse_correct": null,
+        "role_grounding_correct": null,
+        "historical_context_correct": null,
+        "inquiry_correct": null,
+        "structured_recovery_success": null,
+        "planning_contract_compiled": null,
+        "runtime_planning_decision_correct": true,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "runtime_planning_beside_missing_executor_contract",
+      "category": "运行时规划决策",
+      "layer": "runtime_planning",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": "factory_concept_recognized_execution_gap",
+        "expected_status": "factory_concept_recognized_execution_gap",
+        "expected_statuses": [
+          "factory_concept_recognized_execution_gap"
+        ],
+        "motion_started": false,
+        "safe_block": true,
+        "runtime_fact_committed": false
+      },
+      "diagnostics": {
+        "semantic_parse_correct": null,
+        "role_grounding_correct": null,
+        "historical_context_correct": null,
+        "inquiry_correct": null,
+        "structured_recovery_success": null,
+        "planning_contract_compiled": null,
+        "runtime_planning_decision_correct": true,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": true
+      }
+    },
+    {
+      "id": "runtime_planning_facing_missing_executor_contract",
+      "category": "运行时规划决策",
+      "layer": "runtime_planning",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": "concept_gap_clarification_required",
+        "expected_status": "concept_gap_clarification_required",
+        "expected_statuses": [
+          "concept_gap_clarification_required"
+        ],
+        "motion_started": false,
+        "safe_block": true,
+        "runtime_fact_committed": false
+      },
+      "diagnostics": {
+        "semantic_parse_correct": null,
+        "role_grounding_correct": null,
+        "historical_context_correct": null,
+        "inquiry_correct": null,
+        "structured_recovery_success": null,
+        "planning_contract_compiled": null,
+        "runtime_planning_decision_correct": true,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": true
       }
     }
   ]

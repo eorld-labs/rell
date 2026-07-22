@@ -299,6 +299,53 @@ def _planning_contract_fixture_results() -> list[dict[str, Any]]:
     return results
 
 
+def _runtime_planning_fixture_results() -> list[dict[str, Any]]:
+    fixtures = (
+        ("refill_explicit_mug", "用白色马克杯给我接水", "motion_started"),
+        ("navigate_near_human", "站到我身边", "motion_started"),
+        ("place_requires_confirmation", "把白色马克杯放到操作台B", "requires_human_confirmation"),
+        ("grasp_requires_confirmation", "拿起白色马克杯", ("requires_human_confirmation", "process_grounding_clarification_required")),
+        ("beside_missing_executor_contract", "走到操作台A旁边", "factory_concept_recognized_execution_gap"),
+        ("facing_missing_executor_contract", "面向我", "concept_gap_clarification_required"),
+    )
+    results = []
+    for fixture_id, utterance, expected_status in fixtures:
+        started = start_session("home_humanoid", "hospitality_guest")
+        result = begin_motion_command(started["session_id"], utterance)
+        immediate = result.get("immediate_result") or result
+        status = result.get("status") or immediate.get("status")
+        expected_statuses = (expected_status,) if isinstance(expected_status, str) else expected_status
+        passed = status in expected_statuses
+        results.append({
+            "id": f"runtime_planning_{fixture_id}",
+            "category": "运行时规划决策",
+            "layer": "runtime_planning",
+            "passed": passed,
+            "failures": [] if passed else [f"status={status!r}"],
+            "observed": {
+                "status": status,
+                "expected_status": expected_statuses[0] if len(expected_statuses) == 1 else None,
+                "expected_statuses": list(expected_statuses),
+                "motion_started": status == "motion_started",
+                "safe_block": status in {"factory_concept_recognized_execution_gap", "concept_gap_clarification_required"},
+                "runtime_fact_committed": bool(result.get("runtime_fact_committed") or immediate.get("runtime_fact_committed")),
+            },
+            "diagnostics": {
+                "semantic_parse_correct": None,
+                "role_grounding_correct": None,
+                "historical_context_correct": None,
+                "inquiry_correct": None,
+                "structured_recovery_success": None,
+                "planning_contract_compiled": None,
+                "runtime_planning_decision_correct": passed,
+                "planning_success": passed if expected_statuses == ("motion_started",) else None,
+                "physical_verification_passed": None,
+                "safe_rejection": passed if set(expected_statuses).intersection({"factory_concept_recognized_execution_gap", "concept_gap_clarification_required"}) else None,
+            },
+        })
+    return results
+
+
 def run() -> dict[str, Any]:
     benchmark = json.loads(BENCHMARK.read_text(encoding="utf-8"))
     cases = _expand_cases(benchmark["cases"])
@@ -341,6 +388,7 @@ def run() -> dict[str, Any]:
     results.extend(_physical_fixture_results())
     results.extend(_recovery_fixture_results())
     results.extend(_planning_contract_fixture_results())
+    results.extend(_runtime_planning_fixture_results())
     totals = {"cases": len(results), "passed": sum(item["passed"] for item in results)}
     applicable = {
         "semantic_parse": [item for item in results if item["layer"] == "semantic"],
@@ -348,6 +396,8 @@ def run() -> dict[str, Any]:
         "historical_context": [item for item in results if item["diagnostics"].get("historical_context_correct") is not None],
         "inquiry_correctness": [item for item in results if item["layer"] == "interaction" and item["observed"].get("status") in {"role_clarification_required", "contextual_affordance_disambiguation_required", "process_slot_clarification_required"}],
         "planning_contract_compilation": [item for item in results if item["layer"] == "planning_contract"],
+        "runtime_planning_decision": [item for item in results if item["layer"] == "runtime_planning"],
+        "runtime_motion_started": [item for item in results if item["layer"] == "runtime_planning" and item["observed"].get("expected_statuses") == ["motion_started"]],
         "planning_success": [item for item in results if item["layer"] == "interaction" and item["observed"].get("status") == "motion_started"],
         "structured_recovery": [item for item in results if item["layer"] == "recovery"],
         "physical_verification": [item for item in results if item["layer"] == "physical"],
@@ -377,7 +427,7 @@ def run() -> dict[str, Any]:
             "passed": sum(item["passed"] for item in items),
             "pass_rate": sum(item["passed"] for item in items) / len(items),
         }
-    report = {"schema_version": "1.5.0", "benchmark_id": "p020_natural_language_benchmark_v1", "totals": totals, "pass_rate": totals["passed"] / totals["cases"] if totals["cases"] else 0.0, "layered_statistics": layered_statistics, "category_statistics": category_statistics, "results": results}
+    report = {"schema_version": "1.6.0", "benchmark_id": "p020_natural_language_benchmark_v1", "totals": totals, "pass_rate": totals["passed"] / totals["cases"] if totals["cases"] else 0.0, "layered_statistics": layered_statistics, "category_statistics": category_statistics, "results": results}
     OUTPUT.mkdir(parents=True, exist_ok=True)
     (OUTPUT / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     return report
