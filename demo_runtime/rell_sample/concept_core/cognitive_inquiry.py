@@ -607,6 +607,19 @@ def run_concept_validation_loop(
         lifecycle_status="validating",
         evidence_refs=pattern_evidence_refs,
     )
+    candidate["minimal_causal_contract"] = {
+        "observable_features": ["compliant_contact", "projection_inside_boundary"],
+        "functional_affordances": ["support_payload_after_release"],
+        "participating_relations": ["supported_by", "supports"],
+        "preconditions": ["payload_released", "projection_inside_boundary"],
+        "effects": ["stable_support_after_release"],
+        "p016_verification_conditions": ["support_contact_stable", "payload_remains_supported_after_release"],
+    }
+    candidate["applicability_contract"] = {
+        "scope": ["compliant_support_instances", "low_risk_payload_release"],
+        "counterexamples": ["rigid_contact_without_stability", "scene_specific_coincidence"],
+        "new_instance_required": True,
+    }
     authorization = runtime.authorize_route(
         inquiry["inquiry_id"],
         route="safe_probe",
@@ -673,6 +686,18 @@ def run_concept_validation_loop(
         "rollback_supported": True,
         "execution_authority_granted": False,
     }
+    language_adapter_candidate = {
+        "adapter_id": stable_id(
+            "language_adapter_candidate",
+            {"concept": candidate["concept_id"], "decision": decision["decision"]},
+        ),
+        "concept_ref": candidate["concept_id"],
+        "status": "candidate_generated" if prediction_confirmed else "withheld_after_rejection",
+        "surface_forms": ["柔性承托", "顺应性支撑"],
+        "core_dictionary_write_allowed": False,
+        "requires_dictionary_authority_admission": True,
+        "evidence_refs": [verification["envelope_id"]],
+    }
     return {
         "loop_type": "candidate_concept_validation",
         "pattern_episode_count": 3,
@@ -685,6 +710,7 @@ def run_concept_validation_loop(
         "action": authorization,
         "closure": closed,
         "decision": decision,
+        "language_adapter_candidate": language_adapter_candidate,
         "transition_log": deepcopy(runtime.transition_log),
         "planning_view": authority.planning_view(closed["predicate_ref"]),
         "explanation_view": authority.explanation_view(closed["event_ref"]),

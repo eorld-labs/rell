@@ -136,6 +136,7 @@ def run_cognitive_inquiry(
         "explanation_view": deepcopy(explanation),
         "concept_decision": deepcopy(loop.get("decision")),
         "concept_candidate": deepcopy(loop.get("candidate")),
+        "language_adapter_candidate": deepcopy(loop.get("language_adapter_candidate")),
         "authority_extension": authority_extension,
         "shared_readback": {
             "same_fact_authority": planning["fact_authority_ref"]
