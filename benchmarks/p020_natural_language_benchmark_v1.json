@@ -128,6 +128,42 @@
       "layer": "semantic",
       "utterance": "\u628a\u676f\u5b50\u653e\u56de\u521a\u624d\u53d6\u676f\u5b50\u7684\u53f0\u9762",
       "expected": {"operators_include": "place_object"}
+    },
+    {
+      "id": "human_relative_near",
+      "layer": "semantic",
+      "utterance": "\u7ad9\u5230\u6211\u8eab\u8fb9",
+      "expected": {"operators": ["navigate_to"], "spatial_relation": "near_human"}
+    },
+    {
+      "id": "human_relative_front",
+      "layer": "semantic",
+      "utterance": "\u7ad9\u5230\u6211\u524d\u9762",
+      "expected": {"operators": ["navigate_to"], "spatial_relation": "in_front_of"}
+    },
+    {
+      "id": "human_relative_behind",
+      "layer": "semantic",
+      "utterance": "\u7ad9\u5230\u6211\u540e\u9762",
+      "expected": {"operators": ["navigate_to"], "spatial_relation": "behind"}
+    },
+    {
+      "id": "human_relative_facing",
+      "layer": "semantic",
+      "utterance": "\u9762\u5411\u6211",
+      "expected": {"operators": ["orient_executor"], "spatial_relation": "facing"}
+    },
+    {
+      "id": "landmark_beside",
+      "layer": "semantic",
+      "utterance": "\u8d70\u5230\u64cd\u4f5c\u53f0A\u65c1\u8fb9",
+      "expected": {"operators": ["navigate_to"], "spatial_relation": "beside"}
+    },
+    {
+      "id": "landmark_between",
+      "layer": "semantic",
+      "utterance": "\u7ad9\u5230\u64cd\u4f5c\u53f0A\u548c\u64cd\u4f5c\u53f0B\u4e4b\u95f4",
+      "expected": {"operators": ["navigate_to"], "spatial_relation": "between"}
     }
   ]
 }

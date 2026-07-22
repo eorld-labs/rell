@@ -111,7 +111,7 @@ def _category(case: dict[str, Any]) -> str:
         return "指代和历史省略"
     if "compound" in case_id or "connector" in case_id:
         return "复合任务与语篇"
-    if "surface" in case_id or "tray" in case_id or "support" in case_id:
+    if any(token in case_id for token in ("surface", "tray", "support", "human_relative", "landmark_")):
         return "空间关系"
     if "reported" in case_id:
         return "报告与事实区分"
@@ -274,6 +274,7 @@ def run() -> dict[str, Any]:
             "diagnostics": {
                 "semantic_parse_correct": matched if case["layer"] == "semantic" else None,
                 "role_grounding_correct": matched if case["layer"] == "semantic" and any(key in case["expected"] for key in ("theme_entity_ref", "destination_entity_ref", "spatial_relation")) else None,
+                "historical_context_correct": matched if _category(case) == "指代和历史省略" else None,
                 "inquiry_correct": matched if view.get("status") in inquiry_statuses else None,
                 "planning_success": view.get("status") == "motion_started" if case["layer"] == "interaction" else None,
                 "physical_verification_passed": view.get("runtime_fact_committed") if view.get("runtime_fact_committed") else None,
@@ -285,10 +286,13 @@ def run() -> dict[str, Any]:
     totals = {"cases": len(results), "passed": sum(item["passed"] for item in results)}
     applicable = {
         "semantic_parse": [item for item in results if item["layer"] == "semantic"],
+        "role_grounding": [item for item in results if item["diagnostics"].get("role_grounding_correct") is not None],
+        "historical_context": [item for item in results if item["diagnostics"].get("historical_context_correct") is not None],
         "inquiry_correctness": [item for item in results if item["layer"] == "interaction" and item["observed"].get("status") in {"role_clarification_required", "contextual_affordance_disambiguation_required", "process_slot_clarification_required"}],
         "planning_success": [item for item in results if item["layer"] == "interaction" and item["observed"].get("status") == "motion_started"],
         "structured_recovery": [item for item in results if item["layer"] == "recovery"],
         "physical_verification": [item for item in results if item["layer"] == "physical"],
+        "safe_rejection": [item for item in results if item["diagnostics"].get("safe_rejection") is not None],
     }
     layered_statistics = {}
     for name, items in applicable.items():

@@ -2,14 +2,26 @@
   "schema_version": "1.4.0",
   "benchmark_id": "p020_natural_language_benchmark_v1",
   "totals": {
-    "cases": 109,
-    "passed": 109
+    "cases": 115,
+    "passed": 115
   },
   "pass_rate": 1.0,
   "layered_statistics": {
     "semantic_parse": {
-      "applicable_cases": 96,
-      "passed": 96,
+      "applicable_cases": 102,
+      "passed": 102,
+      "pass_rate": 1.0,
+      "status": "measured"
+    },
+    "role_grounding": {
+      "applicable_cases": 8,
+      "passed": 8,
+      "pass_rate": 1.0,
+      "status": "measured"
+    },
+    "historical_context": {
+      "applicable_cases": 77,
+      "passed": 77,
       "pass_rate": 1.0,
       "status": "measured"
     },
@@ -34,6 +46,12 @@
     "physical_verification": {
       "applicable_cases": 3,
       "passed": 3,
+      "pass_rate": 1.0,
+      "status": "measured"
+    },
+    "safe_rejection": {
+      "applicable_cases": 4,
+      "passed": 4,
       "pass_rate": 1.0,
       "status": "measured"
     },
@@ -72,8 +90,8 @@
       "pass_rate": 1.0
     },
     "空间关系": {
-      "cases": 4,
-      "passed": 4,
+      "cases": 10,
+      "passed": 10,
       "pass_rate": 1.0
     },
     "结构化恢复": {
@@ -115,6 +133,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": true,
+        "historical_context_correct": null,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -144,6 +163,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": null,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -172,6 +192,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": null,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -201,6 +222,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -229,6 +251,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": true,
+        "historical_context_correct": null,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -255,6 +278,7 @@
       "diagnostics": {
         "semantic_parse_correct": null,
         "role_grounding_correct": null,
+        "historical_context_correct": null,
         "inquiry_correct": true,
         "planning_success": false,
         "physical_verification_passed": null,
@@ -283,6 +307,7 @@
       "diagnostics": {
         "semantic_parse_correct": null,
         "role_grounding_correct": null,
+        "historical_context_correct": null,
         "inquiry_correct": true,
         "planning_success": false,
         "physical_verification_passed": null,
@@ -309,6 +334,7 @@
       "diagnostics": {
         "semantic_parse_correct": null,
         "role_grounding_correct": null,
+        "historical_context_correct": null,
         "inquiry_correct": true,
         "planning_success": false,
         "physical_verification_passed": null,
@@ -337,6 +363,7 @@
       "diagnostics": {
         "semantic_parse_correct": null,
         "role_grounding_correct": null,
+        "historical_context_correct": null,
         "inquiry_correct": null,
         "planning_success": true,
         "physical_verification_passed": null,
@@ -363,6 +390,7 @@
       "diagnostics": {
         "semantic_parse_correct": null,
         "role_grounding_correct": null,
+        "historical_context_correct": null,
         "inquiry_correct": true,
         "planning_success": false,
         "physical_verification_passed": null,
@@ -392,6 +420,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": null,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -421,6 +450,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": null,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -451,6 +481,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": null,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -480,6 +511,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": null,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -508,6 +540,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -536,6 +569,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -565,6 +599,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -593,6 +628,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": null,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -621,6 +657,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": null,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -649,6 +686,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": null,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -677,6 +715,181 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "human_relative_near",
+      "category": "空间关系",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "navigate_to"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": "guest",
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": true,
+        "historical_context_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "human_relative_front",
+      "category": "空间关系",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "navigate_to"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": "guest",
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": true,
+        "historical_context_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "human_relative_behind",
+      "category": "空间关系",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "navigate_to"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": "guest",
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": true,
+        "historical_context_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "human_relative_facing",
+      "category": "空间关系",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "orient_executor"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": true,
+        "historical_context_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "landmark_beside",
+      "category": "空间关系",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "navigate_to"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": "hospitality_counter_a",
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": true,
+        "historical_context_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "landmark_between",
+      "category": "空间关系",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "navigate_to"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": true,
+        "historical_context_correct": null,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -706,6 +919,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": null,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -735,6 +949,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": null,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -764,6 +979,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": null,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -793,6 +1009,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": null,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -822,6 +1039,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": null,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -851,6 +1069,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": null,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -880,6 +1099,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": null,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -909,6 +1129,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": null,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -937,6 +1158,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -965,6 +1187,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -993,6 +1216,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1021,6 +1245,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1049,6 +1274,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1077,6 +1303,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1105,6 +1332,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1133,6 +1361,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1161,6 +1390,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1189,6 +1419,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1217,6 +1448,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1245,6 +1477,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1273,6 +1506,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1301,6 +1535,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1329,6 +1564,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1357,6 +1593,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1385,6 +1622,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1413,6 +1651,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1441,6 +1680,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1469,6 +1709,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1497,6 +1738,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1525,6 +1767,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1553,6 +1796,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1581,6 +1825,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1609,6 +1854,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1637,6 +1883,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1665,6 +1912,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1693,6 +1941,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1721,6 +1970,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1749,6 +1999,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1777,6 +2028,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1805,6 +2057,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1833,6 +2086,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1861,6 +2115,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1889,6 +2144,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1917,6 +2173,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1945,6 +2202,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -1973,6 +2231,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2001,6 +2260,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2029,6 +2289,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2057,6 +2318,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2085,6 +2347,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2113,6 +2376,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2141,6 +2405,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2169,6 +2434,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2197,6 +2463,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2225,6 +2492,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2253,6 +2521,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2281,6 +2550,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2309,6 +2579,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2337,6 +2608,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2365,6 +2637,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2393,6 +2666,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2421,6 +2695,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2449,6 +2724,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2477,6 +2753,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2505,6 +2782,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2533,6 +2811,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2561,6 +2840,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2589,6 +2869,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2617,6 +2898,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2645,6 +2927,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2673,6 +2956,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2701,6 +2985,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2729,6 +3014,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2757,6 +3043,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2785,6 +3072,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2813,6 +3101,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2841,6 +3130,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2869,6 +3159,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2897,6 +3188,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
@@ -2925,6 +3217,7 @@
       "diagnostics": {
         "semantic_parse_correct": true,
         "role_grounding_correct": null,
+        "historical_context_correct": true,
         "inquiry_correct": null,
         "planning_success": null,
         "physical_verification_passed": null,
