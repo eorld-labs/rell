@@ -989,7 +989,17 @@ def _roles(
     roles: dict[str, Any] = {}
     if placing:
         surface = str(place_event.get("matched_surface") or "")
-        has_destination_connector = any(marker in surface for marker in ("到", "在"))
+        clause_start = int(place_event.get("start", 0))
+        clause_boundaries = [
+            position
+            for marker in ("然后", "随后", "之后", "再", "并且", "同时", "，", "。", "；")
+            if (position := text.find(marker, clause_start)) >= 0
+        ]
+        clause_end = min(clause_boundaries, default=len(text))
+        placement_clause = text[clause_start:clause_end]
+        has_destination_connector = any(
+            marker in placement_clause for marker in ("到", "在", "进", "入")
+        )
         restores_prior_relation = (
             "回" in surface
             or "归还" in surface
@@ -1070,16 +1080,15 @@ def _roles(
             roles["theme"] = {**deepcopy(held[0]), "binding_source": "implicit_unique_verified_holding_fact"}
         destination = roles.get("destination")
         if destination and isinstance(destination.get("start"), int):
-            relation_scope = text[int(destination["start"]):]
-            relation_scope = re.split(
-                r"(?:然后|随后|之后|再|并且|同时|，|。|；)",
-                relation_scope,
-                maxsplit=1,
-            )[0][:16]
+            # Chinese result markers may precede the destination noun
+            # ("放进托盘") or follow it ("放到托盘上"). Keep both in the
+            # semantic window so the relation is compiled before grounding.
+            relation_scope = placement_clause[:24]
             explicit_relation = next(
                 (
                     relation
                     for markers, relation in (
+                        (("放进", "放入", "置入", "放到里面", "放在里面"), "inside_container"),
                         (("上面", "上边", "上"), "on_support_surface"),
                         (("里面", "内部", "里"), "inside_container"),
                         (("附近",), "near_landmark"),

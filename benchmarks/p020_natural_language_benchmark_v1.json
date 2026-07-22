@@ -121,7 +121,25 @@
       "id": "tray_inside_relation",
       "layer": "semantic",
       "utterance": "\u628a\u9ad8\u811a\u676f\u653e\u8fdb\u6258\u76d8",
-      "expected": {"operators": ["place_object"], "runtime_fact_committed": false}
+      "expected": {"operators": ["place_object"], "theme_entity_ref": "glass_tall", "destination_entity_ref": "wooden_tray", "spatial_relation": "supported_by", "runtime_fact_committed": false}
+    },
+    {
+      "id": "tray_inside_relation_put_into",
+      "layer": "semantic",
+      "utterance": "\u5c06\u900f\u660e\u9ad8\u811a\u73bb\u7483\u676f\u653e\u5165\u6258\u76d8",
+      "expected": {"operators": ["place_object"], "theme_entity_ref": "glass_tall", "destination_entity_ref": "wooden_tray", "spatial_relation": "supported_by", "runtime_fact_committed": false}
+    },
+    {
+      "id": "tray_support_relation_on",
+      "layer": "semantic",
+      "utterance": "\u628a\u9ad8\u811a\u676f\u653e\u5230\u6258\u76d8\u4e0a",
+      "expected": {"operators": ["place_object"], "theme_entity_ref": "glass_tall", "destination_entity_ref": "wooden_tray", "spatial_relation": "supported_by", "runtime_fact_committed": false}
+    },
+    {
+      "id": "tray_support_inventory_query",
+      "layer": "semantic",
+      "utterance": "\u6258\u76d8\u4e0a\u6709\u4ec0\u4e48",
+      "expected": {"operators": ["observe_entity"], "speech_act": "state_query", "destination_entity_ref": "wooden_tray", "runtime_fact_committed": false}
     },
     {
       "id": "return_to_recent_pickup_surface",

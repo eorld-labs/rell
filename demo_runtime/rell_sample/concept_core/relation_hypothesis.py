@@ -177,6 +177,27 @@ def generate_relation_hypothesis_workset(
             )
         )
     else:
+        grounded_destination = (
+            (grounded_graph.get("role_bindings") or {}).get("destination") or {}
+        )
+        grounded_destination_basis = str(
+            (grounded_destination.get("evidence") or {}).get("basis") or ""
+        )
+        if grounded_destination_basis == "implicit_previous_verified_support":
+            candidates.append(
+                _relation_predicate(
+                    "supported_by",
+                    theme_ref=theme_ref,
+                    destination_ref=destination_ref,
+                    world_revision=world_revision,
+                    situated_graph=situated_graph,
+                    inference_kind="verified_event_relation",
+                    inference_rule="restore_process_verified_previous_support",
+                    premise_refs=[*premise_refs, "verified_process:previous_support"],
+                    strength=800,
+                    temporal_scope="reported_past",
+                )
+            )
         verified_source_support = next(
             (
                 item

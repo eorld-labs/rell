@@ -1311,20 +1311,34 @@ def _create_transfer_intent(
     source_holder_ref = theme.get("received_by")
     if destination["entity_id"] == theme.get("support_ref"):
         return None
-    companion_concepts = [concept for concept in theme_concepts if concept["concept_id"] != next((item["concept_id"] for item in theme_concepts if theme["kind"] in item.get("compatible_kinds", [])), None)]
-    # Keep every additional mentioned graspable object as a configuration
-    # reference when the utterance explicitly requests co-location.
+    companion_refs: list[str] = []
+    explicit_companion_ref = (
+        ((language_analysis or {}).get("role_bindings") or {}).get("companion") or {}
+    ).get("entity_ref")
+    if explicit_companion_ref and explicit_companion_ref not in {
+        theme["entity_id"], destination["entity_id"]
+    }:
+        companion_refs.append(str(explicit_companion_ref))
+    # An additional movable mention is a companion only when language
+    # explicitly requests co-location. Merely being movable does not turn a
+    # destination such as a tray into an object that must support itself.
     if "一起" in normalized:
         companion_concepts = [
             concept for concept in mentioned
             if concept["concept_id"] != next((item["concept_id"] for item in mentioned if theme["kind"] in item.get("compatible_kinds", [])), None)
             and "graspable" in concept.get("functional_affordances", [])
         ]
-    companion_refs = []
-    for concept in companion_concepts:
-        candidates = [item for item in session["runtime_objects"] if item.get("active") is not False and item.get("kind") in concept.get("compatible_kinds", [])]
-        if len(candidates) == 1:
-            companion_refs.append(candidates[0]["entity_id"])
+        for concept in companion_concepts:
+            candidates = [
+                item for item in session["runtime_objects"]
+                if item.get("active") is not False
+                and item.get("kind") in concept.get("compatible_kinds", [])
+                and item.get("entity_id") not in {
+                    theme["entity_id"], destination["entity_id"]
+                }
+            ]
+            if len(candidates) == 1 and candidates[0]["entity_id"] not in companion_refs:
+                companion_refs.append(candidates[0]["entity_id"])
     intent_id = "intent_" + hashlib.sha1(
         f"{session['session_id']}|{theme['entity_id']}|{destination['entity_id']}|{session['world_revision']}".encode("utf-8")
     ).hexdigest()[:12]
@@ -9099,8 +9113,19 @@ def _build_object_relative_motion(
     perception_bindings = task_perception.get("concept_grounding", {}).get("candidate_bindings", [])
     support_binding = next((item for item in perception_bindings if item.get("role") == "support"), None)
     planning_entity = entity
-    if operator in {"grasp_object", "navigate_near"} and (support_binding or entity.get("support_ref")):
-        support_ref = (support_binding or {}).get("entity_ref") or entity.get("support_ref")
+    nested_support_ref = entity.get("support_ref")
+    use_parent_interaction_boundary = bool(
+        operator == "place_object" and nested_support_ref
+    )
+    if (
+        operator in {"grasp_object", "navigate_near"}
+        and (support_binding or nested_support_ref)
+    ) or use_parent_interaction_boundary:
+        support_ref = (
+            nested_support_ref
+            if use_parent_interaction_boundary
+            else (support_binding or {}).get("entity_ref") or nested_support_ref
+        )
         planning_entity = next(
             (item for item in session["runtime_objects"] if item.get("entity_id") == support_ref),
             entity,
@@ -9114,7 +9139,11 @@ def _build_object_relative_motion(
     clearance = planning_radius + 0.05
     center_x, center_y = map(float, planning_entity["position"])
     half_x, half_y = float(planning_entity["size"][0]) / 2, float(planning_entity["size"][1]) / 2
-    projection_basis = entity["position"] if operator in {"grasp_object", "navigate_near"} else start
+    projection_basis = (
+        entity["position"]
+        if operator in {"grasp_object", "navigate_near"} or planning_entity is not entity
+        else start
+    )
     projected_x = min(max(projection_basis[0], center_x - half_x), center_x + half_x)
     projected_y = min(max(projection_basis[1], center_y - half_y), center_y + half_y)
     # For a grasp over a support surface, the base pose must clear the
@@ -9122,7 +9151,8 @@ def _build_object_relative_motion(
     # perimeter. The extra margin prevents a direct diagonal from entering
     # the furniture envelope at the first corner while keeping the end
     # effector within reach of the target.
-    approach_clearance = clearance + (0.22 if operator == "grasp_object" else 0.0)
+    approach_margin = 0.22 if operator == "grasp_object" else 0.12 if operator == "place_object" else 0.0
+    approach_clearance = clearance + approach_margin
     side_candidates = [
         {"side": "left", "position": [center_x - half_x - approach_clearance, projected_y]},
         {"side": "right", "position": [center_x + half_x + approach_clearance, projected_y]},
@@ -9142,8 +9172,10 @@ def _build_object_relative_motion(
         + float(session["executor_profile"].get("arm_reach_m", 0.0))
     )
     required_terminal_distance_m = (
-        interaction_reach_m
-        if operator in {"grasp_object", "navigate_near", "place_object"}
+        float(session["executor_profile"].get("arm_reach_m", 0.0))
+        if operator == "place_object"
+        else interaction_reach_m
+        if operator in {"grasp_object", "navigate_near"}
         else clearance + 0.02
     )
     feasible: list[dict[str, Any]] = []

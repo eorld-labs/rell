@@ -129,7 +129,22 @@ def resolve_contextual_affordance_request(
         ]
         prior_support_ref = (held_entity or {}).get("last_support_ref") or (held_entity or {}).get("support_ref")
         prior_support = next((item for item in support_entities if item.get("entity_id") == prior_support_ref), None)
-        if explicit_destination:
+        destination_evidence = (role_binding_evidence or {}).get("destination") or {}
+        authorized_destination_ref = destination_evidence.get("value_ref")
+        authorized_destination = next(
+            (
+                item for item in support_entities
+                if item.get("entity_id") == authorized_destination_ref
+            ),
+            None,
+        )
+        if scoped_authorization and authorized_destination:
+            entity = authorized_destination
+            destination_binding = (
+                destination_evidence.get("evidence")
+                or "structured_authorized_destination_binding"
+            )
+        elif explicit_destination:
             entity = explicit_destination
             destination_binding = (
                 "explicit_compatible_destination"
@@ -151,8 +166,6 @@ def resolve_contextual_affordance_request(
             destination_binding = "implicit_nearest_compatible_support_candidate"
         else:
             entity = None
-        destination_evidence = (role_binding_evidence or {}).get("destination") or {}
-        authorized_destination_ref = destination_evidence.get("value_ref")
         if (
             entity
             and authorized_destination_ref == entity.get("entity_id")

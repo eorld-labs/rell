@@ -2,20 +2,20 @@
   "schema_version": "1.7.0",
   "benchmark_id": "p020_natural_language_benchmark_v1",
   "totals": {
-    "cases": 279,
-    "passed": 279
+    "cases": 283,
+    "passed": 283
   },
   "pass_rate": 1.0,
   "layered_statistics": {
     "semantic_parse": {
-      "applicable_cases": 246,
-      "passed": 246,
+      "applicable_cases": 249,
+      "passed": 249,
       "pass_rate": 1.0,
       "status": "measured"
     },
     "role_grounding": {
-      "applicable_cases": 8,
-      "passed": 8,
+      "applicable_cases": 12,
+      "passed": 12,
       "pass_rate": 1.0,
       "status": "measured"
     },
@@ -50,14 +50,14 @@
       "status": "measured"
     },
     "runtime_execution_completion": {
-      "applicable_cases": 5,
-      "passed": 5,
+      "applicable_cases": 6,
+      "passed": 6,
       "pass_rate": 1.0,
       "status": "measured"
     },
     "terminal_fact_verification": {
-      "applicable_cases": 5,
-      "passed": 5,
+      "applicable_cases": 6,
+      "passed": 6,
       "pass_rate": 1.0,
       "status": "measured"
     },
@@ -120,8 +120,8 @@
       "pass_rate": 1.0
     },
     "空间关系": {
-      "cases": 10,
-      "passed": 10,
+      "cases": 13,
+      "passed": 13,
       "pass_rate": 1.0
     },
     "结构化恢复": {
@@ -145,8 +145,8 @@
       "pass_rate": 1.0
     },
     "运行时执行闭环": {
-      "cases": 5,
-      "passed": 5,
+      "cases": 6,
+      "passed": 6,
       "pass_rate": 1.0
     },
     "运行时规划决策": {
@@ -722,7 +722,7 @@
         ],
         "speech_act": "task_request",
         "theme_entity_ref": "glass_tall",
-        "destination_entity_ref": null,
+        "destination_entity_ref": "wooden_tray",
         "runtime_fact_committed": false,
         "pending_role": null,
         "template_id": null,
@@ -730,7 +730,94 @@
       },
       "diagnostics": {
         "semantic_parse_correct": true,
-        "role_grounding_correct": null,
+        "role_grounding_correct": true,
+        "historical_context_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "tray_inside_relation_put_into",
+      "category": "空间关系",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": "glass_tall",
+        "destination_entity_ref": "wooden_tray",
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": true,
+        "historical_context_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "tray_support_relation_on",
+      "category": "空间关系",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": "glass_tall",
+        "destination_entity_ref": "wooden_tray",
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": true,
+        "historical_context_correct": null,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "tray_support_inventory_query",
+      "category": "空间关系",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "observe_entity"
+        ],
+        "speech_act": "state_query",
+        "theme_entity_ref": "wooden_tray",
+        "destination_entity_ref": "wooden_tray",
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": true,
         "historical_context_correct": null,
         "inquiry_correct": null,
         "planning_success": null,
@@ -8186,6 +8273,40 @@
         ],
         "expected_terminal_facts": [
           "executor_between_references"
+        ],
+        "all_terminal_facts_verified": true,
+        "execution_completed": true,
+        "runtime_fact_committed": true
+      },
+      "diagnostics": {
+        "semantic_parse_correct": null,
+        "role_grounding_correct": null,
+        "historical_context_correct": null,
+        "inquiry_correct": null,
+        "structured_recovery_success": null,
+        "planning_contract_compiled": null,
+        "runtime_planning_decision_correct": null,
+        "planning_success": true,
+        "execution_completion": true,
+        "physical_verification_passed": true,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "runtime_execution_carrier_support_complete",
+      "category": "运行时执行闭环",
+      "layer": "runtime_execution",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "initial_status": "requires_human_confirmation",
+        "terminal_facts": [
+          "target_object_in_gripper",
+          "object_supported_at_destination"
+        ],
+        "expected_terminal_facts": [
+          "target_object_in_gripper",
+          "object_supported_at_destination"
         ],
         "all_terminal_facts_verified": true,
         "execution_completed": true,

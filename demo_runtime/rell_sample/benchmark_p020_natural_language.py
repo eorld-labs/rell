@@ -14,7 +14,7 @@ from validate_failure_recovery_architecture import (
     validate_language_correction_enters_evidence_gate,
     validate_new_task_retires_recovery_contract,
 )
-from validate_water_delivery_loop import drain_service
+from validate_water_delivery_loop import drain_service, drain_service_with_confirmations
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -376,16 +376,31 @@ def _runtime_execution_fixture_results() -> list[dict[str, Any]]:
             "between_navigation_complete",
             "站到操作台A和操作台B之间",
             ["executor_between_references"],
+            False,
+        ),
+        (
+            "carrier_support_complete",
+            "把高脚杯放进托盘",
+            ["target_object_in_gripper", "object_supported_at_destination"],
+            True,
         ),
     )
+    fixtures = tuple(
+        item if len(item) == 4 else (*item, False)
+        for item in fixtures
+    )
     results = []
-    for fixture_id, utterance, expected_facts in fixtures:
+    for fixture_id, utterance, expected_facts, confirmations_required in fixtures:
         started = start_session("home_humanoid", "hospitality_guest")
         command = begin_motion_command(started["session_id"], utterance)
         failures = []
         outcomes = []
         try:
-            outcomes = drain_service(command)
+            outcomes = (
+                drain_service_with_confirmations(started["session_id"], command)
+                if confirmations_required
+                else drain_service(command)
+            )
         except AssertionError as error:
             failures.append(str(error))
         terminal_facts = [item.get("terminal_fact") for item in outcomes]
@@ -412,7 +427,9 @@ def _runtime_execution_fixture_results() -> list[dict[str, Any]]:
                 "structured_recovery_success": None,
                 "planning_contract_compiled": None,
                 "runtime_planning_decision_correct": None,
-                "planning_success": command.get("status") == "motion_started",
+                "planning_success": command.get("status") in {
+                    "motion_started", "requires_human_confirmation"
+                },
                 "execution_completion": passed,
                 "physical_verification_passed": passed,
                 "safe_rejection": None,
