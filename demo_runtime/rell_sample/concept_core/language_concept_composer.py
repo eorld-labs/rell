@@ -586,7 +586,7 @@ def _discourse_roles(text: str) -> dict[str, dict[str, Any]]:
     ):
         roles["navigation_landmark"] = {
             "reference": "human_speaker",
-            "relation": "near_landmark",
+            "relation": "near_human",
             "source": "deictic_human_proximity_language",
         }
     recipient_result_relation = bool(
@@ -1057,6 +1057,12 @@ def _roles(
                         (("上面", "上边", "上"), "on_support_surface"),
                         (("里面", "内部", "里"), "inside_container"),
                         (("旁边", "附近", "旁"), "near_landmark"),
+                        (("我身边", "我旁边", "靠近我"), "near_human"),
+                        (("身边", "侧边"), "beside"),
+                        (("前面", "前方"), "in_front_of"),
+                        (("后面", "后方"), "behind"),
+                        (("面向", "朝向", "对着"), "facing"),
+                        (("中间", "之间"), "between"),
                     )
                     if any(marker in relation_scope for marker in markers)
                 ),
@@ -1422,7 +1428,7 @@ def compose_language_concepts(
             "matched_alias": "我这边",
             "entity_type": "human_recipient",
             "reference": "human_speaker",
-            "spatial_relation": "near_landmark",
+            "spatial_relation": "near_human",
             "spatial_relation_basis": "explicit_deictic_human_proximity",
             "source": "discourse_navigation_landmark",
         }

@@ -590,6 +590,7 @@ def main() -> None:
     run_python("validate_dictionary_authority_architecture.py")
     run_python("validate_p020_core_contract.py")
     run_python("validate_rell_spatial_social_primitives.py")
+    run_python("validate_rell_human_spatial_language.py")
     run_python("validate_communication_dictionary_architecture.py")
     run_python("validate_discourse_event_graph.py")
     run_python("validate_language_paraphrase_properties.py")

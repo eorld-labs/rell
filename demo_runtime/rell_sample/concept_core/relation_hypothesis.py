@@ -15,6 +15,12 @@ RELATION_BY_LANGUAGE_CONSTRAINT = {
     "on_support_surface": "supported_by",
     "inside_container": "contained_in",
     "near_landmark": "near",
+    "near_human": "near_human",
+    "beside": "beside",
+    "in_front_of": "in_front_of",
+    "behind": "behind",
+    "facing": "facing",
+    "between": "between",
 }
 
 AFFORDANCE_RELATION_RULES = (
@@ -201,7 +207,10 @@ def generate_relation_hypothesis_workset(
             if item.get("current_world_usable") is True
             and item.get("subject") == theme_ref
             and item.get("object") == destination_ref
-            and item.get("predicate") in {"supported_by", "contained_in", "near"}
+            and item.get("predicate") in {
+                "supported_by", "contained_in", "near", "near_human", "beside",
+                "in_front_of", "behind", "facing", "between",
+            }
         }
         for predicate_name in sorted(current_relation_names):
             candidates.append(
