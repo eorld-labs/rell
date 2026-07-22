@@ -14,6 +14,7 @@ from validate_failure_recovery_architecture import (
     validate_language_correction_enters_evidence_gate,
     validate_new_task_retires_recovery_contract,
 )
+from validate_water_delivery_loop import drain_service
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -346,6 +347,62 @@ def _runtime_planning_fixture_results() -> list[dict[str, Any]]:
     return results
 
 
+def _runtime_execution_fixture_results() -> list[dict[str, Any]]:
+    fixtures = (
+        (
+            "water_service_complete",
+            "用白色马克杯给我接水",
+            ["target_object_in_gripper", "container_filled", "human_received_filled_container"],
+        ),
+        (
+            "near_human_navigation_complete",
+            "站到我身边",
+            ["executor_near_object"],
+        ),
+    )
+    results = []
+    for fixture_id, utterance, expected_facts in fixtures:
+        started = start_session("home_humanoid", "hospitality_guest")
+        command = begin_motion_command(started["session_id"], utterance)
+        failures = []
+        outcomes = []
+        try:
+            outcomes = drain_service(command)
+        except AssertionError as error:
+            failures.append(str(error))
+        terminal_facts = [item.get("terminal_fact") for item in outcomes]
+        passed = not failures and terminal_facts == expected_facts and all(item.get("status") == "fact_established" for item in outcomes)
+        results.append({
+            "id": f"runtime_execution_{fixture_id}",
+            "category": "运行时执行闭环",
+            "layer": "runtime_execution",
+            "passed": passed,
+            "failures": failures or ([] if passed else [f"terminal_facts={terminal_facts!r}"]),
+            "observed": {
+                "initial_status": command.get("status"),
+                "terminal_facts": terminal_facts,
+                "expected_terminal_facts": expected_facts,
+                "all_terminal_facts_verified": all(item.get("status") == "fact_established" for item in outcomes),
+                "execution_completed": passed,
+                "runtime_fact_committed": passed,
+            },
+            "diagnostics": {
+                "semantic_parse_correct": None,
+                "role_grounding_correct": None,
+                "historical_context_correct": None,
+                "inquiry_correct": None,
+                "structured_recovery_success": None,
+                "planning_contract_compiled": None,
+                "runtime_planning_decision_correct": None,
+                "planning_success": command.get("status") == "motion_started",
+                "execution_completion": passed,
+                "physical_verification_passed": passed,
+                "safe_rejection": None,
+            },
+        })
+    return results
+
+
 def run() -> dict[str, Any]:
     benchmark = json.loads(BENCHMARK.read_text(encoding="utf-8"))
     cases = _expand_cases(benchmark["cases"])
@@ -389,6 +446,7 @@ def run() -> dict[str, Any]:
     results.extend(_recovery_fixture_results())
     results.extend(_planning_contract_fixture_results())
     results.extend(_runtime_planning_fixture_results())
+    results.extend(_runtime_execution_fixture_results())
     totals = {"cases": len(results), "passed": sum(item["passed"] for item in results)}
     applicable = {
         "semantic_parse": [item for item in results if item["layer"] == "semantic"],
@@ -398,6 +456,8 @@ def run() -> dict[str, Any]:
         "planning_contract_compilation": [item for item in results if item["layer"] == "planning_contract"],
         "runtime_planning_decision": [item for item in results if item["layer"] == "runtime_planning"],
         "runtime_motion_started": [item for item in results if item["layer"] == "runtime_planning" and item["observed"].get("expected_statuses") == ["motion_started"]],
+        "runtime_execution_completion": [item for item in results if item["layer"] == "runtime_execution"],
+        "terminal_fact_verification": [item for item in results if item["layer"] == "runtime_execution"],
         "planning_success": [item for item in results if item["layer"] == "interaction" and item["observed"].get("status") == "motion_started"],
         "structured_recovery": [item for item in results if item["layer"] == "recovery"],
         "physical_verification": [item for item in results if item["layer"] == "physical"],
@@ -427,7 +487,7 @@ def run() -> dict[str, Any]:
             "passed": sum(item["passed"] for item in items),
             "pass_rate": sum(item["passed"] for item in items) / len(items),
         }
-    report = {"schema_version": "1.6.0", "benchmark_id": "p020_natural_language_benchmark_v1", "totals": totals, "pass_rate": totals["passed"] / totals["cases"] if totals["cases"] else 0.0, "layered_statistics": layered_statistics, "category_statistics": category_statistics, "results": results}
+    report = {"schema_version": "1.7.0", "benchmark_id": "p020_natural_language_benchmark_v1", "totals": totals, "pass_rate": totals["passed"] / totals["cases"] if totals["cases"] else 0.0, "layered_statistics": layered_statistics, "category_statistics": category_statistics, "results": results}
     OUTPUT.mkdir(parents=True, exist_ok=True)
     (OUTPUT / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     return report
