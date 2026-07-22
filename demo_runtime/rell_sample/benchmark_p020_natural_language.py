@@ -6,6 +6,7 @@ from typing import Any
 
 from embodied_scene import SESSIONS, _compose_session_language, begin_motion_command, start_session
 from runtime_core import run_simulated_runtime_sample
+from concept_core.relative_spatial_planning import build_relative_spatial_plan_contract
 from validate_failure_recovery_architecture import (
     validate_conflicting_language_correction_requires_observation,
     validate_failure_rebuilds_from_authoritative_world,
@@ -248,6 +249,56 @@ def _recovery_fixture_results() -> list[dict[str, Any]]:
     return results
 
 
+def _planning_contract_fixture_results() -> list[dict[str, Any]]:
+    fixtures = (
+        ("near_human", "站到我身边", "navigate_to_relative_human_zone"),
+        ("in_front_of", "站到我前面", "navigate_to_front_region"),
+        ("behind", "站到我后面", "navigate_to_rear_region"),
+        ("facing", "面向我", "orient_toward_reference"),
+        ("beside", "走到操作台A旁边", "navigate_to_lateral_relation"),
+        ("between", "站到操作台A和操作台B之间", "navigate_to_between_region"),
+    )
+    results = []
+    for relation, utterance, expected_process in fixtures:
+        started = start_session("home_humanoid", "hospitality_guest")
+        analysis = _compose_session_language(SESSIONS[started["session_id"]], utterance)
+        plan = build_relative_spatial_plan_contract(analysis)
+        passed = bool(
+            plan
+            and plan.get("relation") == relation
+            and plan.get("process_contract") == expected_process
+            and plan.get("control_gateway") == "P018"
+            and plan.get("verification_gateway") == "P016"
+            and plan.get("direct_execution_allowed") is False
+        )
+        results.append({
+            "id": f"planning_contract_{relation}",
+            "category": "规划合同编译",
+            "layer": "planning_contract",
+            "passed": passed,
+            "failures": [] if passed else ["planning_contract_mismatch"],
+            "observed": {
+                "relation": relation,
+                "process_contract": (plan or {}).get("process_contract"),
+                "verification_contract": (plan or {}).get("verification_contract"),
+                "candidate_only": True,
+                "runtime_fact_committed": False,
+            },
+            "diagnostics": {
+                "semantic_parse_correct": None,
+                "role_grounding_correct": None,
+                "historical_context_correct": None,
+                "inquiry_correct": None,
+                "structured_recovery_success": None,
+                "planning_contract_compiled": passed,
+                "planning_success": None,
+                "physical_verification_passed": None,
+                "safe_rejection": None,
+            },
+        })
+    return results
+
+
 def run() -> dict[str, Any]:
     benchmark = json.loads(BENCHMARK.read_text(encoding="utf-8"))
     cases = _expand_cases(benchmark["cases"])
@@ -289,12 +340,14 @@ def run() -> dict[str, Any]:
         })
     results.extend(_physical_fixture_results())
     results.extend(_recovery_fixture_results())
+    results.extend(_planning_contract_fixture_results())
     totals = {"cases": len(results), "passed": sum(item["passed"] for item in results)}
     applicable = {
         "semantic_parse": [item for item in results if item["layer"] == "semantic"],
         "role_grounding": [item for item in results if item["diagnostics"].get("role_grounding_correct") is not None],
         "historical_context": [item for item in results if item["diagnostics"].get("historical_context_correct") is not None],
         "inquiry_correctness": [item for item in results if item["layer"] == "interaction" and item["observed"].get("status") in {"role_clarification_required", "contextual_affordance_disambiguation_required", "process_slot_clarification_required"}],
+        "planning_contract_compilation": [item for item in results if item["layer"] == "planning_contract"],
         "planning_success": [item for item in results if item["layer"] == "interaction" and item["observed"].get("status") == "motion_started"],
         "structured_recovery": [item for item in results if item["layer"] == "recovery"],
         "physical_verification": [item for item in results if item["layer"] == "physical"],
@@ -324,7 +377,7 @@ def run() -> dict[str, Any]:
             "passed": sum(item["passed"] for item in items),
             "pass_rate": sum(item["passed"] for item in items) / len(items),
         }
-    report = {"schema_version": "1.4.0", "benchmark_id": "p020_natural_language_benchmark_v1", "totals": totals, "pass_rate": totals["passed"] / totals["cases"] if totals["cases"] else 0.0, "layered_statistics": layered_statistics, "category_statistics": category_statistics, "results": results}
+    report = {"schema_version": "1.5.0", "benchmark_id": "p020_natural_language_benchmark_v1", "totals": totals, "pass_rate": totals["passed"] / totals["cases"] if totals["cases"] else 0.0, "layered_statistics": layered_statistics, "category_statistics": category_statistics, "results": results}
     OUTPUT.mkdir(parents=True, exist_ok=True)
     (OUTPUT / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     return report

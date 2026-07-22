@@ -1,9 +1,9 @@
 {
-  "schema_version": "1.4.0",
+  "schema_version": "1.5.0",
   "benchmark_id": "p020_natural_language_benchmark_v1",
   "totals": {
-    "cases": 259,
-    "passed": 259
+    "cases": 265,
+    "passed": 265
   },
   "pass_rate": 1.0,
   "layered_statistics": {
@@ -28,6 +28,12 @@
     "inquiry_correctness": {
       "applicable_cases": 4,
       "passed": 4,
+      "pass_rate": 1.0,
+      "status": "measured"
+    },
+    "planning_contract_compilation": {
+      "applicable_cases": 6,
+      "passed": 6,
       "pass_rate": 1.0,
       "status": "measured"
     },
@@ -97,6 +103,11 @@
     "结构化恢复": {
       "cases": 5,
       "passed": 5,
+      "pass_rate": 1.0
+    },
+    "规划合同编译": {
+      "cases": 6,
+      "passed": 6,
       "pass_rate": 1.0
     },
     "角色落地": {
@@ -7582,6 +7593,156 @@
         "planning_success": null,
         "physical_verification_passed": null,
         "safe_rejection": true
+      }
+    },
+    {
+      "id": "planning_contract_near_human",
+      "category": "规划合同编译",
+      "layer": "planning_contract",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "relation": "near_human",
+        "process_contract": "navigate_to_relative_human_zone",
+        "verification_contract": "executor_distance_within_personal_zone",
+        "candidate_only": true,
+        "runtime_fact_committed": false
+      },
+      "diagnostics": {
+        "semantic_parse_correct": null,
+        "role_grounding_correct": null,
+        "historical_context_correct": null,
+        "inquiry_correct": null,
+        "structured_recovery_success": null,
+        "planning_contract_compiled": true,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "planning_contract_in_front_of",
+      "category": "规划合同编译",
+      "layer": "planning_contract",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "relation": "in_front_of",
+        "process_contract": "navigate_to_front_region",
+        "verification_contract": "relative_pose_front_bound",
+        "candidate_only": true,
+        "runtime_fact_committed": false
+      },
+      "diagnostics": {
+        "semantic_parse_correct": null,
+        "role_grounding_correct": null,
+        "historical_context_correct": null,
+        "inquiry_correct": null,
+        "structured_recovery_success": null,
+        "planning_contract_compiled": true,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "planning_contract_behind",
+      "category": "规划合同编译",
+      "layer": "planning_contract",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "relation": "behind",
+        "process_contract": "navigate_to_rear_region",
+        "verification_contract": "relative_pose_rear_bound",
+        "candidate_only": true,
+        "runtime_fact_committed": false
+      },
+      "diagnostics": {
+        "semantic_parse_correct": null,
+        "role_grounding_correct": null,
+        "historical_context_correct": null,
+        "inquiry_correct": null,
+        "structured_recovery_success": null,
+        "planning_contract_compiled": true,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "planning_contract_facing",
+      "category": "规划合同编译",
+      "layer": "planning_contract",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "relation": "facing",
+        "process_contract": "orient_toward_reference",
+        "verification_contract": "orientation_error_bound",
+        "candidate_only": true,
+        "runtime_fact_committed": false
+      },
+      "diagnostics": {
+        "semantic_parse_correct": null,
+        "role_grounding_correct": null,
+        "historical_context_correct": null,
+        "inquiry_correct": null,
+        "structured_recovery_success": null,
+        "planning_contract_compiled": true,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "planning_contract_beside",
+      "category": "规划合同编译",
+      "layer": "planning_contract",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "relation": "beside",
+        "process_contract": "navigate_to_lateral_relation",
+        "verification_contract": "relative_pose_lateral_bound",
+        "candidate_only": true,
+        "runtime_fact_committed": false
+      },
+      "diagnostics": {
+        "semantic_parse_correct": null,
+        "role_grounding_correct": null,
+        "historical_context_correct": null,
+        "inquiry_correct": null,
+        "structured_recovery_success": null,
+        "planning_contract_compiled": true,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "planning_contract_between",
+      "category": "规划合同编译",
+      "layer": "planning_contract",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "relation": "between",
+        "process_contract": "navigate_to_between_region",
+        "verification_contract": "inside_between_region",
+        "candidate_only": true,
+        "runtime_fact_committed": false
+      },
+      "diagnostics": {
+        "semantic_parse_correct": null,
+        "role_grounding_correct": null,
+        "historical_context_correct": null,
+        "inquiry_correct": null,
+        "structured_recovery_success": null,
+        "planning_contract_compiled": true,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
       }
     }
   ]
