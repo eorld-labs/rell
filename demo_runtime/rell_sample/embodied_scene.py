@@ -10036,6 +10036,87 @@ def _execute_transport_region_stage(
     }
 
 
+def _build_structured_relative_spatial_motion(
+    session: dict[str, Any],
+    analysis: dict[str, Any],
+    task_text: str,
+    decision_started_ns: int,
+) -> dict[str, Any] | None:
+    roles = analysis.get("role_bindings") or {}
+    direction = roles.get("direction") or {}
+    destination = roles.get("destination") or {}
+    relation = direction.get("spatial_relation") or destination.get("spatial_relation")
+    if relation == "facing" and direction.get("reference") == "human_speaker":
+        reference = next(
+            (item for item in session.get("runtime_objects", []) if item.get("kind") == "human_recipient" and item.get("active") is not False),
+            None,
+        )
+        if not reference:
+            return None
+        position = list(session["state"]["executor_position"])
+        reference_position = list(reference["position"])
+        current_yaw = float(session["state"].get("executor_yaw_deg") or 0.0)
+        target_yaw = math.degrees(math.atan2(reference_position[1] - position[1], reference_position[0] - position[0]))
+        frames = _rotation_frames(position, current_yaw, target_yaw)
+        if not frames:
+            frames = [{"position": position, "yaw_deg": target_yaw}]
+        _apply_speed_timing(frames, session["executor_profile"].get("max_angular_speed_dps", 90.0))
+        return {
+            "status": "fact_established",
+            "reason": "structured_facing_relation_physically_verified",
+            "prompt": f"已面向{reference['label']}并验真最终朝向。",
+            "frames": frames,
+            "terminal_fact": "executor_facing_reference",
+            "terminal_fact_binding": {"entity_ref": reference["entity_id"], "relation": "facing"},
+            "terminal_verification": {
+                "kind": "orientation_to_dynamic_reference",
+                "entity_ref": reference["entity_id"],
+                "reference_entity_ref": reference["entity_id"],
+                "target_yaw_deg": target_yaw,
+                "maximum_orientation_error_deg": 3.0,
+            },
+            "relative_spatial_execution_contract": {
+                "relation": "facing",
+                "process_contract": "orient_toward_reference",
+                "control_gateway": "P018",
+                "verification_gateway": "P016",
+                "world_revision": session["world_revision"],
+            },
+            "decision_latency": {"input_to_spatial_candidate_decision_ms": round((perf_counter_ns() - decision_started_ns) / 1_000_000, 4)},
+            "session": get_session(session["session_id"]),
+        }
+    if relation == "beside":
+        entity_ref = destination.get("entity_ref") or destination.get("value_ref")
+        if not entity_ref:
+            return None
+        contextual = {
+            "status": "contextual_affordance_available",
+            "available": True,
+            "entity_ref": entity_ref,
+            "theme_entity_ref": entity_ref,
+            "operator_candidate": "navigate_near",
+            "active_role": "spatial_target",
+            "task_context": task_text,
+            "scoped_authorization_present": True,
+            "candidate_only": False,
+            "direct_execution_allowed": True,
+        }
+        result = _build_object_relative_motion(session, contextual, decision_started_ns)
+        if result.get("status") == "fact_established":
+            result["terminal_fact"] = "executor_beside_object"
+            result["terminal_fact_binding"] = {"entity_ref": entity_ref, "relation": "beside"}
+            result["terminal_verification"]["expected_relation"] = "executor_beside_object"
+            result["relative_spatial_execution_contract"] = {
+                "relation": "beside",
+                "process_contract": "navigate_to_lateral_relation",
+                "control_gateway": "P018",
+                "verification_gateway": "P016",
+                "world_revision": session["world_revision"],
+            }
+        return result
+    return None
+
+
 def execute_command(
     session_id: str,
     utterance: str,
@@ -10121,6 +10202,12 @@ def execute_command(
         if language_analysis.get("decision") == "route_canonical_semantics" and language_analysis.get("canonical_utterance")
         else original_text
     )
+    structured_relative_motion = _build_structured_relative_spatial_motion(
+        session, language_analysis, text, decision_started_ns
+    )
+    if structured_relative_motion:
+        structured_relative_motion["language_understanding"] = language_view
+        return structured_relative_motion
     if _is_holding_state_query(text):
         result = _answer_holding_state_query(session)
         result["language_understanding"] = language_view
@@ -12254,24 +12341,36 @@ def step_motion_command(job_id: str) -> dict[str, Any]:
     result = deepcopy(job["terminal_result"])
     terminal_verification = result.get("terminal_verification")
     if terminal_verification:
-        entity = next(
-            (item for item in session["runtime_objects"] if item["entity_id"] == terminal_verification["entity_ref"]),
-            None,
-        )
-        terminal_distance = _distance_to_object_footprint(session["state"]["executor_position"], entity) if entity else math.inf
-        relation_verified = bool(entity) and terminal_distance <= terminal_verification["maximum_near_distance_m"]
-        if terminal_verification.get("must_be_outside_longitudinal_projection") and entity:
-            dx = abs(session["state"]["executor_position"][0] - entity["position"][0])
-            dy = abs(session["state"]["executor_position"][1] - entity["position"][1])
-            relation_verified = relation_verified and (
-                dx > float(entity["size"][0]) / 2 or dy > float(entity["size"][1]) / 2
-            )
-        result["terminal_verification_evidence"] = {
-            "entity_ref": terminal_verification["entity_ref"],
-            "object_footprint_distance_m": round(terminal_distance, 4) if math.isfinite(terminal_distance) else None,
-            "relation_verified": relation_verified,
-            "world_revision": session["world_revision"],
-        }
+        entity = next((item for item in session["runtime_objects"] if item["entity_id"] == terminal_verification["entity_ref"]), None)
+        if terminal_verification.get("kind") == "orientation_to_dynamic_reference":
+            target_yaw = float(terminal_verification["target_yaw_deg"])
+            actual_yaw = float(session["state"].get("executor_yaw_deg") or 0.0)
+            orientation_error = abs((actual_yaw - target_yaw + 180.0) % 360.0 - 180.0)
+            relation_verified = bool(entity) and orientation_error <= float(terminal_verification["maximum_orientation_error_deg"])
+            result["terminal_verification_evidence"] = {
+                "entity_ref": terminal_verification["entity_ref"],
+                "target_yaw_deg": target_yaw,
+                "actual_yaw_deg": actual_yaw,
+                "orientation_error_deg": round(orientation_error, 4),
+                "relation_verified": relation_verified,
+                "world_revision": session["world_revision"],
+                "verifier": "P016",
+            }
+        else:
+            terminal_distance = _distance_to_object_footprint(session["state"]["executor_position"], entity) if entity else math.inf
+            relation_verified = bool(entity) and terminal_distance <= terminal_verification["maximum_near_distance_m"]
+            if terminal_verification.get("must_be_outside_longitudinal_projection") and entity:
+                dx = abs(session["state"]["executor_position"][0] - entity["position"][0])
+                dy = abs(session["state"]["executor_position"][1] - entity["position"][1])
+                relation_verified = relation_verified and (
+                    dx > float(entity["size"][0]) / 2 or dy > float(entity["size"][1]) / 2
+                )
+            result["terminal_verification_evidence"] = {
+                "entity_ref": terminal_verification["entity_ref"],
+                "object_footprint_distance_m": round(terminal_distance, 4) if math.isfinite(terminal_distance) else None,
+                "relation_verified": relation_verified,
+                "world_revision": session["world_revision"],
+            }
         if not relation_verified:
             result.update({
                 "status": "terminal_fact_verification_failed",

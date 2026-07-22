@@ -306,8 +306,8 @@ def _runtime_planning_fixture_results() -> list[dict[str, Any]]:
         ("navigate_near_human", "站到我身边", "motion_started"),
         ("place_requires_confirmation", "把白色马克杯放到操作台B", "requires_human_confirmation"),
         ("grasp_requires_confirmation", "拿起白色马克杯", ("requires_human_confirmation", "process_grounding_clarification_required")),
-        ("beside_missing_executor_contract", "走到操作台A旁边", "factory_concept_recognized_execution_gap"),
-        ("facing_missing_executor_contract", "面向我", "concept_gap_clarification_required"),
+        ("beside_executor_contract", "走到操作台A旁边", "motion_started"),
+        ("facing_executor_contract", "面向我", "motion_started"),
     )
     results = []
     for fixture_id, utterance, expected_status in fixtures:
@@ -358,6 +358,16 @@ def _runtime_execution_fixture_results() -> list[dict[str, Any]]:
             "near_human_navigation_complete",
             "站到我身边",
             ["executor_near_object"],
+        ),
+        (
+            "beside_navigation_complete",
+            "走到操作台A旁边",
+            ["executor_beside_object"],
+        ),
+        (
+            "facing_orientation_complete",
+            "面向我",
+            ["executor_facing_reference"],
         ),
     )
     results = []
