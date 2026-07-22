@@ -581,13 +581,24 @@ def _discourse_roles(text: str) -> dict[str, dict[str, Any]]:
             "source": "deictic_service_role",
         }
     if re.search(
-        r"(?:站|走|到|靠近).{0,8}(?:我这边|我这里|我身边|我旁边|我的旁边)",
+        r"(?:站|走|到|靠近).{0,8}(?:我这边|我这里|我身边|我旁边|我的旁边|我前面|我前方|我后面|我后方)",
         text,
     ):
+        relation = (
+            "in_front_of" if any(marker in text for marker in ("我前面", "我前方"))
+            else "behind" if any(marker in text for marker in ("我后面", "我后方"))
+            else "near_human"
+        )
         roles["navigation_landmark"] = {
             "reference": "human_speaker",
-            "relation": "near_human",
-            "source": "deictic_human_proximity_language",
+            "relation": relation,
+            "source": "deictic_human_relative_spatial_language",
+        }
+    if re.search(r"(?:转向|面向|朝向|对着).{0,4}我", text):
+        roles["orientation_landmark"] = {
+            "reference": "human_speaker",
+            "relation": "facing",
+            "source": "deictic_human_orientation_language",
         }
     recipient_result_relation = bool(
         re.search(
@@ -1424,13 +1435,25 @@ def compose_language_concepts(
         discourse_roles.get("navigation_landmark")
         and any(item.get("operator") == "navigate_to" for item in events)
     ):
+        human_relation = discourse_roles["navigation_landmark"].get("relation") or "near_human"
         roles["destination"] = {
             "matched_alias": "我这边",
             "entity_type": "human_recipient",
             "reference": "human_speaker",
-            "spatial_relation": "near_human",
+            "spatial_relation": human_relation,
             "spatial_relation_basis": "explicit_deictic_human_proximity",
             "source": "discourse_navigation_landmark",
+        }
+    if (
+        discourse_roles.get("orientation_landmark")
+        and any(item.get("operator") == "orient_executor" for item in events)
+    ):
+        roles["direction"] = {
+            "entity_type": "human_recipient",
+            "reference": "human_speaker",
+            "spatial_relation": "facing",
+            "spatial_relation_basis": "explicit_deictic_human_orientation",
+            "source": "discourse_orientation_landmark",
         }
     if query_type == "region_inventory":
         roles["target_region"] = deepcopy(region_mentions[0]) if len(

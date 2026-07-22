@@ -9,3 +9,14 @@
 机器合同：`schemas/rell_spatial_social_primitive_candidates_v1.json`。
 
 校验入口：`demo_runtime/rell_sample/validate_rell_spatial_social_primitives.py`。
+
+## 首批语言与规划接入
+
+已接入以下人体参照表达：
+
+- “站到我身边” -> `navigate_to + near_human(human_speaker)`；
+- “站到我前面” -> `navigate_to + in_front_of(human_speaker)`；
+- “站到我后面” -> `navigate_to + behind(human_speaker)`；
+- “面向我” -> `orient_executor + facing(human_speaker)`。
+
+规划层只生成候选合同：动态人体参考系、相对目标区域或目标朝向、P018 控制入口和 P016 末态验真条件。语言理解本身不能启动执行，也不能提交关系事实。
