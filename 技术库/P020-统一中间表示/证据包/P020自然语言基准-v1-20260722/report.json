@@ -1,11 +1,37 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "benchmark_id": "p020_natural_language_benchmark_v1",
   "totals": {
-    "cases": 21,
-    "passed": 21
+    "cases": 101,
+    "passed": 101
   },
   "pass_rate": 1.0,
+  "layered_statistics": {
+    "semantic_parse": {
+      "applicable_cases": 96,
+      "passed": 96,
+      "pass_rate": 1.0,
+      "status": "measured"
+    },
+    "inquiry_correctness": {
+      "applicable_cases": 4,
+      "passed": 4,
+      "pass_rate": 1.0,
+      "status": "measured"
+    },
+    "planning_success": {
+      "applicable_cases": 1,
+      "passed": 1,
+      "pass_rate": 1.0,
+      "status": "measured"
+    },
+    "physical_verification": {
+      "applicable_cases": 0,
+      "passed": 0,
+      "pass_rate": null,
+      "status": "not_applicable_in_current_fixture"
+    }
+  },
   "results": [
     {
       "id": "place_explicit_roles",
@@ -391,6 +417,1534 @@
     },
     {
       "id": "return_to_recent_pickup_surface",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_connector_01",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object",
+          "fill_container"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": "glass_tall",
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_connector_02",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object",
+          "fill_container"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": "glass_tall",
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_connector_03",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object",
+          "fill_container"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": "glass_tall",
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_connector_04",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object",
+          "fill_container"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": "glass_tall",
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_connector_05",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object",
+          "fill_container"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": "glass_tall",
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_connector_06",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object",
+          "fill_container"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": "glass_tall",
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_connector_07",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object",
+          "fill_container"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": "glass_tall",
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_connector_08",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object",
+          "fill_container"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": "glass_tall",
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_01",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_02",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_03",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_04",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_05",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_06",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_07",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_08",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_09",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_10",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_11",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_12",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_13",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_14",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_15",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_16",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_17",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_18",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_19",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_20",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_21",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_22",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_23",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_24",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_25",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_26",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_27",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_28",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_29",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_30",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_31",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_32",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_33",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_34",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_35",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_36",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_37",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_38",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_39",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_40",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_41",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_42",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_43",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_44",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_45",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_46",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_47",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_48",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_49",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_50",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_51",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_52",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_53",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_54",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_55",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_56",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_57",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_58",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_59",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_60",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_61",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_62",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_63",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_64",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_65",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_66",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_67",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_68",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_69",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_70",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_71",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "generated_historical_72",
       "layer": "semantic",
       "passed": true,
       "failures": [],

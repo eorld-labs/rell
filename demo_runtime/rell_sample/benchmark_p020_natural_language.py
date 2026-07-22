@@ -96,8 +96,46 @@ def _matches(view: dict[str, Any], expected: dict[str, Any], analysis: dict[str,
     return not failures, failures
 
 
+def _expand_cases(cases: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Expand only paraphrase families already covered by independent regressions."""
+    expanded = list(cases)
+    connectors = [
+        "把杯子放到桌面，然后用高脚杯接水给我",
+        "把杯子放到桌面，接着用高脚杯接水给我",
+        "把杯子放到桌面，随后用高脚杯接水给我",
+        "把杯子放到桌面，再然后用高脚杯接水给我",
+        "把杯子放到桌面之后用高脚杯接水给我",
+        "把杯子放到桌面以后用高脚杯接水给我",
+        "把杯子放到桌面而后用高脚杯接水给我",
+        "先把杯子放到桌面再用高脚杯接水给我",
+    ]
+    for index, utterance in enumerate(connectors, 1):
+        expanded.append({
+            "id": f"generated_connector_{index:02d}",
+            "layer": "semantic",
+            "utterance": utterance,
+            "expected": {"operators": ["place_object", "fill_container"], "event_frame_count": 2},
+        })
+    markers = ("刚才", "刚刚", "之前", "先前", "上次", "上回", "方才", "此前")
+    verbs = ("拿", "拿起", "取")
+    supports = ("桌子", "桌面", "台面")
+    index = 0
+    for marker in markers:
+        for verb in verbs:
+            for support in supports:
+                index += 1
+                expanded.append({
+                    "id": f"generated_historical_{index:02d}",
+                    "layer": "semantic",
+                    "utterance": f"把杯子放到{marker}你{verb}过杯子的{support}",
+                    "expected": {"operators_include": "place_object"},
+                })
+    return expanded
+
+
 def run() -> dict[str, Any]:
-    cases = json.loads(BENCHMARK.read_text(encoding="utf-8"))["cases"]
+    benchmark = json.loads(BENCHMARK.read_text(encoding="utf-8"))
+    cases = _expand_cases(benchmark["cases"])
     results = []
     for case in cases:
         session_info = start_session("home_humanoid", "hospitality_guest")
@@ -118,7 +156,21 @@ def run() -> dict[str, Any]:
             matched, failures = _matches(view, case["expected"])
         results.append({"id": case["id"], "layer": case["layer"], "passed": matched, "failures": failures, "observed": view})
     totals = {"cases": len(results), "passed": sum(item["passed"] for item in results)}
-    report = {"schema_version": "1.0.0", "benchmark_id": "p020_natural_language_benchmark_v1", "totals": totals, "pass_rate": totals["passed"] / totals["cases"] if totals["cases"] else 0.0, "results": results}
+    applicable = {
+        "semantic_parse": [item for item in results if item["layer"] == "semantic"],
+        "inquiry_correctness": [item for item in results if item["layer"] == "interaction" and item["observed"].get("status") in {"role_clarification_required", "contextual_affordance_disambiguation_required", "process_slot_clarification_required"}],
+        "planning_success": [item for item in results if item["layer"] == "interaction" and item["observed"].get("status") == "motion_started"],
+        "physical_verification": [item for item in results if item["observed"].get("runtime_fact_committed")],
+    }
+    layered_statistics = {}
+    for name, items in applicable.items():
+        layered_statistics[name] = {
+            "applicable_cases": len(items),
+            "passed": sum(item["passed"] for item in items),
+            "pass_rate": (sum(item["passed"] for item in items) / len(items)) if items else None,
+            "status": "measured" if items else "not_applicable_in_current_fixture",
+        }
+    report = {"schema_version": "1.1.0", "benchmark_id": "p020_natural_language_benchmark_v1", "totals": totals, "pass_rate": totals["passed"] / totals["cases"] if totals["cases"] else 0.0, "layered_statistics": layered_statistics, "results": results}
     OUTPUT.mkdir(parents=True, exist_ok=True)
     (OUTPUT / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     return report
