@@ -5,11 +5,13 @@ from pathlib import Path
 from typing import Any
 
 from embodied_scene import SESSIONS, _compose_session_language, begin_motion_command, start_session
+from runtime_core import run_simulated_runtime_sample
 
 
 ROOT = Path(__file__).resolve().parents[2]
 BENCHMARK = ROOT / "benchmarks" / "p020_natural_language_benchmark_v1.json"
 OUTPUT = ROOT / "demo_runtime" / "output" / "rell_sample" / "p020_natural_language_benchmark"
+DATA = ROOT / "demo_runtime" / "rell_sample" / "data"
 
 
 def _operators(analysis: dict[str, Any]) -> list[str]:
@@ -150,6 +152,47 @@ def _expand_cases(cases: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return expanded
 
 
+def _physical_fixture_results() -> list[dict[str, Any]]:
+    expected = {
+        "simulated_success": ("completed", "completed", "established"),
+        "simulated_no_water": ("requires_human_confirmation", "awaiting_human_confirmation", None),
+        "simulated_channel_conflict": ("requires_human_confirmation", "awaiting_human_confirmation", "conflicted"),
+    }
+    results = []
+    for scenario, (outcome, runtime_state, fact_state) in expected.items():
+        result = run_simulated_runtime_sample(DATA, scenario)
+        audit = result["audit_summary"]
+        state = result["stage_runtime_state"]
+        facts = {item["fact_id"]: item["state"] for item in audit["fact_summary"]}
+        passed = audit["outcome"] == outcome and state["runtime_state"] == runtime_state
+        if fact_state is not None:
+            passed = passed and facts.get("cup_has_water") == fact_state
+        results.append({
+            "id": f"physical_{scenario}",
+            "category": "P016物理验真",
+            "layer": "physical",
+            "passed": passed,
+            "failures": [] if passed else ["physical_outcome_mismatch"],
+            "observed": {
+                "scenario": scenario,
+                "outcome": audit["outcome"],
+                "runtime_state": state["runtime_state"],
+                "cup_has_water": facts.get("cup_has_water"),
+                "goal_established": facts.get("cup_has_water") == "established",
+                "runtime_fact_committed": facts.get("cup_has_water") == "established",
+            },
+            "diagnostics": {
+                "semantic_parse_correct": None,
+                "role_grounding_correct": None,
+                "inquiry_correct": None,
+                "planning_success": None,
+                "physical_verification_passed": passed,
+                "safe_rejection": passed if scenario != "simulated_success" else None,
+            },
+        })
+    return results
+
+
 def run() -> dict[str, Any]:
     benchmark = json.loads(BENCHMARK.read_text(encoding="utf-8"))
     cases = _expand_cases(benchmark["cases"])
@@ -188,12 +231,13 @@ def run() -> dict[str, Any]:
                 "safe_rejection": matched if case["expected"].get("not_motion_started") else None,
             },
         })
+    results.extend(_physical_fixture_results())
     totals = {"cases": len(results), "passed": sum(item["passed"] for item in results)}
     applicable = {
         "semantic_parse": [item for item in results if item["layer"] == "semantic"],
         "inquiry_correctness": [item for item in results if item["layer"] == "interaction" and item["observed"].get("status") in {"role_clarification_required", "contextual_affordance_disambiguation_required", "process_slot_clarification_required"}],
         "planning_success": [item for item in results if item["layer"] == "interaction" and item["observed"].get("status") == "motion_started"],
-        "physical_verification": [item for item in results if item["observed"].get("runtime_fact_committed")],
+        "physical_verification": [item for item in results if item["layer"] == "physical"],
     }
     layered_statistics = {}
     for name, items in applicable.items():
@@ -203,6 +247,14 @@ def run() -> dict[str, Any]:
             "pass_rate": (sum(item["passed"] for item in items) / len(items)) if items else None,
             "status": "measured" if items else "not_applicable_in_current_fixture",
         }
+    physical_items = applicable["physical_verification"]
+    layered_statistics["physical_goal_establishment"] = {
+        "applicable_cases": len(physical_items),
+        "passed": sum(bool(item["observed"].get("goal_established")) for item in physical_items),
+        "pass_rate": (sum(bool(item["observed"].get("goal_established")) for item in physical_items) / len(physical_items)) if physical_items else None,
+        "status": "measured" if physical_items else "not_applicable_in_current_fixture",
+        "note": "Failure fixtures are expected to reject safely; this metric is not outcome-classification accuracy.",
+    }
     category_statistics = {}
     for category in sorted({item["category"] for item in results}):
         items = [item for item in results if item["category"] == category]
@@ -211,7 +263,7 @@ def run() -> dict[str, Any]:
             "passed": sum(item["passed"] for item in items),
             "pass_rate": sum(item["passed"] for item in items) / len(items),
         }
-    report = {"schema_version": "1.2.0", "benchmark_id": "p020_natural_language_benchmark_v1", "totals": totals, "pass_rate": totals["passed"] / totals["cases"] if totals["cases"] else 0.0, "layered_statistics": layered_statistics, "category_statistics": category_statistics, "results": results}
+    report = {"schema_version": "1.3.0", "benchmark_id": "p020_natural_language_benchmark_v1", "totals": totals, "pass_rate": totals["passed"] / totals["cases"] if totals["cases"] else 0.0, "layered_statistics": layered_statistics, "category_statistics": category_statistics, "results": results}
     OUTPUT.mkdir(parents=True, exist_ok=True)
     (OUTPUT / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     return report
