@@ -145,17 +145,23 @@ def _expand_cases(cases: list[dict[str, Any]]) -> list[dict[str, Any]]:
     markers = ("刚才", "刚刚", "之前", "先前", "上次", "上回", "方才", "此前")
     verbs = ("拿", "拿起", "取")
     supports = ("桌子", "桌面", "台面")
+    forms = (
+        lambda marker, verb, support: f"把杯子放到{marker}你{verb}过杯子的{support}",
+        lambda marker, verb, support: f"把杯子放到{marker}你{verb}过它的{support}",
+        lambda marker, verb, support: f"把杯子放到{marker}你{verb}过的{support}",
+    )
     index = 0
     for marker in markers:
         for verb in verbs:
             for support in supports:
-                index += 1
-                expanded.append({
-                    "id": f"generated_historical_{index:02d}",
-                    "layer": "semantic",
-                    "utterance": f"把杯子放到{marker}你{verb}过杯子的{support}",
-                    "expected": {"operators_include": "place_object"},
-                })
+                for build in forms:
+                    index += 1
+                    expanded.append({
+                        "id": f"generated_historical_{index:03d}",
+                        "layer": "semantic",
+                        "utterance": build(marker, verb, support),
+                        "expected": {"operators_include": "place_object"},
+                    })
     return expanded
 
 

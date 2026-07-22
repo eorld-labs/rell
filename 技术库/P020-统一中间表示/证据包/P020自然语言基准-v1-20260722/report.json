@@ -2,14 +2,14 @@
   "schema_version": "1.4.0",
   "benchmark_id": "p020_natural_language_benchmark_v1",
   "totals": {
-    "cases": 115,
-    "passed": 115
+    "cases": 259,
+    "passed": 259
   },
   "pass_rate": 1.0,
   "layered_statistics": {
     "semantic_parse": {
-      "applicable_cases": 102,
-      "passed": 102,
+      "applicable_cases": 246,
+      "passed": 246,
       "pass_rate": 1.0,
       "status": "measured"
     },
@@ -20,8 +20,8 @@
       "status": "measured"
     },
     "historical_context": {
-      "applicable_cases": 77,
-      "passed": 77,
+      "applicable_cases": 221,
+      "passed": 221,
       "pass_rate": 1.0,
       "status": "measured"
     },
@@ -80,8 +80,8 @@
       "pass_rate": 1.0
     },
     "指代和历史省略": {
-      "cases": 77,
-      "passed": 77,
+      "cases": 221,
+      "passed": 221,
       "pass_rate": 1.0
     },
     "新概念与未知动词": {
@@ -1137,7 +1137,7 @@
       }
     },
     {
-      "id": "generated_historical_01",
+      "id": "generated_historical_001",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1166,7 +1166,7 @@
       }
     },
     {
-      "id": "generated_historical_02",
+      "id": "generated_historical_002",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1195,7 +1195,7 @@
       }
     },
     {
-      "id": "generated_historical_03",
+      "id": "generated_historical_003",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1224,7 +1224,7 @@
       }
     },
     {
-      "id": "generated_historical_04",
+      "id": "generated_historical_004",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1253,7 +1253,7 @@
       }
     },
     {
-      "id": "generated_historical_05",
+      "id": "generated_historical_005",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1282,7 +1282,7 @@
       }
     },
     {
-      "id": "generated_historical_06",
+      "id": "generated_historical_006",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1311,7 +1311,7 @@
       }
     },
     {
-      "id": "generated_historical_07",
+      "id": "generated_historical_007",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1340,7 +1340,7 @@
       }
     },
     {
-      "id": "generated_historical_08",
+      "id": "generated_historical_008",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1369,7 +1369,7 @@
       }
     },
     {
-      "id": "generated_historical_09",
+      "id": "generated_historical_009",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1398,7 +1398,7 @@
       }
     },
     {
-      "id": "generated_historical_10",
+      "id": "generated_historical_010",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1427,7 +1427,7 @@
       }
     },
     {
-      "id": "generated_historical_11",
+      "id": "generated_historical_011",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1456,7 +1456,7 @@
       }
     },
     {
-      "id": "generated_historical_12",
+      "id": "generated_historical_012",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1485,7 +1485,7 @@
       }
     },
     {
-      "id": "generated_historical_13",
+      "id": "generated_historical_013",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1514,7 +1514,7 @@
       }
     },
     {
-      "id": "generated_historical_14",
+      "id": "generated_historical_014",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1543,7 +1543,7 @@
       }
     },
     {
-      "id": "generated_historical_15",
+      "id": "generated_historical_015",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1572,7 +1572,7 @@
       }
     },
     {
-      "id": "generated_historical_16",
+      "id": "generated_historical_016",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1601,7 +1601,7 @@
       }
     },
     {
-      "id": "generated_historical_17",
+      "id": "generated_historical_017",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1630,7 +1630,7 @@
       }
     },
     {
-      "id": "generated_historical_18",
+      "id": "generated_historical_018",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1659,7 +1659,7 @@
       }
     },
     {
-      "id": "generated_historical_19",
+      "id": "generated_historical_019",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1688,7 +1688,7 @@
       }
     },
     {
-      "id": "generated_historical_20",
+      "id": "generated_historical_020",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1717,7 +1717,7 @@
       }
     },
     {
-      "id": "generated_historical_21",
+      "id": "generated_historical_021",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1746,7 +1746,7 @@
       }
     },
     {
-      "id": "generated_historical_22",
+      "id": "generated_historical_022",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1775,7 +1775,7 @@
       }
     },
     {
-      "id": "generated_historical_23",
+      "id": "generated_historical_023",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1804,7 +1804,7 @@
       }
     },
     {
-      "id": "generated_historical_24",
+      "id": "generated_historical_024",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1833,7 +1833,7 @@
       }
     },
     {
-      "id": "generated_historical_25",
+      "id": "generated_historical_025",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1862,7 +1862,7 @@
       }
     },
     {
-      "id": "generated_historical_26",
+      "id": "generated_historical_026",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1891,7 +1891,7 @@
       }
     },
     {
-      "id": "generated_historical_27",
+      "id": "generated_historical_027",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1920,7 +1920,7 @@
       }
     },
     {
-      "id": "generated_historical_28",
+      "id": "generated_historical_028",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1949,7 +1949,7 @@
       }
     },
     {
-      "id": "generated_historical_29",
+      "id": "generated_historical_029",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -1978,7 +1978,7 @@
       }
     },
     {
-      "id": "generated_historical_30",
+      "id": "generated_historical_030",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2007,7 +2007,7 @@
       }
     },
     {
-      "id": "generated_historical_31",
+      "id": "generated_historical_031",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2036,7 +2036,7 @@
       }
     },
     {
-      "id": "generated_historical_32",
+      "id": "generated_historical_032",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2065,7 +2065,7 @@
       }
     },
     {
-      "id": "generated_historical_33",
+      "id": "generated_historical_033",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2094,7 +2094,7 @@
       }
     },
     {
-      "id": "generated_historical_34",
+      "id": "generated_historical_034",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2123,7 +2123,7 @@
       }
     },
     {
-      "id": "generated_historical_35",
+      "id": "generated_historical_035",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2152,7 +2152,7 @@
       }
     },
     {
-      "id": "generated_historical_36",
+      "id": "generated_historical_036",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2181,7 +2181,7 @@
       }
     },
     {
-      "id": "generated_historical_37",
+      "id": "generated_historical_037",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2210,7 +2210,7 @@
       }
     },
     {
-      "id": "generated_historical_38",
+      "id": "generated_historical_038",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2239,7 +2239,7 @@
       }
     },
     {
-      "id": "generated_historical_39",
+      "id": "generated_historical_039",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2268,7 +2268,7 @@
       }
     },
     {
-      "id": "generated_historical_40",
+      "id": "generated_historical_040",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2297,7 +2297,7 @@
       }
     },
     {
-      "id": "generated_historical_41",
+      "id": "generated_historical_041",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2326,7 +2326,7 @@
       }
     },
     {
-      "id": "generated_historical_42",
+      "id": "generated_historical_042",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2355,7 +2355,7 @@
       }
     },
     {
-      "id": "generated_historical_43",
+      "id": "generated_historical_043",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2384,7 +2384,7 @@
       }
     },
     {
-      "id": "generated_historical_44",
+      "id": "generated_historical_044",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2413,7 +2413,7 @@
       }
     },
     {
-      "id": "generated_historical_45",
+      "id": "generated_historical_045",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2442,7 +2442,7 @@
       }
     },
     {
-      "id": "generated_historical_46",
+      "id": "generated_historical_046",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2471,7 +2471,7 @@
       }
     },
     {
-      "id": "generated_historical_47",
+      "id": "generated_historical_047",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2500,7 +2500,7 @@
       }
     },
     {
-      "id": "generated_historical_48",
+      "id": "generated_historical_048",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2529,7 +2529,7 @@
       }
     },
     {
-      "id": "generated_historical_49",
+      "id": "generated_historical_049",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2558,7 +2558,7 @@
       }
     },
     {
-      "id": "generated_historical_50",
+      "id": "generated_historical_050",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2587,7 +2587,7 @@
       }
     },
     {
-      "id": "generated_historical_51",
+      "id": "generated_historical_051",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2616,7 +2616,7 @@
       }
     },
     {
-      "id": "generated_historical_52",
+      "id": "generated_historical_052",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2645,7 +2645,7 @@
       }
     },
     {
-      "id": "generated_historical_53",
+      "id": "generated_historical_053",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2674,7 +2674,7 @@
       }
     },
     {
-      "id": "generated_historical_54",
+      "id": "generated_historical_054",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2703,7 +2703,7 @@
       }
     },
     {
-      "id": "generated_historical_55",
+      "id": "generated_historical_055",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2732,7 +2732,7 @@
       }
     },
     {
-      "id": "generated_historical_56",
+      "id": "generated_historical_056",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2761,7 +2761,7 @@
       }
     },
     {
-      "id": "generated_historical_57",
+      "id": "generated_historical_057",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2790,7 +2790,7 @@
       }
     },
     {
-      "id": "generated_historical_58",
+      "id": "generated_historical_058",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2819,7 +2819,7 @@
       }
     },
     {
-      "id": "generated_historical_59",
+      "id": "generated_historical_059",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2848,7 +2848,7 @@
       }
     },
     {
-      "id": "generated_historical_60",
+      "id": "generated_historical_060",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2877,7 +2877,7 @@
       }
     },
     {
-      "id": "generated_historical_61",
+      "id": "generated_historical_061",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2906,7 +2906,7 @@
       }
     },
     {
-      "id": "generated_historical_62",
+      "id": "generated_historical_062",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2935,7 +2935,7 @@
       }
     },
     {
-      "id": "generated_historical_63",
+      "id": "generated_historical_063",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2964,7 +2964,7 @@
       }
     },
     {
-      "id": "generated_historical_64",
+      "id": "generated_historical_064",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -2993,7 +2993,7 @@
       }
     },
     {
-      "id": "generated_historical_65",
+      "id": "generated_historical_065",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -3022,7 +3022,7 @@
       }
     },
     {
-      "id": "generated_historical_66",
+      "id": "generated_historical_066",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -3051,7 +3051,7 @@
       }
     },
     {
-      "id": "generated_historical_67",
+      "id": "generated_historical_067",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -3080,7 +3080,7 @@
       }
     },
     {
-      "id": "generated_historical_68",
+      "id": "generated_historical_068",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -3109,7 +3109,7 @@
       }
     },
     {
-      "id": "generated_historical_69",
+      "id": "generated_historical_069",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -3138,7 +3138,7 @@
       }
     },
     {
-      "id": "generated_historical_70",
+      "id": "generated_historical_070",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -3167,7 +3167,7 @@
       }
     },
     {
-      "id": "generated_historical_71",
+      "id": "generated_historical_071",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
@@ -3196,7 +3196,4183 @@
       }
     },
     {
-      "id": "generated_historical_72",
+      "id": "generated_historical_072",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_073",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_074",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_075",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_076",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_077",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_078",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_079",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_080",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_081",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_082",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_083",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_084",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_085",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_086",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_087",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_088",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_089",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_090",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_091",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_092",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_093",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_094",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_095",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_096",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_097",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_098",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_099",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_100",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_101",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_102",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_103",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_104",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_105",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_106",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_107",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_108",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_109",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_110",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_111",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_112",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_113",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_114",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_115",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_116",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_117",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_118",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_119",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_120",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_121",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_122",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_123",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_124",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_125",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_126",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_127",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_128",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_129",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_130",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_131",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_132",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_133",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_134",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_135",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_136",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_137",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_138",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_139",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_140",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_141",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_142",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_143",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_144",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_145",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_146",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_147",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_148",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_149",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_150",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_151",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_152",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_153",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_154",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_155",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_156",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_157",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_158",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_159",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_160",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_161",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_162",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_163",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_164",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_165",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_166",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_167",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_168",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_169",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_170",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_171",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_172",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_173",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_174",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_175",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_176",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_177",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_178",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_179",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_180",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_181",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_182",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_183",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_184",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_185",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_186",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_187",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_188",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_189",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_190",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_191",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_192",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_193",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_194",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_195",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_196",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_197",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_198",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_199",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_200",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_201",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_202",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_203",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_204",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_205",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_206",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_207",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_208",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_209",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_210",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_211",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_212",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_213",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_214",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_215",
+      "category": "指代和历史省略",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      },
+      "diagnostics": {
+        "semantic_parse_correct": true,
+        "role_grounding_correct": null,
+        "historical_context_correct": true,
+        "inquiry_correct": null,
+        "planning_success": null,
+        "physical_verification_passed": null,
+        "safe_rejection": null
+      }
+    },
+    {
+      "id": "generated_historical_216",
       "category": "指代和历史省略",
       "layer": "semantic",
       "passed": true,
