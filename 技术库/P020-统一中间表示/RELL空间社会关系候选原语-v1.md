@@ -26,3 +26,13 @@
 - “操作台A旁边” -> `beside(操作台A)`，要求侧向相对位姿验真；
 - “操作台A附近” -> `near_landmark(操作台A)`，只要求宽松距离范围；
 - “操作台A和操作台B之间” -> `between(操作台A, 操作台B)`，两个参考实体分别落地为稳定 `EntityRef`，规划目标是由二者共同定义的派生空间区域。
+
+关系正反合同已登记在 `schemas/rell_relation_duality_contract_v1.json`：
+
+- `inside` <-> `contains`；
+- `supports` <-> `supported_by`；
+- `held_by` <-> `holds`；
+- `owned_by` <-> `owns`；
+- `accessible_to` <-> `can_be_accessed_by`。
+
+反向投影只生成候选解释，不产生第二事实；物理关系需要 P016 验真，社会关系需要社会证据，可达关系同时需要可达性和权限证据。

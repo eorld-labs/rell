@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0.0",
+  "contract_id": "rell_relation_duality_contract_v1",
+  "status": "candidate_contract",
+  "authority": {
+    "candidate_relation_store": "ephemeral_task_working_memory",
+    "fact_source": "WorldFactLedger",
+    "verification_gateway": "P016",
+    "control_gateway": "P018"
+  },
+  "relations": [
+    {"canonical": "contained_in", "language_positive": "inside", "inverse": "contains", "evidence_class": "physical_boundary", "verification": "inside_container_boundary"},
+    {"canonical": "supported_by", "language_positive": "supports", "inverse": "supports", "evidence_class": "physical_contact", "verification": "stable_support_contact"},
+    {"canonical": "held_by", "language_positive": "held_by", "inverse": "holds", "evidence_class": "possession_contact", "verification": "possession_contact_verified"},
+    {"canonical": "owned_by", "language_positive": "owned_by", "inverse": "owns", "evidence_class": "social_context", "verification": "ownership_evidence_verified"},
+    {"canonical": "accessible_to", "language_positive": "accessible_to", "inverse": "can_be_accessed_by", "evidence_class": "reachability_and_permission", "verification": "reachability_and_permission_verified"}
+  ],
+  "rules": [
+    "inverse_projection_does_not_create_new_fact",
+    "language_relation_is_candidate_until_verified",
+    "social_relation_requires_social_evidence",
+    "physical_relation_requires_p016_verification",
+    "ambiguous_inverse_never_silently_becomes_unique"
+  ]
+}
