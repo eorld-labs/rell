@@ -62,6 +62,72 @@
       "layer": "interaction",
       "utterance": "\u628a\u6728\u8d28\u5bb9\u5668\u653e\u597d",
       "expected": {"not_motion_started": true, "runtime_fact_committed": false}
+    },
+    {
+      "id": "compound_connective_then_variant",
+      "layer": "semantic",
+      "utterance": "\u628a\u676f\u5b50\u653e\u5230\u684c\u9762\uff0c\u7136\u540e\u7528\u9ad8\u811a\u676f\u63a5\u6c34\u7ed9\u6211",
+      "expected": {"operators": ["place_object", "fill_container"], "event_frame_count": 2}
+    },
+    {
+      "id": "compound_connective_next",
+      "layer": "semantic",
+      "utterance": "\u628a\u676f\u5b50\u653e\u5230\u684c\u9762\uff0c\u63a5\u7740\u7528\u9ad8\u811a\u676f\u63a5\u6c34\u7ed9\u6211",
+      "expected": {"operators": ["place_object", "fill_container"], "event_frame_count": 2}
+    },
+    {
+      "id": "compound_connective_afterwards",
+      "layer": "semantic",
+      "utterance": "\u628a\u676f\u5b50\u653e\u5230\u684c\u9762\uff0c\u968f\u540e\u7528\u9ad8\u811a\u676f\u76db\u6c34\u9012\u7ed9\u6211",
+      "expected": {"operators": ["place_object", "fill_container", "handover_object"], "event_frame_count": 2}
+    },
+    {
+      "id": "compound_connective_re_then",
+      "layer": "semantic",
+      "utterance": "\u628a\u676f\u5b50\u653e\u5230\u684c\u9762\uff0c\u518d\u7136\u540e\u7528\u9ad8\u811a\u676f\u63a5\u6c34\u7ed9\u6211",
+      "expected": {"operators": ["place_object", "fill_container"], "event_frame_count": 2}
+    },
+    {
+      "id": "historical_return_just_now",
+      "layer": "semantic",
+      "utterance": "\u4f60\u521a\u521a\u4ece\u684c\u5b50\u4e0a\u62ff\u8d77\u8fc7\u676f\u5b50",
+      "expected": {"operators_include": "grasp_object"}
+    },
+    {
+      "id": "historical_return_before",
+      "layer": "semantic",
+      "utterance": "\u628a\u676f\u5b50\u653e\u56de\u4f60\u521a\u521a\u53d6\u5b83\u7684\u53f0\u9762",
+      "expected": {"operators_include": "place_object"}
+    },
+    {
+      "id": "historical_return_previous_time",
+      "layer": "semantic",
+      "utterance": "\u56de\u5230\u521a\u624d\u53d6\u676f\u5b50\u7684\u5730\u65b9",
+      "expected": {"operators_include": "navigate_to", "temporal_scope": "most_recent_verified_past"}
+    },
+    {
+      "id": "surface_synonym_desktop",
+      "layer": "semantic",
+      "utterance": "\u628a\u767d\u8272\u9a6c\u514b\u676f\u653e\u5728\u684c\u9762",
+      "expected": {"operators": ["place_object"]}
+    },
+    {
+      "id": "surface_synonym_tabletop",
+      "layer": "semantic",
+      "utterance": "\u628a\u767d\u8272\u9a6c\u514b\u676f\u6401\u5728\u53f0\u9762",
+      "expected": {"operators": ["place_object"]}
+    },
+    {
+      "id": "tray_inside_relation",
+      "layer": "semantic",
+      "utterance": "\u628a\u9ad8\u811a\u676f\u653e\u8fdb\u6258\u76d8",
+      "expected": {"operators": ["place_object"], "runtime_fact_committed": false}
+    },
+    {
+      "id": "return_to_recent_pickup_surface",
+      "layer": "semantic",
+      "utterance": "\u628a\u676f\u5b50\u653e\u56de\u521a\u624d\u53d6\u676f\u5b50\u7684\u53f0\u9762",
+      "expected": {"operators_include": "place_object"}
     }
   ]
 }

@@ -2,8 +2,8 @@
   "schema_version": "1.0.0",
   "benchmark_id": "p020_natural_language_benchmark_v1",
   "totals": {
-    "cases": 10,
-    "passed": 10
+    "cases": 21,
+    "passed": 21
   },
   "pass_rate": 1.0,
   "results": [
@@ -190,6 +190,221 @@
         "runtime_fact_committed": false,
         "pending_role": null,
         "template_id": "place_object",
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "compound_connective_then_variant",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object",
+          "fill_container"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": "glass_tall",
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "compound_connective_next",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object",
+          "fill_container"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": "glass_tall",
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "compound_connective_afterwards",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object",
+          "fill_container",
+          "handover_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": "glass_tall",
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "compound_connective_re_then",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object",
+          "fill_container"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": "glass_tall",
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "historical_return_just_now",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "grasp_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "historical_return_before",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "historical_return_previous_time",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "navigate_to",
+          "grasp_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "surface_synonym_desktop",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": "mug_white",
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "surface_synonym_tabletop",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": "mug_white",
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "tray_inside_relation",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": "glass_tall",
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
+        "reported_event_types": []
+      }
+    },
+    {
+      "id": "return_to_recent_pickup_surface",
+      "layer": "semantic",
+      "passed": true,
+      "failures": [],
+      "observed": {
+        "status": null,
+        "operators": [
+          "place_object"
+        ],
+        "speech_act": "task_request",
+        "theme_entity_ref": null,
+        "destination_entity_ref": null,
+        "runtime_fact_committed": false,
+        "pending_role": null,
+        "template_id": null,
         "reported_event_types": []
       }
     }
