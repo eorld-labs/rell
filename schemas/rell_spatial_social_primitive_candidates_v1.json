@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0.0",
+  "registry_id": "rell_spatial_social_primitive_candidates_v1",
+  "status": "candidate_only",
+  "authority": {
+    "candidate_store": "ephemeral_task_working_memory",
+    "fact_source": "WorldFactLedger",
+    "verification_gateway": "P016",
+    "control_gateway": "P018"
+  },
+  "primitives": [
+    {"id": "near_human", "aliases": ["我身边", "我旁边", "靠近我"], "arity": 2, "grounding": "human_reference_and_distance", "planner_contract": "navigate_to_relative_human_zone", "verification": "executor_distance_within_personal_zone"},
+    {"id": "beside", "aliases": ["旁边", "身边", "侧边"], "arity": 2, "grounding": "relative_lateral_position", "planner_contract": "navigate_to_lateral_relation", "verification": "relative_pose_lateral_bound"},
+    {"id": "in_front_of", "aliases": ["前面", "前方"], "arity": 2, "grounding": "reference_heading_frame", "planner_contract": "navigate_to_front_region", "verification": "relative_pose_front_bound"},
+    {"id": "behind", "aliases": ["后面", "后方"], "arity": 2, "grounding": "reference_heading_frame", "planner_contract": "navigate_to_rear_region", "verification": "relative_pose_rear_bound"},
+    {"id": "facing", "aliases": ["面向", "朝向", "对着"], "arity": 2, "grounding": "orientation_against_reference", "planner_contract": "orient_toward_reference", "verification": "orientation_error_bound"},
+    {"id": "between", "aliases": ["中间", "之间"], "arity": 3, "grounding": "two_reference_region", "planner_contract": "navigate_to_between_region", "verification": "inside_between_region"},
+    {"id": "inside", "aliases": ["里面", "内部", "放进"], "arity": 2, "grounding": "container_interior_boundary", "planner_contract": "place_inside_container", "verification": "inside_container_boundary"},
+    {"id": "contains", "aliases": ["装有", "包含", "里面有"], "arity": 2, "grounding": "container_content_relation", "planner_contract": "verify_container_content", "verification": "content_inside_boundary"},
+    {"id": "supports", "aliases": ["承托", "支撑", "放在上面"], "arity": 2, "grounding": "support_surface_contact", "planner_contract": "place_on_support_surface", "verification": "stable_support_contact"},
+    {"id": "held_by", "aliases": ["拿着", "握着", "被拿在手里"], "arity": 2, "grounding": "gripper_or_human_contact", "planner_contract": "transfer_or_grasp_object", "verification": "possession_contact_verified"},
+    {"id": "owned_by", "aliases": ["我的", "属于", "归我"], "arity": 2, "grounding": "social_ownership_context", "planner_contract": "preserve_ownership_policy", "verification": "ownership_evidence_verified"},
+    {"id": "accessible_to", "aliases": ["够得到", "可取用", "能拿到"], "arity": 2, "grounding": "reachability_and_permission", "planner_contract": "check_accessibility_before_action", "verification": "reachability_and_permission_verified"}
+  ],
+  "promotion_policy": ["candidate_concept", "minimal_causal_contract", "active_observation", "new_instance_verification", "promote_or_reject", "language_adapter_generation"]
+}
